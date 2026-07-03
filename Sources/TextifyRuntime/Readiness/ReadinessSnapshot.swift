@@ -16,6 +16,49 @@ public struct ReadinessSnapshot: Equatable, Sendable {
         self.model = model
         self.blockers = blockers
     }
+
+    public init(
+        permissions: RuntimePermissionSnapshot,
+        model: RuntimeModelReadiness
+    ) {
+        self.init(
+            permissions: permissions,
+            model: model,
+            blockers: Self.blockers(permissions: permissions, model: model)
+        )
+    }
+
+    private static func blockers(
+        permissions: RuntimePermissionSnapshot,
+        model: RuntimeModelReadiness
+    ) -> [ReadinessBlocker] {
+        var blockers: [ReadinessBlocker] = []
+
+        if permissions.microphone == .denied {
+            blockers.append(.microphonePermissionDenied)
+        }
+        if permissions.accessibility == .denied {
+            blockers.append(.accessibilityPermissionDenied)
+        }
+        if permissions.inputMonitoring == .denied {
+            blockers.append(.inputMonitoringPermissionDenied)
+        }
+
+        switch model {
+        case .ready:
+            break
+        case let .loading(modelID), let .warming(modelID):
+            blockers.append(.activeModelNotReady(modelID: modelID))
+        case .noActiveModel:
+            blockers.append(.noActiveModel)
+        case let .missing(modelID):
+            blockers.append(.activeModelMissing(modelID: modelID))
+        case let .failed(modelID, _):
+            blockers.append(.transcriptionRuntimeFailed(modelID: modelID))
+        }
+
+        return blockers
+    }
 }
 
 public struct RuntimePermissionSnapshot: Equatable, Sendable {
