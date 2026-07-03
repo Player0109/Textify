@@ -15,6 +15,7 @@ public final class AppDictationService {
     private var triggerStateMachine: TriggerStateMachine
     private var activationTimerToken: UUID?
     private var activeSessionID: UUID?
+    private var insertionSessionID: UUID?
 
     public init(
         dependencies: RuntimeDependencies,
@@ -38,7 +39,11 @@ public final class AppDictationService {
         let preferences = await dependencies.settings.loadPreferences()
         let permissions = await dependencies.permissions.permissionSnapshot()
         let activeModel = await dependencies.models.resolveActiveModel(preferences: preferences)
-        let modelReadiness = await dependencies.models.readiness(for: activeModel)
+        let installedReadiness = await dependencies.models.readiness(for: activeModel)
+        let modelReadiness = await effectiveModelReadiness(
+            activeModel: activeModel,
+            installedReadiness: installedReadiness
+        )
         let snapshot = ReadinessSnapshot(
             permissions: permissions,
             model: modelReadiness
@@ -49,7 +54,16 @@ public final class AppDictationService {
 
     @discardableResult
     public func handleTriggerEvent(_ event: TriggerEvent) async -> TriggerAction {
+        if case .triggerDown = event, !canStartActivation {
+            return .none
+        }
+
         let action = triggerStateMachine.handle(event)
+        if case .triggerUp = event, action == .none, status == .waitingForActivation {
+            activationTimerToken = nil
+            resetTriggerStateMachine()
+            status = .idle
+        }
         if case .speechDetected = event, activeSessionID != nil {
             status = .recording(speechDetected: true)
         }
@@ -62,6 +76,9 @@ public final class AppDictationService {
         case .none:
             return
         case let .startActivationTimer(delayMs):
+            guard canStartActivation else {
+                return
+            }
             startActivationTimer(delayMs: delayMs)
         case .beginRecording:
             await beginRecording()
@@ -70,6 +87,9 @@ public final class AppDictationService {
         case .cancelRecording:
             await cancelActiveSession(reason: .escapeKey)
         case .discardRecording:
+            guard insertionSessionID == nil else {
+                return
+            }
             activationTimerToken = nil
             activeSessionID = nil
             resetTriggerStateMachine()
@@ -82,6 +102,11 @@ public final class AppDictationService {
 
     public func cancelActiveSession(reason: DictationCancellationReason) async {
         activationTimerToken = nil
+        if insertionSessionID != nil {
+            resetTriggerStateMachine()
+            return
+        }
+
         activeSessionID = nil
         resetTriggerStateMachine()
         await dependencies.audio.discardRecording()
@@ -110,8 +135,18 @@ public final class AppDictationService {
     }
 
     private func beginRecording() async {
+        guard !hasActiveDictationWork else {
+            return
+        }
+
+        let sessionID = UUID()
+        activeSessionID = sessionID
         activationTimerToken = nil
         let snapshot = await refreshReadiness()
+        guard activeSessionID == sessionID else {
+            return
+        }
+
         if let blocker = snapshot.blockers.first {
             activeSessionID = nil
             resetTriggerStateMachine()
@@ -120,8 +155,9 @@ public final class AppDictationService {
         }
 
         let preferences = await dependencies.settings.loadPreferences()
-        let sessionID = UUID()
-        activeSessionID = sessionID
+        guard activeSessionID == sessionID else {
+            return
+        }
 
         do {
             try await dependencies.audio.startRecording(
@@ -207,12 +243,14 @@ public final class AppDictationService {
             }
 
             status = .inserting
+            insertionSessionID = sessionID
             let outcome = await dependencies.inserter.insert(InsertionRequest(text: processed))
             guard activeSessionID == sessionID else {
                 return
             }
 
             activeSessionID = nil
+            insertionSessionID = nil
             switch outcome {
             case .pasted:
                 status = .completed(textLengthBucket: Self.textLengthBucket(for: processed.count))
@@ -221,13 +259,59 @@ public final class AppDictationService {
             }
         } catch let error as LiveAudioRecorderError {
             activeSessionID = nil
-            status = error == .emptyRecording ? .cancelled(.noSpeechDetected) : .failed(.audioFinishFailed)
+            insertionSessionID = nil
+            status = Self.status(forAudioFinishError: error)
         } catch is WhisperRuntimeError {
             activeSessionID = nil
+            insertionSessionID = nil
             status = .failed(.transcriptionFailed)
         } catch {
             activeSessionID = nil
+            insertionSessionID = nil
             status = .failed(.transcriptionFailed)
+        }
+    }
+
+    private var canStartActivation: Bool {
+        !hasActiveDictationWork && status != .waitingForActivation
+    }
+
+    private var hasActiveDictationWork: Bool {
+        if activeSessionID != nil || insertionSessionID != nil {
+            return true
+        }
+
+        switch status {
+        case .recording, .processing, .inserting:
+            return true
+        case .idle, .waitingForActivation, .completed, .cancelled, .blocked, .failed:
+            return false
+        }
+    }
+
+    private func effectiveModelReadiness(
+        activeModel: RuntimeActiveModel?,
+        installedReadiness: RuntimeModelReadiness
+    ) async -> RuntimeModelReadiness {
+        guard let activeModel else {
+            return .noActiveModel
+        }
+
+        guard case .ready = installedReadiness else {
+            return installedReadiness
+        }
+
+        let transcriberReadiness = await dependencies.transcriber.readiness
+        switch transcriberReadiness {
+        case let .loading(modelID),
+             let .warming(modelID):
+            return modelID == activeModel.id ? transcriberReadiness : installedReadiness
+        case let .failed(modelID, _):
+            return modelID == activeModel.id ? transcriberReadiness : installedReadiness
+        case let .ready(modelID):
+            return modelID == activeModel.id ? transcriberReadiness : installedReadiness
+        case .noActiveModel, .missing:
+            return installedReadiness
         }
     }
 
@@ -250,6 +334,24 @@ public final class AppDictationService {
             return "201-500"
         default:
             return "501+"
+        }
+    }
+
+    private static func status(forAudioFinishError error: LiveAudioRecorderError) -> DictationRuntimeStatus {
+        switch error {
+        case .emptyRecording:
+            return .cancelled(.noSpeechDetected)
+        case .conversionFailed, .unsupportedInputFormat:
+            return .failed(.audioConversionFailed)
+        case .deviceChangedDuringRecording:
+            return .failed(.microphoneChanged)
+        case .microphonePermissionDenied,
+             .unsupportedInput,
+             .alreadyRecording,
+             .notRecording,
+             .inputNodeUnavailable,
+             .engineStartFailed:
+            return .failed(.audioFinishFailed)
         }
     }
 }

@@ -78,6 +78,79 @@ final class AppDictationServiceTests: XCTestCase {
         XCTAssertEqual(service.status, .recording(speechDetected: false))
     }
 
+    func testReleaseBeforeActivationReturnsIdleAndStaleTimerDoesNotStartAudio() async {
+        let fakes = RuntimeFakes.ready()
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        _ = await service.handleTriggerEvent(.triggerDown(timestampMs: 0))
+        await waitUntil { fakes.clock.sleepCount() == 1 }
+        _ = await service.handleTriggerEvent(.triggerUp(timestampMs: 120))
+
+        fakes.clock.fireOldestSleep(nowMilliseconds: 250)
+        await settle()
+
+        let startCount = await fakes.audio.startCount()
+        XCTAssertEqual(service.status, .idle)
+        XCTAssertEqual(startCount, 0)
+    }
+
+    func testCancellationWhileReadinessLoadIsSuspendedPreventsAudioStart() async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.settings.suspendLoad(callNumber: 1)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        let task = Task { await service.handleTriggerAction(.beginRecording) }
+        await waitUntil { await fakes.settings.suspendedLoadCall() == 1 }
+        await service.cancelActiveSession(reason: .escapeKey)
+        await fakes.settings.releaseLoad()
+        await task.value
+
+        let startCount = await fakes.audio.startCount()
+        XCTAssertEqual(startCount, 0)
+        XCTAssertEqual(service.status, .cancelled(.escapeKey))
+    }
+
+    func testReleaseWhileSettingsLoadIsSuspendedPreventsAudioStart() async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.settings.suspendLoad(callNumber: 2)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        let task = Task { await service.handleTriggerAction(.beginRecording) }
+        await waitUntil { await fakes.settings.suspendedLoadCall() == 2 }
+        await service.handleTriggerAction(.discardRecording)
+        await fakes.settings.releaseLoad()
+        await task.value
+
+        let startCount = await fakes.audio.startCount()
+        XCTAssertEqual(startCount, 0)
+        XCTAssertEqual(service.status, .cancelled(.noSpeechDetected))
+    }
+
+    func testSecondTriggerDuringTranscriptionCannotStealActiveSession() async {
+        let fakes = RuntimeFakes.ready(transcript: "first result", processedText: "first result")
+        await fakes.transcriber.setSuspendUntilReleased(true)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+        let task = Task { await service.handleTriggerAction(.finishRecording) }
+        await waitUntil { await fakes.transcriber.isSuspended() }
+
+        _ = await service.handleTriggerEvent(.triggerDown(timestampMs: 1_000))
+        await settle()
+        if fakes.clock.sleepCount() > 0 {
+            fakes.clock.fireOldestSleep(nowMilliseconds: 1_250)
+        }
+        await settle()
+        await fakes.transcriber.release()
+        await task.value
+
+        let startCount = await fakes.audio.startCount()
+        let insertedTexts = await fakes.inserter.insertedTexts()
+        XCTAssertEqual(startCount, 1)
+        XCTAssertEqual(insertedTexts, ["first result"])
+        XCTAssertEqual(service.status, .completed(textLengthBucket: "1-50"))
+    }
+
     func testSpeechDetectedCallbackUpdatesStatusOnlyForActiveSession() async {
         let fakes = RuntimeFakes.ready()
         let service = AppDictationService(dependencies: fakes.dependencies)
@@ -124,6 +197,27 @@ final class AppDictationServiceTests: XCTestCase {
         XCTAssertEqual(transcribeCount, 0)
     }
 
+    func testTranscriberLoadingReadinessBlocksRefreshAndRecordingStart() async {
+        await assertTranscriberReadinessBlocks(
+            .loading(modelID: RuntimeActiveModel.fixture.id),
+            expectedBlocker: .activeModelNotReady(modelID: RuntimeActiveModel.fixture.id)
+        )
+    }
+
+    func testTranscriberWarmingReadinessBlocksRefreshAndRecordingStart() async {
+        await assertTranscriberReadinessBlocks(
+            .warming(modelID: RuntimeActiveModel.fixture.id),
+            expectedBlocker: .activeModelNotReady(modelID: RuntimeActiveModel.fixture.id)
+        )
+    }
+
+    func testTranscriberFailedReadinessBlocksRefreshAndRecordingStart() async {
+        await assertTranscriberReadinessBlocks(
+            .failed(modelID: RuntimeActiveModel.fixture.id, reason: .warmupFailed),
+            expectedBlocker: .transcriptionRuntimeFailed(modelID: RuntimeActiveModel.fixture.id)
+        )
+    }
+
     func testSuccessfulFinishPreparesTranscribesPostProcessesInsertsAndCompletesWithLengthBucket() async {
         let processed = String(repeating: "a", count: 51)
         let fakes = RuntimeFakes.ready(transcript: "raw transcript", processedText: processed)
@@ -166,6 +260,24 @@ final class AppDictationServiceTests: XCTestCase {
         XCTAssertEqual(service.status, .failed(.insertionFailed))
     }
 
+    func testCancellationDuringInsertionKeepsInsertionOutcome() async {
+        let fakes = RuntimeFakes.ready(processedText: "insert me")
+        await fakes.inserter.setSuspendUntilReleased(true)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+        let task = Task { await service.handleTriggerAction(.finishRecording) }
+        await waitUntil { await fakes.inserter.isSuspended() }
+
+        await service.cancelActiveSession(reason: .escapeKey)
+        await fakes.inserter.release()
+        await task.value
+
+        let insertedTexts = await fakes.inserter.insertedTexts()
+        XCTAssertEqual(insertedTexts, ["insert me"])
+        XCTAssertEqual(service.status, .completed(textLengthBucket: "1-50"))
+    }
+
     func testAudioFinishFailureMapsToFailedAudioFinishFailed() async {
         let fakes = RuntimeFakes.ready()
         await fakes.audio.setFinishError(LiveAudioRecorderError.engineStartFailed)
@@ -192,6 +304,24 @@ final class AppDictationServiceTests: XCTestCase {
         XCTAssertEqual(insertedTexts, [])
     }
 
+    func testAudioConversionFinishErrorsMapToAudioConversionFailed() async {
+        await assertAudioFinishError(
+            LiveAudioRecorderError.conversionFailed,
+            mapsTo: .failed(.audioConversionFailed)
+        )
+        await assertAudioFinishError(
+            LiveAudioRecorderError.unsupportedInputFormat,
+            mapsTo: .failed(.audioConversionFailed)
+        )
+    }
+
+    func testAudioDeviceChangeDuringRecordingMapsToMicrophoneChanged() async {
+        await assertAudioFinishError(
+            LiveAudioRecorderError.deviceChangedDuringRecording,
+            mapsTo: .failed(.microphoneChanged)
+        )
+    }
+
     func testTranscriptionFailureMapsToFailedTranscriptionFailed() async {
         let fakes = RuntimeFakes.ready()
         await fakes.transcriber.setTranscribeError(WhisperRuntimeError.transcriptionFailed("fixture"))
@@ -203,6 +333,43 @@ final class AppDictationServiceTests: XCTestCase {
         XCTAssertEqual(service.status, .failed(.transcriptionFailed))
         let insertedTexts = await fakes.inserter.insertedTexts()
         XCTAssertEqual(insertedTexts, [])
+    }
+
+    private func assertTranscriberReadinessBlocks(
+        _ transcriberReadiness: RuntimeModelReadiness,
+        expectedBlocker: ReadinessBlocker,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.transcriber.setReadiness(transcriberReadiness)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        let snapshot = await service.refreshReadiness()
+        XCTAssertEqual(snapshot.model, transcriberReadiness, file: file, line: line)
+        XCTAssertEqual(snapshot.blockers, [expectedBlocker], file: file, line: line)
+
+        await service.handleTriggerAction(.beginRecording)
+
+        let startCount = await fakes.audio.startCount()
+        XCTAssertEqual(startCount, 0, file: file, line: line)
+        XCTAssertEqual(service.status, .blocked(.readinessBlocked(expectedBlocker)), file: file, line: line)
+    }
+
+    private func assertAudioFinishError(
+        _ error: LiveAudioRecorderError,
+        mapsTo expectedStatus: DictationRuntimeStatus,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.audio.setFinishError(error)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+        await service.handleTriggerAction(.finishRecording)
+
+        XCTAssertEqual(service.status, expectedStatus, file: file, line: line)
     }
 
     private func settle() async {
@@ -338,17 +505,44 @@ private struct RuntimeFakes {
 
 private actor FakeRuntimeSettings: RuntimeSettingsProviding {
     private var preferences: AppPreferences
+    private var loadCallCount = 0
+    private var suspendedLoadCallValue: Int?
+    private var suspendedCallNumbers: Set<Int> = []
+    private var suspensionContinuation: CheckedContinuation<Void, Never>?
 
     init(preferences: AppPreferences) {
         self.preferences = preferences
     }
 
     func loadPreferences() async -> AppPreferences {
+        loadCallCount += 1
+        let callNumber = loadCallCount
+        if suspendedCallNumbers.contains(callNumber) {
+            suspendedLoadCallValue = callNumber
+            await withCheckedContinuation { continuation in
+                suspensionContinuation = continuation
+            }
+        }
         return preferences
     }
 
     func savePreferences(_ preferences: AppPreferences) async {
         self.preferences = preferences
+    }
+
+    func suspendLoad(callNumber: Int) {
+        suspendedCallNumbers.insert(callNumber)
+    }
+
+    func suspendedLoadCall() -> Int? {
+        suspendedLoadCallValue
+    }
+
+    func releaseLoad() {
+        let continuation = suspensionContinuation
+        suspensionContinuation = nil
+        suspendedLoadCallValue = nil
+        continuation?.resume()
     }
 }
 
@@ -474,7 +668,7 @@ private actor FakeRuntimeTranscriber: RuntimeTranscribing {
 
     init(transcript: String) {
         self.transcript = transcript
-        self.readinessValue = .ready(modelID: RuntimeActiveModel.fixture.id)
+        self.readinessValue = .noActiveModel
     }
 
     func prepare(model: RuntimeActiveModel) async throws {
@@ -508,6 +702,10 @@ private actor FakeRuntimeTranscriber: RuntimeTranscribing {
         self.transcribeError = error
     }
 
+    func setReadiness(_ readiness: RuntimeModelReadiness) {
+        self.readinessValue = readiness
+    }
+
     func release() {
         let continuation = suspensionContinuation
         suspensionContinuation = nil
@@ -520,18 +718,39 @@ private actor FakeInsertionService: InsertionService {
         PasteInsertionReport(pasteboardRestored: true, pasteboardRestoreFailed: false)
     )
     private var insertedTextsValue: [String] = []
+    private var suspendUntilReleased = false
+    private var suspensionContinuation: CheckedContinuation<Void, Never>?
 
     func insertedTexts() -> [String] {
         insertedTextsValue
     }
 
+    func isSuspended() -> Bool {
+        suspensionContinuation != nil
+    }
+
     func insert(_ request: InsertionRequest) async -> InsertionOutcome {
         insertedTextsValue.append(request.text)
+        if suspendUntilReleased {
+            await withCheckedContinuation { continuation in
+                suspensionContinuation = continuation
+            }
+        }
         return outcome
     }
 
     func setOutcome(_ outcome: InsertionOutcome) {
         self.outcome = outcome
+    }
+
+    func setSuspendUntilReleased(_ suspendUntilReleased: Bool) {
+        self.suspendUntilReleased = suspendUntilReleased
+    }
+
+    func release() {
+        let continuation = suspensionContinuation
+        suspensionContinuation = nil
+        continuation?.resume()
     }
 }
 
