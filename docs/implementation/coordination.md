@@ -31,3 +31,8 @@ Task 1 must merge before parallel Wave 1 work begins.
 - `DictationControllerTests.testDevelopmentMockCycleRunsSpeechThenReleasePath` proves the mock dictation cycle reaches the speech-detected release path and inserts through the fake insertion path.
 - `DiagnosticsTests.testInsertionEventContainsNoContentFields` plus the mock insertion logger prove diagnostics record only text length buckets and insertion metadata, not dictated content.
 - Verification on 2026-07-03: `swift test` passed 64 tests, and `./script/build_and_run.sh --verify` launched the staged app successfully.
+
+## V1.1 Runtime Target
+- Added TextifyRuntime as the production orchestration target.
+- Domain targets must not import TextifyRuntime; TextifyRuntime adapts domain primitives.
+- AppDictationService is @MainActor because SwiftUI observes its status and readiness.

@@ -76,6 +76,7 @@ let package = Package(
         .library(name: "TextifyHotkeys", targets: ["TextifyHotkeys"]),
         .library(name: "TextifyDiagnostics", targets: ["TextifyDiagnostics"]),
         .library(name: "TextifySettings", targets: ["TextifySettings"]),
+        .library(name: "TextifyRuntime", targets: ["TextifyRuntime"]),
         .library(name: "TextifyWhisperShim", targets: ["TextifyWhisperShim"]),
         .executable(name: "Textify", targets: ["Textify"])
     ],
@@ -139,6 +140,19 @@ let package = Package(
         .target(name: "TextifyHotkeys", dependencies: ["TextifyCore", "TextifyDiagnostics"]),
         .target(name: "TextifyDiagnostics"),
         .target(name: "TextifySettings", dependencies: ["TextifyModels"]),
+        .target(
+            name: "TextifyRuntime",
+            dependencies: [
+                "TextifyCore",
+                "TextifyAudio",
+                "TextifyTranscription",
+                "TextifyModels",
+                "TextifyInsertion",
+                "TextifyHotkeys",
+                "TextifyDiagnostics",
+                "TextifySettings"
+            ]
+        ),
         .executableTarget(
             name: "Textify",
             dependencies: [
@@ -149,7 +163,8 @@ let package = Package(
                 "TextifyInsertion",
                 "TextifyHotkeys",
                 "TextifyDiagnostics",
-                "TextifySettings"
+                "TextifySettings",
+                "TextifyRuntime"
             ]
         ),
         .testTarget(name: "TextifyCoreTests", dependencies: ["TextifyCore"]),
@@ -165,7 +180,8 @@ let package = Package(
         .testTarget(name: "TextifyInsertionTests", dependencies: ["TextifyInsertion"]),
         .testTarget(name: "TextifyHotkeysTests", dependencies: ["TextifyHotkeys"]),
         .testTarget(name: "TextifyDiagnosticsTests", dependencies: ["TextifyDiagnostics"]),
-        .testTarget(name: "TextifySettingsTests", dependencies: ["TextifySettings"])
+        .testTarget(name: "TextifySettingsTests", dependencies: ["TextifySettings"]),
+        .testTarget(name: "TextifyRuntimeTests", dependencies: ["TextifyRuntime"])
     ],
     cLanguageStandard: .c11,
     cxxLanguageStandard: .cxx17

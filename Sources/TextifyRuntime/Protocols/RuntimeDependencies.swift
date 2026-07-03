@@ -1,0 +1,108 @@
+import TextifyAudio
+import TextifyCore
+import TextifyDiagnostics
+import TextifyInsertion
+import TextifyModels
+import TextifySettings
+import TextifyTranscription
+
+public struct RuntimeActiveModel: Equatable, Sendable {
+    public let id: String
+    public let displayName: String
+    public let tier: String
+    public let localModelPath: String
+    public let useGPU: Bool
+    public let threadCount: Int?
+
+    public init(
+        id: String,
+        displayName: String,
+        tier: String,
+        localModelPath: String,
+        useGPU: Bool,
+        threadCount: Int?
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.tier = tier
+        self.localModelPath = localModelPath
+        self.useGPU = useGPU
+        self.threadCount = threadCount
+    }
+}
+
+public struct RuntimeDependencies: Sendable {
+    public let settings: any RuntimeSettingsProviding
+    public let permissions: any RuntimePermissionChecking
+    public let models: any RuntimeModelResolving
+    public let audio: any RuntimeAudioRecording
+    public let transcriber: any RuntimeTranscribing
+    public let inserter: any InsertionService
+    public let diagnostics: any RuntimeDiagnosticsLogging
+    public let postProcessor: any RuntimePostProcessing
+    public let clock: any RuntimeClock
+
+    public init(
+        settings: any RuntimeSettingsProviding,
+        permissions: any RuntimePermissionChecking,
+        models: any RuntimeModelResolving,
+        audio: any RuntimeAudioRecording,
+        transcriber: any RuntimeTranscribing,
+        inserter: any InsertionService,
+        diagnostics: any RuntimeDiagnosticsLogging,
+        postProcessor: any RuntimePostProcessing,
+        clock: any RuntimeClock
+    ) {
+        self.settings = settings
+        self.permissions = permissions
+        self.models = models
+        self.audio = audio
+        self.transcriber = transcriber
+        self.inserter = inserter
+        self.diagnostics = diagnostics
+        self.postProcessor = postProcessor
+        self.clock = clock
+    }
+}
+
+public protocol RuntimeSettingsProviding: Sendable {
+    func loadPreferences() async -> AppPreferences
+    func savePreferences(_ preferences: AppPreferences) async
+}
+
+public protocol RuntimePermissionChecking: Sendable {
+    func permissionSnapshot() async -> RuntimePermissionSnapshot
+}
+
+public protocol RuntimeModelResolving: Sendable {
+    func resolveActiveModel(preferences: AppPreferences) async -> RuntimeActiveModel?
+    func readiness(for model: RuntimeActiveModel?) async -> RuntimeModelReadiness
+}
+
+public protocol RuntimeAudioRecording: Sendable {
+    func startRecording(
+        microphone: MicrophoneSelection,
+        onSpeechDetected: @escaping @Sendable () -> Void
+    ) async throws
+    func finishRecording() async throws -> CanonicalAudioBuffer
+    func discardRecording() async
+}
+
+public protocol RuntimeTranscribing: Sendable {
+    var readiness: RuntimeModelReadiness { get async }
+    func prepare(model: RuntimeActiveModel) async throws
+    func transcribe(_ audio: TranscriptionAudioBuffer) async throws -> TranscriptionResult
+}
+
+public protocol RuntimeDiagnosticsLogging: Sendable {
+    func log(_ event: DiagnosticEvent) async
+}
+
+public protocol RuntimePostProcessing: Sendable {
+    func process(rawText: String, preferences: AppPreferences) async -> String
+}
+
+public protocol RuntimeClock: Sendable {
+    func nowMilliseconds() -> Int
+    func sleep(milliseconds: Int) async
+}
