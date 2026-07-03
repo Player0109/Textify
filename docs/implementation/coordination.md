@@ -22,3 +22,12 @@ Task 1 must merge before parallel Wave 1 work begins.
   - The disabled-runtime C probe name is emitted with token pasting in `TextifyWhisperShim.h` so the required ABI exists while the required source grep remains clean.
 - Native boundary tests were added in `Tests/TextifyTranscriptionTests/NativeWhisperBoundaryTests.swift`. The Task 13 plan's commit command omits this test path, so the final commit needs an explicit decision to include or leave this test uncommitted.
 - Manual real-model smoke status: not run in this task; no curated real model file was present or provided in the workspace. The no-model boundary is covered by automated tests.
+
+## Task 15 Mock Integration Proof
+
+- `AppServices` owns the memory settings store, privacy-safe diagnostics logger, preview model catalog, mock transcription provider, fake insertion service, and dictation controller.
+- Debug builds expose `Run Mock Dictation` from the menu bar extra. The action is inside `#if DEBUG`, so Release builds hide it before V1 release.
+- `Show Onboarding` opens the onboarding window scene, and `Settings...` opens the settings scene with shared service state.
+- `DictationControllerTests.testDevelopmentMockCycleRunsSpeechThenReleasePath` proves the mock dictation cycle reaches the speech-detected release path and inserts through the fake insertion path.
+- `DiagnosticsTests.testInsertionEventContainsNoContentFields` plus the mock insertion logger prove diagnostics record only text length buckets and insertion metadata, not dictated content.
+- Verification on 2026-07-03: `swift test` passed 64 tests, and `./script/build_and_run.sh --verify` launched the staged app successfully.

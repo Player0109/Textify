@@ -128,4 +128,17 @@ final class DictationControllerTests: XCTestCase {
         XCTAssertEqual(startedRecordingCount, 1)
         XCTAssertEqual(insertedTexts, ["first"])
     }
+
+    func testDevelopmentMockCycleRunsSpeechThenReleasePath() async {
+        let controller = DictationController.fakingEverything(transcript: "mock dictation")
+
+        await controller.runDevelopmentMockCycle()
+
+        let state = await controller.state
+        let finishedRecordingCount = await controller.fakeAudio.finishedRecordingCount
+        let insertedTexts = await controller.fakeInsertion.insertedTexts
+        XCTAssertEqual(state, .idle)
+        XCTAssertEqual(finishedRecordingCount, 1)
+        XCTAssertEqual(insertedTexts, ["mock dictation"])
+    }
 }

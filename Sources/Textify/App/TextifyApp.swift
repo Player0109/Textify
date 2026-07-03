@@ -15,5 +15,10 @@ struct TextifyApp: App {
             SettingsRootView()
                 .environment(services)
         }
+
+        Window("Textify Onboarding", id: "onboarding") {
+            OnboardingRootView()
+                .environment(services)
+        }
     }
 }

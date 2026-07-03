@@ -48,19 +48,19 @@ struct SettingsRootView: View {
 }
 
 private struct GeneralSettingsPane: View {
-    @State private var launchAtLogin = true
-    @State private var showInDock = false
-    @State private var automaticallyCheckForUpdates = true
+    @Environment(AppServices.self) private var services
 
     var body: some View {
+        @Bindable var services = services
+
         SettingsPaneLayout(title: "General") {
             SettingsSection("Startup") {
-                Toggle("Launch at Login", isOn: $launchAtLogin)
-                Toggle("Show in Dock", isOn: $showInDock)
+                Toggle("Launch at Login", isOn: $services.preferences.launchAtLoginRequestedByOnboarding)
+                Toggle("Show in Dock", isOn: $services.preferences.showInDock)
             }
 
             SettingsSection("Updates") {
-                Toggle("Automatically check for updates", isOn: $automaticallyCheckForUpdates)
+                Toggle("Automatically check for updates", isOn: $services.preferences.automaticallyCheckForUpdates)
                 Button("Check for Updates Now") {}
                     .disabled(true)
             }
@@ -68,6 +68,9 @@ private struct GeneralSettingsPane: View {
             SettingsSection("Version") {
                 LabeledContent("App Version", value: "0.1.0")
             }
+        }
+        .onChange(of: services.preferences) { _, _ in
+            services.savePreferences()
         }
     }
 }
@@ -104,21 +107,21 @@ private struct DictationSettingsPane: View {
 }
 
 private struct ModelsSettingsPane: View {
-    private let models = [
-        MockModelRow(tier: "Fast", name: "Whisper base.en", size: "TBD"),
-        MockModelRow(tier: "Balanced", name: "Whisper small.en", size: "TBD"),
-        MockModelRow(tier: "Accurate", name: "Whisper medium.en", size: "TBD")
-    ]
+    @Environment(AppServices.self) private var services
 
     var body: some View {
         SettingsPaneLayout(title: "Models") {
             SettingsSection("Installed Model") {
-                Text("No model installed.")
-                    .foregroundStyle(.secondary)
+                if let activeModelID = services.modelCatalog.activeModelID {
+                    LabeledContent("Active Model ID", value: activeModelID)
+                } else {
+                    Text("No model installed.")
+                        .foregroundStyle(.secondary)
+                }
             }
 
             SettingsSection("Curated Models") {
-                ForEach(models) { model in
+                ForEach(services.modelCatalog.curatedModels) { model in
                     HStack(alignment: .firstTextBaseline) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(model.tier)
@@ -195,6 +198,7 @@ private struct PrivacySettingsPane: View {
 }
 
 private struct AdvancedSettingsPane: View {
+    @Environment(AppServices.self) private var services
     @State private var developerMode = false
 
     var body: some View {
@@ -216,6 +220,7 @@ private struct AdvancedSettingsPane: View {
                 LabeledContent("Active Runtime", value: "Mock")
                 LabeledContent("Metal Acceleration", value: "Not loaded")
                 LabeledContent("Thread Count", value: "Automatic")
+                LabeledContent("Mock Dictation", value: services.mockDictationStatus.menuTitle ?? "Idle")
             }
 
             SettingsSection("Developer Mode") {
@@ -288,11 +293,4 @@ private struct PermissionRow: View {
                 .disabled(true)
         }
     }
-}
-
-private struct MockModelRow: Identifiable {
-    let id = UUID()
-    let tier: String
-    let name: String
-    let size: String
 }

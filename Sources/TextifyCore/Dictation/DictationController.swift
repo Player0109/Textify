@@ -60,6 +60,13 @@ public actor DictationController {
         }
     }
 
+    public func runDevelopmentMockCycle() async {
+        await handle(.triggerDown(timestampMs: 0))
+        await handle(.activationThresholdPassed(timestampMs: 250))
+        await handle(.speechDetected(timestampMs: 400))
+        await handle(.triggerUp(timestampMs: 900))
+    }
+
     private func handleTriggerUp() async {
         switch state {
         case .armed:
