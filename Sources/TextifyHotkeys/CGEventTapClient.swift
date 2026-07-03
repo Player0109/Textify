@@ -1,6 +1,12 @@
 import CoreGraphics
 import Foundation
 
+public enum CGEventTapMessage: Equatable, Sendable {
+    case keyboardEvent(KeyboardEventSnapshot)
+    case tapDisabledByTimeout
+    case tapDisabledByUserInput
+}
+
 public struct CGEventTapHandle: @unchecked Sendable {
     fileprivate let port: CFMachPort?
     fileprivate let source: CFRunLoopSource?
@@ -20,14 +26,15 @@ public struct CGEventTapHandle: @unchecked Sendable {
 }
 
 public protocol CGEventTapClient: Sendable {
-    func start(handler: @escaping @Sendable (KeyboardEventSnapshot) -> Void) throws -> CGEventTapHandle
+    func start(handler: @escaping @Sendable (CGEventTapMessage) -> Void) throws -> CGEventTapHandle
+    func setEnabled(_ handle: CGEventTapHandle, enabled: Bool)
     func stop(_ handle: CGEventTapHandle)
 }
 
 public final class SystemCGEventTapClient: CGEventTapClient, @unchecked Sendable {
     public init() {}
 
-    public func start(handler: @escaping @Sendable (KeyboardEventSnapshot) -> Void) throws -> CGEventTapHandle {
+    public func start(handler: @escaping @Sendable (CGEventTapMessage) -> Void) throws -> CGEventTapHandle {
         let mask = (CGEventMask(1) << CGEventType.flagsChanged.rawValue)
             | (CGEventMask(1) << CGEventType.keyDown.rawValue)
         let box = EventHandlerBox(handler: handler)
@@ -42,8 +49,16 @@ public final class SystemCGEventTapClient: CGEventTapClient, @unchecked Sendable
                     return Unmanaged.passUnretained(event)
                 }
                 let box = Unmanaged<EventHandlerBox>.fromOpaque(refcon).takeUnretainedValue()
+                if type == .tapDisabledByTimeout {
+                    box.handler(.tapDisabledByTimeout)
+                    return Unmanaged.passUnretained(event)
+                }
+                if type == .tapDisabledByUserInput {
+                    box.handler(.tapDisabledByUserInput)
+                    return Unmanaged.passUnretained(event)
+                }
                 if let snapshot = KeyboardEventSnapshot(event: event, type: type) {
-                    box.handler(snapshot)
+                    box.handler(.keyboardEvent(snapshot))
                 }
                 return Unmanaged.passUnretained(event)
             },
@@ -62,13 +77,20 @@ public final class SystemCGEventTapClient: CGEventTapClient, @unchecked Sendable
         return CGEventTapHandle(port: port, source: source, refcon: refcon)
     }
 
+    public func setEnabled(_ handle: CGEventTapHandle, enabled: Bool) {
+        guard let port = handle.port else {
+            return
+        }
+        CGEvent.tapEnable(tap: port, enable: enabled)
+    }
+
     public func stop(_ handle: CGEventTapHandle) {
         guard let port = handle.port,
               let source = handle.source,
               let refcon = handle.refcon else {
             return
         }
-        CGEvent.tapEnable(tap: port, enable: false)
+        setEnabled(handle, enabled: false)
         CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
         CFMachPortInvalidate(port)
         Unmanaged<EventHandlerBox>.fromOpaque(refcon).release()
@@ -76,9 +98,9 @@ public final class SystemCGEventTapClient: CGEventTapClient, @unchecked Sendable
 }
 
 private final class EventHandlerBox: @unchecked Sendable {
-    let handler: @Sendable (KeyboardEventSnapshot) -> Void
+    let handler: @Sendable (CGEventTapMessage) -> Void
 
-    init(handler: @escaping @Sendable (KeyboardEventSnapshot) -> Void) {
+    init(handler: @escaping @Sendable (CGEventTapMessage) -> Void) {
         self.handler = handler
     }
 }
