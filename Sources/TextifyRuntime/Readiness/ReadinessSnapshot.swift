@@ -34,10 +34,10 @@ public struct ReadinessSnapshot: Equatable, Sendable {
     ) -> [ReadinessBlocker] {
         var blockers: [ReadinessBlocker] = []
 
-        if permissions.microphone == .denied {
+        if permissions.microphone != .granted {
             blockers.append(.microphonePermissionDenied)
         }
-        if permissions.accessibility == .denied {
+        if permissions.accessibility != .granted {
             blockers.append(.accessibilityPermissionDenied)
         }
         if permissions.inputMonitoring != .granted {

@@ -19,13 +19,15 @@ public struct TriggerTestSessionResult: Equatable, Sendable {
 }
 
 public actor TriggerTestSession {
-    private var stateMachine = TriggerStateMachine()
+    private var stateMachine: TriggerStateMachine
     private var sawDown = false
     private var sawBeginRecording = false
     private var sawUp = false
     private var wasCancelled = false
 
-    public init() {}
+    public init(activationDelayMs: Int = 250) {
+        self.stateMachine = TriggerStateMachine(activationDelayMs: activationDelayMs)
+    }
 
     public func ingest(_ event: TriggerEvent) -> TriggerTestSessionResult {
         if case .triggerDown = event { sawDown = true }
