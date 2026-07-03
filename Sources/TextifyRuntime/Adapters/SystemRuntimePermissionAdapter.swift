@@ -26,13 +26,6 @@ public struct SystemRuntimePermissionAdapter: RuntimePermissionChecking {
     }
 
     private func inputMonitoringState() -> RuntimePermissionState {
-        switch inputMonitoring.status() {
-        case .granted:
-            return .granted
-        case .denied:
-            return .denied
-        case .unknown:
-            return .unknown
-        }
+        inputMonitoring.status() == .granted ? .granted : .unknown
     }
 }

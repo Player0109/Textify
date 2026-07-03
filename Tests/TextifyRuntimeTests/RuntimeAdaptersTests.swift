@@ -128,7 +128,7 @@ final class RuntimeAdaptersTests: XCTestCase {
         XCTAssertEqual(readiness, .noActiveModel)
     }
 
-    func testPermissionAdapterMapsDomainClients() async {
+    func testPermissionAdapterMapsDeniedInputMonitoringToUnknown() async {
         let adapter = SystemRuntimePermissionAdapter(
             microphone: MicrophonePermissionClient(
                 status: { .granted },
@@ -145,7 +145,27 @@ final class RuntimeAdaptersTests: XCTestCase {
 
         XCTAssertEqual(snapshot.microphone, .granted)
         XCTAssertEqual(snapshot.accessibility, .denied)
-        XCTAssertEqual(snapshot.inputMonitoring, .denied)
+        XCTAssertEqual(snapshot.inputMonitoring, .unknown)
+    }
+
+    func testPermissionAdapterMapsUnknownInputMonitoringToUnknown() async {
+        let adapter = SystemRuntimePermissionAdapter(
+            microphone: MicrophonePermissionClient(
+                status: { .granted },
+                requestAccess: { .granted }
+            ),
+            inputMonitoring: InputMonitoringPermissionClient(
+                status: { .unknown },
+                requestAccess: { .denied }
+            ),
+            accessibility: AccessibilityTrustClient(status: { .trusted })
+        )
+
+        let snapshot = await adapter.permissionSnapshot()
+
+        XCTAssertEqual(snapshot.microphone, .granted)
+        XCTAssertEqual(snapshot.accessibility, .granted)
+        XCTAssertEqual(snapshot.inputMonitoring, .unknown)
     }
 
     func testSystemRuntimeClockReturnsMillisecondsAndSleepsForNonNegativeDurations() async {
