@@ -29,6 +29,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		047F02C7C6B402C590F2375D /* Textify */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Textify; path = .; sourceTree = SOURCE_ROOT; };
 		0DE762BA89473A6795A5D976 /* AppServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServices.swift; sourceTree = "<group>"; };
 		22DFC5ADE2174CBEA8D692D7 /* RecordingOverlayWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingOverlayWindow.swift; sourceTree = "<group>"; };
 		35A0D6F1EF4A7DB14D99D2D6 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -36,7 +37,6 @@
 		5F80B1907E994ACF795B14A1 /* TextifyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextifyApp.swift; sourceTree = "<group>"; };
 		6CF0AB1D69531402DCE40D70 /* AppPaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPaths.swift; sourceTree = "<group>"; };
 		77EBF4271CB3FC9AE19B1DE5 /* LaunchAtLoginController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginController.swift; sourceTree = "<group>"; };
-		957E54D6FC97EC16F4E376D2 /* Textify */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Textify; path = .; sourceTree = SOURCE_ROOT; };
 		AC943A14D084BC8D112A71EB /* SettingsRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRootView.swift; sourceTree = "<group>"; };
 		C32C98F05AD92486666F9717 /* MenuBarRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarRoot.swift; sourceTree = "<group>"; };
 		F0C61DAF2351DEC5C3365040 /* Textify.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Textify.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -130,7 +130,7 @@
 		88237D86D1E7014C985840AD /* Packages */ = {
 			isa = PBXGroup;
 			children = (
-				957E54D6FC97EC16F4E376D2 /* Textify */,
+				047F02C7C6B402C590F2375D /* Textify */,
 			);
 			name = Packages;
 			sourceTree = "<group>";
