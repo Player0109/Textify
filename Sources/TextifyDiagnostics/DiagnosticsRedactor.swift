@@ -112,18 +112,105 @@ enum DiagnosticsStringSanitizer {
     ]
 
     static func sanitize(_ value: String, forKey key: String) -> String {
-        let lowercased = value.lowercased()
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let allowedValues = closedValueAllowlists[key] {
+            return allowedValues.contains(normalized) ? normalized : unknownValue
+        }
+
+        let lowercased = normalized.lowercased()
         if forbiddenFragments.contains(where: { lowercased.contains($0) }) {
             return redactedValue
         }
 
         if shouldCheckForBundleIdentifierLikeToken(forKey: key),
-           containsBundleIdentifierLikeToken(value) {
+           containsBundleIdentifierLikeToken(normalized) {
             return redactedValue
         }
 
-        return value
+        return normalized
     }
+
+    private static let unknownValue = "unknown"
+
+    private static let closedValueAllowlists: [String: Set<String>] = [
+        "appLocationCategory": [
+            "applications",
+            "not_found",
+            "unsupported",
+            "user_applications",
+            unknownValue
+        ],
+        "event": [
+            "app_started",
+            "dictation_blocked_excluded_app",
+            "insertion_attempt",
+            "launch_at_login_change",
+            "model_load",
+            "speech_recognition_completed",
+            unknownValue
+        ],
+        "fallbackBlockedReason": [
+            "control_characters_present",
+            "empty_text",
+            "paste_outcome_unobservable",
+            "secure_field_detected",
+            "target_changed",
+            "text_too_long",
+            unknownValue
+        ],
+        "manifestSource": [
+            "bundled",
+            "cached",
+            "remote",
+            unknownValue
+        ],
+        "requestedAction": [
+            "disable",
+            "enable",
+            unknownValue
+        ],
+        "result": [
+            "failed",
+            "failure",
+            "missing_model",
+            "ready",
+            "success",
+            "unavailable",
+            "unloaded",
+            unknownValue
+        ],
+        "statusAfter": [
+            "enabled",
+            "error",
+            "notFound",
+            "notRegistered",
+            "requiresApproval",
+            unknownValue
+        ],
+        "statusBefore": [
+            "enabled",
+            "error",
+            "notFound",
+            "notRegistered",
+            "requiresApproval",
+            unknownValue
+        ],
+        "textLengthBucket": [
+            "0",
+            "1-50",
+            "51-200",
+            "201-500",
+            "501+",
+            unknownValue
+        ],
+        "tier": [
+            "accurate",
+            "balanced",
+            "fast",
+            unknownValue
+        ]
+    ]
 
     private static func shouldCheckForBundleIdentifierLikeToken(forKey key: String) -> Bool {
         key != "appVersion" && key != "macOSVersion"

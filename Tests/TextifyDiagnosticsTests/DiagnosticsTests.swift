@@ -170,7 +170,8 @@ final class DiagnosticsTests: XCTestCase {
 
         XCTAssertTrue(redacted.contains("app_started"))
         XCTAssertTrue(redacted.contains("1.0.0"))
-        XCTAssertTrue(redacted.contains("[redacted]"))
+        XCTAssertTrue(redacted.contains(#""fallbackBlockedReason":"unknown""#))
+        XCTAssertTrue(redacted.contains(#""result":"unknown""#))
         XCTAssertFalse(redacted.localizedCaseInsensitiveContains("transcript"))
         XCTAssertFalse(redacted.localizedCaseInsensitiveContains("clipboard"))
         XCTAssertFalse(redacted.localizedCaseInsensitiveContains("TEXTIFY_FORBIDDEN_MARKER"))
@@ -188,9 +189,75 @@ final class DiagnosticsTests: XCTestCase {
 
         let json = String(decoding: try JSONEncoder().encode(event), as: UTF8.self)
 
-        XCTAssertTrue(json.contains("[redacted]"))
+        XCTAssertTrue(json.contains(#""result":"unknown""#))
         XCTAssertFalse(json.localizedCaseInsensitiveContains("raw error"))
         XCTAssertFalse(json.localizedCaseInsensitiveContains("transcript"))
+    }
+
+    func testResultWithRawPathOrOrdinaryPhraseIsNormalized() throws {
+        let event = DiagnosticEvent.modelLoad(
+            modelID: "ggml-small.en-q5_1",
+            tier: "fast",
+            durationMs: 42,
+            result: "/Users/alice/Library/Application Support/Textify/model load failed"
+        )
+
+        let json = String(decoding: try JSONEncoder().encode(event), as: UTF8.self)
+
+        XCTAssertTrue(json.contains(#""result":"unknown""#))
+        XCTAssertFalse(json.contains("/Users/alice"))
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("Library/Application Support"))
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("model load failed"))
+    }
+
+    func testUnknownFallbackBlockedReasonIsNormalized() throws {
+        let event = DiagnosticEvent.insertionAttempt(
+            textLengthBucket: "1-50",
+            pasteboardSnapshotSucceeded: true,
+            pasteboardWriteSucceeded: true,
+            pasteEventPosted: false,
+            fallbackAttempted: false,
+            fallbackBlockedReason: "target editor rejected paste because the note is locked",
+            durationMs: 12
+        )
+
+        let json = String(decoding: try JSONEncoder().encode(event), as: UTF8.self)
+
+        XCTAssertTrue(json.contains(#""fallbackBlockedReason":"unknown""#))
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("target editor"))
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("note is locked"))
+    }
+
+    func testInsertionAttemptNormalizesUnexpectedTextLengthBucket() throws {
+        let event = DiagnosticEvent.insertionAttempt(
+            textLengthBucket: "approximately one paragraph",
+            pasteboardSnapshotSucceeded: true,
+            pasteboardWriteSucceeded: true,
+            pasteEventPosted: true,
+            fallbackAttempted: false,
+            fallbackBlockedReason: nil,
+            durationMs: 12
+        )
+
+        let json = String(decoding: try JSONEncoder().encode(event), as: UTF8.self)
+
+        XCTAssertTrue(json.contains(#""textLengthBucket":"unknown""#))
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("approximately one paragraph"))
+    }
+
+    func testRedactorNormalizesUnknownEnumLikeAllowedStringValues() throws {
+        let line = #"""
+        {"event":"model_load","result":"operation failed while opening /Users/alice/model.bin","fallbackBlockedReason":"target editor rejected paste because the note is locked","textLengthBucket":"approximately one paragraph","appVersion":"1.0.0"}
+        """#
+
+        let redacted = try XCTUnwrap(DiagnosticsRedactor().redactJSONLine(line))
+
+        XCTAssertTrue(redacted.contains(#""result":"unknown""#))
+        XCTAssertTrue(redacted.contains(#""fallbackBlockedReason":"unknown""#))
+        XCTAssertTrue(redacted.contains(#""textLengthBucket":"unknown""#))
+        XCTAssertFalse(redacted.contains("/Users/alice"))
+        XCTAssertFalse(redacted.localizedCaseInsensitiveContains("target editor"))
+        XCTAssertFalse(redacted.localizedCaseInsensitiveContains("approximately one paragraph"))
     }
 
     func testExporterSkipsSymlinkedAndNonRegularMatchingLogFiles() throws {

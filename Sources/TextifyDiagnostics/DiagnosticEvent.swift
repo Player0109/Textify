@@ -73,7 +73,7 @@ public enum DiagnosticEvent: Encodable, Sendable {
             durationMs
         ):
             try container.encode("insertion_attempt", forKey: .event)
-            try container.encode(textLengthBucket, forKey: .textLengthBucket)
+            try container.encode(sanitize(textLengthBucket, forKey: .textLengthBucket), forKey: .textLengthBucket)
             try container.encode(pasteboardSnapshotSucceeded, forKey: .pasteboardSnapshotSucceeded)
             try container.encode(pasteboardWriteSucceeded, forKey: .pasteboardWriteSucceeded)
             try container.encode(pasteEventPosted, forKey: .pasteEventPosted)
