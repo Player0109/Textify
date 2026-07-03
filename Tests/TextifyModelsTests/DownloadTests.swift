@@ -42,16 +42,18 @@ final class DownloadTests: XCTestCase {
                 data: try Self.fixtureData("manifest.json.sig")
             )
         ])
-        let downloader = ModelDownloader(transport: transport)
+        let downloader = ModelDownloader(
+            transport: transport,
+            manifestVerifier: try Self.fixtureManifestVerifier()
+        )
 
         let manifest = try await downloader.downloadManifest(
             manifestURL: URL(string: "https://example.com/manifest.json")!,
-            signatureURL: URL(string: "https://example.com/manifest.json.sig")!,
-            publicKeyBase64: try Self.fixtureString("manifest.fixture-public-key.base64")
+            signatureURL: URL(string: "https://example.com/manifest.json.sig")!
         )
 
         XCTAssertEqual(manifest.manifestVersion, 1)
-        XCTAssertEqual(manifest.models.first?.id, "whisper-base-en-fast")
+        XCTAssertEqual(manifest.models.first?.id, ProductionModelPolicy.requiredModelID)
         XCTAssertEqual(transport.requestedURLs, [
             URL(string: "https://example.com/manifest.json")!,
             URL(string: "https://example.com/manifest.json.sig")!
@@ -67,18 +69,60 @@ final class DownloadTests: XCTestCase {
                 data: try Self.fixtureData("manifest.json.sig")
             )
         ])
-        let downloader = ModelDownloader(transport: transport)
+        let downloader = ModelDownloader(
+            transport: transport,
+            manifestVerifier: try Self.fixtureManifestVerifier()
+        )
 
         do {
             _ = try await downloader.downloadManifest(
                 manifestURL: URL(string: "https://example.com/manifest.json")!,
-                signatureURL: URL(string: "https://example.com/manifest.json.sig")!,
-                publicKeyBase64: try Self.fixtureString("manifest.fixture-public-key.base64")
+                signatureURL: URL(string: "https://example.com/manifest.json.sig")!
             )
             XCTFail("Expected manifest verification to reject tampered bytes")
-        } catch ManifestVerificationError.contentHashMismatch {
+        } catch ManifestVerificationError.signatureRejected {
             // Expected path from ManifestVerifier.
         }
+    }
+
+    func testManifestDownloadRejectsNonHTTPSManifestURLBeforeTransport() async throws {
+        let transport = FixtureDownloadTransport(responses: [:])
+        let downloader = ModelDownloader(
+            transport: transport,
+            manifestVerifier: try Self.fixtureManifestVerifier()
+        )
+        let manifestURL = URL(string: "http://player0109.github.io/Textify/models/manifest.json")!
+
+        do {
+            _ = try await downloader.downloadManifest(
+                manifestURL: manifestURL,
+                signatureURL: URL(string: "https://player0109.github.io/Textify/models/manifest.json.sig")!
+            )
+            XCTFail("Expected non-HTTPS manifest URL rejection")
+        } catch let error as ModelDownloadPolicyError {
+            XCTAssertEqual(error, .nonHTTPSURL(manifestURL.absoluteString))
+        }
+        XCTAssertEqual(transport.requestedURLs, [])
+    }
+
+    func testManifestDownloadRejectsNonHTTPSSignatureURLBeforeTransport() async throws {
+        let transport = FixtureDownloadTransport(responses: [:])
+        let downloader = ModelDownloader(
+            transport: transport,
+            manifestVerifier: try Self.fixtureManifestVerifier()
+        )
+        let signatureURL = URL(string: "http://player0109.github.io/Textify/models/manifest.json.sig")!
+
+        do {
+            _ = try await downloader.downloadManifest(
+                manifestURL: URL(string: "https://player0109.github.io/Textify/models/manifest.json")!,
+                signatureURL: signatureURL
+            )
+            XCTFail("Expected non-HTTPS signature URL rejection")
+        } catch let error as ModelDownloadPolicyError {
+            XCTAssertEqual(error, .nonHTTPSURL(signatureURL.absoluteString))
+        }
+        XCTAssertEqual(transport.requestedURLs, [])
     }
 
     func testDownloadStateReportsProgressFraction() {
@@ -107,6 +151,15 @@ final class DownloadTests: XCTestCase {
         String(decoding: try fixtureData(name), as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
+
+    private static func fixtureManifestVerifier() throws -> ManifestVerifier {
+        ManifestVerifier(trustedKeys: [
+            TrustedModelManifestKey(
+                keyId: "fixture-key",
+                publicKeyBase64: try fixtureString("manifest.fixture-public-key.base64")
+            )
+        ])
+    }
 }
 
 private final class FixtureDownloadTransport: DownloadTransport {
@@ -121,5 +174,16 @@ private final class FixtureDownloadTransport: DownloadTransport {
         let url = try XCTUnwrap(request.url)
         requestedURLs.append(url)
         return try XCTUnwrap(responses[url])
+    }
+
+    func downloadFile(_ request: URLRequest, to temporaryURL: URL) async throws -> DownloadFileResponse {
+        let response = try await fetch(request)
+        try response.data.write(to: temporaryURL)
+        return DownloadFileResponse(
+            fileURL: temporaryURL,
+            eTag: response.eTag,
+            lastModified: response.lastModified,
+            statusCode: response.statusCode
+        )
     }
 }
