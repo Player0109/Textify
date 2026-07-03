@@ -38,21 +38,23 @@ public struct DiagnosticsRedactor: Sendable {
 
         var redacted: [String: Any] = [:]
         for (key, value) in dictionary where allowedKeys.contains(key) {
-            redacted[key] = redactJSONValue(value)
+            redacted[key] = redactJSONValue(value, forKey: key)
         }
         return redacted
     }
 
-    private func redactJSONValue(_ value: Any) -> Any {
+    private func redactJSONValue(_ value: Any, forKey key: String) -> Any {
         switch value {
+        case let string as String:
+            return DiagnosticsStringSanitizer.sanitize(string, forKey: key)
         case let dictionary as [String: Any]:
             var redacted: [String: Any] = [:]
             for (key, nestedValue) in dictionary where allowedKeys.contains(key) {
-                redacted[key] = redactJSONValue(nestedValue)
+                redacted[key] = redactJSONValue(nestedValue, forKey: key)
             }
             return redacted
         case let array as [Any]:
-            return array.map(redactJSONValue)
+            return array.map { redactJSONValue($0, forKey: key) }
         default:
             return value
         }
@@ -90,4 +92,61 @@ public struct DiagnosticsRedactor: Sendable {
         "textLengthBucket",
         "tier"
     ]
+}
+
+enum DiagnosticsStringSanitizer {
+    static let redactedValue = "[redacted]"
+
+    private static let forbiddenFragments = [
+        "audiosamples",
+        "audio samples",
+        "bundleidentifier",
+        "clipboard",
+        "content",
+        "details",
+        "dictated text",
+        "message",
+        "raw error",
+        "textify_forbidden_marker",
+        "transcript"
+    ]
+
+    static func sanitize(_ value: String, forKey key: String) -> String {
+        let lowercased = value.lowercased()
+        if forbiddenFragments.contains(where: { lowercased.contains($0) }) {
+            return redactedValue
+        }
+
+        if shouldCheckForBundleIdentifierLikeToken(forKey: key),
+           containsBundleIdentifierLikeToken(value) {
+            return redactedValue
+        }
+
+        return value
+    }
+
+    private static func shouldCheckForBundleIdentifierLikeToken(forKey key: String) -> Bool {
+        key != "appVersion" && key != "macOSVersion"
+    }
+
+    private static func containsBundleIdentifierLikeToken(_ value: String) -> Bool {
+        value
+            .split(whereSeparator: { character in
+                !(character.isLetter || character.isNumber || character == "." || character == "-" || character == "_")
+            })
+            .contains(where: isBundleIdentifierLikeToken)
+    }
+
+    private static func isBundleIdentifierLikeToken(_ token: Substring) -> Bool {
+        let parts = token.split(separator: ".")
+        guard parts.count >= 3 else {
+            return false
+        }
+
+        return parts.allSatisfy { part in
+            !part.isEmpty && part.unicodeScalars.allSatisfy { scalar in
+                CharacterSet.alphanumerics.contains(scalar) || scalar == "-" || scalar == "_"
+            }
+        }
+    }
 }

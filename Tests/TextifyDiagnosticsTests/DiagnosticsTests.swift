@@ -84,6 +84,25 @@ final class DiagnosticsTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: directory.appendingPathComponent("notes.txt").path))
     }
 
+    func testLoggerClearThrowsWhenDiagnosticDeletionFails() async throws {
+        let directory = try makeTemporaryDirectory()
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let logger = DiagnosticsLogger(
+            directory: directory,
+            fileDeleter: AlwaysFailingDiagnosticsFileDeleter()
+        )
+        try await logger.log(.appStarted(appVersion: "1.0.0", macOSVersion: "14.0"))
+
+        do {
+            try await logger.clear()
+            XCTFail("Expected clear to throw when deleting a diagnostic file fails.")
+        } catch let error as DiagnosticsLoggerError {
+            XCTAssertEqual(error.failedURLs.map(\.lastPathComponent), [logger.logFileURL.lastPathComponent])
+        }
+    }
+
     func testLoggerRotateAppliesRetentionPolicy() async throws {
         let directory = try makeTemporaryDirectory()
         defer {
@@ -142,6 +161,68 @@ final class DiagnosticsTests: XCTestCase {
         XCTAssertFalse(contents.localizedCaseInsensitiveContains("secret"))
     }
 
+    func testRedactorRedactsForbiddenContentInsideAllowedStringValues() throws {
+        let line = #"""
+        {"event":"app_started","fallbackBlockedReason":"transcript=hello clipboard=copy TEXTIFY_FORBIDDEN_MARKER","result":"raw error from com.example.TargetApp","appVersion":"1.0.0"}
+        """#
+
+        let redacted = try XCTUnwrap(DiagnosticsRedactor().redactJSONLine(line))
+
+        XCTAssertTrue(redacted.contains("app_started"))
+        XCTAssertTrue(redacted.contains("1.0.0"))
+        XCTAssertTrue(redacted.contains("[redacted]"))
+        XCTAssertFalse(redacted.localizedCaseInsensitiveContains("transcript"))
+        XCTAssertFalse(redacted.localizedCaseInsensitiveContains("clipboard"))
+        XCTAssertFalse(redacted.localizedCaseInsensitiveContains("TEXTIFY_FORBIDDEN_MARKER"))
+        XCTAssertFalse(redacted.localizedCaseInsensitiveContains("raw error"))
+        XCTAssertFalse(redacted.localizedCaseInsensitiveContains("com.example.TargetApp"))
+    }
+
+    func testDiagnosticEventSanitizesUnsafeAllowedStringValues() throws {
+        let event = DiagnosticEvent.modelLoad(
+            modelID: "ggml-small.en-q5_1",
+            tier: "fast",
+            durationMs: 42,
+            result: "raw error transcript=hello"
+        )
+
+        let json = String(decoding: try JSONEncoder().encode(event), as: UTF8.self)
+
+        XCTAssertTrue(json.contains("[redacted]"))
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("raw error"))
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("transcript"))
+    }
+
+    func testExporterSkipsSymlinkedAndNonRegularMatchingLogFiles() throws {
+        let directory = try makeTemporaryDirectory()
+        let outsideDirectory = try makeTemporaryDirectory()
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+            try? FileManager.default.removeItem(at: outsideDirectory)
+        }
+        try writeFile(
+            "diagnostics-real.jsonl",
+            contents: #"{"event":"app_started","appVersion":"1.0.0"}"# + "\n",
+            in: directory
+        )
+        let matchingDirectory = directory.appendingPathComponent("log-directory.jsonl", isDirectory: true)
+        try FileManager.default.createDirectory(at: matchingDirectory, withIntermediateDirectories: true)
+        let outsideLog = try writeFile(
+            "outside.jsonl",
+            contents: #"{"event":"app_started","appVersion":"leak"}"# + "\n",
+            in: outsideDirectory
+        )
+        try FileManager.default.createSymbolicLink(
+            at: directory.appendingPathComponent("diagnostics-symlink.jsonl"),
+            withDestinationURL: outsideLog
+        )
+
+        let document = try DiagnosticsExporter().exportRedactedLogs(from: directory)
+
+        XCTAssertEqual(document.files.map(\.filename), ["diagnostics-real.jsonl"])
+        XCTAssertFalse(document.files.first?.contents.contains("leak") ?? true)
+    }
+
     private func makeTemporaryDirectory() throws -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("TextifyDiagnosticsTests-\(UUID().uuidString)", isDirectory: true)
@@ -158,5 +239,11 @@ final class DiagnosticsTests: XCTestCase {
 
     private func setModifiedAt(_ date: Date, for url: URL) throws {
         try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: url.path)
+    }
+}
+
+private struct AlwaysFailingDiagnosticsFileDeleter: DiagnosticsFileDeleting {
+    func removeItem(at url: URL) throws {
+        throw CocoaError(.fileWriteNoPermission)
     }
 }

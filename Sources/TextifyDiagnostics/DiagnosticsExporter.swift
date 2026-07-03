@@ -46,9 +46,15 @@ public struct DiagnosticsExporter: Sendable {
             return DiagnosticsExportDocument(formatVersion: 1, files: [])
         }
 
-        let urls = try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
-            .filter { $0.pathExtension == "jsonl" }
-            .filter { $0.lastPathComponent.hasPrefix("diagnostics-") || $0.lastPathComponent.hasPrefix("log-") }
+        let rootDirectory = directory.resolvingSymlinksInPath().standardizedFileURL
+        let urls = try fileManager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
+            options: [.skipsHiddenFiles]
+        )
+        .filter { $0.pathExtension == "jsonl" }
+        .filter { $0.lastPathComponent.hasPrefix("diagnostics-") || $0.lastPathComponent.hasPrefix("log-") }
+        .filter { try Self.isExportableRegularFile($0, rootDirectory: rootDirectory) }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
 
         let files = try urls.map { url in
@@ -60,6 +66,17 @@ public struct DiagnosticsExporter: Sendable {
         }
 
         return DiagnosticsExportDocument(formatVersion: 1, files: files)
+    }
+
+    private static func isExportableRegularFile(_ url: URL, rootDirectory: URL) throws -> Bool {
+        let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+        guard values.isRegularFile == true, values.isSymbolicLink != true else {
+            return false
+        }
+
+        let resolvedPath = url.resolvingSymlinksInPath().standardizedFileURL.path
+        let rootPath = rootDirectory.path.hasSuffix("/") ? rootDirectory.path : "\(rootDirectory.path)/"
+        return resolvedPath.hasPrefix(rootPath)
     }
 
     private static func jsonObject(for event: DiagnosticEvent) throws -> [String: Any] {

@@ -1,17 +1,44 @@
 import Foundation
 
+public protocol DiagnosticsFileDeleting: Sendable {
+    func removeItem(at url: URL) throws
+}
+
+public struct FoundationDiagnosticsFileDeleter: DiagnosticsFileDeleting {
+    public init() {}
+
+    public func removeItem(at url: URL) throws {
+        try FileManager.default.removeItem(at: url)
+    }
+}
+
+public struct DiagnosticsLoggerError: Error, Equatable, Sendable {
+    public let failedURLs: [URL]
+
+    public init(failedURLs: [URL]) {
+        self.failedURLs = failedURLs
+    }
+}
+
 public actor DiagnosticsLogger {
     public nonisolated let directory: URL
     public nonisolated let logFileURL: URL
 
     private let encoder: JSONEncoder
     private let fileManager: FileManager
+    private let fileDeleter: any DiagnosticsFileDeleting
 
-    public init(directory: URL, date: Date = Date(), fileManager: FileManager = .default) {
+    public init(
+        directory: URL,
+        date: Date = Date(),
+        fileManager: FileManager = .default,
+        fileDeleter: any DiagnosticsFileDeleting = FoundationDiagnosticsFileDeleter()
+    ) {
         self.directory = directory
         self.logFileURL = directory.appendingPathComponent(Self.logFileName(for: date), isDirectory: false)
         self.encoder = JSONEncoder()
         self.fileManager = fileManager
+        self.fileDeleter = fileDeleter
     }
 
     public func log(_ event: DiagnosticEvent) throws {
@@ -37,26 +64,29 @@ public actor DiagnosticsLogger {
         let files = try diagnosticLogFiles()
         let cutoff = Calendar.current.date(byAdding: .day, value: -policy.maxAgeDays, to: now) ?? now
 
-        for file in files where file.modifiedAt < cutoff {
-            try? fileManager.removeItem(at: file.url)
-        }
+        try removeLogFiles(files.filter { $0.modifiedAt < cutoff })
 
         let remaining = try diagnosticLogFiles().sorted { $0.modifiedAt > $1.modifiedAt }
-        for file in remaining.dropFirst(policy.maxFileCount) {
-            try? fileManager.removeItem(at: file.url)
-        }
+        try removeLogFiles(Array(remaining.dropFirst(policy.maxFileCount)))
 
         var totalBytes = try diagnosticLogFiles().reduce(Int64(0)) { $0 + $1.sizeBytes }
+        var failedURLs: [URL] = []
         for file in try diagnosticLogFiles().sorted(by: { $0.modifiedAt < $1.modifiedAt }) where totalBytes > policy.maxTotalBytes {
-            try? fileManager.removeItem(at: file.url)
-            totalBytes -= file.sizeBytes
+            do {
+                try fileDeleter.removeItem(at: file.url)
+                totalBytes -= file.sizeBytes
+            } catch {
+                failedURLs.append(file.url)
+            }
+        }
+
+        if !failedURLs.isEmpty {
+            throw DiagnosticsLoggerError(failedURLs: failedURLs)
         }
     }
 
     public func clear() throws {
-        for file in try diagnosticLogFiles() {
-            try? fileManager.removeItem(at: file.url)
-        }
+        try removeLogFiles(try diagnosticLogFiles())
     }
 
     private static func logFileName(for date: Date) -> String {
@@ -86,6 +116,22 @@ public actor DiagnosticsLogger {
                 modifiedAt: values.contentModificationDate ?? .distantPast,
                 sizeBytes: Int64(values.fileSize ?? 0)
             )
+        }
+    }
+
+    private func removeLogFiles(_ files: [DiagnosticLogFile]) throws {
+        var failedURLs: [URL] = []
+
+        for file in files {
+            do {
+                try fileDeleter.removeItem(at: file.url)
+            } catch {
+                failedURLs.append(file.url)
+            }
+        }
+
+        if !failedURLs.isEmpty {
+            throw DiagnosticsLoggerError(failedURLs: failedURLs)
         }
     }
 }
