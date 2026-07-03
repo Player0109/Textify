@@ -96,6 +96,9 @@ private struct GeneralSettingsPane: View {
 
     private var launchAtLoginStatusText: String {
         if services.launchAtLoginOperationError != nil {
+            if services.launchAtLoginFailedRequestedEnabled == false {
+                return "Textify could not disable Launch at Login. Use System Settings -> General -> Login Items."
+            }
             return "Textify could not update Launch at Login."
         }
 

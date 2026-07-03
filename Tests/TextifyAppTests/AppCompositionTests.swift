@@ -14,7 +14,8 @@ final class AppCompositionTests: XCTestCase {
         let paths = try Self.makeTemporaryPaths()
         let services = AppServices.production(
             pathFactory: { paths },
-            launchAtLogin: FakeLaunchAtLoginManager(status: .disabled)
+            launchAtLogin: FakeLaunchAtLoginManager(status: .disabled),
+            launchAtLoginLocation: FixedLaunchAtLoginLocation(isSupported: true)
         )
 
         XCTAssertEqual(services.paths.settingsFileURL.lastPathComponent, "settings.json")
@@ -57,6 +58,27 @@ final class AppCompositionTests: XCTestCase {
         XCTAssertNotEqual(LaunchAtLoginStatus.failed("first"), .failed("second"))
     }
 
+    func testLaunchAtLoginLocationCheckerAllowsOnlyApplicationsFolders() {
+        let homeDirectory = URL(fileURLWithPath: "/Users/textify", isDirectory: true)
+
+        XCTAssertTrue(LaunchAtLoginLocationChecker(
+            bundleURL: URL(fileURLWithPath: "/Applications/Textify.app", isDirectory: true),
+            homeDirectory: homeDirectory
+        ).isSupported)
+        XCTAssertTrue(LaunchAtLoginLocationChecker(
+            bundleURL: URL(fileURLWithPath: "/Users/textify/Applications/Textify.app", isDirectory: true),
+            homeDirectory: homeDirectory
+        ).isSupported)
+        XCTAssertFalse(LaunchAtLoginLocationChecker(
+            bundleURL: URL(fileURLWithPath: "/Users/textify/Downloads/Textify.app", isDirectory: true),
+            homeDirectory: homeDirectory
+        ).isSupported)
+        XCTAssertFalse(LaunchAtLoginLocationChecker(
+            bundleURL: URL(fileURLWithPath: "/Volumes/Textify/Textify.app", isDirectory: true),
+            homeDirectory: homeDirectory
+        ).isSupported)
+    }
+
     @MainActor
     func testLaunchAtLoginBridgeRefreshesStatusAndPersistsSuccessfulChanges() async throws {
         let launchAtLogin = FakeLaunchAtLoginManager(status: .disabled)
@@ -94,17 +116,22 @@ final class AppCompositionTests: XCTestCase {
         XCTAssertEqual(status, LaunchAtLoginStatus.failed("fixture"))
         XCTAssertEqual(services.launchAtLoginStatus, LaunchAtLoginStatus.enabled)
         XCTAssertEqual(services.launchAtLoginOperationError, "fixture")
+        XCTAssertEqual(services.launchAtLoginFailedRequestedEnabled, false)
         XCTAssertTrue(services.preferences.launchAtLoginEnabled)
         XCTAssertTrue(services.settingsStore.load().launchAtLoginEnabled)
     }
 
     @MainActor
-    func testLaunchAtLoginUnsupportedLocationDisablesChangesAndPersistsOff() async throws {
-        let launchAtLogin = FakeLaunchAtLoginManager(status: .unsupportedLocation)
-        let services = try Self.makeServices(launchAtLogin: launchAtLogin)
+    func testLaunchAtLoginUnsupportedLocationOverridesLiveStatusAndPersistsOff() async throws {
+        let launchAtLogin = FakeLaunchAtLoginManager(status: .enabled)
+        let services = try Self.makeServices(
+            launchAtLogin: launchAtLogin,
+            launchAtLoginLocation: FixedLaunchAtLoginLocation(isSupported: false)
+        )
         services.preferences.launchAtLoginEnabled = true
         services.savePreferences()
 
+        XCTAssertEqual(services.refreshLaunchAtLoginStatus(), LaunchAtLoginStatus.unsupportedLocation)
         XCTAssertFalse(services.canChangeLaunchAtLogin)
 
         let status = await services.setLaunchAtLoginEnabled(true)
@@ -171,7 +198,8 @@ final class AppCompositionTests: XCTestCase {
 
         let services = AppServices.production(
             pathFactory: { paths },
-            launchAtLogin: FakeLaunchAtLoginManager(status: .disabled)
+            launchAtLogin: FakeLaunchAtLoginManager(status: .disabled),
+            launchAtLoginLocation: FixedLaunchAtLoginLocation(isSupported: true)
         )
 
         XCTAssertEqual(services.hotkeyMonitor.configuredTrigger, TextifyHotkeys.TriggerPreference.rightOption)
@@ -182,7 +210,8 @@ final class AppCompositionTests: XCTestCase {
     func testProductionCompositionReportsPathStartupFailureWithoutCrashing() {
         let services = AppServices.production(
             pathFactory: { throw AppPathFixtureError.unavailable },
-            launchAtLogin: FakeLaunchAtLoginManager(status: .disabled)
+            launchAtLogin: FakeLaunchAtLoginManager(status: .disabled),
+            launchAtLoginLocation: FixedLaunchAtLoginLocation(isSupported: true)
         )
 
         XCTAssertEqual(services.startupIssue, AppStartupIssue.applicationPathsUnavailable("unavailable"))
@@ -192,7 +221,8 @@ final class AppCompositionTests: XCTestCase {
     private static func makeServices(
         preferences: AppPreferences = .defaults,
         hotkeyMonitor: GlobalHotkeyMonitor? = nil,
-        launchAtLogin: FakeLaunchAtLoginManager? = nil
+        launchAtLogin: FakeLaunchAtLoginManager? = nil,
+        launchAtLoginLocation: any LaunchAtLoginLocationChecking = FixedLaunchAtLoginLocation(isSupported: true)
     ) throws -> AppServices {
         let paths = try makeTemporaryPaths()
         let settingsStore = SettingsStore(storage: .file(paths.settingsFileURL))
@@ -222,7 +252,8 @@ final class AppCompositionTests: XCTestCase {
                 clock: SuspendedRuntimeClock()
             )),
             hotkeyMonitor: hotkeyMonitor,
-            launchAtLogin: launchAtLogin
+            launchAtLogin: launchAtLogin,
+            launchAtLoginLocation: launchAtLoginLocation
         )
     }
 
@@ -272,6 +303,10 @@ private final class FakeLaunchAtLoginManager: LaunchAtLoginManaging {
         }
         return result
     }
+}
+
+private struct FixedLaunchAtLoginLocation: LaunchAtLoginLocationChecking {
+    let isSupported: Bool
 }
 
 private final class MutableInputMonitoringPermission: @unchecked Sendable {

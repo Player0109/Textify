@@ -19,11 +19,13 @@ final class AppServices {
     let dictation: AppDictationService
     let hotkeyMonitor: GlobalHotkeyMonitor
     let launchAtLogin: any LaunchAtLoginManaging
+    let launchAtLoginLocation: any LaunchAtLoginLocationChecking
     let startupIssue: AppStartupIssue?
 
     var preferences: AppPreferences
     var launchAtLoginStatus: LaunchAtLoginStatus
     var launchAtLoginOperationError: String?
+    var launchAtLoginFailedRequestedEnabled: Bool?
     var onboardingStep = OnboardingStep.welcome
     var overlayState = RecordingOverlayState.hidden
 
@@ -32,20 +34,23 @@ final class AppServices {
     static func production() -> AppServices {
         production(
             pathFactory: { try AppPaths.production() },
-            launchAtLogin: LaunchAtLoginController()
+            launchAtLogin: LaunchAtLoginController(),
+            launchAtLoginLocation: LaunchAtLoginLocationChecker()
         )
     }
 
     static func production(
         pathFactory: () throws -> AppPaths,
         fileManager: FileManager = .default,
-        launchAtLogin: any LaunchAtLoginManaging
+        launchAtLogin: any LaunchAtLoginManaging,
+        launchAtLoginLocation: any LaunchAtLoginLocationChecking
     ) -> AppServices {
         do {
             return production(
                 paths: try pathFactory(),
                 fileManager: fileManager,
                 launchAtLogin: launchAtLogin,
+                launchAtLoginLocation: launchAtLoginLocation,
                 startupIssue: nil
             )
         } catch {
@@ -53,6 +58,7 @@ final class AppServices {
                 paths: AppPaths.temporaryFallback(fileManager: fileManager),
                 fileManager: fileManager,
                 launchAtLogin: launchAtLogin,
+                launchAtLoginLocation: launchAtLoginLocation,
                 startupIssue: .applicationPathsUnavailable(String(describing: error))
             )
         }
@@ -65,6 +71,7 @@ final class AppServices {
         dictation: AppDictationService,
         hotkeyMonitor: GlobalHotkeyMonitor,
         launchAtLogin: any LaunchAtLoginManaging,
+        launchAtLoginLocation: any LaunchAtLoginLocationChecking = LaunchAtLoginLocationChecker(),
         startupIssue: AppStartupIssue? = nil
     ) {
         self.paths = paths
@@ -73,9 +80,10 @@ final class AppServices {
         self.dictation = dictation
         self.hotkeyMonitor = hotkeyMonitor
         self.launchAtLogin = launchAtLogin
+        self.launchAtLoginLocation = launchAtLoginLocation
         self.startupIssue = startupIssue
         self.preferences = settingsStore.load()
-        self.launchAtLoginStatus = launchAtLogin.status()
+        self.launchAtLoginStatus = launchAtLoginLocation.isSupported ? launchAtLogin.status() : .unsupportedLocation
     }
 
     func startRuntime() {
@@ -114,14 +122,15 @@ final class AppServices {
     }
 
     var canChangeLaunchAtLogin: Bool {
-        launchAtLoginStatus != .unsupportedLocation
+        launchAtLoginLocation.isSupported && launchAtLoginStatus != .unsupportedLocation
     }
 
     @discardableResult
     func refreshLaunchAtLoginStatus() -> LaunchAtLoginStatus {
-        let status = launchAtLogin.status()
+        let status = currentLaunchAtLoginStatus()
         launchAtLoginStatus = status
         launchAtLoginOperationError = nil
+        launchAtLoginFailedRequestedEnabled = nil
         return status
     }
 
@@ -138,11 +147,13 @@ final class AppServices {
         case .failed(let message):
             let status = refreshLaunchAtLoginStatus()
             launchAtLoginOperationError = message
+            launchAtLoginFailedRequestedEnabled = enabled
             persistLaunchAtLoginPreference(for: status)
             return operationStatus
         case let status:
             launchAtLoginStatus = status
             launchAtLoginOperationError = nil
+            launchAtLoginFailedRequestedEnabled = nil
             persistLaunchAtLoginPreference(for: status)
             return status
         }
@@ -158,6 +169,13 @@ final class AppServices {
             break
         }
         savePreferences()
+    }
+
+    private func currentLaunchAtLoginStatus() -> LaunchAtLoginStatus {
+        guard launchAtLoginLocation.isSupported else {
+            return .unsupportedLocation
+        }
+        return launchAtLogin.status()
     }
 
     nonisolated private static func hotkeyFailureLeavesMonitorStopped(_ error: HotkeyMonitorError) -> Bool {
@@ -178,6 +196,7 @@ final class AppServices {
         paths: AppPaths,
         fileManager: FileManager,
         launchAtLogin: any LaunchAtLoginManaging,
+        launchAtLoginLocation: any LaunchAtLoginLocationChecking,
         startupIssue: AppStartupIssue?
     ) -> AppServices {
         let settingsStore = SettingsStore(storage: .file(paths.settingsFileURL), fileManager: fileManager)
@@ -213,6 +232,7 @@ final class AppServices {
             ),
             hotkeyMonitor: GlobalHotkeyMonitor(trigger: trigger),
             launchAtLogin: launchAtLogin,
+            launchAtLoginLocation: launchAtLoginLocation,
             startupIssue: startupIssue
         )
     }
