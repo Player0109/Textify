@@ -42,7 +42,13 @@ let package = Package(
         .testTarget(name: "TextifyCoreTests", dependencies: ["TextifyCore"]),
         .testTarget(name: "TextifyAudioTests", dependencies: ["TextifyAudio"]),
         .testTarget(name: "TextifyTranscriptionTests", dependencies: ["TextifyTranscription"]),
-        .testTarget(name: "TextifyModelsTests", dependencies: ["TextifyModels"]),
+        .testTarget(
+            name: "TextifyModelsTests",
+            dependencies: ["TextifyModels"],
+            resources: [
+                .copy("Fixtures")
+            ]
+        ),
         .testTarget(name: "TextifyInsertionTests", dependencies: ["TextifyInsertion"]),
         .testTarget(name: "TextifyHotkeysTests", dependencies: ["TextifyHotkeys"]),
         .testTarget(name: "TextifyDiagnosticsTests", dependencies: ["TextifyDiagnostics"]),

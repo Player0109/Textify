@@ -1,0 +1,58 @@
+{
+  "manifestVersion": 1,
+  "generatedAt": "2026-07-01T00:00:00Z",
+  "models": [
+    {
+      "id": "whisper-base-en-fast",
+      "displayName": "Fast - Whisper base.en",
+      "tier": "fast",
+      "description": "Fast local English dictation with better first-run quality than tiny.en.",
+      "sizeBytes": 73400320,
+      "files": [
+        {
+          "filename": "ggml-base.en-q5_1.bin",
+          "url": "https://github.com/Player0109/Textify/releases/download/models-v1/ggml-base.en-q5_1.bin",
+          "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "sizeBytes": 73400320
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "converted ggml model file",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://github.com/Player0109/Textify/releases/download/models-v1/ggml-base.en-q5_1.LICENSES.txt"
+        }
+      ],
+      "provenance": {
+        "sourceName": "ggerganov/whisper.cpp",
+        "sourceUrl": "https://huggingface.co/ggerganov/whisper.cpp",
+        "sourceRevision": "1234567890abcdef1234567890abcdef12345678",
+        "sourceFile": "ggml-base.en-q5_1.bin",
+        "originalModelName": "OpenAI Whisper base.en",
+        "originalModelUrl": "https://huggingface.co/openai/whisper-base.en",
+        "mirroredBy": "Textify",
+        "mirroredAt": "2026-07-01"
+      },
+      "runtimeParameters": {
+        "language": "en",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0.0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1.0,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.0.0"
+    }
+  ]
+}
