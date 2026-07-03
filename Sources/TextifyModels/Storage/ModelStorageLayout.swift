@@ -51,15 +51,6 @@ public struct ModelStorageLayout: Equatable, Sendable {
         )
     }
 
-    func backupFileURL(modelID: String, filename: String) throws -> URL {
-        let safeFilename = try Self.validatePathComponent(filename)
-        let modelDirectory = try installedModelDirectory(modelID: modelID)
-        return try containedURL(
-            modelDirectory.appendingPathComponent(".\(safeFilename).backup-\(UUID().uuidString)", isDirectory: false),
-            in: modelDirectory
-        )
-    }
-
     private static func validatePathComponent(_ value: String) throws -> String {
         guard !value.isEmpty,
               value != ".",

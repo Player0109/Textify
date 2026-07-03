@@ -1,21 +1,45 @@
 import CryptoKit
 import Foundation
 
+public protocol InstalledModelFileReplacing {
+    func replaceExistingInstalledFile(at installedURL: URL, with replacementURL: URL) throws
+}
+
+public struct FileManagerInstalledModelFileReplacer: InstalledModelFileReplacing {
+    private let fileManager: FileManager
+
+    public init(fileManager: FileManager = .default) {
+        self.fileManager = fileManager
+    }
+
+    public func replaceExistingInstalledFile(at installedURL: URL, with replacementURL: URL) throws {
+        _ = try fileManager.replaceItemAt(
+            installedURL,
+            withItemAt: replacementURL,
+            backupItemName: nil,
+            options: []
+        )
+    }
+}
+
 public struct ModelInstaller {
     private let layout: ModelStorageLayout
     private let transport: any DownloadTransport
     private let fileManager: FileManager
+    private let fileReplacer: any InstalledModelFileReplacing
     private let nowISO8601: @Sendable () -> String
 
     public init(
         layout: ModelStorageLayout,
         transport: any DownloadTransport,
         fileManager: FileManager = .default,
+        fileReplacer: (any InstalledModelFileReplacing)? = nil,
         nowISO8601: @escaping @Sendable () -> String = { ISO8601DateFormatter().string(from: Date()) }
     ) {
         self.layout = layout
         self.transport = transport
         self.fileManager = fileManager
+        self.fileReplacer = fileReplacer ?? FileManagerInstalledModelFileReplacer(fileManager: fileManager)
         self.nowISO8601 = nowISO8601
     }
 
@@ -57,9 +81,7 @@ public struct ModelInstaller {
         do {
             try replaceInstalledFile(
                 replacementURL: replacementURL,
-                installedURL: installedURL,
-                modelID: model.id,
-                filename: file.filename
+                installedURL: installedURL
             )
         } catch {
             try? fileManager.removeItem(at: replacementURL)
@@ -95,28 +117,14 @@ public struct ModelInstaller {
 
     private func replaceInstalledFile(
         replacementURL: URL,
-        installedURL: URL,
-        modelID: String,
-        filename: String
+        installedURL: URL
     ) throws {
         guard fileManager.fileExists(atPath: installedURL.path) else {
             try fileManager.moveItem(at: replacementURL, to: installedURL)
             return
         }
 
-        let backupURL = try layout.backupFileURL(modelID: modelID, filename: filename)
-        try? fileManager.removeItem(at: backupURL)
-        try fileManager.moveItem(at: installedURL, to: backupURL)
-        do {
-            try fileManager.moveItem(at: replacementURL, to: installedURL)
-            try? fileManager.removeItem(at: backupURL)
-        } catch {
-            if fileManager.fileExists(atPath: backupURL.path),
-               !fileManager.fileExists(atPath: installedURL.path) {
-                try? fileManager.moveItem(at: backupURL, to: installedURL)
-            }
-            throw error
-        }
+        try fileReplacer.replaceExistingInstalledFile(at: installedURL, with: replacementURL)
     }
 
     private func loadStore() throws -> InstalledModelsStore {

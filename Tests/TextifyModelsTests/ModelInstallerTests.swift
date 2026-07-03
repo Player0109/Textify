@@ -154,7 +154,7 @@ final class ModelInstallerTests: XCTestCase {
         }
     }
 
-    func testExistingInstalledFileSurvivesFailedReplacement() async throws {
+    func testExistingInstallUsesAtomicReplacementWithoutMovingInstalledFile() async throws {
         let manifest = try Self.fixtureManifest()
         let model = try XCTUnwrap(manifest.models.first)
         let file = try XCTUnwrap(model.files.first)
@@ -168,22 +168,68 @@ final class ModelInstallerTests: XCTestCase {
         )
         let existingData = Data("existing model bytes".utf8)
         try existingData.write(to: installedURL)
-        let fileManager = ReplacementFailingFileManager(failDestination: installedURL)
+        let fileManager = InstalledPathRecordingFileManager(installedURL: installedURL)
+        let fileReplacer = AtomicReplacementSpy(
+            expectedInstalledURL: installedURL,
+            expectedExistingData: existingData
+        )
         let installer = ModelInstaller(
             layout: layout,
             transport: FixtureFileDownloadTransport(dataByURL: [
                 try XCTUnwrap(URL(string: file.url)): try Self.fixtureData("model.bin")
             ]),
-            fileManager: fileManager
+            fileManager: fileManager,
+            fileReplacer: fileReplacer
+        )
+
+        _ = try await installer.install(modelID: ProductionModelPolicy.requiredModelID, from: manifest)
+
+        XCTAssertEqual(fileReplacer.replacementCalls, 1)
+        XCTAssertTrue(fileReplacer.installedFileExistedAtReplacement)
+        XCTAssertEqual(fileReplacer.installedDataAtReplacement, existingData)
+        XCTAssertFalse(fileManager.didMoveFromInstalledURL)
+        XCTAssertFalse(fileManager.didMoveToInstalledURL)
+        XCTAssertFalse(fileManager.didRemoveInstalledURL)
+        XCTAssertEqual(try Data(contentsOf: installedURL), try Self.fixtureData("model.bin"))
+    }
+
+    func testExistingInstalledFileSurvivesFailedAtomicReplacement() async throws {
+        let manifest = try Self.fixtureManifest()
+        let model = try XCTUnwrap(manifest.models.first)
+        let file = try XCTUnwrap(model.files.first)
+        let rootDirectory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectory) }
+        let layout = ModelStorageLayout(rootDirectory: rootDirectory)
+        let installedURL = try layout.installedFileURL(modelID: model.id, filename: file.filename)
+        try FileManager.default.createDirectory(
+            at: installedURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let existingData = Data("existing model bytes".utf8)
+        try existingData.write(to: installedURL)
+        let fileReplacer = AtomicReplacementSpy(
+            expectedInstalledURL: installedURL,
+            expectedExistingData: existingData,
+            injectedError: AtomicReplacementFailure.injected
+        )
+        let installer = ModelInstaller(
+            layout: layout,
+            transport: FixtureFileDownloadTransport(dataByURL: [
+                try XCTUnwrap(URL(string: file.url)): try Self.fixtureData("model.bin")
+            ]),
+            fileReplacer: fileReplacer
         )
 
         do {
             _ = try await installer.install(modelID: ProductionModelPolicy.requiredModelID, from: manifest)
-            XCTFail("Expected replacement failure")
-        } catch {
+            XCTFail("Expected atomic replacement failure")
+        } catch AtomicReplacementFailure.injected {
             // Expected injected filesystem failure.
         }
+
+        XCTAssertEqual(fileReplacer.replacementCalls, 1)
         XCTAssertEqual(try Data(contentsOf: installedURL), existingData)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: layout.installedStoreURL.path))
     }
 
     private static func fixtureManifest(
@@ -268,24 +314,71 @@ private enum FixtureFileDownloadTransportError: Error {
     case missingResponse
 }
 
-private final class ReplacementFailingFileManager: FileManager {
-    private let failDestination: URL
-    private var hasInjectedFailure = false
+private final class InstalledPathRecordingFileManager: FileManager {
+    private let installedURL: URL
+    private(set) var didMoveFromInstalledURL = false
+    private(set) var didMoveToInstalledURL = false
+    private(set) var didRemoveInstalledURL = false
 
-    init(failDestination: URL) {
-        self.failDestination = failDestination.standardizedFileURL
+    init(installedURL: URL) {
+        self.installedURL = installedURL.standardizedFileURL
         super.init()
     }
 
     override func moveItem(at srcURL: URL, to dstURL: URL) throws {
-        if dstURL.standardizedFileURL == failDestination, !hasInjectedFailure {
-            hasInjectedFailure = true
-            throw ReplacementFailure.injected
+        if srcURL.standardizedFileURL == installedURL {
+            didMoveFromInstalledURL = true
+        }
+        if dstURL.standardizedFileURL == installedURL {
+            didMoveToInstalledURL = true
         }
         try super.moveItem(at: srcURL, to: dstURL)
     }
+
+    override func removeItem(at URL: URL) throws {
+        if URL.standardizedFileURL == installedURL {
+            didRemoveInstalledURL = true
+        }
+        try super.removeItem(at: URL)
+    }
 }
 
-private enum ReplacementFailure: Error {
+private final class AtomicReplacementSpy: InstalledModelFileReplacing {
+    private let expectedInstalledURL: URL
+    private let expectedExistingData: Data
+    private let injectedError: (any Error)?
+    private(set) var replacementCalls = 0
+    private(set) var installedFileExistedAtReplacement = false
+    private(set) var installedDataAtReplacement: Data?
+
+    init(
+        expectedInstalledURL: URL,
+        expectedExistingData: Data,
+        injectedError: (any Error)? = nil
+    ) {
+        self.expectedInstalledURL = expectedInstalledURL.standardizedFileURL
+        self.expectedExistingData = expectedExistingData
+        self.injectedError = injectedError
+    }
+
+    func replaceExistingInstalledFile(at installedURL: URL, with replacementURL: URL) throws {
+        replacementCalls += 1
+        XCTAssertEqual(installedURL.standardizedFileURL, expectedInstalledURL)
+        installedFileExistedAtReplacement = FileManager.default.fileExists(atPath: installedURL.path)
+        installedDataAtReplacement = try? Data(contentsOf: installedURL)
+        XCTAssertEqual(installedDataAtReplacement, expectedExistingData)
+        if let injectedError {
+            throw injectedError
+        }
+        _ = try FileManager.default.replaceItemAt(
+            installedURL,
+            withItemAt: replacementURL,
+            backupItemName: nil,
+            options: []
+        )
+    }
+}
+
+private enum AtomicReplacementFailure: Error {
     case injected
 }
