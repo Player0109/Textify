@@ -31,6 +31,14 @@ static int32_t textify_whisper_effective_thread_count(int32_t thread_count) {
     return std::max<int32_t>(1, thread_count);
 }
 
+static const char *textify_whisper_effective_language(const char *language) {
+    if (language == nullptr || std::strlen(language) == 0) {
+        return "en";
+    }
+
+    return language;
+}
+
 TextifyWhisperContext *textify_whisper_load(const char *model_path, int32_t use_gpu, int32_t thread_count) {
     if (model_path == nullptr || std::strlen(model_path) == 0) {
         textify_whisper_set_global_error("model path is empty");
@@ -75,7 +83,12 @@ void textify_whisper_free(TextifyWhisperContext *context) {
 int32_t textify_whisper_transcribe(
     TextifyWhisperContext *context,
     const float *pcm_mono_f32_16khz,
-    int32_t sample_count
+    int32_t sample_count,
+    const char *language,
+    int32_t translate,
+    float temperature,
+    int32_t no_context,
+    const char *initial_prompt
 ) {
     if (context == nullptr || context->context == nullptr) {
         textify_whisper_set_global_error("native context is not loaded");
@@ -90,8 +103,8 @@ int32_t textify_whisper_transcribe(
 
     whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
     params.n_threads = textify_whisper_effective_thread_count(context->threadCount);
-    params.translate = false;
-    params.no_context = true;
+    params.translate = translate != 0;
+    params.no_context = no_context != 0;
     params.no_timestamps = true;
     params.single_segment = false;
     params.print_special = false;
@@ -99,10 +112,11 @@ int32_t textify_whisper_transcribe(
     params.print_realtime = false;
     params.print_timestamps = false;
     params.token_timestamps = false;
-    params.language = "en";
+    params.language = textify_whisper_effective_language(language);
     params.detect_language = false;
-    params.temperature = 0.0f;
+    params.temperature = temperature;
     params.temperature_inc = 0.0f;
+    params.initial_prompt = initial_prompt;
     params.greedy.best_of = 1;
     params.beam_search.beam_size = 1;
 

@@ -15,6 +15,7 @@ final class MockTranscriptionTests: XCTestCase {
         let result = try await provider.transcribe(.emptyForTests)
 
         XCTAssertEqual(result.text, "hello period")
+        XCTAssertNil(result.timing)
     }
 
     func testMockProviderReturnsQueuedResultsInOrder() async throws {

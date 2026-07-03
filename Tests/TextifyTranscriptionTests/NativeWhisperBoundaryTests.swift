@@ -23,4 +23,28 @@ final class NativeWhisperBoundaryTests: XCTestCase {
 
         XCTAssertEqual(state, .noModel)
     }
+
+    func testWhisperRuntimeSnapshotStartsWithoutMetrics() async {
+        let runtime = WhisperRuntime()
+
+        let snapshot = await runtime.snapshot()
+
+        XCTAssertEqual(snapshot.state, .noModel)
+        XCTAssertEqual(snapshot.metrics, WhisperRuntimeMetrics())
+    }
+
+    func testNativeShimRequiresExplicitTranscriptionOptions() {
+        let returnCode = textify_whisper_transcribe(
+            nil,
+            nil,
+            0,
+            "en",
+            0,
+            Float(0),
+            1,
+            nil
+        )
+
+        XCTAssertEqual(returnCode, -1)
+    }
 }
