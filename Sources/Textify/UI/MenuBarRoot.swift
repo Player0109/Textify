@@ -7,22 +7,6 @@ struct MenuBarRoot: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-#if DEBUG
-        Button("Run Mock Dictation") {
-            Task {
-                await services.runMockDictation()
-            }
-        }
-        .disabled(!services.canRunMockDictation)
-
-        if let title = services.mockDictationStatus.menuTitle {
-            Text(title)
-                .foregroundStyle(.secondary)
-        }
-
-        Divider()
-#endif
-
         Button("Settings...") {
             openSettingsPane(.general)
         }
@@ -34,7 +18,6 @@ struct MenuBarRoot: View {
         }
 
         Button("Check for Updates...") {
-            services.updateStatus = .unavailable("Sparkle is not wired in this mock build.")
         }
         .disabled(true)
 

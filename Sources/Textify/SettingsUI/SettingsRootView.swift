@@ -1,4 +1,6 @@
+import AppKit
 import SwiftUI
+import TextifyRuntime
 
 struct SettingsRootView: View {
     @Environment(AppServices.self) private var services
@@ -55,7 +57,11 @@ private struct GeneralSettingsPane: View {
 
         SettingsPaneLayout(title: "General") {
             SettingsSection("Startup") {
-                Toggle("Launch at Login", isOn: $services.preferences.launchAtLoginRequestedByOnboarding)
+                Toggle("Launch at Login", isOn: launchAtLoginBinding)
+                    .disabled(!services.canChangeLaunchAtLogin)
+                Text(launchAtLoginStatusText)
+                    .foregroundStyle(.secondary)
+                launchAtLoginAction
                 Toggle("Show in Dock", isOn: $services.preferences.showInDock)
             }
 
@@ -72,6 +78,65 @@ private struct GeneralSettingsPane: View {
         .onChange(of: services.preferences) { _, _ in
             services.savePreferences()
         }
+        .onAppear {
+            services.refreshLaunchAtLoginStatus()
+        }
+    }
+
+    private var launchAtLoginBinding: Binding<Bool> {
+        Binding(
+            get: {
+                services.launchAtLoginStatus == .enabled
+            },
+            set: { isEnabled in
+                Task {
+                    await services.setLaunchAtLoginEnabled(isEnabled)
+                }
+            }
+        )
+    }
+
+    private var launchAtLoginStatusText: String {
+        if services.launchAtLoginOperationError != nil {
+            if services.launchAtLoginFailedRequestedEnabled == false {
+                return "Textify could not disable Launch at Login. Use System Settings -> General -> Login Items."
+            }
+            return "Textify could not update Launch at Login."
+        }
+
+        switch services.launchAtLoginStatus {
+        case .enabled:
+            return "Textify will open at login."
+        case .disabled:
+            return "Textify will not open at login."
+        case .requiresApproval:
+            return "macOS needs approval before Textify can open at login."
+        case .unsupportedLocation:
+            return "Move Textify to Applications to use Launch at Login."
+        case .unavailable:
+            return "Textify could not check Launch at Login status."
+        case .failed:
+            return "Textify could not update Launch at Login."
+        }
+    }
+
+    @ViewBuilder
+    private var launchAtLoginAction: some View {
+        if services.launchAtLoginStatus == .requiresApproval {
+            Button("Open Login Items Settings") {
+                LoginItemsSettingsOpener.open()
+            }
+        }
+    }
+}
+
+struct LoginItemsSettingsOpener {
+    static let loginItemsSettingsURL = URL(
+        string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension"
+    )!
+
+    static func open(workspace: NSWorkspace = .shared) {
+        workspace.open(loginItemsSettingsURL)
     }
 }
 
@@ -112,34 +177,30 @@ private struct ModelsSettingsPane: View {
     var body: some View {
         SettingsPaneLayout(title: "Models") {
             SettingsSection("Installed Model") {
-                if let activeModelID = services.modelCatalog.activeModelID {
-                    LabeledContent("Active Model ID", value: activeModelID)
-                } else {
-                    Text("No model installed.")
-                        .foregroundStyle(.secondary)
-                }
+                LabeledContent("Readiness", value: modelReadinessText)
+                LabeledContent("Active Model ID", value: services.preferences.activeModelID ?? "None")
             }
 
             SettingsSection("Curated Models") {
-                ForEach(services.modelCatalog.curatedModels) { model in
-                    HStack(alignment: .firstTextBaseline) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(model.tier)
-                                .font(.headline)
-                            Text(model.name)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        Text(model.size)
-                            .foregroundStyle(.secondary)
-
-                        Button("Download") {}
-                            .disabled(true)
-                    }
-                }
+                EmptySettingsRow("No curated model manifest loaded.")
             }
+        }
+    }
+
+    private var modelReadinessText: String {
+        switch services.dictation.readiness.model {
+        case .noActiveModel:
+            return "No active model"
+        case let .missing(modelID):
+            return "Missing \(modelID)"
+        case let .loading(modelID):
+            return "Loading \(modelID)"
+        case let .warming(modelID):
+            return "Preparing \(modelID)"
+        case let .ready(modelID):
+            return "Ready \(modelID)"
+        case let .failed(modelID, _):
+            return "Failed \(modelID)"
         }
     }
 }
@@ -217,15 +278,38 @@ private struct AdvancedSettingsPane: View {
             }
 
             SettingsSection("Runtime Status") {
-                LabeledContent("Active Runtime", value: "Mock")
+                LabeledContent("Active Runtime", value: "Whisper")
                 LabeledContent("Metal Acceleration", value: "Not loaded")
                 LabeledContent("Thread Count", value: "Automatic")
-                LabeledContent("Mock Dictation", value: services.mockDictationStatus.menuTitle ?? "Idle")
+                LabeledContent("Dictation", value: dictationStatusText)
             }
 
             SettingsSection("Developer Mode") {
                 Toggle("Developer Mode", isOn: $developerMode)
             }
+        }
+    }
+
+    private var dictationStatusText: String {
+        switch services.dictation.status {
+        case .idle:
+            return "Idle"
+        case .waitingForActivation:
+            return "Waiting"
+        case .recording:
+            return "Recording"
+        case .processing:
+            return "Processing"
+        case .inserting:
+            return "Inserting"
+        case .completed:
+            return "Completed"
+        case .cancelled:
+            return "Cancelled"
+        case .blocked:
+            return "Blocked"
+        case .failed:
+            return "Failed"
         }
     }
 }

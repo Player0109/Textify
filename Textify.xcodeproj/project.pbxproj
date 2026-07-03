@@ -11,11 +11,14 @@
 		24B9C8C0EB665F386AC9A049 /* TextifyTranscription in Frameworks */ = {isa = PBXBuildFile; productRef = 5A754B4772812D6F6B03E1B5 /* TextifyTranscription */; };
 		352499832F959F080E70F038 /* TextifyModels in Frameworks */ = {isa = PBXBuildFile; productRef = 55B2B6B8EA96A06F9F2110FC /* TextifyModels */; };
 		3B0FD05953AE11637273FC75 /* TextifyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F80B1907E994ACF795B14A1 /* TextifyApp.swift */; };
-		46245AB98B48D7BC8D492056 /* TextifySettings in Frameworks */ = {isa = PBXBuildFile; productRef = 9430CD33F9E9B82564632D30 /* TextifySettings */; };
+		46245AB98B48D7BC8D492056 /* TextifyRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = 0BD9D2AC02C77D2DE0E3FD37 /* TextifyRuntime */; };
 		503BE9FCFD1D80B2DF7C9BA3 /* MenuBarRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = C32C98F05AD92486666F9717 /* MenuBarRoot.swift */; };
 		540E3CA7AD2B1392BA874392 /* TextifyCore in Frameworks */ = {isa = PBXBuildFile; productRef = B53B43D517933AD130F94821 /* TextifyCore */; };
+		545A09C7EA9374897B657BA6 /* AppPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CF0AB1D69531402DCE40D70 /* AppPaths.swift */; };
 		55134887FB3786EEAC7F8CD4 /* RecordingOverlayWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22DFC5ADE2174CBEA8D692D7 /* RecordingOverlayWindow.swift */; };
 		7BD8D1C22BB1F0EE2536BB3D /* TextifyHotkeys in Frameworks */ = {isa = PBXBuildFile; productRef = 48F8807F9DA4FFCFE56FACA7 /* TextifyHotkeys */; };
+		9B4DF1DED0EE9DA1B7C5CE5C /* TextifySettings in Frameworks */ = {isa = PBXBuildFile; productRef = 9430CD33F9E9B82564632D30 /* TextifySettings */; };
+		A144C92E74AAF7D61126BDC4 /* LaunchAtLoginController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77EBF4271CB3FC9AE19B1DE5 /* LaunchAtLoginController.swift */; };
 		B8A079B1778C11DC35E50AED /* TextifyAudio in Frameworks */ = {isa = PBXBuildFile; productRef = B1677768EEB0E11CB0915BF3 /* TextifyAudio */; };
 		D8D18BF5FDF50911E7580A66 /* TextifyDiagnostics in Frameworks */ = {isa = PBXBuildFile; productRef = 95C59065380C81191E03CD94 /* TextifyDiagnostics */; };
 		E4C0244160BA9CEE6A7445AD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F7E292AC1DD24E083692F969 /* Assets.xcassets */; };
@@ -26,12 +29,14 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		047F02C7C6B402C590F2375D /* Textify */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Textify; path = .; sourceTree = SOURCE_ROOT; };
 		0DE762BA89473A6795A5D976 /* AppServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServices.swift; sourceTree = "<group>"; };
 		22DFC5ADE2174CBEA8D692D7 /* RecordingOverlayWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingOverlayWindow.swift; sourceTree = "<group>"; };
 		35A0D6F1EF4A7DB14D99D2D6 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		44C5780DE99C8DD3D79B7EFC /* OnboardingRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingRootView.swift; sourceTree = "<group>"; };
 		5F80B1907E994ACF795B14A1 /* TextifyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextifyApp.swift; sourceTree = "<group>"; };
+		6CF0AB1D69531402DCE40D70 /* AppPaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPaths.swift; sourceTree = "<group>"; };
+		77EBF4271CB3FC9AE19B1DE5 /* LaunchAtLoginController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginController.swift; sourceTree = "<group>"; };
+		957E54D6FC97EC16F4E376D2 /* Textify */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Textify; path = .; sourceTree = SOURCE_ROOT; };
 		AC943A14D084BC8D112A71EB /* SettingsRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRootView.swift; sourceTree = "<group>"; };
 		C32C98F05AD92486666F9717 /* MenuBarRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarRoot.swift; sourceTree = "<group>"; };
 		F0C61DAF2351DEC5C3365040 /* Textify.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Textify.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -50,7 +55,8 @@
 				225D483CCD7F74E4320FCAA1 /* TextifyInsertion in Frameworks */,
 				7BD8D1C22BB1F0EE2536BB3D /* TextifyHotkeys in Frameworks */,
 				D8D18BF5FDF50911E7580A66 /* TextifyDiagnostics in Frameworks */,
-				46245AB98B48D7BC8D492056 /* TextifySettings in Frameworks */,
+				46245AB98B48D7BC8D492056 /* TextifyRuntime in Frameworks */,
+				9B4DF1DED0EE9DA1B7C5CE5C /* TextifySettings in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -93,7 +99,9 @@
 			isa = PBXGroup;
 			children = (
 				35A0D6F1EF4A7DB14D99D2D6 /* AppDelegate.swift */,
+				6CF0AB1D69531402DCE40D70 /* AppPaths.swift */,
 				0DE762BA89473A6795A5D976 /* AppServices.swift */,
+				77EBF4271CB3FC9AE19B1DE5 /* LaunchAtLoginController.swift */,
 				5F80B1907E994ACF795B14A1 /* TextifyApp.swift */,
 			);
 			path = App;
@@ -122,7 +130,7 @@
 		88237D86D1E7014C985840AD /* Packages */ = {
 			isa = PBXGroup;
 			children = (
-				047F02C7C6B402C590F2375D /* Textify */,
+				957E54D6FC97EC16F4E376D2 /* Textify */,
 			);
 			name = Packages;
 			sourceTree = "<group>";
@@ -177,6 +185,7 @@
 				07F283ACA2766E166455A5EF /* TextifyInsertion */,
 				48F8807F9DA4FFCFE56FACA7 /* TextifyHotkeys */,
 				95C59065380C81191E03CD94 /* TextifyDiagnostics */,
+				0BD9D2AC02C77D2DE0E3FD37 /* TextifyRuntime */,
 				9430CD33F9E9B82564632D30 /* TextifySettings */,
 			);
 			productName = Textify;
@@ -237,7 +246,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				F328A0C3A3107E02586111FA /* AppDelegate.swift in Sources */,
+				545A09C7EA9374897B657BA6 /* AppPaths.swift in Sources */,
 				FECC8E50DA0E6FD0AC8F8B50 /* AppServices.swift in Sources */,
+				A144C92E74AAF7D61126BDC4 /* LaunchAtLoginController.swift in Sources */,
 				503BE9FCFD1D80B2DF7C9BA3 /* MenuBarRoot.swift in Sources */,
 				F846FDC25A332B69852DEA3A /* OnboardingRootView.swift in Sources */,
 				55134887FB3786EEAC7F8CD4 /* RecordingOverlayWindow.swift in Sources */,
@@ -464,6 +475,10 @@
 		07F283ACA2766E166455A5EF /* TextifyInsertion */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = TextifyInsertion;
+		};
+		0BD9D2AC02C77D2DE0E3FD37 /* TextifyRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = TextifyRuntime;
 		};
 		48F8807F9DA4FFCFE56FACA7 /* TextifyHotkeys */ = {
 			isa = XCSwiftPackageProductDependency;

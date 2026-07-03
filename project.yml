@@ -41,6 +41,8 @@ targets:
       - package: TextifyPackage
         product: TextifyDiagnostics
       - package: TextifyPackage
+        product: TextifyRuntime
+      - package: TextifyPackage
         product: TextifySettings
 
     settings:

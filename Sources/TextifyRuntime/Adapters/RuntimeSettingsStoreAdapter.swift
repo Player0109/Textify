@@ -7,6 +7,10 @@ public actor RuntimeSettingsStoreAdapter: RuntimeSettingsProviding {
         self.store = store
     }
 
+    public init(storage: SettingsStorage) {
+        self.store = SettingsStore(storage: storage)
+    }
+
     public func loadPreferences() async -> AppPreferences {
         store.load()
     }

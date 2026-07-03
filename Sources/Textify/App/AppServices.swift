@@ -1,9 +1,11 @@
 import Foundation
 import Observation
-import TextifyCore
+import TextifyAudio
 import TextifyDiagnostics
+import TextifyHotkeys
 import TextifyInsertion
 import TextifyModels
+import TextifyRuntime
 import TextifySettings
 import TextifyTranscription
 
@@ -11,59 +13,107 @@ import TextifyTranscription
 @Observable
 final class AppServices {
     let settingsRouter = SettingsRouter()
+    let paths: AppPaths
     let settingsStore: SettingsStore
     let diagnosticsLogger: DiagnosticsLogger
-    let fakeInsertionService: DevelopmentInsertionService
+    let dictation: AppDictationService
+    let hotkeyMonitor: GlobalHotkeyMonitor
+    let launchAtLogin: any LaunchAtLoginManaging
+    let launchAtLoginLocation: any LaunchAtLoginLocationChecking
+    let startupIssue: AppStartupIssue?
 
     var preferences: AppPreferences
-    var modelCatalog: ModelCatalogState
-    var mockTranscriptionProvider: MockTranscriptionProvider
-    var dictationController: DictationController
-    var updateStatus = MockActionStatus.idle
-    var mockDictationStatus = MockActionStatus.idle
+    var launchAtLoginStatus: LaunchAtLoginStatus
+    var launchAtLoginOperationError: String?
+    var launchAtLoginFailedRequestedEnabled: Bool?
     var onboardingStep = OnboardingStep.welcome
     var overlayState = RecordingOverlayState.hidden
 
+    @ObservationIgnored private var runtimeStarted = false
+
+    static func production() -> AppServices {
+        production(
+            pathFactory: { try AppPaths.production() },
+            launchAtLogin: LaunchAtLoginController(),
+            launchAtLoginLocation: LaunchAtLoginLocationChecker()
+        )
+    }
+
+    static func production(
+        pathFactory: () throws -> AppPaths,
+        fileManager: FileManager = .default,
+        launchAtLogin: any LaunchAtLoginManaging,
+        launchAtLoginLocation: any LaunchAtLoginLocationChecking
+    ) -> AppServices {
+        do {
+            return production(
+                paths: try pathFactory(),
+                fileManager: fileManager,
+                launchAtLogin: launchAtLogin,
+                launchAtLoginLocation: launchAtLoginLocation,
+                startupIssue: nil
+            )
+        } catch {
+            return production(
+                paths: AppPaths.temporaryFallback(fileManager: fileManager),
+                fileManager: fileManager,
+                launchAtLogin: launchAtLogin,
+                launchAtLoginLocation: launchAtLoginLocation,
+                startupIssue: .applicationPathsUnavailable(String(describing: error))
+            )
+        }
+    }
+
     init(
-        settingsStore: SettingsStore = SettingsStore(storage: .memory),
-        diagnosticsLogger: DiagnosticsLogger = DiagnosticsLogger(directory: AppServices.defaultDiagnosticsDirectory),
-        fakeInsertionService: DevelopmentInsertionService = DevelopmentInsertionService()
+        paths: AppPaths,
+        settingsStore: SettingsStore,
+        diagnosticsLogger: DiagnosticsLogger,
+        dictation: AppDictationService,
+        hotkeyMonitor: GlobalHotkeyMonitor,
+        launchAtLogin: any LaunchAtLoginManaging,
+        launchAtLoginLocation: any LaunchAtLoginLocationChecking = LaunchAtLoginLocationChecker(),
+        startupIssue: AppStartupIssue? = nil
     ) {
+        self.paths = paths
         self.settingsStore = settingsStore
         self.diagnosticsLogger = diagnosticsLogger
-        self.fakeInsertionService = fakeInsertionService
+        self.dictation = dictation
+        self.hotkeyMonitor = hotkeyMonitor
+        self.launchAtLogin = launchAtLogin
+        self.launchAtLoginLocation = launchAtLoginLocation
+        self.startupIssue = startupIssue
         self.preferences = settingsStore.load()
-        self.modelCatalog = .v1Preview
-        self.mockTranscriptionProvider = Self.makeMockTranscriptionProvider()
-        self.dictationController = Self.makeMockDictationController(transcript: Self.developmentMockTranscript)
+        self.launchAtLoginStatus = launchAtLoginLocation.isSupported ? launchAtLogin.status() : .unsupportedLocation
     }
 
-    var canRunMockDictation: Bool {
-        mockDictationStatus != .running
-    }
-
-    func runMockDictation() async {
-        guard canRunMockDictation else {
+    func startRuntime() {
+        guard !runtimeStarted || !hotkeyMonitor.isRunning else {
             return
         }
 
-        mockDictationStatus = .running
-        overlayState = .recording(elapsedSeconds: 0)
+        let dictation = dictation
 
-        do {
-            mockTranscriptionProvider = Self.makeMockTranscriptionProvider()
-            let result = try await mockTranscriptionProvider.transcribe(.emptyForTests)
-            dictationController = Self.makeMockDictationController(transcript: result.text)
-            await dictationController.runDevelopmentMockCycle()
+        Task { @MainActor in
+            await dictation.refreshReadiness()
+        }
 
-            let outcome = await fakeInsertionService.insert(InsertionRequest(text: result.text))
-            try await logMockInsertion(text: result.text, outcome: outcome)
-
-            overlayState = .hidden
-            mockDictationStatus = .succeeded("Mock dictation inserted")
-        } catch {
-            overlayState = .blocked("Mock dictation failed")
-            mockDictationStatus = .unavailable("Mock dictation failed")
+        let result = hotkeyMonitor.start(
+            onEvent: { event in
+                Task { @MainActor in
+                    await dictation.handleTriggerEvent(event)
+                }
+            },
+            onFailure: { [weak self] error in
+                Task { @MainActor in
+                    if AppServices.hotkeyFailureLeavesMonitorStopped(error) {
+                        self?.runtimeStarted = false
+                    }
+                    await dictation.refreshReadiness()
+                }
+            }
+        )
+        if case .success = result {
+            runtimeStarted = true
         }
     }
 
@@ -71,69 +121,140 @@ final class AppServices {
         settingsStore.save(preferences)
     }
 
-    private func logMockInsertion(text: String, outcome: InsertionOutcome) async throws {
-        let pasteSucceeded: Bool
-        if case .pasted = outcome {
-            pasteSucceeded = true
-        } else {
-            pasteSucceeded = false
+    var canChangeLaunchAtLogin: Bool {
+        launchAtLoginLocation.isSupported && launchAtLoginStatus != .unsupportedLocation
+    }
+
+    @discardableResult
+    func refreshLaunchAtLoginStatus() -> LaunchAtLoginStatus {
+        let status = currentLaunchAtLoginStatus()
+        launchAtLoginStatus = status
+        launchAtLoginOperationError = nil
+        launchAtLoginFailedRequestedEnabled = nil
+        return status
+    }
+
+    @discardableResult
+    func setLaunchAtLoginEnabled(_ enabled: Bool) async -> LaunchAtLoginStatus {
+        let currentStatus = refreshLaunchAtLoginStatus()
+        guard currentStatus != .unsupportedLocation else {
+            persistLaunchAtLoginPreference(for: currentStatus)
+            return currentStatus
         }
 
-        try await diagnosticsLogger.log(
-            .insertionAttempt(
-                textLengthBucket: Self.textLengthBucket(for: text.count),
-                pasteboardSnapshotSucceeded: true,
-                pasteboardWriteSucceeded: pasteSucceeded,
-                pasteEventPosted: pasteSucceeded,
-                fallbackAttempted: false,
-                fallbackBlockedReason: nil,
-                durationMs: 0
-            )
-        )
-    }
-
-    private nonisolated static func makeMockTranscriptionProvider() -> MockTranscriptionProvider {
-        MockTranscriptionProvider(
-            results: [
-                TranscriptionResult(
-                    text: developmentMockTranscript,
-                    noSpeechProbability: 0.01,
-                    averageLogProbability: -0.1,
-                    compressionRatio: 1.1
-                )
-            ]
-        )
-    }
-
-    private nonisolated static func makeMockDictationController(transcript: String) -> DictationController {
-        DictationController(
-            fakeAudio: FakeDictationAudio(),
-            fakeTranscriber: FakeDictationTranscriber(transcripts: [transcript]),
-            fakeInsertion: FakeDictationInsertion()
-        )
-    }
-
-    private nonisolated static func textLengthBucket(for count: Int) -> String {
-        switch count {
-        case 0:
-            return "0"
-        case 1...50:
-            return "1-50"
-        case 51...200:
-            return "51-200"
-        case 201...500:
-            return "201-500"
-        default:
-            return "501+"
+        let operationStatus = await launchAtLogin.setEnabled(enabled)
+        switch operationStatus {
+        case .failed(let message):
+            let status = refreshLaunchAtLoginStatus()
+            launchAtLoginOperationError = message
+            launchAtLoginFailedRequestedEnabled = enabled
+            persistLaunchAtLoginPreference(for: status)
+            return operationStatus
+        case let status:
+            launchAtLoginStatus = status
+            launchAtLoginOperationError = nil
+            launchAtLoginFailedRequestedEnabled = nil
+            persistLaunchAtLoginPreference(for: status)
+            return status
         }
     }
 
-    private nonisolated static let developmentMockTranscript = "Textify mock dictation."
-
-    private nonisolated static var defaultDiagnosticsDirectory: URL {
-        FileManager.default.temporaryDirectory
-            .appendingPathComponent("TextifyDevelopmentDiagnostics", isDirectory: true)
+    private func persistLaunchAtLoginPreference(for status: LaunchAtLoginStatus) {
+        switch status {
+        case .enabled:
+            preferences.launchAtLoginEnabled = true
+        case .disabled, .requiresApproval, .unsupportedLocation, .unavailable:
+            preferences.launchAtLoginEnabled = false
+        case .failed:
+            break
+        }
+        savePreferences()
     }
+
+    private func currentLaunchAtLoginStatus() -> LaunchAtLoginStatus {
+        guard launchAtLoginLocation.isSupported else {
+            return .unsupportedLocation
+        }
+        return launchAtLogin.status()
+    }
+
+    nonisolated private static func hotkeyFailureLeavesMonitorStopped(_ error: HotkeyMonitorError) -> Bool {
+        switch error {
+        case .inputMonitoringPermissionRequired,
+             .inputMonitoringDenied,
+             .eventTapDisabledByUserInput,
+             .eventTapCreationFailed,
+             .runLoopSourceCreationFailed,
+             .notRunning:
+            return true
+        case .alreadyRunning:
+            return false
+        }
+    }
+
+    private static func production(
+        paths: AppPaths,
+        fileManager: FileManager,
+        launchAtLogin: any LaunchAtLoginManaging,
+        launchAtLoginLocation: any LaunchAtLoginLocationChecking,
+        startupIssue: AppStartupIssue?
+    ) -> AppServices {
+        let settingsStore = SettingsStore(storage: .file(paths.settingsFileURL), fileManager: fileManager)
+        let diagnosticsLogger = DiagnosticsLogger(directory: paths.logsDirectory)
+        let modelLayout = ModelStorageLayout(rootDirectory: paths.modelsDirectory)
+        let whisperRuntime = WhisperRuntime()
+        let preferences = settingsStore.load()
+        let trigger = hotkeyTrigger(for: preferences.trigger)
+        let dependencies = RuntimeDependencies(
+            settings: RuntimeSettingsStoreAdapter(storage: .file(paths.settingsFileURL)),
+            permissions: SystemRuntimePermissionAdapter(),
+            models: RuntimeModelResolverAdapter(layout: modelLayout),
+            audio: RuntimeAudioRecorderAdapter(),
+            transcriber: WhisperRuntimeTranscribingAdapter(runtime: whisperRuntime),
+            inserter: PasteInsertionService(
+                pasteboard: SystemPasteboardClient(),
+                eventPoster: SystemEventPoster(),
+                accessibility: .live,
+                targetChecker: SystemInsertionTargetChecker()
+            ),
+            diagnostics: RuntimeDiagnosticsLoggerAdapter(logger: diagnosticsLogger),
+            postProcessor: RuntimePostProcessingAdapter(),
+            clock: SystemRuntimeClock()
+        )
+
+        return AppServices(
+            paths: paths,
+            settingsStore: settingsStore,
+            diagnosticsLogger: diagnosticsLogger,
+            dictation: AppDictationService(
+                dependencies: dependencies,
+                triggerStateMachine: TriggerStateMachine(trigger: trigger)
+            ),
+            hotkeyMonitor: GlobalHotkeyMonitor(trigger: trigger),
+            launchAtLogin: launchAtLogin,
+            launchAtLoginLocation: launchAtLoginLocation,
+            startupIssue: startupIssue
+        )
+    }
+
+    private static func hotkeyTrigger(
+        for preference: TextifySettings.TriggerPreference
+    ) -> TextifyHotkeys.TriggerPreference {
+        switch preference {
+        case .rightCommand:
+            return .rightCommand
+        case .rightOption:
+            return .rightOption
+        case .rightControl:
+            return .rightControl
+        case .controlSpace:
+            return .controlSpace
+        }
+    }
+}
+
+enum AppStartupIssue: Equatable {
+    case applicationPathsUnavailable(String)
 }
 
 @Observable
@@ -182,71 +303,6 @@ enum SettingsPane: String, CaseIterable, Identifiable {
             return "hand.raised"
         case .advanced:
             return "slider.horizontal.3"
-        }
-    }
-}
-
-enum MockActionStatus: Equatable {
-    case idle
-    case running
-    case succeeded(String)
-    case unavailable(String)
-
-    var menuTitle: String? {
-        switch self {
-        case .idle:
-            return nil
-        case .running:
-            return "Mock dictation running"
-        case let .succeeded(message), let .unavailable(message):
-            return message
-        }
-    }
-}
-
-struct ModelCatalogState: Equatable {
-    var installedModels: InstalledModelsStore
-    var curatedModels: [ModelCatalogItem]
-    var activeModelID: String?
-
-    static let v1Preview = ModelCatalogState(
-        installedModels: InstalledModelsStore(),
-        curatedModels: [
-            ModelCatalogItem(id: "whisper-base-en-fast", tier: "Fast", name: "Whisper base.en", size: "TBD"),
-            ModelCatalogItem(id: "whisper-small-en-balanced", tier: "Balanced", name: "Whisper small.en", size: "TBD"),
-            ModelCatalogItem(id: "whisper-medium-en-accurate", tier: "Accurate", name: "Whisper medium.en", size: "TBD")
-        ],
-        activeModelID: nil
-    )
-}
-
-struct ModelCatalogItem: Equatable, Identifiable {
-    let id: String
-    let tier: String
-    let name: String
-    let size: String
-}
-
-actor DevelopmentInsertionService: InsertionService {
-    private(set) var insertedLengthBuckets: [String] = []
-
-    func insert(_ request: InsertionRequest) async -> InsertionOutcome {
-        insertedLengthBuckets.append(Self.textLengthBucket(for: request.text.count))
-        return .pasted(PasteInsertionReport(pasteboardRestored: false, pasteboardRestoreFailed: false))
-    }
-
-    private static func textLengthBucket(for count: Int) -> String {
-        switch count {
-        case 0:
-            return "0"
-        case 1...50:
-            return "1-50"
-        case 51...200:
-            return "51-200"
-        case 201...500:
-            return "201-500"
-        default:
-            return "501+"
         }
     }
 }
