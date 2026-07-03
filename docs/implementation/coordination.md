@@ -48,3 +48,18 @@ Task 1 must merge before parallel Wave 1 work begins.
 ## V1.1 Task 10 Production UI Carry-forward
 - The onboarding and settings model panes now call through the real `ModelDownloader`/`ModelInstaller` path with embedded manifest URLs and a trusted model-manifest key set for `ggml-small.en-q5_1`.
 - Release remains blocked until the model publishing task creates and deploys the signed manifest, signature, and GitHub Release model asset. As of Task 10 verification, `https://player0109.github.io/Textify/models/manifest.json` and `manifest.json.sig` still return 404.
+
+## V1.1 Integration Status
+
+- Automated verification on 2026-07-03:
+  - `swift test`: passed, 247 tests with 0 failures.
+  - `swift build -c release --arch arm64`: passed.
+  - `bash script/release/validate_release.sh`: passed, including plist checks, release string scans, and arm64 binary validation.
+  - `./script/build_and_run.sh --verify`: passed with the staged `.app` bundle; the launched `Textify` process was stopped after verification.
+- Local manual dictation smoke: not run in this integration gate. It requires a real published/installed curated model, user-granted Microphone/Accessibility/Input Monitoring permissions, and interactive dictation into target apps.
+- Secure-field, cancellation, and clipboard manual checks: not run in this integration gate; they remain release-blocking checklist items in `docs/MANUAL_QA.md`.
+- Maintainer-machine signing/notarization: not run. It requires Developer ID signing credentials and a notary keychain profile.
+- External publishing blocker as of 2026-07-03:
+  - `https://player0109.github.io/Textify/models/manifest.json`: 404.
+  - `https://player0109.github.io/Textify/models/manifest.json.sig`: 404.
+  - The V1.1 app should not be treated as user-production-ready until the model asset, model license/provenance sidecars, signed manifest, and signature are published and verified.
