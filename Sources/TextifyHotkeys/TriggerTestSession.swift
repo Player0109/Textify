@@ -33,7 +33,7 @@ public actor TriggerTestSession {
         let action = stateMachine.handle(event)
         if action == .beginRecording { sawBeginRecording = true }
         if case .escapeKeyDown = event { wasCancelled = true }
-        if action == .cancelRecording || action == .cancelAsShortcut { wasCancelled = true }
+        if action == .cancelRecording { wasCancelled = true }
         return TriggerTestSessionResult(
             sawDown: sawDown,
             sawBeginRecording: sawBeginRecording,
