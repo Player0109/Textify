@@ -2,8 +2,10 @@
 public final class GlobalHotkeyMonitor {
     private let permissionClient: InputMonitoringPermissionClient
     private let eventTapClient: any CGEventTapClient
+    private let trigger: TriggerPreference
     private var mapper: TriggerEventMapper
     private var handle: CGEventTapHandle?
+    private var sessionGeneration = 0
 
     public init(
         permissionClient: InputMonitoringPermissionClient = .live,
@@ -12,6 +14,7 @@ public final class GlobalHotkeyMonitor {
     ) {
         self.permissionClient = permissionClient
         self.eventTapClient = eventTapClient
+        self.trigger = trigger
         self.mapper = TriggerEventMapper(trigger: trigger)
     }
 
@@ -40,9 +43,17 @@ public final class GlobalHotkeyMonitor {
             return
         }
         do {
+            sessionGeneration += 1
+            mapper = TriggerEventMapper(trigger: trigger)
+            let callbackGeneration = sessionGeneration
             handle = try eventTapClient.start { [weak self] message in
                 Task { @MainActor [weak self] in
-                    self?.handle(message, onEvent: onEvent, onFailure: onFailure)
+                    self?.handle(
+                        message,
+                        callbackGeneration: callbackGeneration,
+                        onEvent: onEvent,
+                        onFailure: onFailure
+                    )
                 }
             }
         } catch let error as HotkeyMonitorError {
@@ -56,15 +67,21 @@ public final class GlobalHotkeyMonitor {
         guard let handle else {
             return
         }
+        sessionGeneration += 1
+        mapper = TriggerEventMapper(trigger: trigger)
         eventTapClient.stop(handle)
         self.handle = nil
     }
 
     private func handle(
         _ message: CGEventTapMessage,
+        callbackGeneration: Int,
         onEvent: @escaping @Sendable (TriggerEvent) -> Void,
         onFailure: @escaping @Sendable (HotkeyMonitorError) -> Void
     ) {
+        guard callbackGeneration == sessionGeneration else {
+            return
+        }
         switch message {
         case .keyboardEvent(let snapshot):
             guard let event = mapper.map(snapshot) else {

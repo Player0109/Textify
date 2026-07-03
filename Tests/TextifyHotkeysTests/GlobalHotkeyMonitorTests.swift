@@ -72,6 +72,89 @@ final class GlobalHotkeyMonitorTests: XCTestCase {
         XCTAssertEqual(events.values, [.triggerDown(timestampMs: 100)])
     }
 
+    func testQueuedCallbackFromStoppedSessionAfterRestartEmitsNothing() async {
+        let tap = FakeCGEventTapClient()
+        let monitor = GlobalHotkeyMonitor(
+            permissionClient: InputMonitoringPermissionClient(
+                status: { .granted },
+                requestAccess: { .granted }
+            ),
+            eventTapClient: tap
+        )
+        let oldEvents = Recorder<TriggerEvent>()
+        let newEvents = Recorder<TriggerEvent>()
+
+        monitor.start(
+            onEvent: { oldEvents.append($0) },
+            onFailure: { _ in XCTFail("Expected first monitor start to succeed") }
+        )
+        tap.send(
+            KeyboardEventSnapshot(
+                type: .flagsChanged,
+                keyCode: TriggerKeyMatcher.rightCommandKeyCode,
+                flags: TriggerKeyMatcher.commandFlagMask,
+                timestampMs: 100,
+                isAutoRepeat: false
+            )
+        )
+        monitor.stop()
+        monitor.start(
+            onEvent: { newEvents.append($0) },
+            onFailure: { _ in XCTFail("Expected second monitor start to succeed") }
+        )
+        await Task.yield()
+
+        XCTAssertEqual(oldEvents.values, [])
+        XCTAssertEqual(newEvents.values, [])
+    }
+
+    func testStopRestartAfterTriggerDownResetsMapperAndUsesNewSessionCallback() async {
+        let tap = FakeCGEventTapClient()
+        let monitor = GlobalHotkeyMonitor(
+            permissionClient: InputMonitoringPermissionClient(
+                status: { .granted },
+                requestAccess: { .granted }
+            ),
+            eventTapClient: tap
+        )
+        let oldEvents = Recorder<TriggerEvent>()
+        let newEvents = Recorder<TriggerEvent>()
+
+        monitor.start(
+            onEvent: { oldEvents.append($0) },
+            onFailure: { _ in XCTFail("Expected first monitor start to succeed") }
+        )
+        tap.send(
+            KeyboardEventSnapshot(
+                type: .flagsChanged,
+                keyCode: TriggerKeyMatcher.rightCommandKeyCode,
+                flags: TriggerKeyMatcher.commandFlagMask,
+                timestampMs: 100,
+                isAutoRepeat: false
+            )
+        )
+        await Task.yield()
+        monitor.stop()
+
+        monitor.start(
+            onEvent: { newEvents.append($0) },
+            onFailure: { _ in XCTFail("Expected second monitor start to succeed") }
+        )
+        tap.send(
+            KeyboardEventSnapshot(
+                type: .flagsChanged,
+                keyCode: TriggerKeyMatcher.rightCommandKeyCode,
+                flags: TriggerKeyMatcher.commandFlagMask,
+                timestampMs: 200,
+                isAutoRepeat: false
+            )
+        )
+        await Task.yield()
+
+        XCTAssertEqual(oldEvents.values, [.triggerDown(timestampMs: 100)])
+        XCTAssertEqual(newEvents.values, [.triggerDown(timestampMs: 200)])
+    }
+
     func testMappedEventsAreEmittedOnMainThreadAfterTapCallbackHop() async {
         let tap = FakeCGEventTapClient()
         let monitor = GlobalHotkeyMonitor(
