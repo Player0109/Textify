@@ -9,6 +9,23 @@ import TextifySettings
 import TextifyTranscription
 
 final class AppCompositionTests: XCTestCase {
+    func testAppDelegateActivationPolicyFollowsShowInDockPreference() {
+        var preferences = AppPreferences.defaults
+        preferences.showInDock = false
+        XCTAssertEqual(AppDelegate.activationPolicy(preferences: preferences), .accessory)
+
+        preferences.showInDock = true
+        XCTAssertEqual(AppDelegate.activationPolicy(preferences: preferences), .regular)
+    }
+
+    func testAppDelegateActivationPolicyFallsBackToAccessoryWhenSettingsPathFails() {
+        let policy = AppDelegate.activationPolicy(
+            pathFactory: { throw AppPathFixtureError.unavailable }
+        )
+
+        XCTAssertEqual(policy, .accessory)
+    }
+
     @MainActor
     func testProductionCompositionBuildsRuntimeServices() throws {
         let paths = try Self.makeTemporaryPaths()
@@ -56,6 +73,13 @@ final class AppCompositionTests: XCTestCase {
         XCTAssertEqual(LaunchAtLoginStatus.enabled, .enabled)
         XCTAssertEqual(LaunchAtLoginStatus.unsupportedLocation, .unsupportedLocation)
         XCTAssertNotEqual(LaunchAtLoginStatus.failed("first"), .failed("second"))
+    }
+
+    func testLoginItemsSettingsURLUsesSystemSettingsLoginItemsPane() {
+        XCTAssertEqual(
+            LoginItemsSettingsOpener.loginItemsSettingsURL.absoluteString,
+            "x-apple.systempreferences:com.apple.LoginItems-Settings.extension"
+        )
     }
 
     func testLaunchAtLoginLocationCheckerAllowsOnlyApplicationsFolders() {

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import TextifyRuntime
 
@@ -60,6 +61,7 @@ private struct GeneralSettingsPane: View {
                     .disabled(!services.canChangeLaunchAtLogin)
                 Text(launchAtLoginStatusText)
                     .foregroundStyle(.secondary)
+                launchAtLoginAction
                 Toggle("Show in Dock", isOn: $services.preferences.showInDock)
             }
 
@@ -116,6 +118,25 @@ private struct GeneralSettingsPane: View {
         case .failed:
             return "Textify could not update Launch at Login."
         }
+    }
+
+    @ViewBuilder
+    private var launchAtLoginAction: some View {
+        if services.launchAtLoginStatus == .requiresApproval {
+            Button("Open Login Items Settings") {
+                LoginItemsSettingsOpener.open()
+            }
+        }
+    }
+}
+
+struct LoginItemsSettingsOpener {
+    static let loginItemsSettingsURL = URL(
+        string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension"
+    )!
+
+    static func open(workspace: NSWorkspace = .shared) {
+        workspace.open(loginItemsSettingsURL)
     }
 }
 
