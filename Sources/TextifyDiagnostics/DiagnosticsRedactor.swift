@@ -150,6 +150,13 @@ enum DiagnosticsStringSanitizer {
             "speech_recognition_completed",
             unknownValue
         ],
+        "errorDomain": [
+            "NSCocoaErrorDomain",
+            "NSOSStatusErrorDomain",
+            "NSPOSIXErrorDomain",
+            "SMAppServiceErrorDomain",
+            unknownValue
+        ],
         "fallbackBlockedReason": [
             "control_characters_present",
             "empty_text",
@@ -163,6 +170,13 @@ enum DiagnosticsStringSanitizer {
             "bundled",
             "cached",
             "remote",
+            unknownValue
+        ],
+        "modelID": [
+            "ggml-small.en-q5_1",
+            "whisper-base-en-fast",
+            "whisper-medium-en-accurate",
+            "whisper-small-en-balanced",
             unknownValue
         ],
         "requestedAction": [

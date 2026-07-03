@@ -194,6 +194,128 @@ final class DiagnosticsTests: XCTestCase {
         XCTAssertFalse(json.localizedCaseInsensitiveContains("transcript"))
     }
 
+    func testDiagnosticEventsNormalizeSensitiveModelIDAndErrorDomainValues() throws {
+        let sensitiveValues: [(value: String, leakedFragments: [String])] = [
+            (
+                "/Users/alice/Library/Application Support/Textify/model.bin",
+                ["/Users/alice", "Library/Application Support", "model.bin"]
+            ),
+            (
+                "~/Library/Application Support/Textify/model.bin",
+                ["~/Library", "Library/Application Support", "model.bin"]
+            ),
+            (
+                "/Applications/Foo.app",
+                ["/Applications/Foo.app", "Foo.app"]
+            ),
+            (
+                "Preview",
+                ["Preview"]
+            ),
+            (
+                "whisper_init_from_file_with_params_no_state: failed to open /Users/alice/model.bin",
+                ["whisper_init_from_file", "failed to open", "/Users/alice", "model.bin"]
+            )
+        ]
+
+        for testCase in sensitiveValues {
+            let modelLoad = DiagnosticEvent.modelLoad(
+                modelID: testCase.value,
+                tier: "fast",
+                durationMs: 42,
+                result: "ready"
+            )
+            let (modelLoadObject, modelLoadJSON) = try encodedJSONObject(for: modelLoad)
+            XCTAssertEqual(modelLoadObject["modelID"] as? String, "unknown")
+            assertNoFragments(testCase.leakedFragments, in: modelLoadJSON)
+
+            let launchAtLogin = DiagnosticEvent.launchAtLoginChange(
+                requestedAction: "enable",
+                statusBefore: "notRegistered",
+                statusAfter: "error",
+                appLocationCategory: "applications",
+                succeeded: false,
+                errorDomain: testCase.value,
+                errorCode: 1
+            )
+            let (launchObject, launchJSON) = try encodedJSONObject(for: launchAtLogin)
+            XCTAssertEqual(launchObject["errorDomain"] as? String, "unknown")
+            assertNoFragments(testCase.leakedFragments, in: launchJSON)
+        }
+    }
+
+    func testDiagnosticEventsPreserveClosedModelIDAndErrorDomainValues() throws {
+        let modelLoad = DiagnosticEvent.modelLoad(
+            modelID: "ggml-small.en-q5_1",
+            tier: "balanced",
+            durationMs: 42,
+            result: "ready"
+        )
+        let (modelLoadObject, _) = try encodedJSONObject(for: modelLoad)
+        XCTAssertEqual(modelLoadObject["modelID"] as? String, "ggml-small.en-q5_1")
+
+        let launchAtLogin = DiagnosticEvent.launchAtLoginChange(
+            requestedAction: "enable",
+            statusBefore: "notRegistered",
+            statusAfter: "requiresApproval",
+            appLocationCategory: "applications",
+            succeeded: false,
+            errorDomain: "SMAppServiceErrorDomain",
+            errorCode: 1
+        )
+        let (launchObject, _) = try encodedJSONObject(for: launchAtLogin)
+        XCTAssertEqual(launchObject["errorDomain"] as? String, "SMAppServiceErrorDomain")
+    }
+
+    func testExporterNormalizesSensitiveModelIDAndErrorDomainValues() throws {
+        let directory = try makeTemporaryDirectory()
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let sensitiveValues = [
+            "/Users/alice/Library/Application Support/Textify/model.bin",
+            "~/Library/Application Support/Textify/model.bin",
+            "/Applications/Foo.app",
+            "Preview",
+            "whisper_init_from_file_with_params_no_state: failed to open /Users/alice/model.bin"
+        ]
+        let logContents = try sensitiveValues.map { value in
+            try jsonLine([
+                "event": "model_load",
+                "modelID": value,
+                "errorDomain": value,
+                "tier": "fast",
+                "durationMs": 42,
+                "result": "ready"
+            ])
+        }
+        .joined(separator: "\n") + "\n"
+        try writeFile("diagnostics-sensitive.jsonl", contents: logContents, in: directory)
+
+        let document = try DiagnosticsExporter().exportRedactedLogs(from: directory)
+
+        let contents = try XCTUnwrap(document.files.first?.contents)
+        let redactedLines = contents.split(separator: "\n").map(String.init)
+        XCTAssertEqual(redactedLines.count, sensitiveValues.count)
+        for line in redactedLines {
+            let data = try XCTUnwrap(line.data(using: .utf8))
+            let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            XCTAssertEqual(object["modelID"] as? String, "unknown")
+            XCTAssertEqual(object["errorDomain"] as? String, "unknown")
+        }
+        assertNoFragments([
+            "/Users/alice",
+            "~/Library",
+            "Library/Application Support",
+            "/Applications/Foo.app",
+            "Foo.app",
+            "Preview",
+            "whisper_init_from_file",
+            "failed to open",
+            "model.bin"
+        ], in: contents)
+    }
+
     func testResultWithRawPathOrOrdinaryPhraseIsNormalized() throws {
         let event = DiagnosticEvent.modelLoad(
             modelID: "ggml-small.en-q5_1",
@@ -306,6 +428,29 @@ final class DiagnosticsTests: XCTestCase {
 
     private func setModifiedAt(_ date: Date, for url: URL) throws {
         try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: url.path)
+    }
+
+    private func encodedJSONObject(for event: DiagnosticEvent) throws -> ([String: Any], String) {
+        let data = try JSONEncoder().encode(event)
+        let json = String(decoding: data, as: UTF8.self)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        return (object, json)
+    }
+
+    private func jsonLine(_ object: [String: Any]) throws -> String {
+        let data = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    private func assertNoFragments(
+        _ fragments: [String],
+        in string: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        for fragment in fragments {
+            XCTAssertFalse(string.contains(fragment), "Leaked fragment: \(fragment)", file: file, line: line)
+        }
     }
 }
 
