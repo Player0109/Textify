@@ -1,3 +1,5 @@
+#if defined(__arm64__) || defined(__aarch64__) || defined(__ARM_ARCH)
+
 #define GGML_COMMON_IMPL_CPP
 #define GGML_COMMON_DECL_CPP
 #include "ggml-common.h"
@@ -2160,3 +2162,5 @@ void ggml_gemm_iq4_nl_4x4_q8_0(int n, float * GGML_RESTRICT s, size_t bs, const 
         }
     }
 }
+
+#endif

@@ -104,8 +104,6 @@ let package = Package(
                 "ggml/src/ggml-cpu/quants.c",
                 "ggml/src/ggml-cpu/repack.cpp",
                 "ggml/src/ggml-cpu/hbm.cpp",
-                "ggml/src/ggml-cpu/amx/amx.cpp",
-                "ggml/src/ggml-cpu/amx/mmq.cpp",
                 "ggml/src/ggml-cpu/arch/arm/quants.c",
                 "ggml/src/ggml-cpu/arch/arm/repack.cpp",
                 "ggml/src/ggml-metal/ggml-metal.m"

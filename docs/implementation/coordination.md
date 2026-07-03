@@ -12,7 +12,7 @@ Task 1 must merge before parallel Wave 1 work begins.
 - Vendored upstream: ggml-org/whisper.cpp tag `v1.7.6`, commit `a8d002cfd879315632a579e73f0148d06959de36`.
 - Source-list drift handled:
   - `ggml/src/ggml-backend-meta.cpp` is in the plan's example list but is not present in upstream `v1.7.6`, so `Package.swift` omits it.
-  - `v1.7.6` requires `ggml-cpu/amx/` and `ggml-cpu/arch/arm/{quants.c,repack.cpp}` for the ARM64 CPU backend link, so those files are included.
+  - `ggml-cpu/arch/arm/{quants.c,repack.cpp}` are included for ARM64 vector-dot, quantize, and repack symbols. `arch/arm/repack.cpp` has a local architecture guard so Xcode's generic macOS archive can compile the SwiftPM package target's `x86_64` slice without duplicate symbols against the generic `ggml-cpu/repack.cpp`.
   - The Metal shader file is added as a SwiftPM processed resource so the Metal backend can resolve it at runtime.
   - The vendor target public include directory carries copied public headers so `TextifyWhisperShim` can include the vendor module without private `-I` flags.
   - The package target omits invalid `exclude` entries for directories that are not copied into the minimal vendor subset.
