@@ -57,6 +57,44 @@ final class ManifestSignatureTests: XCTestCase {
         XCTAssertThrowsError(try verifier.verify(manifestData: changedData, signatureData: signatureData))
     }
 
+    func testVerifierRejectsSignatureBase64WithLeadingTrailingWhitespace() throws {
+        let privateKey = Curve25519.Signing.PrivateKey()
+        let manifestData = Data(#"{"manifestVersion":1,"generatedAt":"2026-07-03T00:00:00Z","models":[]}"#.utf8)
+        let signature = try privateKey.signature(for: manifestData).base64EncodedString()
+        let signatureData = Data("""
+        {"signatureVersion":1,"keyId":"test-key","algorithm":"Ed25519","signatureBase64":" \(signature) "}
+        """.utf8)
+        let verifier = ManifestVerifier(trustedKeys: [
+            TrustedModelManifestKey(
+                keyId: "test-key",
+                publicKeyBase64: privateKey.publicKey.rawRepresentation.base64EncodedString()
+            )
+        ])
+
+        XCTAssertThrowsError(try verifier.verify(manifestData: manifestData, signatureData: signatureData)) { error in
+            XCTAssertEqual(error as? ManifestVerificationError, .invalidSignatureEncoding)
+        }
+    }
+
+    func testVerifierRejectsPublicKeyBase64WithLeadingTrailingWhitespace() throws {
+        let privateKey = Curve25519.Signing.PrivateKey()
+        let manifestData = Data(#"{"manifestVersion":1,"generatedAt":"2026-07-03T00:00:00Z","models":[]}"#.utf8)
+        let signature = try privateKey.signature(for: manifestData).base64EncodedString()
+        let signatureData = Data("""
+        {"signatureVersion":1,"keyId":"test-key","algorithm":"Ed25519","signatureBase64":"\(signature)"}
+        """.utf8)
+        let verifier = ManifestVerifier(trustedKeys: [
+            TrustedModelManifestKey(
+                keyId: "test-key",
+                publicKeyBase64: " \(privateKey.publicKey.rawRepresentation.base64EncodedString()) "
+            )
+        ])
+
+        XCTAssertThrowsError(try verifier.verify(manifestData: manifestData, signatureData: signatureData)) { error in
+            XCTAssertEqual(error as? ManifestVerificationError, .invalidSignatureEncoding)
+        }
+    }
+
     func testVerifierAcceptsFixtureSignature() throws {
         let verifier = ManifestVerifier(trustedKeys: [
             TrustedModelManifestKey(

@@ -39,8 +39,8 @@ public struct ManifestVerifier {
         guard let trustedKey = trustedKeys.first(where: { $0.keyId == signature.keyId }) else {
             throw ManifestVerificationError.unknownKeyId(signature.keyId)
         }
-        guard let publicKeyData = Data(base64Encoded: trustedKey.publicKeyBase64.trimmingCharacters(in: .whitespacesAndNewlines)),
-              let signatureBytes = Data(base64Encoded: signature.signatureBase64.trimmingCharacters(in: .whitespacesAndNewlines))
+        guard let publicKeyData = Data(base64Encoded: trustedKey.publicKeyBase64),
+              let signatureBytes = Data(base64Encoded: signature.signatureBase64)
         else {
             throw ManifestVerificationError.invalidSignatureEncoding
         }
