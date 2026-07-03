@@ -87,9 +87,11 @@ final class AppCompositionTests: XCTestCase {
         services.savePreferences()
 
         launchAtLogin.setResult = .failed("fixture")
+        launchAtLogin.liveStatusAfterSetFailure = .enabled
         let status = await services.setLaunchAtLoginEnabled(false)
 
-        XCTAssertEqual(status, LaunchAtLoginStatus.failed("fixture"))
+        XCTAssertEqual(status, LaunchAtLoginStatus.enabled)
+        XCTAssertEqual(services.launchAtLoginStatus, LaunchAtLoginStatus.enabled)
         XCTAssertTrue(services.preferences.launchAtLoginEnabled)
         XCTAssertTrue(services.settingsStore.load().launchAtLoginEnabled)
     }
@@ -112,6 +114,32 @@ final class AppCompositionTests: XCTestCase {
         services.startRuntime()
 
         XCTAssertEqual(tap.startCount, 1)
+    }
+
+    @MainActor
+    func testStartRuntimeCanRetryAfterUserInputDisablesStartedMonitor() async throws {
+        let tap = FakeCGEventTapClient()
+        let services = try Self.makeServices(
+            hotkeyMonitor: GlobalHotkeyMonitor(
+                permissionClient: InputMonitoringPermissionClient(
+                    status: { .granted },
+                    requestAccess: { .granted }
+                ),
+                eventTapClient: tap
+            )
+        )
+
+        services.startRuntime()
+        XCTAssertEqual(tap.startCount, 1)
+
+        tap.send(.tapDisabledByUserInput)
+
+        for _ in 0..<10 where tap.startCount == 1 {
+            await Task.yield()
+            services.startRuntime()
+        }
+
+        XCTAssertEqual(tap.startCount, 2)
     }
 
     @MainActor
@@ -202,6 +230,7 @@ private enum AppPathFixtureError: Error, CustomStringConvertible {
 private final class FakeLaunchAtLoginManager: LaunchAtLoginManaging {
     var currentStatus: LaunchAtLoginStatus
     var setResult: LaunchAtLoginStatus?
+    var liveStatusAfterSetFailure: LaunchAtLoginStatus?
     private(set) var requestedEnabledValues: [Bool] = []
 
     init(status: LaunchAtLoginStatus) {
@@ -215,7 +244,11 @@ private final class FakeLaunchAtLoginManager: LaunchAtLoginManaging {
     func setEnabled(_ enabled: Bool) async -> LaunchAtLoginStatus {
         requestedEnabledValues.append(enabled)
         let result = setResult ?? (enabled ? LaunchAtLoginStatus.enabled : .disabled)
-        currentStatus = result
+        if case .failed = result, let liveStatusAfterSetFailure {
+            currentStatus = liveStatusAfterSetFailure
+        } else {
+            currentStatus = result
+        }
         return result
     }
 }
@@ -236,16 +269,22 @@ private final class MutableInputMonitoringPermission {
 }
 
 private final class FakeCGEventTapClient: CGEventTapClient, @unchecked Sendable {
+    private var handler: (@Sendable (CGEventTapMessage) -> Void)?
     private(set) var startCount = 0
 
     func start(handler: @escaping @Sendable (CGEventTapMessage) -> Void) throws -> CGEventTapHandle {
         startCount += 1
+        self.handler = handler
         return CGEventTapHandle()
     }
 
     func setEnabled(_ handle: CGEventTapHandle, enabled: Bool) {}
 
     func stop(_ handle: CGEventTapHandle) {}
+
+    func send(_ message: CGEventTapMessage) {
+        handler?(message)
+    }
 }
 
 private struct FakeRuntimePermissionChecker: RuntimePermissionChecking {

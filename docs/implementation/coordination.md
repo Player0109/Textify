@@ -39,3 +39,6 @@ Task 1 must merge before parallel Wave 1 work begins.
 
 ## V1.1 Task 3 Insertion Note
 - Task 3 touched `Sources/Textify/App/AppServices.swift` only to migrate compile references from the removed legacy `InsertionOutcome.pastePosted` surface to the new `.pasted(...)` outcome shape.
+
+## V1.1 Task 9 App Composition Follow-up
+- Task 9 touched `Sources/TextifyHotkeys/GlobalHotkeyMonitor.swift` to expose read-only `isRunning` state. `AppServices.startRuntime()` uses it to retry after the event tap stops itself on `.tapDisabledByUserInput`, while preserving hotkey ownership of event-tap lifecycle details.

@@ -78,7 +78,7 @@ final class AppServices {
     }
 
     func startRuntime() {
-        guard !runtimeStarted else {
+        guard !runtimeStarted || !hotkeyMonitor.isRunning else {
             return
         }
 
@@ -94,8 +94,11 @@ final class AppServices {
                     await dictation.handleTriggerEvent(event)
                 }
             },
-            onFailure: { _ in
+            onFailure: { [weak self] error in
                 Task { @MainActor in
+                    if AppServices.hotkeyFailureLeavesMonitorStopped(error) {
+                        self?.runtimeStarted = false
+                    }
                     await dictation.refreshReadiness()
                 }
             }
@@ -118,8 +121,14 @@ final class AppServices {
 
     @discardableResult
     func setLaunchAtLoginEnabled(_ enabled: Bool) async -> LaunchAtLoginStatus {
-        let status = await launchAtLogin.setEnabled(enabled)
-        launchAtLoginStatus = status
+        let operationStatus = await launchAtLogin.setEnabled(enabled)
+        let status: LaunchAtLoginStatus
+        if case .failed = operationStatus {
+            status = refreshLaunchAtLoginStatus()
+        } else {
+            status = operationStatus
+            launchAtLoginStatus = status
+        }
 
         switch status {
         case .enabled:
@@ -133,6 +142,20 @@ final class AppServices {
         }
 
         return status
+    }
+
+    nonisolated private static func hotkeyFailureLeavesMonitorStopped(_ error: HotkeyMonitorError) -> Bool {
+        switch error {
+        case .inputMonitoringPermissionRequired,
+             .inputMonitoringDenied,
+             .eventTapDisabledByUserInput,
+             .eventTapCreationFailed,
+             .runLoopSourceCreationFailed,
+             .notRunning:
+            return true
+        case .alreadyRunning:
+            return false
+        }
     }
 
     private static func production(

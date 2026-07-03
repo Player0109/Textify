@@ -11,6 +11,10 @@ public final class GlobalHotkeyMonitor {
         trigger
     }
 
+    public var isRunning: Bool {
+        handle != nil
+    }
+
     public init(
         permissionClient: InputMonitoringPermissionClient = .live,
         eventTapClient: any CGEventTapClient = SystemCGEventTapClient(),
