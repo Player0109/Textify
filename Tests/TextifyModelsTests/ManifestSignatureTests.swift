@@ -1,3 +1,4 @@
+import CryptoKit
 import TextifyModels
 import XCTest
 
@@ -18,49 +19,75 @@ final class ManifestSignatureTests: XCTestCase {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    func testSignatureEnvelopeParsesAndBuildsCanonicalPayload() throws {
-        let signature = try ManifestSignature.decode(try Self.fixtureData("manifest.json.sig"))
-        let payload = String(
-            decoding: ManifestVerifier().canonicalPayload(signature: signature),
-            as: UTF8.self
-        )
+    func testVerifierAcceptsSignatureOverExactManifestBytes() throws {
+        let privateKey = Curve25519.Signing.PrivateKey()
+        let manifestData = Data(#"{"manifestVersion":1,"generatedAt":"2026-07-03T00:00:00Z","models":[]}"#.utf8)
+        let signature = try privateKey.signature(for: manifestData).base64EncodedString()
+        let signatureData = Data("""
+        {"signatureVersion":1,"keyId":"test-key","algorithm":"Ed25519","signatureBase64":"\(signature)"}
+        """.utf8)
 
-        XCTAssertEqual(signature.signatureVersion, 1)
-        XCTAssertEqual(signature.signatureType, "io.github.Player0109.Textify.model-manifest")
-        XCTAssertEqual(signature.algorithm, "Ed25519")
-        XCTAssertEqual(signature.keyId, "model-manifest-v1")
-        XCTAssertTrue(payload.hasSuffix("\n"))
-        XCTAssertTrue(payload.contains("contentSHA256=\(signature.contentSHA256)\n"))
+        let verifier = ManifestVerifier(trustedKeys: [
+            TrustedModelManifestKey(
+                keyId: "test-key",
+                publicKeyBase64: privateKey.publicKey.rawRepresentation.base64EncodedString()
+            )
+        ])
+
+        let manifest = try verifier.verify(manifestData: manifestData, signatureData: signatureData)
+
+        XCTAssertEqual(manifest.manifestVersion, 1)
     }
 
-    func testVerifierAcceptsValidFixtureSignature() throws {
-        try ManifestVerifier().verify(
+    func testVerifierRejectsWhitespaceChangedAfterSigning() throws {
+        let privateKey = Curve25519.Signing.PrivateKey()
+        let signedData = Data(#"{"manifestVersion":1,"generatedAt":"2026-07-03T00:00:00Z","models":[]}"#.utf8)
+        let changedData = Data(#"{ "manifestVersion": 1, "generatedAt": "2026-07-03T00:00:00Z", "models": [] }"#.utf8)
+        let signature = try privateKey.signature(for: signedData).base64EncodedString()
+        let signatureData = Data("""
+        {"signatureVersion":1,"keyId":"test-key","algorithm":"Ed25519","signatureBase64":"\(signature)"}
+        """.utf8)
+        let verifier = ManifestVerifier(trustedKeys: [
+            TrustedModelManifestKey(
+                keyId: "test-key",
+                publicKeyBase64: privateKey.publicKey.rawRepresentation.base64EncodedString()
+            )
+        ])
+
+        XCTAssertThrowsError(try verifier.verify(manifestData: changedData, signatureData: signatureData))
+    }
+
+    func testVerifierAcceptsFixtureSignature() throws {
+        let verifier = ManifestVerifier(trustedKeys: [
+            TrustedModelManifestKey(
+                keyId: "fixture-key",
+                publicKeyBase64: try Self.fixtureString("manifest.fixture-public-key.base64")
+            )
+        ])
+
+        let manifest = try verifier.verify(
             manifestData: try Self.fixtureData("manifest.json"),
-            signatureData: try Self.fixtureData("manifest.json.sig"),
-            publicKeyBase64: try Self.fixtureString("manifest.fixture-public-key.base64")
+            signatureData: try Self.fixtureData("manifest.json.sig")
         )
+
+        XCTAssertEqual(manifest.models.first?.id, ProductionModelPolicy.requiredModelID)
     }
 
     func testVerifierRejectsTamperedManifestBytes() throws {
         var manifestData = try Self.fixtureData("manifest.json")
         manifestData.append(Data("\n".utf8))
-
-        XCTAssertThrowsError(
-            try ManifestVerifier().verify(
-                manifestData: manifestData,
-                signatureData: try Self.fixtureData("manifest.json.sig"),
+        let verifier = ManifestVerifier(trustedKeys: [
+            TrustedModelManifestKey(
+                keyId: "fixture-key",
                 publicKeyBase64: try Self.fixtureString("manifest.fixture-public-key.base64")
             )
+        ])
+
+        XCTAssertThrowsError(
+            try verifier.verify(
+                manifestData: manifestData,
+                signatureData: try Self.fixtureData("manifest.json.sig")
+            )
         )
-    }
-
-    func testSignatureUnknownFieldsAreRejected() throws {
-        let signatureJSON = String(decoding: try Self.fixtureData("manifest.json.sig"), as: UTF8.self)
-        let data = Data(signatureJSON.replacingOccurrences(
-            of: "\n}",
-            with: ",\n  \"unexpectedFieldForStrictSchemaTest\": true\n}"
-        ).utf8)
-
-        XCTAssertThrowsError(try ManifestSignature.decode(data))
     }
 }

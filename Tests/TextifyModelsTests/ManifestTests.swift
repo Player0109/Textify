@@ -28,7 +28,7 @@ final class ManifestTests: XCTestCase {
     func testManifestParsesInitialCuratedModelShape() throws {
         let manifest = try ModelManifest.decode(try Self.validManifestData)
         XCTAssertEqual(manifest.manifestVersion, 1)
-        XCTAssertEqual(manifest.models.first?.id, "whisper-base-en-fast")
+        XCTAssertEqual(manifest.models.first?.id, ProductionModelPolicy.requiredModelID)
         XCTAssertEqual(manifest.models.first?.runtimeParameters.language, "en")
         XCTAssertEqual(manifest.models.first?.runtimeParameters.temperatureFallback, [])
     }
