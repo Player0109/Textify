@@ -172,12 +172,13 @@ final class AppCompositionTests: XCTestCase {
     private static func makeServices(
         preferences: AppPreferences = .defaults,
         hotkeyMonitor: GlobalHotkeyMonitor? = nil,
-        launchAtLogin: FakeLaunchAtLoginManager = FakeLaunchAtLoginManager(status: .disabled)
+        launchAtLogin: FakeLaunchAtLoginManager? = nil
     ) throws -> AppServices {
         let paths = try makeTemporaryPaths()
         let settingsStore = SettingsStore(storage: .file(paths.settingsFileURL))
         settingsStore.save(preferences)
         let diagnosticsLogger = DiagnosticsLogger(directory: paths.logsDirectory)
+        let launchAtLogin = launchAtLogin ?? FakeLaunchAtLoginManager(status: .disabled)
         let hotkeyMonitor = hotkeyMonitor ?? GlobalHotkeyMonitor(
             permissionClient: InputMonitoringPermissionClient(
                 status: { .granted },
@@ -190,7 +191,7 @@ final class AppCompositionTests: XCTestCase {
             settingsStore: settingsStore,
             diagnosticsLogger: diagnosticsLogger,
             dictation: AppDictationService(dependencies: RuntimeDependencies(
-                settings: RuntimeSettingsStoreAdapter(store: settingsStore),
+                settings: RuntimeSettingsStoreAdapter(storage: .file(paths.settingsFileURL)),
                 permissions: FakeRuntimePermissionChecker(),
                 models: FakeRuntimeModelResolver(),
                 audio: FakeRuntimeAudioRecorder(),
@@ -253,11 +254,25 @@ private final class FakeLaunchAtLoginManager: LaunchAtLoginManaging {
     }
 }
 
-private final class MutableInputMonitoringPermission {
-    var status: InputMonitoringPermissionStatus
+private final class MutableInputMonitoringPermission: @unchecked Sendable {
+    private let lock = NSLock()
+    private var protectedStatus: InputMonitoringPermissionStatus
+
+    var status: InputMonitoringPermissionStatus {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return protectedStatus
+        }
+        set {
+            lock.lock()
+            protectedStatus = newValue
+            lock.unlock()
+        }
+    }
 
     init(status: InputMonitoringPermissionStatus) {
-        self.status = status
+        self.protectedStatus = status
     }
 
     var client: InputMonitoringPermissionClient {

@@ -165,14 +165,13 @@ final class AppServices {
         startupIssue: AppStartupIssue?
     ) -> AppServices {
         let settingsStore = SettingsStore(storage: .file(paths.settingsFileURL), fileManager: fileManager)
-        let runtimeSettingsStore = SettingsStore(storage: .file(paths.settingsFileURL), fileManager: fileManager)
         let diagnosticsLogger = DiagnosticsLogger(directory: paths.logsDirectory)
         let modelLayout = ModelStorageLayout(rootDirectory: paths.modelsDirectory)
         let whisperRuntime = WhisperRuntime()
         let preferences = settingsStore.load()
         let trigger = hotkeyTrigger(for: preferences.trigger)
         let dependencies = RuntimeDependencies(
-            settings: RuntimeSettingsStoreAdapter(store: runtimeSettingsStore),
+            settings: RuntimeSettingsStoreAdapter(storage: .file(paths.settingsFileURL)),
             permissions: SystemRuntimePermissionAdapter(),
             models: RuntimeModelResolverAdapter(layout: modelLayout),
             audio: RuntimeAudioRecorderAdapter(),

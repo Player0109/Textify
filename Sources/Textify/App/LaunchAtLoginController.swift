@@ -8,6 +8,7 @@ enum LaunchAtLoginStatus: Equatable {
     case failed(String)
 }
 
+@MainActor
 protocol LaunchAtLoginManaging {
     func status() -> LaunchAtLoginStatus
     func setEnabled(_ enabled: Bool) async -> LaunchAtLoginStatus
