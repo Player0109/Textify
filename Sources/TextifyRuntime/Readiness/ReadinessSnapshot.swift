@@ -45,10 +45,8 @@ public struct ReadinessSnapshot: Equatable, Sendable {
         }
 
         switch model {
-        case .ready:
+        case .ready, .loading, .warming:
             break
-        case let .loading(modelID), let .warming(modelID):
-            blockers.append(.activeModelNotReady(modelID: modelID))
         case .noActiveModel:
             blockers.append(.noActiveModel)
         case let .missing(modelID):

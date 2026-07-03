@@ -23,8 +23,7 @@ public final class AppDictationService {
                 accessibility: .unknown,
                 inputMonitoring: .unknown
             ),
-            model: .noActiveModel,
-            blockers: [.noActiveModel]
+            model: .noActiveModel
         )
     }
 
@@ -36,8 +35,7 @@ public final class AppDictationService {
         let modelReadiness = await dependencies.models.readiness(for: activeModel)
         let snapshot = ReadinessSnapshot(
             permissions: permissions,
-            model: modelReadiness,
-            blockers: Self.blockers(permissions: permissions, model: modelReadiness)
+            model: modelReadiness
         )
         readiness = snapshot
         return snapshot
@@ -72,36 +70,5 @@ public final class AppDictationService {
     public func cancelActiveSession(reason: DictationCancellationReason) async {
         await dependencies.audio.discardRecording()
         status = .cancelled(reason)
-    }
-
-    private static func blockers(
-        permissions: RuntimePermissionSnapshot,
-        model: RuntimeModelReadiness
-    ) -> [ReadinessBlocker] {
-        var blockers: [ReadinessBlocker] = []
-        if permissions.microphone == .denied {
-            blockers.append(.microphonePermissionDenied)
-        }
-        if permissions.accessibility == .denied {
-            blockers.append(.accessibilityPermissionDenied)
-        }
-        if permissions.inputMonitoring == .denied {
-            blockers.append(.inputMonitoringPermissionDenied)
-        }
-
-        switch model {
-        case .ready:
-            break
-        case .loading(let modelID), .warming(let modelID):
-            blockers.append(.activeModelNotReady(modelID: modelID))
-        case .noActiveModel:
-            blockers.append(.noActiveModel)
-        case let .missing(modelID):
-            blockers.append(.activeModelMissing(modelID: modelID))
-        case let .failed(modelID, _):
-            blockers.append(.transcriptionRuntimeFailed(modelID: modelID))
-        }
-
-        return blockers
     }
 }
