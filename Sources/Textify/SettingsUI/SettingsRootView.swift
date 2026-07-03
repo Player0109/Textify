@@ -57,6 +57,7 @@ private struct GeneralSettingsPane: View {
         SettingsPaneLayout(title: "General") {
             SettingsSection("Startup") {
                 Toggle("Launch at Login", isOn: launchAtLoginBinding)
+                    .disabled(!services.canChangeLaunchAtLogin)
                 Text(launchAtLoginStatusText)
                     .foregroundStyle(.secondary)
                 Toggle("Show in Dock", isOn: $services.preferences.showInDock)
@@ -94,6 +95,10 @@ private struct GeneralSettingsPane: View {
     }
 
     private var launchAtLoginStatusText: String {
+        if services.launchAtLoginOperationError != nil {
+            return "Textify could not update Launch at Login."
+        }
+
         switch services.launchAtLoginStatus {
         case .enabled:
             return "Textify will open at login."
@@ -101,6 +106,8 @@ private struct GeneralSettingsPane: View {
             return "Textify will not open at login."
         case .requiresApproval:
             return "macOS needs approval before Textify can open at login."
+        case .unsupportedLocation:
+            return "Move Textify to Applications to use Launch at Login."
         case .unavailable:
             return "Textify could not check Launch at Login status."
         case .failed:
@@ -248,8 +255,8 @@ private struct AdvancedSettingsPane: View {
 
             SettingsSection("Runtime Status") {
                 LabeledContent("Active Runtime", value: "Whisper")
-                LabeledContent("Metal Acceleration", value: "Automatic")
-                LabeledContent("Thread Count", value: "\(ProcessInfo.processInfo.activeProcessorCount)")
+                LabeledContent("Metal Acceleration", value: "Not loaded")
+                LabeledContent("Thread Count", value: "Automatic")
                 LabeledContent("Dictation", value: dictationStatusText)
             }
 

@@ -23,6 +23,7 @@ final class AppServices {
 
     var preferences: AppPreferences
     var launchAtLoginStatus: LaunchAtLoginStatus
+    var launchAtLoginOperationError: String?
     var onboardingStep = OnboardingStep.welcome
     var overlayState = RecordingOverlayState.hidden
 
@@ -112,36 +113,51 @@ final class AppServices {
         settingsStore.save(preferences)
     }
 
+    var canChangeLaunchAtLogin: Bool {
+        launchAtLoginStatus != .unsupportedLocation
+    }
+
     @discardableResult
     func refreshLaunchAtLoginStatus() -> LaunchAtLoginStatus {
         let status = launchAtLogin.status()
         launchAtLoginStatus = status
+        launchAtLoginOperationError = nil
         return status
     }
 
     @discardableResult
     func setLaunchAtLoginEnabled(_ enabled: Bool) async -> LaunchAtLoginStatus {
-        let operationStatus = await launchAtLogin.setEnabled(enabled)
-        let status: LaunchAtLoginStatus
-        if case .failed = operationStatus {
-            status = refreshLaunchAtLoginStatus()
-        } else {
-            status = operationStatus
-            launchAtLoginStatus = status
+        let currentStatus = refreshLaunchAtLoginStatus()
+        guard currentStatus != .unsupportedLocation else {
+            persistLaunchAtLoginPreference(for: currentStatus)
+            return currentStatus
         }
 
+        let operationStatus = await launchAtLogin.setEnabled(enabled)
+        switch operationStatus {
+        case .failed(let message):
+            let status = refreshLaunchAtLoginStatus()
+            launchAtLoginOperationError = message
+            persistLaunchAtLoginPreference(for: status)
+            return operationStatus
+        case let status:
+            launchAtLoginStatus = status
+            launchAtLoginOperationError = nil
+            persistLaunchAtLoginPreference(for: status)
+            return status
+        }
+    }
+
+    private func persistLaunchAtLoginPreference(for status: LaunchAtLoginStatus) {
         switch status {
         case .enabled:
             preferences.launchAtLoginEnabled = true
-            savePreferences()
-        case .disabled, .requiresApproval, .unavailable:
+        case .disabled, .requiresApproval, .unsupportedLocation, .unavailable:
             preferences.launchAtLoginEnabled = false
-            savePreferences()
         case .failed:
             break
         }
-
-        return status
+        savePreferences()
     }
 
     nonisolated private static func hotkeyFailureLeavesMonitorStopped(_ error: HotkeyMonitorError) -> Bool {

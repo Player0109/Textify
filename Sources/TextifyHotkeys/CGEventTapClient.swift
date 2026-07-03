@@ -12,7 +12,7 @@ public struct CGEventTapHandle: @unchecked Sendable {
     fileprivate let source: CFRunLoopSource?
     fileprivate let refcon: UnsafeMutableRawPointer?
 
-    public init() {
+    init() {
         self.port = nil
         self.source = nil
         self.refcon = nil

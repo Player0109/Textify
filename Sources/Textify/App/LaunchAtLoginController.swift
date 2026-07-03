@@ -4,6 +4,7 @@ enum LaunchAtLoginStatus: Equatable {
     case enabled
     case disabled
     case requiresApproval
+    case unsupportedLocation
     case unavailable
     case failed(String)
 }
@@ -30,7 +31,7 @@ struct LaunchAtLoginController: LaunchAtLoginManaging {
         case .requiresApproval:
             return .requiresApproval
         case .notFound:
-            return .unavailable
+            return .unsupportedLocation
         @unknown default:
             return .unavailable
         }

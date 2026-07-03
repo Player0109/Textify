@@ -2,7 +2,7 @@ import XCTest
 @testable import Textify
 import TextifyAudio
 import TextifyDiagnostics
-import TextifyHotkeys
+@testable import TextifyHotkeys
 import TextifyInsertion
 import TextifyRuntime
 import TextifySettings
@@ -53,6 +53,7 @@ final class AppCompositionTests: XCTestCase {
 
     func testLaunchAtLoginStatusIsEquatable() {
         XCTAssertEqual(LaunchAtLoginStatus.enabled, .enabled)
+        XCTAssertEqual(LaunchAtLoginStatus.unsupportedLocation, .unsupportedLocation)
         XCTAssertNotEqual(LaunchAtLoginStatus.failed("first"), .failed("second"))
     }
 
@@ -90,10 +91,29 @@ final class AppCompositionTests: XCTestCase {
         launchAtLogin.liveStatusAfterSetFailure = .enabled
         let status = await services.setLaunchAtLoginEnabled(false)
 
-        XCTAssertEqual(status, LaunchAtLoginStatus.enabled)
+        XCTAssertEqual(status, LaunchAtLoginStatus.failed("fixture"))
         XCTAssertEqual(services.launchAtLoginStatus, LaunchAtLoginStatus.enabled)
+        XCTAssertEqual(services.launchAtLoginOperationError, "fixture")
         XCTAssertTrue(services.preferences.launchAtLoginEnabled)
         XCTAssertTrue(services.settingsStore.load().launchAtLoginEnabled)
+    }
+
+    @MainActor
+    func testLaunchAtLoginUnsupportedLocationDisablesChangesAndPersistsOff() async throws {
+        let launchAtLogin = FakeLaunchAtLoginManager(status: .unsupportedLocation)
+        let services = try Self.makeServices(launchAtLogin: launchAtLogin)
+        services.preferences.launchAtLoginEnabled = true
+        services.savePreferences()
+
+        XCTAssertFalse(services.canChangeLaunchAtLogin)
+
+        let status = await services.setLaunchAtLoginEnabled(true)
+
+        XCTAssertEqual(status, LaunchAtLoginStatus.unsupportedLocation)
+        XCTAssertEqual(services.launchAtLoginStatus, LaunchAtLoginStatus.unsupportedLocation)
+        XCTAssertEqual(launchAtLogin.requestedEnabledValues, [])
+        XCTAssertFalse(services.preferences.launchAtLoginEnabled)
+        XCTAssertFalse(services.settingsStore.load().launchAtLoginEnabled)
     }
 
     @MainActor

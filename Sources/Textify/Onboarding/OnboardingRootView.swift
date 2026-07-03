@@ -53,15 +53,15 @@ struct OnboardingRootView: View {
         case .model:
             Text("Choose and download a curated English model during onboarding. No model is bundled with the app.")
         case .microphone:
-            Text("Microphone permission status is not checked in this milestone.")
+            Text("Allow microphone access so Textify can capture your dictation.")
         case .accessibility:
-            Text("Accessibility permission status is not checked in this milestone.")
+            Text("Allow Accessibility access so Textify can type into the current app.")
         case .inputMonitoring:
-            Text("Input Monitoring permission status is not checked in this milestone.")
+            Text("Allow Input Monitoring so Textify can detect the dictation trigger.")
         case .triggerTest:
-            Text("Trigger testing is disabled until the native hotkey path is wired.")
+            Text("Press and hold your dictation trigger to confirm Textify can detect it.")
         case .completion:
-            Text("Onboarding completion is not persisted in this milestone.")
+            Text("Textify is ready to run from the menu bar.")
         }
     }
 
