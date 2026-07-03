@@ -32,11 +32,15 @@ public struct ModelInstaller {
         guard let url = URL(string: file.url) else {
             throw ModelInstallError.invalidDownloadURL(file.url)
         }
+        try ModelDownloadURLPolicy.requireTextifyGitHubReleaseAsset(url)
 
         try createDirectories()
-        let temporaryURL = layout.temporaryDownloadURL(modelID: model.id, filename: file.filename)
-        let installedURL = layout.installedFileURL(modelID: model.id, filename: file.filename)
+        let installedModelDirectory = try layout.installedModelDirectory(modelID: model.id)
+        let temporaryURL = try layout.temporaryDownloadURL(modelID: model.id, filename: file.filename)
+        let installedURL = try layout.installedFileURL(modelID: model.id, filename: file.filename)
+        let replacementURL = try layout.replacementFileURL(modelID: model.id, filename: file.filename)
         try? fileManager.removeItem(at: temporaryURL)
+        try? fileManager.removeItem(at: replacementURL)
 
         _ = try await transport.downloadFile(URLRequest(url: url), to: temporaryURL)
         let actualChecksum = try sha256Hex(fileURL: temporaryURL)
@@ -46,11 +50,21 @@ public struct ModelInstaller {
         }
 
         try fileManager.createDirectory(
-            at: layout.installedModelDirectory(modelID: model.id),
+            at: installedModelDirectory,
             withIntermediateDirectories: true
         )
-        try? fileManager.removeItem(at: installedURL)
-        try fileManager.moveItem(at: temporaryURL, to: installedURL)
+        try fileManager.moveItem(at: temporaryURL, to: replacementURL)
+        do {
+            try replaceInstalledFile(
+                replacementURL: replacementURL,
+                installedURL: installedURL,
+                modelID: model.id,
+                filename: file.filename
+            )
+        } catch {
+            try? fileManager.removeItem(at: replacementURL)
+            throw error
+        }
 
         let record = InstalledModelRecord(
             model: model,
@@ -77,6 +91,32 @@ public struct ModelInstaller {
         store.upsert(record)
         let data = try JSONEncoder().encode(store)
         try data.write(to: layout.installedStoreURL, options: [.atomic])
+    }
+
+    private func replaceInstalledFile(
+        replacementURL: URL,
+        installedURL: URL,
+        modelID: String,
+        filename: String
+    ) throws {
+        guard fileManager.fileExists(atPath: installedURL.path) else {
+            try fileManager.moveItem(at: replacementURL, to: installedURL)
+            return
+        }
+
+        let backupURL = try layout.backupFileURL(modelID: modelID, filename: filename)
+        try? fileManager.removeItem(at: backupURL)
+        try fileManager.moveItem(at: installedURL, to: backupURL)
+        do {
+            try fileManager.moveItem(at: replacementURL, to: installedURL)
+            try? fileManager.removeItem(at: backupURL)
+        } catch {
+            if fileManager.fileExists(atPath: backupURL.path),
+               !fileManager.fileExists(atPath: installedURL.path) {
+                try? fileManager.moveItem(at: backupURL, to: installedURL)
+            }
+            throw error
+        }
     }
 
     private func loadStore() throws -> InstalledModelsStore {

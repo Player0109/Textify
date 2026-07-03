@@ -95,6 +95,16 @@ final class ManifestSignatureTests: XCTestCase {
         }
     }
 
+    func testSignatureUnknownFieldsAreRejected() throws {
+        let signatureJSON = String(decoding: try Self.fixtureData("manifest.json.sig"), as: UTF8.self)
+        let data = Data(signatureJSON.replacingOccurrences(
+            of: "\n}",
+            with: ",\n  \"unexpectedFieldForStrictSchemaTest\": true\n}"
+        ).utf8)
+
+        XCTAssertThrowsError(try ManifestSignature.decode(data))
+    }
+
     func testVerifierAcceptsFixtureSignature() throws {
         let verifier = ManifestVerifier(trustedKeys: [
             TrustedModelManifestKey(

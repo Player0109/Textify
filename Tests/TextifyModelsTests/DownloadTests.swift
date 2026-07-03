@@ -85,6 +85,46 @@ final class DownloadTests: XCTestCase {
         }
     }
 
+    func testManifestDownloadRejectsNonHTTPSManifestURLBeforeTransport() async throws {
+        let transport = FixtureDownloadTransport(responses: [:])
+        let downloader = ModelDownloader(
+            transport: transport,
+            manifestVerifier: try Self.fixtureManifestVerifier()
+        )
+        let manifestURL = URL(string: "http://player0109.github.io/Textify/models/manifest.json")!
+
+        do {
+            _ = try await downloader.downloadManifest(
+                manifestURL: manifestURL,
+                signatureURL: URL(string: "https://player0109.github.io/Textify/models/manifest.json.sig")!
+            )
+            XCTFail("Expected non-HTTPS manifest URL rejection")
+        } catch let error as ModelDownloadPolicyError {
+            XCTAssertEqual(error, .nonHTTPSURL(manifestURL.absoluteString))
+        }
+        XCTAssertEqual(transport.requestedURLs, [])
+    }
+
+    func testManifestDownloadRejectsNonHTTPSSignatureURLBeforeTransport() async throws {
+        let transport = FixtureDownloadTransport(responses: [:])
+        let downloader = ModelDownloader(
+            transport: transport,
+            manifestVerifier: try Self.fixtureManifestVerifier()
+        )
+        let signatureURL = URL(string: "http://player0109.github.io/Textify/models/manifest.json.sig")!
+
+        do {
+            _ = try await downloader.downloadManifest(
+                manifestURL: URL(string: "https://player0109.github.io/Textify/models/manifest.json")!,
+                signatureURL: signatureURL
+            )
+            XCTFail("Expected non-HTTPS signature URL rejection")
+        } catch let error as ModelDownloadPolicyError {
+            XCTAssertEqual(error, .nonHTTPSURL(signatureURL.absoluteString))
+        }
+        XCTAssertEqual(transport.requestedURLs, [])
+    }
+
     func testDownloadStateReportsProgressFraction() {
         let state = DownloadState(
             modelID: "balanced",

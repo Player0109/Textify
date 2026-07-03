@@ -42,6 +42,33 @@ public enum DownloadTransportError: Error, Equatable {
     case unacceptableStatusCode(Int)
 }
 
+public enum ModelDownloadPolicyError: Error, Equatable {
+    case nonHTTPSURL(String)
+    case unsupportedModelFileURL(String)
+}
+
+public enum ModelDownloadURLPolicy {
+    public static func requireHTTPS(_ url: URL) throws {
+        guard url.scheme?.lowercased() == "https" else {
+            throw ModelDownloadPolicyError.nonHTTPSURL(url.absoluteString)
+        }
+    }
+
+    public static func requireTextifyGitHubReleaseAsset(_ url: URL) throws {
+        try requireHTTPS(url)
+        let expectedPrefix = ["/", "Player0109", "Textify", "releases", "download"]
+        let components = url.pathComponents
+        guard url.host?.lowercased() == "github.com",
+              components.count == expectedPrefix.count + 2,
+              Array(components.prefix(expectedPrefix.count)) == expectedPrefix,
+              !components[expectedPrefix.count].isEmpty,
+              !components[expectedPrefix.count + 1].isEmpty
+        else {
+            throw ModelDownloadPolicyError.unsupportedModelFileURL(url.absoluteString)
+        }
+    }
+}
+
 public final class URLSessionDownloadTransport: DownloadTransport {
     private let session: URLSession
 
@@ -110,6 +137,9 @@ public struct ModelDownloader {
         manifestURL: URL,
         signatureURL: URL
     ) async throws -> ModelManifest {
+        try ModelDownloadURLPolicy.requireHTTPS(manifestURL)
+        try ModelDownloadURLPolicy.requireHTTPS(signatureURL)
+
         let manifestResponse = try await transport.fetch(URLRequest(url: manifestURL))
         let signatureResponse = try await transport.fetch(URLRequest(url: signatureURL))
 

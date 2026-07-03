@@ -34,11 +34,11 @@ final class ModelInstallerTests: XCTestCase {
 
         let record = try await installer.install(modelID: ProductionModelPolicy.requiredModelID, from: manifest)
 
-        let installedURL = layout.installedFileURL(modelID: model.id, filename: file.filename)
+        let installedURL = try layout.installedFileURL(modelID: model.id, filename: file.filename)
         XCTAssertEqual(record.model.id, ProductionModelPolicy.requiredModelID)
         XCTAssertEqual(record.localFilesByManifestFilename[file.filename], installedURL.path)
         XCTAssertEqual(try Data(contentsOf: installedURL), modelData)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: layout.temporaryDownloadURL(modelID: model.id, filename: file.filename).path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: try layout.temporaryDownloadURL(modelID: model.id, filename: file.filename).path))
 
         let storeData = try Data(contentsOf: layout.installedStoreURL)
         let store = try JSONDecoder().decode(InstalledModelsStore.self, from: storeData)
@@ -69,7 +69,7 @@ final class ModelInstallerTests: XCTestCase {
             }
         }
 
-        XCTAssertFalse(FileManager.default.fileExists(atPath: layout.temporaryDownloadURL(modelID: model.id, filename: file.filename).path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: try layout.temporaryDownloadURL(modelID: model.id, filename: file.filename).path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: layout.installedStoreURL.path))
     }
 
@@ -95,20 +95,123 @@ final class ModelInstallerTests: XCTestCase {
         }
     }
 
-    private static func fixtureManifest(replacingModelID modelID: String? = nil) throws -> ModelManifest {
+    func testStorageLayoutRejectsTraversalModelID() throws {
+        let layout = ModelStorageLayout(rootDirectory: Self.temporaryDirectory())
+
+        XCTAssertThrowsError(try layout.installedModelDirectory(modelID: "../escape")) { error in
+            XCTAssertEqual(error as? ModelStorageLayoutError, .unsafePathComponent("../escape"))
+        }
+    }
+
+    func testInstallerRejectsTraversalFilename() async throws {
+        let manifest = try Self.fixtureManifest(replacingFilename: "../model.bin")
+        let rootDirectory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectory) }
+        let installer = ModelInstaller(
+            layout: ModelStorageLayout(rootDirectory: rootDirectory),
+            transport: FixtureFileDownloadTransport(dataByURL: [:])
+        )
+
+        do {
+            _ = try await installer.install(modelID: ProductionModelPolicy.requiredModelID, from: manifest)
+            XCTFail("Expected unsafe filename rejection")
+        } catch let error as ModelStorageLayoutError {
+            XCTAssertEqual(error, .unsafePathComponent("../model.bin"))
+        }
+    }
+
+    func testInstallerRejectsNonHTTPSModelFileURLBeforeDownload() async throws {
+        let manifest = try Self.fixtureManifest(replacingFileURL: "http://github.com/Player0109/Textify/releases/download/models-v1/model.bin")
+        let rootDirectory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectory) }
+        let installer = ModelInstaller(
+            layout: ModelStorageLayout(rootDirectory: rootDirectory),
+            transport: FixtureFileDownloadTransport(dataByURL: [:])
+        )
+
+        do {
+            _ = try await installer.install(modelID: ProductionModelPolicy.requiredModelID, from: manifest)
+            XCTFail("Expected non-HTTPS model file URL rejection")
+        } catch let error as ModelDownloadPolicyError {
+            XCTAssertEqual(error, .nonHTTPSURL("http://github.com/Player0109/Textify/releases/download/models-v1/model.bin"))
+        }
+    }
+
+    func testInstallerRejectsWrongModelFileHostBeforeDownload() async throws {
+        let manifest = try Self.fixtureManifest(replacingFileURL: "https://example.com/Player0109/Textify/releases/download/models-v1/model.bin")
+        let rootDirectory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectory) }
+        let installer = ModelInstaller(
+            layout: ModelStorageLayout(rootDirectory: rootDirectory),
+            transport: FixtureFileDownloadTransport(dataByURL: [:])
+        )
+
+        do {
+            _ = try await installer.install(modelID: ProductionModelPolicy.requiredModelID, from: manifest)
+            XCTFail("Expected unsupported model file URL rejection")
+        } catch let error as ModelDownloadPolicyError {
+            XCTAssertEqual(error, .unsupportedModelFileURL("https://example.com/Player0109/Textify/releases/download/models-v1/model.bin"))
+        }
+    }
+
+    func testExistingInstalledFileSurvivesFailedReplacement() async throws {
+        let manifest = try Self.fixtureManifest()
+        let model = try XCTUnwrap(manifest.models.first)
+        let file = try XCTUnwrap(model.files.first)
+        let rootDirectory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectory) }
+        let layout = ModelStorageLayout(rootDirectory: rootDirectory)
+        let installedURL = try layout.installedFileURL(modelID: model.id, filename: file.filename)
+        try FileManager.default.createDirectory(
+            at: installedURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let existingData = Data("existing model bytes".utf8)
+        try existingData.write(to: installedURL)
+        let fileManager = ReplacementFailingFileManager(failDestination: installedURL)
+        let installer = ModelInstaller(
+            layout: layout,
+            transport: FixtureFileDownloadTransport(dataByURL: [
+                try XCTUnwrap(URL(string: file.url)): try Self.fixtureData("model.bin")
+            ]),
+            fileManager: fileManager
+        )
+
+        do {
+            _ = try await installer.install(modelID: ProductionModelPolicy.requiredModelID, from: manifest)
+            XCTFail("Expected replacement failure")
+        } catch {
+            // Expected injected filesystem failure.
+        }
+        XCTAssertEqual(try Data(contentsOf: installedURL), existingData)
+    }
+
+    private static func fixtureManifest(
+        replacingModelID modelID: String? = nil,
+        replacingFilename filename: String? = nil,
+        replacingFileURL fileURL: String? = nil
+    ) throws -> ModelManifest {
         let manifest = try ModelManifest.decode(try fixtureData("manifest.json"))
-        guard let modelID else {
+        guard modelID != nil || filename != nil || fileURL != nil else {
             return manifest
         }
 
         let models = manifest.models.map { model -> ModelEntry in
-            ModelEntry(
-                id: modelID,
+            let files = model.files.map { file in
+                ModelFile(
+                    filename: filename ?? file.filename,
+                    url: fileURL ?? file.url,
+                    sha256: file.sha256,
+                    sizeBytes: file.sizeBytes
+                )
+            }
+            return ModelEntry(
+                id: modelID ?? model.id,
                 displayName: model.displayName,
                 tier: model.tier,
                 description: model.description,
                 sizeBytes: model.sizeBytes,
-                files: model.files,
+                files: files,
                 licenses: model.licenses,
                 provenance: model.provenance,
                 runtimeParameters: model.runtimeParameters,
@@ -163,4 +266,26 @@ private final class FixtureFileDownloadTransport: DownloadTransport {
 
 private enum FixtureFileDownloadTransportError: Error {
     case missingResponse
+}
+
+private final class ReplacementFailingFileManager: FileManager {
+    private let failDestination: URL
+    private var hasInjectedFailure = false
+
+    init(failDestination: URL) {
+        self.failDestination = failDestination.standardizedFileURL
+        super.init()
+    }
+
+    override func moveItem(at srcURL: URL, to dstURL: URL) throws {
+        if dstURL.standardizedFileURL == failDestination, !hasInjectedFailure {
+            hasInjectedFailure = true
+            throw ReplacementFailure.injected
+        }
+        try super.moveItem(at: srcURL, to: dstURL)
+    }
+}
+
+private enum ReplacementFailure: Error {
+    case injected
 }

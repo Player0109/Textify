@@ -11,7 +11,7 @@
       "files": [
         {
           "filename": "model.bin",
-          "url": "https://example.com/Textify/models/ggml-small.en-q5_1/model.bin",
+          "url": "https://github.com/Player0109/Textify/releases/download/models-v1/model.bin",
           "sha256": "66bd26882020db56790522008135dfc28268bac4ed7ebce49086c7179bd2f868",
           "sizeBytes": 33
         }
