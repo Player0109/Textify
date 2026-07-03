@@ -36,3 +36,6 @@ Task 1 must merge before parallel Wave 1 work begins.
 - Added TextifyRuntime as the production orchestration target.
 - Domain targets must not import TextifyRuntime; TextifyRuntime adapts domain primitives.
 - AppDictationService is @MainActor because SwiftUI observes its status and readiness.
+
+## V1.1 Task 3 Insertion Note
+- Task 3 touched `Sources/Textify/App/AppServices.swift` only to migrate compile references from the removed legacy `InsertionOutcome.pastePosted` surface to the new `.pasted(...)` outcome shape.

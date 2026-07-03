@@ -28,6 +28,8 @@ public struct PasteboardWriteResult: Equatable, Sendable {
 
 public protocol PasteboardClient: Sendable {
     func snapshot() async throws -> PasteboardSnapshot
-    func clearAndWritePlainText(_ text: String) async throws -> PasteboardWriteResult
-    func restore(_ snapshot: PasteboardSnapshot, ifCurrentChangeCountMatches changeCount: Int) async throws -> Bool
+    func clearAndWritePlainText(_ text: String, marker: PasteboardMarker) async throws -> PasteboardWriteResult
+    func containsMarker(_ marker: PasteboardMarker) async throws -> Bool
+    func currentChangeCount() async -> Int
+    func restore(_ snapshot: PasteboardSnapshot, ifCurrentChangeCountMatches expectedChangeCount: Int) async throws -> Bool
 }

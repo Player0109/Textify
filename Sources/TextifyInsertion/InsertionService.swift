@@ -7,9 +7,18 @@ public struct InsertionRequest: Equatable, Sendable {
 }
 
 public enum InsertionOutcome: Equatable, Sendable {
-    case pastePosted
-    case fallbackTyped(chunks: Int)
-    case notInserted(reason: String)
+    case pasted(PasteInsertionReport)
+    case notInserted(InsertionFailureReason)
+}
+
+public struct PasteInsertionReport: Equatable, Sendable {
+    public let pasteboardRestored: Bool
+    public let pasteboardRestoreFailed: Bool
+
+    public init(pasteboardRestored: Bool, pasteboardRestoreFailed: Bool) {
+        self.pasteboardRestored = pasteboardRestored
+        self.pasteboardRestoreFailed = pasteboardRestoreFailed
+    }
 }
 
 public protocol InsertionService: Sendable {
