@@ -485,7 +485,7 @@ struct ProductionModelInstallConfiguration: Equatable {
         trustedKeys: [
             TrustedModelManifestKey(
                 keyId: "textify-model-manifest-2026-primary",
-                publicKeyBase64: "XVToVwChFfhpAP/JxKkLLzgqhzdnF56PgwPMGxgm1eI="
+                publicKeyBase64: "mLO7nEpXKrM6LkuQrMrpXtGDaJFEQWQivS9Hxm8RWY0="
             ),
             TrustedModelManifestKey(
                 keyId: "textify-model-manifest-2026-reserve",

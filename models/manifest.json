@@ -1,0 +1,58 @@
+{
+  "manifestVersion": 1,
+  "generatedAt": "2026-07-03T18:00:46Z",
+  "models": [
+    {
+      "id": "ggml-small.en-q5_1",
+      "displayName": "Balanced - Whisper small.en",
+      "tier": "balanced",
+      "description": "Balanced local English dictation for Textify V1.1.",
+      "sizeBytes": 190098681,
+      "files": [
+        {
+          "filename": "ggml-small.en-q5_1.bin",
+          "url": "https://github.com/Player0109/Textify/releases/download/models-v1/ggml-small.en-q5_1.bin",
+          "sha256": "bfdff4894dcb76bbf647d56263ea2a96645423f1669176f4844a1bf8e478ad30",
+          "sizeBytes": 190098681
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "OpenAI Whisper small.en model converted to ggml format",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://github.com/Player0109/Textify/releases/download/models-v1/ggml-small.en-q5_1.LICENSES.txt"
+        }
+      ],
+      "provenance": {
+        "sourceName": "ggerganov/whisper.cpp",
+        "sourceUrl": "https://huggingface.co/ggerganov/whisper.cpp",
+        "sourceRevision": "5359861c739e955e79d9a303bcbc70fb988958b1",
+        "sourceFile": "ggml-small.en-q5_1.bin",
+        "originalModelName": "OpenAI Whisper small.en",
+        "originalModelUrl": "https://huggingface.co/openai/whisper-small.en",
+        "mirroredBy": "Textify",
+        "mirroredAt": "2026-07-03"
+      },
+      "runtimeParameters": {
+        "language": "en",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0.0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1.0,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0"
+    }
+  ]
+}
