@@ -14,6 +14,12 @@ public enum MicrophoneSelection: Codable, Equatable, Sendable {
     }
 
     public init(from decoder: Decoder) throws {
+        if let legacyValue = try? decoder.singleValueContainer().decode(String.self),
+           legacyValue == SelectionType.systemDefault.rawValue {
+            self = .systemDefault
+            return
+        }
+
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let type = try container.decode(SelectionType.self, forKey: .type)
 
