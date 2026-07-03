@@ -1,0 +1,4 @@
+module WhisperCppVendor [system] {
+  header "TextifyWhisperVendor.h"
+  export *
+}
