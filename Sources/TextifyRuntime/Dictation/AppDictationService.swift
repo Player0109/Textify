@@ -64,7 +64,9 @@ public final class AppDictationService {
             resetTriggerStateMachine()
             status = .idle
         }
-        if case .speechDetected = event, activeSessionID != nil {
+        if case .speechDetected = event,
+           activeSessionID != nil,
+           case .recording = status {
             status = .recording(speechDetected: true)
         }
         await handleTriggerAction(action)
@@ -175,10 +177,14 @@ public final class AppDictationService {
             }
 
             guard activeSessionID == sessionID else {
+                await dependencies.audio.discardRecording()
                 return
             }
             status = .recording(speechDetected: false)
         } catch {
+            guard activeSessionID == sessionID else {
+                return
+            }
             activeSessionID = nil
             resetTriggerStateMachine()
             status = .failed(.audioStartFailed)
@@ -188,6 +194,9 @@ public final class AppDictationService {
     private func finishRecording() async {
         guard let sessionID = activeSessionID else {
             status = .idle
+            return
+        }
+        guard case .recording = status else {
             return
         }
 
@@ -258,14 +267,23 @@ public final class AppDictationService {
                 status = .failed(.insertionFailed)
             }
         } catch let error as LiveAudioRecorderError {
+            guard activeSessionID == sessionID else {
+                return
+            }
             activeSessionID = nil
             insertionSessionID = nil
             status = Self.status(forAudioFinishError: error)
         } catch is WhisperRuntimeError {
+            guard activeSessionID == sessionID else {
+                return
+            }
             activeSessionID = nil
             insertionSessionID = nil
             status = .failed(.transcriptionFailed)
         } catch {
+            guard activeSessionID == sessionID else {
+                return
+            }
             activeSessionID = nil
             insertionSessionID = nil
             status = .failed(.transcriptionFailed)

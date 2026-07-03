@@ -52,6 +52,110 @@ final class AppDictationServiceTests: XCTestCase {
         XCTAssertEqual(service.status, .cancelled(.escapeKey))
     }
 
+    func testLateSpeechCallbackDuringProcessingDoesNotReturnToRecording() async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.transcriber.setSuspendUntilReleased(true)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+        let task = Task { await service.handleTriggerAction(.finishRecording) }
+        await waitUntil { await fakes.transcriber.isSuspended() }
+
+        await fakes.audio.emitSpeech(callbackIndex: 0)
+        await settle()
+
+        XCTAssertEqual(service.status, .processing)
+        await fakes.transcriber.release()
+        await task.value
+    }
+
+    func testStartRecordingErrorAfterCancellationKeepsCancellationStatus() async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.audio.setSuspendStartUntilReleased(true)
+        await fakes.audio.setStartError(LiveAudioRecorderError.engineStartFailed)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        let task = Task { await service.handleTriggerAction(.beginRecording) }
+        await waitUntil { await fakes.audio.isStartSuspended() }
+        await service.cancelActiveSession(reason: .escapeKey)
+        await fakes.audio.releaseStart()
+        await task.value
+
+        XCTAssertEqual(service.status, .cancelled(.escapeKey))
+    }
+
+    func testFinishRecordingErrorAfterCancellationKeepsCancellationStatus() async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.audio.suspendFinish(callNumber: 1)
+        await fakes.audio.setFinishError(LiveAudioRecorderError.engineStartFailed)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+        let task = Task { await service.handleTriggerAction(.finishRecording) }
+        await waitUntil { await fakes.audio.suspendedFinishCall() == 1 }
+
+        await service.cancelActiveSession(reason: .escapeKey)
+        await fakes.audio.releaseFinish()
+        await task.value
+
+        XCTAssertEqual(service.status, .cancelled(.escapeKey))
+    }
+
+    func testPrepareErrorAfterCancellationKeepsCancellationStatus() async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.transcriber.setSuspendPrepareUntilReleased(true)
+        await fakes.transcriber.setPrepareError(WhisperRuntimeError.loadFailed("fixture"))
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+        let task = Task { await service.handleTriggerAction(.finishRecording) }
+        await waitUntil { await fakes.transcriber.isPrepareSuspended() }
+
+        await service.cancelActiveSession(reason: .escapeKey)
+        await fakes.transcriber.releasePrepare()
+        await task.value
+
+        XCTAssertEqual(service.status, .cancelled(.escapeKey))
+    }
+
+    func testTranscriptionErrorAfterCancellationKeepsCancellationStatus() async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.transcriber.setSuspendUntilReleased(true)
+        await fakes.transcriber.setTranscribeError(WhisperRuntimeError.transcriptionFailed("fixture"))
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+        let task = Task { await service.handleTriggerAction(.finishRecording) }
+        await waitUntil { await fakes.transcriber.isSuspended() }
+
+        await service.cancelActiveSession(reason: .escapeKey)
+        await fakes.transcriber.release()
+        await task.value
+
+        XCTAssertEqual(service.status, .cancelled(.escapeKey))
+    }
+
+    func testDuplicateFinishWhileFirstFinishIsSuspendedDoesNotProcessTwice() async {
+        let fakes = RuntimeFakes.ready(processedText: "insert once")
+        await fakes.audio.suspendFinish(callNumber: 1)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+        let firstFinish = Task { await service.handleTriggerAction(.finishRecording) }
+        await waitUntil { await fakes.audio.suspendedFinishCall() == 1 }
+
+        await service.handleTriggerAction(.finishRecording)
+        await fakes.audio.releaseFinish()
+        await firstFinish.value
+
+        let finishCount = await fakes.audio.finishCount()
+        let transcribeCount = await fakes.transcriber.transcribeCount()
+        let insertedTexts = await fakes.inserter.insertedTexts()
+        XCTAssertEqual(finishCount, 1)
+        XCTAssertEqual(transcribeCount, 1)
+        XCTAssertEqual(insertedTexts, ["insert once"])
+    }
+
     func testActivationTimerTokenIgnoresStaleTimerAfterCancellationAndRestart() async {
         let fakes = RuntimeFakes.ready()
         let service = AppDictationService(dependencies: fakes.dependencies)
@@ -597,12 +701,31 @@ private actor FakeRuntimeModels: RuntimeModelResolving {
 
 private actor FakeRuntimeAudio: RuntimeAudioRecording {
     private var audio: CanonicalAudioBuffer
+    private var startError: Error?
     private var finishError: Error?
     private var callbacks: [@Sendable () -> Void] = []
     private var startCountValue = 0
+    private var finishCountValue = 0
+    private var suspendStartUntilReleased = false
+    private var startSuspensionContinuation: CheckedContinuation<Void, Never>?
+    private var suspendedFinishCallNumbers: Set<Int> = []
+    private var suspendedFinishCallValue: Int?
+    private var finishSuspensionContinuation: CheckedContinuation<Void, Never>?
 
     func startCount() -> Int {
         startCountValue
+    }
+
+    func finishCount() -> Int {
+        finishCountValue
+    }
+
+    func isStartSuspended() -> Bool {
+        startSuspensionContinuation != nil
+    }
+
+    func suspendedFinishCall() -> Int? {
+        suspendedFinishCallValue
     }
 
     init(audio: CanonicalAudioBuffer) {
@@ -614,10 +737,26 @@ private actor FakeRuntimeAudio: RuntimeAudioRecording {
         onSpeechDetected: @escaping @Sendable () -> Void
     ) async throws {
         startCountValue += 1
+        if suspendStartUntilReleased {
+            await withCheckedContinuation { continuation in
+                startSuspensionContinuation = continuation
+            }
+        }
+        if let startError {
+            throw startError
+        }
         callbacks.append(onSpeechDetected)
     }
 
     func finishRecording() async throws -> CanonicalAudioBuffer {
+        finishCountValue += 1
+        let callNumber = finishCountValue
+        if suspendedFinishCallNumbers.contains(callNumber) {
+            suspendedFinishCallValue = callNumber
+            await withCheckedContinuation { continuation in
+                finishSuspensionContinuation = continuation
+            }
+        }
         if let finishError {
             throw finishError
         }
@@ -629,6 +768,31 @@ private actor FakeRuntimeAudio: RuntimeAudioRecording {
 
     func setFinishError(_ error: Error?) {
         finishError = error
+    }
+
+    func setStartError(_ error: Error?) {
+        startError = error
+    }
+
+    func setSuspendStartUntilReleased(_ suspendStartUntilReleased: Bool) {
+        self.suspendStartUntilReleased = suspendStartUntilReleased
+    }
+
+    func suspendFinish(callNumber: Int) {
+        suspendedFinishCallNumbers.insert(callNumber)
+    }
+
+    func releaseStart() {
+        let continuation = startSuspensionContinuation
+        startSuspensionContinuation = nil
+        continuation?.resume()
+    }
+
+    func releaseFinish() {
+        let continuation = finishSuspensionContinuation
+        finishSuspensionContinuation = nil
+        suspendedFinishCallValue = nil
+        continuation?.resume()
     }
 
     func emitSpeech(callbackIndex: Int) {
@@ -644,8 +808,11 @@ private actor FakeRuntimeTranscriber: RuntimeTranscribing {
     private var readinessValue: RuntimeModelReadiness
     private var prepareCountValue = 0
     private var transcribeCountValue = 0
+    private var prepareError: Error?
     private var transcribeError: Error?
+    private var suspendPrepareUntilReleased = false
     private var suspendUntilReleased = false
+    private var prepareSuspensionContinuation: CheckedContinuation<Void, Never>?
     private var suspensionContinuation: CheckedContinuation<Void, Never>?
 
     var readiness: RuntimeModelReadiness {
@@ -666,6 +833,10 @@ private actor FakeRuntimeTranscriber: RuntimeTranscribing {
         suspensionContinuation != nil
     }
 
+    func isPrepareSuspended() -> Bool {
+        prepareSuspensionContinuation != nil
+    }
+
     init(transcript: String) {
         self.transcript = transcript
         self.readinessValue = .noActiveModel
@@ -673,6 +844,14 @@ private actor FakeRuntimeTranscriber: RuntimeTranscribing {
 
     func prepare(model: RuntimeActiveModel) async throws {
         prepareCountValue += 1
+        if suspendPrepareUntilReleased {
+            await withCheckedContinuation { continuation in
+                prepareSuspensionContinuation = continuation
+            }
+        }
+        if let prepareError {
+            throw prepareError
+        }
         readinessValue = .ready(modelID: model.id)
     }
 
@@ -698,6 +877,14 @@ private actor FakeRuntimeTranscriber: RuntimeTranscribing {
         self.suspendUntilReleased = suspendUntilReleased
     }
 
+    func setSuspendPrepareUntilReleased(_ suspendPrepareUntilReleased: Bool) {
+        self.suspendPrepareUntilReleased = suspendPrepareUntilReleased
+    }
+
+    func setPrepareError(_ error: Error?) {
+        self.prepareError = error
+    }
+
     func setTranscribeError(_ error: Error?) {
         self.transcribeError = error
     }
@@ -709,6 +896,12 @@ private actor FakeRuntimeTranscriber: RuntimeTranscribing {
     func release() {
         let continuation = suspensionContinuation
         suspensionContinuation = nil
+        continuation?.resume()
+    }
+
+    func releasePrepare() {
+        let continuation = prepareSuspensionContinuation
+        prepareSuspensionContinuation = nil
         continuation?.resume()
     }
 }
