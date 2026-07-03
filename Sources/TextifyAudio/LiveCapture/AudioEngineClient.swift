@@ -1,6 +1,6 @@
 @preconcurrency import AVFoundation
 
-public protocol AudioEngineClient: AnyObject {
+public protocol AudioEngineClient: AnyObject, Sendable {
     func start() throws
     func stop()
     func reset()

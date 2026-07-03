@@ -1,6 +1,6 @@
 @preconcurrency import AVFoundation
 
-public final class SystemAudioEngineClient: AudioEngineClient {
+public final class SystemAudioEngineClient: AudioEngineClient, @unchecked Sendable {
     private let engine = AVAudioEngine()
 
     public init() {}

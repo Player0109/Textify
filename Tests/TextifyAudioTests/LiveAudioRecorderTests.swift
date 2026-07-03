@@ -66,6 +66,37 @@ final class LiveAudioRecorderTests: XCTestCase {
         XCTAssertTrue(engine.stopped)
     }
 
+    func testFinishRecordingDrainsOrderedTapBuffersBeforeReturningAudio() async throws {
+        let permission = MicrophonePermissionClient(
+            status: { .granted },
+            requestAccess: { .granted }
+        )
+        let engine = FakeAudioEngineClient()
+        let recorder = LiveAudioRecorder(
+            permissionClient: permission,
+            configuration: LiveAudioRecordingConfiguration(postReleaseGraceMilliseconds: 0),
+            engineClient: engine
+        )
+
+        try await recorder.startRecording(onSpeechDetected: {}, onMaximumDurationReached: {})
+
+        for chunkIndex in 0..<12 {
+            try engine.emit(
+                samples: Array(repeating: Float(chunkIndex) / 10.0, count: 320),
+                sampleRate: 16_000
+            )
+        }
+
+        let audio = try await recorder.finishRecording()
+        XCTAssertEqual(audio.samples.count, 3_840)
+
+        let chunkAverages = stride(from: 0, to: audio.samples.count, by: 320).map { startIndex in
+            let chunk = audio.samples[startIndex..<(startIndex + 320)]
+            return chunk.reduce(Float(0), +) / Float(chunk.count)
+        }
+        XCTAssertEqualSamples(chunkAverages, (0..<12).map { Float($0) / 10.0 })
+    }
+
     func testMaximumDurationCallbackFires() async throws {
         let permission = MicrophonePermissionClient(
             status: { .granted },
@@ -126,31 +157,48 @@ final class LiveAudioRecorderTests: XCTestCase {
     }
 }
 
-final class FakeAudioEngineClient: AudioEngineClient {
-    var started = false
-    var stopped = false
-    var tapInstalled = false
+final class FakeAudioEngineClient: AudioEngineClient, @unchecked Sendable {
+    private let lock = NSLock()
+    private var state = State()
 
-    private var tapHandler: (@Sendable (AVAudioPCMBuffer, AVAudioTime) -> Void)?
+    var started: Bool {
+        withLock { state.started }
+    }
+
+    var stopped: Bool {
+        withLock { state.stopped }
+    }
+
+    var tapInstalled: Bool {
+        withLock { state.tapInstalled }
+    }
 
     func start() throws {
-        started = true
+        withLock {
+            state.started = true
+        }
     }
 
     func stop() {
-        stopped = true
+        withLock {
+            state.stopped = true
+        }
     }
 
     func reset() {}
 
     func installTap(_ handler: @escaping @Sendable (AVAudioPCMBuffer, AVAudioTime) -> Void) throws {
-        tapInstalled = true
-        tapHandler = handler
+        withLock {
+            state.tapInstalled = true
+            state.tapHandler = handler
+        }
     }
 
     func removeTap() {
-        tapInstalled = false
-        tapHandler = nil
+        withLock {
+            state.tapInstalled = false
+            state.tapHandler = nil
+        }
     }
 
     func emit(samples: [Float], sampleRate: Double) throws {
@@ -174,7 +222,8 @@ final class FakeAudioEngineClient: AudioEngineClient {
             channelData[0][frame] = samples[frame]
         }
 
-        tapHandler?(buffer, AVAudioTime(sampleTime: 0, atRate: sampleRate))
+        let handler = withLock { state.tapHandler }
+        handler?(buffer, AVAudioTime(sampleTime: 0, atRate: sampleRate))
     }
 
     func emitInt16(samples: [Int16], sampleRate: Double) throws {
@@ -198,6 +247,32 @@ final class FakeAudioEngineClient: AudioEngineClient {
             channelData[0][frame] = samples[frame]
         }
 
-        tapHandler?(buffer, AVAudioTime(sampleTime: 0, atRate: sampleRate))
+        let handler = withLock { state.tapHandler }
+        handler?(buffer, AVAudioTime(sampleTime: 0, atRate: sampleRate))
+    }
+
+    private func withLock<T>(_ body: () throws -> T) rethrows -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return try body()
+    }
+
+    private struct State {
+        var started = false
+        var stopped = false
+        var tapInstalled = false
+        var tapHandler: (@Sendable (AVAudioPCMBuffer, AVAudioTime) -> Void)?
+    }
+}
+
+private func XCTAssertEqualSamples(
+    _ actual: [Float],
+    _ expected: [Float],
+    file: StaticString = #filePath,
+    line: UInt = #line
+) {
+    XCTAssertEqual(actual.count, expected.count, file: file, line: line)
+    for (actualSample, expectedSample) in zip(actual, expected) {
+        XCTAssertEqual(actualSample, expectedSample, accuracy: 0.0001, file: file, line: line)
     }
 }

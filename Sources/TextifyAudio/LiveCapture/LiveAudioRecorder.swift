@@ -13,6 +13,8 @@ public actor LiveAudioRecorder {
     private var terminalError: LiveAudioRecorderError?
     private var terminalStopReason: TerminalStopReason?
     private var maximumDurationTask: Task<Void, Never>?
+    private var ingestionPipeline: LiveAudioIngestionPipeline?
+    private var ingestionTask: Task<Void, Never>?
 
     public init(
         permissionClient: MicrophonePermissionClient = .live,
@@ -28,7 +30,7 @@ public actor LiveAudioRecorder {
         onSpeechDetected: @escaping @Sendable () -> Void,
         onMaximumDurationReached: @escaping @Sendable () -> Void
     ) async throws {
-        guard !isRecording else {
+        guard !isRecording, terminalStopReason == nil else {
             throw LiveAudioRecorderError.alreadyRecording
         }
 
@@ -44,31 +46,35 @@ public actor LiveAudioRecorder {
         terminalStopReason = nil
         rmsEmitter = RMSFrameEmitter()
 
+        let (ingestionStream, ingestionPipeline) = LiveAudioIngestionPipeline.makeStream()
+        self.ingestionPipeline = ingestionPipeline
+        ingestionTask = Task { [weak self] in
+            for await event in ingestionStream {
+                await self?.handleIngestionEvent(event, onSpeechDetected: onSpeechDetected)
+            }
+        }
+
         do {
-            let tapConverter = CanonicalAudioConverter()
-            try engineClient.installTap { [weak self] buffer, _ in
-                do {
-                    let canonical = try tapConverter.convert(buffer)
-                    Task { await self?.ingest(canonical, onSpeechDetected: onSpeechDetected) }
-                } catch let error as LiveAudioRecorderError {
-                    Task { await self?.recordTerminalError(error) }
-                } catch {
-                    Task { await self?.recordTerminalError(.conversionFailed) }
-                }
+            try engineClient.installTap { buffer, _ in
+                ingestionPipeline.ingest(buffer)
             }
             try engineClient.start()
             scheduleMaximumDurationCallback(onMaximumDurationReached)
         } catch let error as LiveAudioRecorderError {
             stopEngine()
+            await closeIngestionPipeline(drain: false)
+            clearRecordingState()
             throw error
         } catch {
             stopEngine()
+            await closeIngestionPipeline(drain: false)
+            clearRecordingState()
             throw LiveAudioRecorderError.engineStartFailed
         }
     }
 
     public func finishRecording() async throws -> CanonicalAudioBuffer {
-        try consumeTerminalErrorIfPresent()
+        try await consumeTerminalErrorIfPresent()
 
         guard isRecording || terminalStopReason != nil else {
             throw LiveAudioRecorderError.notRecording
@@ -77,12 +83,14 @@ public actor LiveAudioRecorder {
         if isRecording {
             cancelMaximumDurationCallback()
             await sleepForPostReleaseGrace()
-            try consumeTerminalErrorIfPresent()
+            try await consumeTerminalErrorIfPresent()
             if isRecording {
                 stopEngine()
             }
-            try consumeTerminalErrorIfPresent()
         }
+
+        await closeIngestionPipeline(drain: true)
+        try await consumeTerminalErrorIfPresent()
 
         let buffer = CanonicalAudioBuffer(samples: capturedSamples)
         clearRecordingState()
@@ -98,6 +106,7 @@ public actor LiveAudioRecorder {
         if isRecording {
             stopEngine()
         }
+        await closeIngestionPipeline(drain: false)
         clearRecordingState()
     }
 
@@ -114,11 +123,23 @@ public actor LiveAudioRecorder {
         }
     }
 
+    private func handleIngestionEvent(
+        _ event: LiveAudioIngestionEvent,
+        onSpeechDetected: @escaping @Sendable () -> Void
+    ) {
+        switch event {
+        case .audio(let canonical):
+            ingest(canonical, onSpeechDetected: onSpeechDetected)
+        case .terminalError(let error):
+            recordTerminalError(error)
+        }
+    }
+
     private func ingest(
         _ canonical: CanonicalAudioBuffer,
         onSpeechDetected: @escaping @Sendable () -> Void
     ) {
-        guard isRecording else {
+        guard terminalError == nil else {
             return
         }
 
@@ -130,11 +151,13 @@ public actor LiveAudioRecorder {
     }
 
     private func recordTerminalError(_ error: LiveAudioRecorderError) {
-        guard isRecording else {
+        guard terminalError == nil else {
             return
         }
         terminalError = error
-        stopEngine()
+        if isRecording {
+            stopEngine()
+        }
     }
 
     private func scheduleMaximumDurationCallback(_ onMaximumDurationReached: @escaping @Sendable () -> Void) {
@@ -190,8 +213,23 @@ public actor LiveAudioRecorder {
         rmsEmitter = RMSFrameEmitter()
     }
 
-    private func consumeTerminalErrorIfPresent() throws {
+    private func closeIngestionPipeline(drain: Bool) async {
+        let pipeline = ingestionPipeline
+        let task = ingestionTask
+        ingestionPipeline = nil
+        ingestionTask = nil
+
+        if drain {
+            pipeline?.finish()
+        } else {
+            pipeline?.cancel()
+        }
+        await task?.value
+    }
+
+    private func consumeTerminalErrorIfPresent() async throws {
         if let terminalError {
+            await closeIngestionPipeline(drain: false)
             clearRecordingState()
             throw terminalError
         }
@@ -204,5 +242,92 @@ public actor LiveAudioRecorder {
 
     private enum TerminalStopReason {
         case maximumDurationReached
+    }
+}
+
+private enum LiveAudioIngestionEvent: Sendable {
+    case audio(CanonicalAudioBuffer)
+    case terminalError(LiveAudioRecorderError)
+}
+
+private final class LiveAudioIngestionPipeline: @unchecked Sendable {
+    private let lock = NSLock()
+    private let conversionSession = CanonicalAudioConverter().makeSession()
+    private let continuation: AsyncStream<LiveAudioIngestionEvent>.Continuation
+    private var isFinished = false
+
+    private init(continuation: AsyncStream<LiveAudioIngestionEvent>.Continuation) {
+        self.continuation = continuation
+    }
+
+    static func makeStream() -> (AsyncStream<LiveAudioIngestionEvent>, LiveAudioIngestionPipeline) {
+        let streamPair = AsyncStream<LiveAudioIngestionEvent>.makeStream(
+            bufferingPolicy: .unbounded
+        )
+        return (streamPair.stream, LiveAudioIngestionPipeline(continuation: streamPair.continuation))
+    }
+
+    func ingest(_ buffer: AVAudioPCMBuffer) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard !isFinished else {
+            return
+        }
+
+        do {
+            let canonical = try conversionSession.convert(buffer)
+            if !canonical.isEmpty {
+                continuation.yield(.audio(canonical))
+            }
+        } catch let error as LiveAudioRecorderError {
+            finishLocked(with: error)
+        } catch {
+            finishLocked(with: .conversionFailed)
+        }
+    }
+
+    func finish() {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard !isFinished else {
+            return
+        }
+
+        do {
+            let drained = try conversionSession.finish()
+            if !drained.isEmpty {
+                continuation.yield(.audio(drained))
+            }
+            finishLocked()
+        } catch let error as LiveAudioRecorderError {
+            finishLocked(with: error)
+        } catch {
+            finishLocked(with: .conversionFailed)
+        }
+    }
+
+    func cancel() {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard !isFinished else {
+            return
+        }
+
+        finishLocked()
+    }
+
+    private func finishLocked(with error: LiveAudioRecorderError? = nil) {
+        guard !isFinished else {
+            return
+        }
+
+        if let error {
+            continuation.yield(.terminalError(error))
+        }
+        isFinished = true
+        continuation.finish()
     }
 }
