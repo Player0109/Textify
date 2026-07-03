@@ -8,3 +8,4 @@ DerivedData/
 .spike/
 Textify.app/
 dist/
+.worktrees/
