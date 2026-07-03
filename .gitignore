@@ -1,0 +1,10 @@
+.build/
+.swiftpm/
+DerivedData/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+.DS_Store
+.spike/
+Textify.app/
+dist/
