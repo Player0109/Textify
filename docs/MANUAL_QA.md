@@ -1,24 +1,37 @@
-# Textify V1 Manual QA
+# Textify V1.1 Manual QA
 
-Run these checks before treating a local archive as a release candidate.
+Run these checks before publishing a V1.1 GitHub Release. Any unchecked item is
+release-blocking.
 
-## Bundle Smoke
+## Release-Blocking Checks
 
-- Generate the Xcode project from `project.yml`.
-- Confirm `xcodebuild -list -project Textify.xcodeproj` shows the `Textify` scheme.
-- Build Debug with `xcodebuild` and launch through `./script/build_and_run.sh --full`.
-- Archive Release to `dist/archive/Textify.xcarchive`.
-- Confirm `dist/` remains untracked.
+- [ ] 1. Fresh install from stapled DMG on macOS 14+ Apple Silicon.
+- [ ] 2. Gatekeeper opens app without override.
+- [ ] 3. No Dock icon by default.
+- [ ] 4. Menu bar icon appears.
+- [ ] 5. Onboarding installs and verifies `ggml-small.en-q5_1`.
+- [ ] 6. Microphone permission flow works.
+- [ ] 7. Accessibility permission flow works.
+- [ ] 8. Input Monitoring permission flow works.
+- [ ] 9. Right Command trigger test passes.
+- [ ] 10. Dictation into TextEdit works.
+- [ ] 11. Dictation into Notes or browser text field works.
+- [ ] 12. Secure password field blocks insertion.
+- [ ] 13. Cancelling during processing does not insert late text.
+- [ ] 14. Clipboard is restored after paste when marker remains.
+- [ ] 15. Clipboard is not overwritten if changed during paste.
+- [ ] 16. Diagnostics export contains no transcript or clipboard content.
+- [ ] 17. Launch at Login works if enabled.
+- [ ] 18. Sparkle UI/framework is absent.
+- [ ] 19. App binary is arm64 only.
+- [ ] 20. DMG notarization/stapling validation passes.
 
-## V1 Release-Blocking Checks
+## Supporting Commands
 
-- Fresh onboarding on a clean machine or account.
-- Dictation in TextEdit or Notes, a browser field, and a terminal or code editor.
-- Clipboard restoration after insertion.
-- Secure field protection.
-- Excluded app behavior.
-- Clean DMG install and Gatekeeper behavior once DMG packaging exists.
-- Sparkle update success and tampered update rejection once Sparkle is added.
-- Model download and SHA-256 verification once hosted model assets exist.
-- Diagnostics export contains no dictated text.
-- Launch at Login behavior, including `.requiresApproval` when macOS requires approval.
+```bash
+git diff --check
+bash script/release/validate_release.sh
+```
+
+Use `docs/RELEASING.md` for the archive, model publishing, signing,
+notarization, stapling, and GitHub Release flow.
