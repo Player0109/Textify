@@ -1,10 +1,34 @@
 import Foundation
 import TextifyTranscription
 
+protocol WhisperRuntimeLoading: Sendable {
+    var state: WhisperRuntimeState { get async }
+
+    func load(
+        modelID: String,
+        modelPath: String,
+        useGPU: Bool,
+        threadCount: Int,
+        warmup: Bool
+    ) async throws
+
+    func transcribe(
+        _ audio: TranscriptionAudioBuffer,
+        options: WhisperTranscriptionOptions
+    ) async throws -> TranscriptionResult
+}
+
+extension WhisperRuntime: WhisperRuntimeLoading {}
+
 public actor WhisperRuntimeTranscribingAdapter: RuntimeTranscribing {
-    private let runtime: WhisperRuntime
+    private let runtime: any WhisperRuntimeLoading
+    private var inFlightPreparations: [PreparationKey: InFlightPreparation] = [:]
 
     public init(runtime: WhisperRuntime) {
+        self.runtime = runtime
+    }
+
+    init(runtime: any WhisperRuntimeLoading) {
         self.runtime = runtime
     }
 
@@ -15,18 +39,42 @@ public actor WhisperRuntimeTranscribingAdapter: RuntimeTranscribing {
     }
 
     public func prepare(model: RuntimeActiveModel) async throws {
+        let threadCount = model.threadCount ?? ProcessInfo.processInfo.activeProcessorCount
+        let key = PreparationKey(
+            modelID: model.id,
+            modelPath: model.localModelPath,
+            useGPU: model.useGPU,
+            threadCount: threadCount
+        )
         let state = await runtime.state
         if case let .ready(modelID) = state, modelID == model.id {
             return
         }
+        if let inFlightPreparation = inFlightPreparations[key] {
+            try await inFlightPreparation.task.value
+            return
+        }
 
-        try await runtime.load(
-            modelID: model.id,
-            modelPath: model.localModelPath,
-            useGPU: model.useGPU,
-            threadCount: model.threadCount ?? ProcessInfo.processInfo.activeProcessorCount,
-            warmup: true
-        )
+        let preparationID = UUID()
+        let runtime = runtime
+        let task = Task {
+            try await runtime.load(
+                modelID: model.id,
+                modelPath: model.localModelPath,
+                useGPU: model.useGPU,
+                threadCount: threadCount,
+                warmup: true
+            )
+        }
+        inFlightPreparations[key] = InFlightPreparation(id: preparationID, task: task)
+
+        do {
+            try await task.value
+            clearInFlightPreparation(key: key, id: preparationID)
+        } catch {
+            clearInFlightPreparation(key: key, id: preparationID)
+            throw error
+        }
     }
 
     public func transcribe(_ audio: TranscriptionAudioBuffer) async throws -> TranscriptionResult {
@@ -61,5 +109,24 @@ public actor WhisperRuntimeTranscribingAdapter: RuntimeTranscribing {
         case .warmupFailed:
             return .warmupFailed
         }
+    }
+
+    private func clearInFlightPreparation(key: PreparationKey, id: UUID) {
+        guard inFlightPreparations[key]?.id == id else {
+            return
+        }
+        inFlightPreparations[key] = nil
+    }
+
+    private struct PreparationKey: Hashable, Sendable {
+        let modelID: String
+        let modelPath: String
+        let useGPU: Bool
+        let threadCount: Int
+    }
+
+    private struct InFlightPreparation {
+        let id: UUID
+        let task: Task<Void, Error>
     }
 }

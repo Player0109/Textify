@@ -38,7 +38,21 @@ final class ReadinessTests: XCTestCase {
         )
     }
 
-    func testLoadingAndWarmingModelsHaveNoBlockers() {
+    func testUnknownInputMonitoringBlocksDictation() {
+        let snapshot = ReadinessSnapshot(
+            permissions: RuntimePermissionSnapshot(
+                microphone: .granted,
+                accessibility: .granted,
+                inputMonitoring: .unknown
+            ),
+            model: .ready(modelID: "ggml-small.en-q5_1")
+        )
+
+        XCTAssertFalse(snapshot.canDictate)
+        XCTAssertEqual(snapshot.blockers, [.inputMonitoringPermissionDenied])
+    }
+
+    func testLoadingAndWarmingModelsBlockDictationStart() {
         let loading = ReadinessSnapshot(
             permissions: RuntimePermissionSnapshot(
                 microphone: .granted,
@@ -56,10 +70,10 @@ final class ReadinessTests: XCTestCase {
             model: .warming(modelID: "ggml-small.en-q5_1")
         )
 
-        XCTAssertTrue(loading.canDictate)
-        XCTAssertEqual(loading.blockers, [])
+        XCTAssertFalse(loading.canDictate)
+        XCTAssertEqual(loading.blockers, [.activeModelNotReady(modelID: "ggml-small.en-q5_1")])
 
-        XCTAssertTrue(warming.canDictate)
-        XCTAssertEqual(warming.blockers, [])
+        XCTAssertFalse(warming.canDictate)
+        XCTAssertEqual(warming.blockers, [.activeModelNotReady(modelID: "ggml-small.en-q5_1")])
     }
 }

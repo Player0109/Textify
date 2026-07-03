@@ -40,13 +40,15 @@ public struct ReadinessSnapshot: Equatable, Sendable {
         if permissions.accessibility == .denied {
             blockers.append(.accessibilityPermissionDenied)
         }
-        if permissions.inputMonitoring == .denied {
+        if permissions.inputMonitoring != .granted {
             blockers.append(.inputMonitoringPermissionDenied)
         }
 
         switch model {
-        case .ready, .loading, .warming:
+        case .ready:
             break
+        case let .loading(modelID), let .warming(modelID):
+            blockers.append(.activeModelNotReady(modelID: modelID))
         case .noActiveModel:
             blockers.append(.noActiveModel)
         case let .missing(modelID):

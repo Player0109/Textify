@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import TextifyAudio
 import TextifyCore
@@ -5,9 +6,9 @@ import TextifyDiagnostics
 import TextifyHotkeys
 import TextifyInsertion
 import TextifyModels
-import TextifyRuntime
 import TextifySettings
 import TextifyTranscription
+@testable import TextifyRuntime
 import XCTest
 
 final class RuntimeAdaptersTests: XCTestCase {
@@ -71,6 +72,64 @@ final class RuntimeAdaptersTests: XCTestCase {
         }
     }
 
+    func testWhisperAdapterCoalescesConcurrentSameModelPrepare() async throws {
+        let runtime = FakeWhisperRuntime(suspendLoad: true)
+        let adapter = WhisperRuntimeTranscribingAdapter(runtime: runtime)
+        let model = Self.activeModel()
+
+        let firstPrepare = Task {
+            try await adapter.prepare(model: model)
+        }
+        while await runtime.loadCallCount() == 0 {
+            await Task.yield()
+        }
+
+        let secondPrepare = Task {
+            try await adapter.prepare(model: model)
+        }
+        await Task.yield()
+
+        let loadCallCountWhilePreparing = await runtime.loadCallCount()
+        XCTAssertEqual(loadCallCountWhilePreparing, 1)
+        await runtime.releaseLoads()
+
+        try await firstPrepare.value
+        try await secondPrepare.value
+        let finalLoadCallCount = await runtime.loadCallCount()
+        XCTAssertEqual(finalLoadCallCount, 1)
+    }
+
+    func testWhisperAdapterStartsNewPrepareAfterFailedPrepare() async throws {
+        let runtime = FakeWhisperRuntime(loadError: FakeWhisperRuntimeError.loadFailed)
+        let adapter = WhisperRuntimeTranscribingAdapter(runtime: runtime)
+        let model = Self.activeModel()
+
+        do {
+            try await adapter.prepare(model: model)
+            XCTFail("Expected first prepare to fail")
+        } catch FakeWhisperRuntimeError.loadFailed {
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+
+        await runtime.setLoadError(nil)
+        try await adapter.prepare(model: model)
+
+        let loadCallCount = await runtime.loadCallCount()
+        XCTAssertEqual(loadCallCount, 2)
+    }
+
+    func testWhisperAdapterSkipsLoadWhenSameModelIsAlreadyReady() async throws {
+        let model = Self.activeModel()
+        let runtime = FakeWhisperRuntime(initialState: .ready(modelID: model.id))
+        let adapter = WhisperRuntimeTranscribingAdapter(runtime: runtime)
+
+        try await adapter.prepare(model: model)
+
+        let loadCallCount = await runtime.loadCallCount()
+        XCTAssertEqual(loadCallCount, 0)
+    }
+
     func testPostProcessingAdapterUsesV1Pipeline() async {
         let adapter = RuntimePostProcessingAdapter()
 
@@ -85,21 +144,12 @@ final class RuntimeAdaptersTests: XCTestCase {
     func testModelResolverReturnsInstalledActiveModelAndReadiness() async throws {
         let directory = Self.temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let modelURL = directory.appendingPathComponent("ggml-small.en-q5_1.bin")
-        try Data("model".utf8).write(to: modelURL)
-        let model = Self.modelEntry(filename: modelURL.lastPathComponent)
-        let store = InstalledModelsStore(records: [
-            InstalledModelRecord(
-                model: model,
-                installedAt: "2026-07-03T00:00:00Z",
-                localFilesByManifestFilename: [modelURL.lastPathComponent: modelURL.path]
-            )
-        ])
-        let resolver = RuntimeModelResolverAdapter(
-            layout: ModelStorageLayout(rootDirectory: directory),
-            loadStore: { store }
-        )
+        let layout = ModelStorageLayout(rootDirectory: directory)
+        let modelData = Data("model".utf8)
+        let modelURL = try Self.writeCanonicalModelFile(modelData, layout: layout)
+        let model = Self.modelEntry(filename: modelURL.lastPathComponent, data: modelData)
+        let store = Self.installedStore(model: model, localPath: modelURL.path)
+        let resolver = Self.modelResolver(layout: layout, store: store)
         var preferences = AppPreferences.defaults
         preferences.activeModelID = model.id
 
@@ -111,12 +161,100 @@ final class RuntimeAdaptersTests: XCTestCase {
         XCTAssertEqual(readiness, .ready(modelID: model.id))
     }
 
+    func testModelResolverIgnoresStoredPathOutsideCanonicalLayout() async throws {
+        let directory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let layout = ModelStorageLayout(rootDirectory: directory)
+        let modelData = Data("model".utf8)
+        let canonicalURL = try layout.installedFileURL(
+            modelID: Self.fixtureModelID,
+            filename: Self.fixtureFilename
+        )
+        let model = Self.modelEntry(filename: canonicalURL.lastPathComponent, data: modelData)
+        let outsideURL = directory.deletingLastPathComponent()
+            .appendingPathComponent("outside-\(UUID().uuidString).bin")
+        let store = Self.installedStore(model: model, localPath: outsideURL.path)
+        let resolver = Self.modelResolver(layout: layout, store: store)
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = model.id
+
+        let activeModel = await resolver.resolveActiveModel(preferences: preferences)
+
+        XCTAssertNil(activeModel)
+    }
+
+    func testModelResolverReportsMissingWhenCanonicalFileIsAbsent() async throws {
+        let directory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let layout = ModelStorageLayout(rootDirectory: directory)
+        let modelData = Data("model".utf8)
+        let canonicalURL = try layout.installedFileURL(
+            modelID: Self.fixtureModelID,
+            filename: Self.fixtureFilename
+        )
+        let model = Self.modelEntry(filename: canonicalURL.lastPathComponent, data: modelData)
+        let store = Self.installedStore(model: model, localPath: canonicalURL.path)
+        let resolver = Self.modelResolver(layout: layout, store: store)
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = model.id
+
+        let activeModel = await resolver.resolveActiveModel(preferences: preferences)
+
+        XCTAssertEqual(activeModel?.localModelPath, canonicalURL.path)
+        let readiness = await resolver.readiness(for: activeModel)
+        XCTAssertEqual(readiness, .missing(modelID: model.id))
+    }
+
+    func testModelResolverFailsReadinessForSizeMismatch() async throws {
+        let directory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let layout = ModelStorageLayout(rootDirectory: directory)
+        let modelData = Data("model".utf8)
+        let modelURL = try Self.writeCanonicalModelFile(modelData, layout: layout)
+        let model = Self.modelEntry(
+            filename: modelURL.lastPathComponent,
+            data: modelData,
+            sizeBytes: Int64(modelData.count + 1)
+        )
+        let store = Self.installedStore(model: model, localPath: modelURL.path)
+        let resolver = Self.modelResolver(layout: layout, store: store)
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = model.id
+
+        let activeModel = await resolver.resolveActiveModel(preferences: preferences)
+        let readiness = await resolver.readiness(for: activeModel)
+
+        XCTAssertEqual(readiness, .failed(modelID: model.id, reason: .checksumFailed))
+    }
+
+    func testModelResolverFailsReadinessForChecksumMismatch() async throws {
+        let directory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let layout = ModelStorageLayout(rootDirectory: directory)
+        let modelData = Data("model".utf8)
+        let modelURL = try Self.writeCanonicalModelFile(modelData, layout: layout)
+        let model = Self.modelEntry(
+            filename: modelURL.lastPathComponent,
+            data: modelData,
+            sha256: String(repeating: "0", count: 64)
+        )
+        let store = Self.installedStore(model: model, localPath: modelURL.path)
+        let resolver = Self.modelResolver(layout: layout, store: store)
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = model.id
+
+        let activeModel = await resolver.resolveActiveModel(preferences: preferences)
+        let readiness = await resolver.readiness(for: activeModel)
+
+        XCTAssertEqual(readiness, .failed(modelID: model.id, reason: .checksumFailed))
+    }
+
     func testModelResolverDoesNotResolveModelOutsideInstalledStore() async {
         let directory = Self.temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
-        let resolver = RuntimeModelResolverAdapter(
+        let resolver = Self.modelResolver(
             layout: ModelStorageLayout(rootDirectory: directory),
-            loadStore: { InstalledModelsStore() }
+            store: InstalledModelsStore()
         )
         var preferences = AppPreferences.defaults
         preferences.activeModelID = "arbitrary-local-model"
@@ -181,19 +319,72 @@ final class RuntimeAdaptersTests: XCTestCase {
             .appendingPathComponent("TextifyRuntimeTests-\(UUID().uuidString)", isDirectory: true)
     }
 
-    private static func modelEntry(filename: String) -> ModelEntry {
+    private static let fixtureModelID = "ggml-small.en-q5_1"
+    private static let fixtureFilename = "ggml-small.en-q5_1.bin"
+
+    private static func activeModel() -> RuntimeActiveModel {
+        RuntimeActiveModel(
+            id: fixtureModelID,
+            displayName: "Balanced - Whisper small.en",
+            tier: "balanced",
+            localModelPath: "/tmp/textify-model.bin",
+            useGPU: true,
+            threadCount: 1
+        )
+    }
+
+    private static func writeCanonicalModelFile(
+        _ data: Data,
+        layout: ModelStorageLayout,
+        filename: String = fixtureFilename
+    ) throws -> URL {
+        let modelURL = try layout.installedFileURL(modelID: fixtureModelID, filename: filename)
+        try FileManager.default.createDirectory(
+            at: modelURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try data.write(to: modelURL)
+        return modelURL
+    }
+
+    private static func installedStore(model: ModelEntry, localPath: String) -> InstalledModelsStore {
+        InstalledModelsStore(records: [
+            InstalledModelRecord(
+                model: model,
+                installedAt: "2026-07-03T00:00:00Z",
+                localFilesByManifestFilename: [model.files[0].filename: localPath]
+            )
+        ])
+    }
+
+    private static func modelResolver(
+        layout: ModelStorageLayout,
+        store: InstalledModelsStore
+    ) -> RuntimeModelResolverAdapter {
+        let fixture = InstalledStoreFixture(store: store)
+        return RuntimeModelResolverAdapter(layout: layout) {
+            fixture.store
+        }
+    }
+
+    private static func modelEntry(
+        filename: String,
+        data: Data,
+        sha256: String? = nil,
+        sizeBytes: Int64? = nil
+    ) -> ModelEntry {
         ModelEntry(
-            id: "ggml-small.en-q5_1",
+            id: fixtureModelID,
             displayName: "Balanced - Whisper small.en",
             tier: "balanced",
             description: "Balanced local English dictation.",
-            sizeBytes: 5,
+            sizeBytes: sizeBytes ?? Int64(data.count),
             files: [
                 ModelFile(
                     filename: filename,
                     url: "https://github.com/Player0109/Textify/releases/download/models-v1/\(filename)",
-                    sha256: "abc",
-                    sizeBytes: 5
+                    sha256: sha256 ?? sha256Hex(data),
+                    sizeBytes: sizeBytes ?? Int64(data.count)
                 )
             ],
             licenses: [],
@@ -227,5 +418,86 @@ final class RuntimeAdaptersTests: XCTestCase {
             ),
             minAppVersion: "0.1.0"
         )
+    }
+
+    private static func sha256Hex(_ data: Data) -> String {
+        let digest = SHA256.hash(data: data)
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+private enum FakeWhisperRuntimeError: Error {
+    case loadFailed
+}
+
+private struct InstalledStoreFixture: @unchecked Sendable {
+    let store: InstalledModelsStore
+}
+
+private actor FakeWhisperRuntime: WhisperRuntimeLoading {
+    private var mutableState: WhisperRuntimeState
+    private var mutableLoadError: Error?
+    private var continuations: [CheckedContinuation<Void, Never>] = []
+    private let suspendLoad: Bool
+    private var loadCalls = 0
+
+    init(
+        initialState: WhisperRuntimeState = .noModel,
+        suspendLoad: Bool = false,
+        loadError: Error? = nil
+    ) {
+        self.mutableState = initialState
+        self.suspendLoad = suspendLoad
+        self.mutableLoadError = loadError
+    }
+
+    var state: WhisperRuntimeState {
+        mutableState
+    }
+
+    func load(
+        modelID: String,
+        modelPath: String,
+        useGPU: Bool,
+        threadCount: Int,
+        warmup: Bool
+    ) async throws {
+        loadCalls += 1
+        if let mutableLoadError {
+            throw mutableLoadError
+        }
+
+        mutableState = .loading(modelID: modelID)
+        if suspendLoad {
+            await withCheckedContinuation { continuation in
+                continuations.append(continuation)
+            }
+        }
+        mutableState = .ready(modelID: modelID)
+    }
+
+    func transcribe(_ audio: TranscriptionAudioBuffer, options: WhisperTranscriptionOptions) async throws -> TranscriptionResult {
+        TranscriptionResult(
+            text: "hello",
+            noSpeechProbability: 0,
+            averageLogProbability: 0,
+            compressionRatio: 0
+        )
+    }
+
+    func loadCallCount() -> Int {
+        loadCalls
+    }
+
+    func setLoadError(_ error: Error?) {
+        mutableLoadError = error
+    }
+
+    func releaseLoads() {
+        let pendingContinuations = continuations
+        continuations.removeAll()
+        for continuation in pendingContinuations {
+            continuation.resume()
+        }
     }
 }

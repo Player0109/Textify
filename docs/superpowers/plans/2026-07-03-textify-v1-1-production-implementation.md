@@ -455,10 +455,12 @@ public final class AppDictationService {
         var blockers: [ReadinessBlocker] = []
         if permissions.microphone == .denied { blockers.append(.microphonePermissionDenied) }
         if permissions.accessibility == .denied { blockers.append(.accessibilityPermissionDenied) }
-        if permissions.inputMonitoring == .denied { blockers.append(.inputMonitoringPermissionDenied) }
+        if permissions.inputMonitoring != .granted { blockers.append(.inputMonitoringPermissionDenied) }
         switch model {
-        case .ready, .loading, .warming:
+        case .ready:
             break
+        case let .loading(modelID), let .warming(modelID):
+            blockers.append(.activeModelNotReady(modelID: modelID))
         case .noActiveModel:
             blockers.append(.noActiveModel)
         case let .missing(modelID):
@@ -2805,6 +2807,7 @@ public actor WhisperRuntimeTranscribingAdapter: RuntimeTranscribing {
 Create `RuntimeModelResolverAdapter.swift`:
 
 ```swift
+import CryptoKit
 import Foundation
 import TextifyModels
 import TextifySettings
@@ -2822,17 +2825,22 @@ public actor RuntimeModelResolverAdapter: RuntimeModelResolving {
     }
 
     public func resolveActiveModel(preferences: AppPreferences) async -> RuntimeActiveModel? {
-        guard let modelID = preferences.activeModelID,
+        guard preferences.modelSelectionScope == .curatedInstalledModels,
+              let modelID = preferences.activeModelID,
               let record = try? loadStore().record(forModelID: modelID),
               let firstFile = record.model.files.first,
-              let localPath = record.localFilesByManifestFilename[firstFile.filename] else {
+              let canonicalURL = try? layout.installedFileURL(
+                  modelID: record.model.id,
+                  filename: firstFile.filename
+              ),
+              record.localFilesByManifestFilename[firstFile.filename] == canonicalURL.path else {
             return nil
         }
         return RuntimeActiveModel(
             id: record.model.id,
             displayName: record.model.displayName,
             tier: record.model.tier,
-            localModelPath: localPath,
+            localModelPath: canonicalURL.path,
             useGPU: true,
             threadCount: ProcessInfo.processInfo.activeProcessorCount
         )
@@ -2840,9 +2848,38 @@ public actor RuntimeModelResolverAdapter: RuntimeModelResolving {
 
     public func readiness(for activeModel: RuntimeActiveModel?) async -> RuntimeModelReadiness {
         guard let activeModel else { return .noActiveModel }
-        return FileManager.default.fileExists(atPath: activeModel.localModelPath)
-            ? .ready(modelID: activeModel.id)
-            : .missing(modelID: activeModel.id)
+        guard let record = try? loadStore().record(forModelID: activeModel.id),
+              let firstFile = record.model.files.first,
+              let canonicalURL = try? layout.installedFileURL(
+                  modelID: record.model.id,
+                  filename: firstFile.filename
+              ),
+              record.localFilesByManifestFilename[firstFile.filename] == canonicalURL.path else {
+            return .missing(modelID: activeModel.id)
+        }
+        guard FileManager.default.fileExists(atPath: canonicalURL.path) else {
+            return .missing(modelID: activeModel.id)
+        }
+        guard canonicalURL.path == activeModel.localModelPath,
+              fileSize(at: canonicalURL) == firstFile.sizeBytes,
+              (try? Self.sha256Hex(fileURL: canonicalURL)) == firstFile.sha256 else {
+            return .failed(modelID: activeModel.id, reason: .checksumFailed)
+        }
+        return .ready(modelID: activeModel.id)
+    }
+
+    private func fileSize(at url: URL) -> Int64? {
+        guard let fileSize = try? FileManager.default
+            .attributesOfItem(atPath: url.path)[.size] as? NSNumber else {
+            return nil
+        }
+        return fileSize.int64Value
+    }
+
+    private static func sha256Hex(fileURL: URL) throws -> String {
+        let data = try Data(contentsOf: fileURL)
+        let digest = SHA256.hash(data: data)
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 }
 ```

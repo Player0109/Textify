@@ -1,14 +1,17 @@
+import CryptoKit
 import Foundation
 import TextifyModels
 import TextifySettings
 
 public actor RuntimeModelResolverAdapter: RuntimeModelResolving {
-    private let loadStore: () throws -> InstalledModelsStore
+    private let layout: ModelStorageLayout
+    private let loadStore: @Sendable () throws -> InstalledModelsStore
 
     public init(
         layout: ModelStorageLayout,
-        loadStore: @escaping () throws -> InstalledModelsStore
+        loadStore: @escaping @Sendable () throws -> InstalledModelsStore
     ) {
+        self.layout = layout
         self.loadStore = loadStore
     }
 
@@ -23,7 +26,11 @@ public actor RuntimeModelResolverAdapter: RuntimeModelResolving {
               let modelID = preferences.activeModelID,
               let record = try? loadStore().record(forModelID: modelID),
               let firstFile = record.model.files.first,
-              let localPath = record.localFilesByManifestFilename[firstFile.filename]
+              let canonicalURL = try? layout.installedFileURL(
+                  modelID: record.model.id,
+                  filename: firstFile.filename
+              ),
+              record.localFilesByManifestFilename[firstFile.filename] == canonicalURL.path
         else {
             return nil
         }
@@ -32,7 +39,7 @@ public actor RuntimeModelResolverAdapter: RuntimeModelResolving {
             id: record.model.id,
             displayName: record.model.displayName,
             tier: record.model.tier,
-            localModelPath: localPath,
+            localModelPath: canonicalURL.path,
             useGPU: true,
             threadCount: ProcessInfo.processInfo.activeProcessorCount
         )
@@ -43,9 +50,20 @@ public actor RuntimeModelResolverAdapter: RuntimeModelResolving {
             return .noActiveModel
         }
 
-        return FileManager.default.fileExists(atPath: model.localModelPath)
-            ? .ready(modelID: model.id)
-            : .missing(modelID: model.id)
+        guard let installedFile = installedFile(for: model) else {
+            return .missing(modelID: model.id)
+        }
+        guard FileManager.default.fileExists(atPath: installedFile.url.path) else {
+            return .missing(modelID: model.id)
+        }
+        guard installedFile.url.path == model.localModelPath,
+              fileSize(at: installedFile.url) == installedFile.manifestFile.sizeBytes,
+              (try? Self.sha256Hex(fileURL: installedFile.url)) == installedFile.manifestFile.sha256
+        else {
+            return .failed(modelID: model.id, reason: .checksumFailed)
+        }
+
+        return .ready(modelID: model.id)
     }
 
     private static func loadInstalledStore(layout: ModelStorageLayout) throws -> InstalledModelsStore {
@@ -55,5 +73,40 @@ public actor RuntimeModelResolverAdapter: RuntimeModelResolving {
 
         let data = try Data(contentsOf: layout.installedStoreURL)
         return try JSONDecoder().decode(InstalledModelsStore.self, from: data)
+    }
+
+    private func installedFile(for model: RuntimeActiveModel) -> InstalledFile? {
+        guard let record = try? loadStore().record(forModelID: model.id),
+              let manifestFile = record.model.files.first,
+              let canonicalURL = try? layout.installedFileURL(
+                  modelID: record.model.id,
+                  filename: manifestFile.filename
+              ),
+              record.localFilesByManifestFilename[manifestFile.filename] == canonicalURL.path
+        else {
+            return nil
+        }
+
+        return InstalledFile(url: canonicalURL, manifestFile: manifestFile)
+    }
+
+    private func fileSize(at url: URL) -> Int64? {
+        guard let fileSize = try? FileManager.default
+            .attributesOfItem(atPath: url.path)[.size] as? NSNumber
+        else {
+            return nil
+        }
+        return fileSize.int64Value
+    }
+
+    private static func sha256Hex(fileURL: URL) throws -> String {
+        let data = try Data(contentsOf: fileURL)
+        let digest = SHA256.hash(data: data)
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    private struct InstalledFile {
+        let url: URL
+        let manifestFile: ModelFile
     }
 }
