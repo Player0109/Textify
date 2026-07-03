@@ -1,0 +1,85 @@
+name: Textify
+
+options:
+  minimumXcodeGenVersion: 2.42.0
+  createIntermediateGroups: true
+  deploymentTarget:
+    macOS: "14.0"
+
+settings:
+  base:
+    ARCHS: arm64
+    EXCLUDED_ARCHS[sdk=macosx*]: x86_64
+
+packages:
+  TextifyPackage:
+    path: .
+
+targets:
+  Textify:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+
+    sources:
+      - path: Sources/Textify
+      - path: Resources/Assets.xcassets
+
+    dependencies:
+      - package: TextifyPackage
+        product: TextifyCore
+      - package: TextifyPackage
+        product: TextifyAudio
+      - package: TextifyPackage
+        product: TextifyTranscription
+      - package: TextifyPackage
+        product: TextifyModels
+      - package: TextifyPackage
+        product: TextifyInsertion
+      - package: TextifyPackage
+        product: TextifyHotkeys
+      - package: TextifyPackage
+        product: TextifyDiagnostics
+      - package: TextifyPackage
+        product: TextifySettings
+
+    settings:
+      base:
+        PRODUCT_NAME: Textify
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.Player0109.Textify
+        INFOPLIST_FILE: Resources/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: Textify.entitlements
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-"
+        DEVELOPMENT_TEAM: ""
+        ENABLE_HARDENED_RUNTIME: YES
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        SWIFT_VERSION: "5.9"
+        ARCHS: arm64
+        SUPPORTED_PLATFORMS: macosx
+        SDKROOT: macosx
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "0.1.0"
+      configs:
+        Debug:
+          ONLY_ACTIVE_ARCH: YES
+        Release:
+          ONLY_ACTIVE_ARCH: NO
+
+schemes:
+  Textify:
+    build:
+      preActions:
+        - name: Prepare SwiftPM Metal Headers
+          settingsTarget: Textify
+          script: |
+            mkdir -p "${BUILT_PRODUCTS_DIR}/include"
+            cp "${PROJECT_DIR}/Vendor/whisper.cpp/ggml/src/ggml-common.h" "${BUILT_PRODUCTS_DIR}/include/ggml-common.h"
+      targets:
+        Textify: all
+    run:
+      config: Debug
+    archive:
+      config: Release
