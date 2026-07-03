@@ -72,12 +72,19 @@ final class AppServices {
     }
 
     private func logMockInsertion(text: String, outcome: InsertionOutcome) async throws {
+        let pasteSucceeded: Bool
+        if case .pasted = outcome {
+            pasteSucceeded = true
+        } else {
+            pasteSucceeded = false
+        }
+
         try await diagnosticsLogger.log(
             .insertionAttempt(
                 textLengthBucket: Self.textLengthBucket(for: text.count),
                 pasteboardSnapshotSucceeded: true,
-                pasteboardWriteSucceeded: outcome == .pastePosted,
-                pasteEventPosted: outcome == .pastePosted,
+                pasteboardWriteSucceeded: pasteSucceeded,
+                pasteEventPosted: pasteSucceeded,
                 fallbackAttempted: false,
                 fallbackBlockedReason: nil,
                 durationMs: 0
@@ -225,7 +232,7 @@ actor DevelopmentInsertionService: InsertionService {
 
     func insert(_ request: InsertionRequest) async -> InsertionOutcome {
         insertedLengthBuckets.append(Self.textLengthBucket(for: request.text.count))
-        return .pastePosted
+        return .pasted(PasteInsertionReport(pasteboardRestored: false, pasteboardRestoreFailed: false))
     }
 
     private static func textLengthBucket(for count: Int) -> String {
