@@ -117,6 +117,22 @@ final class AppServices {
         }
     }
 
+    func stopRuntime() {
+        hotkeyMonitor.stop()
+        runtimeStarted = false
+    }
+
+    @discardableResult
+    func completeOnboarding(launchAtLogin enabled: Bool) async -> LaunchAtLoginStatus {
+        preferences.onboardingCompleted = true
+        preferences.launchAtLoginEnabled = enabled
+        savePreferences()
+        let status = await setLaunchAtLoginEnabled(enabled)
+        await dictation.refreshReadiness()
+        startRuntime()
+        return status
+    }
+
     func savePreferences() {
         settingsStore.save(preferences)
     }
@@ -266,7 +282,6 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case general
     case dictation
     case models
-    case vocabulary
     case privacy
     case advanced
 
@@ -280,8 +295,6 @@ enum SettingsPane: String, CaseIterable, Identifiable {
             return "Dictation"
         case .models:
             return "Models"
-        case .vocabulary:
-            return "Vocabulary"
         case .privacy:
             return "Privacy"
         case .advanced:
@@ -297,8 +310,6 @@ enum SettingsPane: String, CaseIterable, Identifiable {
             return "mic"
         case .models:
             return "externaldrive"
-        case .vocabulary:
-            return "textformat.abc"
         case .privacy:
             return "hand.raised"
         case .advanced:

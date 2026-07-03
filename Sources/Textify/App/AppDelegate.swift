@@ -2,8 +2,17 @@ import AppKit
 import TextifySettings
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    @MainActor
+    static var launchCoordinator: AppLaunchCoordinator?
+
     func applicationWillFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(Self.activationPolicy())
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        Task { @MainActor in
+            await Self.launchCoordinator?.run()
+        }
     }
 
     func applicationShouldHandleReopen(

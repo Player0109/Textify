@@ -174,9 +174,6 @@ enum DiagnosticsStringSanitizer {
         ],
         "modelID": [
             "ggml-small.en-q5_1",
-            "whisper-base-en-fast",
-            "whisper-medium-en-accurate",
-            "whisper-small-en-balanced",
             unknownValue
         ],
         "requestedAction": [

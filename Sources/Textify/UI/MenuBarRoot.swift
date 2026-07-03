@@ -1,25 +1,32 @@
 import AppKit
 import SwiftUI
+import TextifyRuntime
 
 struct MenuBarRoot: View {
     @Environment(AppServices.self) private var services
     @Environment(\.openSettings) private var openSettings
-    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
+        Text(statusTitle)
+            .foregroundStyle(.secondary)
+
+        if let blockerTitle {
+            Text(blockerTitle)
+                .foregroundStyle(.secondary)
+        }
+
+        Divider()
+
         Button("Settings...") {
             openSettingsPane(.general)
         }
         .keyboardShortcut(",", modifiers: [.command])
 
-        Button("Show Onboarding") {
-            openWindow(id: "onboarding")
-            NSApplication.shared.activate(ignoringOtherApps: true)
+        if shouldShowFinishSetup {
+            Button("Finish Setup...") {
+                TextifyOnboardingWindowPresenter.shared.show(services: services)
+            }
         }
-
-        Button("Check for Updates...") {
-        }
-        .disabled(true)
 
         Button("About Textify") {
             showAboutPanel()
@@ -33,6 +40,23 @@ struct MenuBarRoot: View {
         .keyboardShortcut("q", modifiers: [.command])
     }
 
+    private var statusTitle: String {
+        if !services.dictation.readiness.canDictate,
+           services.dictation.status == .idle {
+            return "Setup Required"
+        }
+
+        return services.dictation.status.menuStatusTitle
+    }
+
+    private var blockerTitle: String? {
+        services.dictation.readiness.blockers.first?.menuBlockerSummary
+    }
+
+    private var shouldShowFinishSetup: Bool {
+        !services.preferences.onboardingCompleted || !services.dictation.readiness.canDictate
+    }
+
     private func openSettingsPane(_ pane: SettingsPane) {
         services.settingsRouter.selectedPane = pane
         openSettings()
@@ -43,9 +67,54 @@ struct MenuBarRoot: View {
         NSApplication.shared.activate(ignoringOtherApps: true)
         NSApplication.shared.orderFrontStandardAboutPanel(
             options: [
-                .applicationName: "Textify",
-                .applicationVersion: "0.1.0"
+                .applicationName: "Textify"
             ]
         )
+    }
+}
+
+extension DictationRuntimeStatus {
+    var menuStatusTitle: String {
+        switch self {
+        case .idle:
+            return "Ready"
+        case .waitingForActivation:
+            return "Waiting"
+        case .recording:
+            return "Recording"
+        case .processing:
+            return "Processing"
+        case .inserting:
+            return "Typing"
+        case .completed:
+            return "Done"
+        case .cancelled:
+            return "Cancelled"
+        case .blocked:
+            return "Setup Required"
+        case .failed:
+            return "Unavailable"
+        }
+    }
+}
+
+extension ReadinessBlocker {
+    var menuBlockerSummary: String {
+        switch self {
+        case .microphonePermissionDenied:
+            return "Microphone access needed"
+        case .accessibilityPermissionDenied:
+            return "Accessibility needed"
+        case .inputMonitoringPermissionDenied:
+            return "Input Monitoring needed"
+        case .noActiveModel:
+            return "Model not selected"
+        case .activeModelMissing:
+            return "Model not installed"
+        case .activeModelNotReady:
+            return "Model preparing"
+        default:
+            return "Model unavailable"
+        }
     }
 }

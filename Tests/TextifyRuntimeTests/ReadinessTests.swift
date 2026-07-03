@@ -52,6 +52,20 @@ final class ReadinessTests: XCTestCase {
         XCTAssertEqual(snapshot.blockers, [.inputMonitoringPermissionDenied])
     }
 
+    func testUnknownMicrophoneBlocksDictation() {
+        let snapshot = ReadinessSnapshot(
+            permissions: RuntimePermissionSnapshot(
+                microphone: .unknown,
+                accessibility: .granted,
+                inputMonitoring: .granted
+            ),
+            model: .ready(modelID: "ggml-small.en-q5_1")
+        )
+
+        XCTAssertFalse(snapshot.canDictate)
+        XCTAssertEqual(snapshot.blockers, [.microphonePermissionDenied])
+    }
+
     func testLoadingAndWarmingModelsBlockDictationStart() {
         let loading = ReadinessSnapshot(
             permissions: RuntimePermissionSnapshot(

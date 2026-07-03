@@ -44,3 +44,7 @@ Task 1 must merge before parallel Wave 1 work begins.
 - Task 9 touched `Sources/TextifyHotkeys/GlobalHotkeyMonitor.swift` to expose read-only `isRunning` state. `AppServices.startRuntime()` uses it to retry after the event tap stops itself on `.tapDisabledByUserInput`, while preserving hotkey ownership of event-tap lifecycle details.
 - Task 9 now maps `SMAppService.Status.notFound` to a distinct unsupported-location state and keeps Launch at Login operation failures visible while refreshing the live toggle status.
 - Task 10 owns the visible onboarding/menu lifecycle, including showing onboarding on incomplete/reset state and replacing the remaining scaffold UI with production controls. The quality review also flagged active-model launch preload as a production readiness requirement; it is not part of Task 9's composition contract and should be handled in the next runtime/UI integration slice before release-candidate gates.
+
+## V1.1 Task 10 Production UI Carry-forward
+- The onboarding and settings model panes now call through the real `ModelDownloader`/`ModelInstaller` path with embedded manifest URLs and a trusted model-manifest key set for `ggml-small.en-q5_1`.
+- Release remains blocked until the model publishing task creates and deploys the signed manifest, signature, and GitHub Release model asset. As of Task 10 verification, `https://player0109.github.io/Textify/models/manifest.json` and `manifest.json.sig` still return 404.

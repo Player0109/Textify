@@ -214,6 +214,291 @@ final class AppCompositionTests: XCTestCase {
     }
 
     @MainActor
+    func testAppLaunchCoordinatorShowsOnboardingFromLaunchLifecycle() async throws {
+        var preferences = AppPreferences.defaults
+        preferences.onboardingCompleted = false
+        let runtimeTap = FakeCGEventTapClient()
+        let services = try Self.makeServices(
+            preferences: preferences,
+            hotkeyMonitor: GlobalHotkeyMonitor(
+                permissionClient: InputMonitoringPermissionClient(
+                    status: { .granted },
+                    requestAccess: { .granted }
+                ),
+                eventTapClient: runtimeTap
+            )
+        )
+        var didShowOnboarding = false
+        let coordinator = AppLaunchCoordinator(services: services) {
+            didShowOnboarding = true
+        }
+
+        await coordinator.run()
+
+        XCTAssertTrue(didShowOnboarding)
+        XCTAssertEqual(runtimeTap.startCount, 0)
+        XCTAssertFalse(services.dictation.readiness.canDictate)
+    }
+
+    @MainActor
+    func testAppLaunchCoordinatorStartsRuntimeFromLaunchLifecycle() async throws {
+        var preferences = AppPreferences.defaults
+        preferences.onboardingCompleted = true
+        let runtimeTap = FakeCGEventTapClient()
+        let services = try Self.makeServices(
+            preferences: preferences,
+            hotkeyMonitor: GlobalHotkeyMonitor(
+                permissionClient: InputMonitoringPermissionClient(
+                    status: { .granted },
+                    requestAccess: { .granted }
+                ),
+                eventTapClient: runtimeTap
+            )
+        )
+        var didShowOnboarding = false
+        let coordinator = AppLaunchCoordinator(services: services) {
+            didShowOnboarding = true
+        }
+
+        await coordinator.run()
+
+        XCTAssertFalse(didShowOnboarding)
+        XCTAssertEqual(runtimeTap.startCount, 1)
+    }
+
+    @MainActor
+    func testStopRuntimeSuspendsHotkeyMonitorAndAllowsRestart() async throws {
+        let tap = FakeCGEventTapClient()
+        let services = try Self.makeServices(
+            hotkeyMonitor: GlobalHotkeyMonitor(
+                permissionClient: InputMonitoringPermissionClient(
+                    status: { .granted },
+                    requestAccess: { .granted }
+                ),
+                eventTapClient: tap
+            )
+        )
+
+        services.startRuntime()
+        XCTAssertEqual(tap.startCount, 1)
+        XCTAssertEqual(tap.stopCount, 0)
+
+        services.stopRuntime()
+        XCTAssertEqual(tap.stopCount, 1)
+
+        services.startRuntime()
+        XCTAssertEqual(tap.startCount, 2)
+    }
+
+    @MainActor
+    func testTriggerTestControllerSuspendsAndResumesProductionRuntimeWhenOnboarded() throws {
+        let runtimeTap = FakeCGEventTapClient()
+        var preferences = AppPreferences.defaults
+        preferences.onboardingCompleted = true
+        let services = try Self.makeServices(
+            preferences: preferences,
+            hotkeyMonitor: GlobalHotkeyMonitor(
+                permissionClient: InputMonitoringPermissionClient(
+                    status: { .granted },
+                    requestAccess: { .granted }
+                ),
+                eventTapClient: runtimeTap
+            )
+        )
+        let triggerTestTap = FakeCGEventTapClient()
+        let controller = OnboardingTriggerTestController(
+            makeMonitor: {
+                GlobalHotkeyMonitor(
+                    permissionClient: InputMonitoringPermissionClient(
+                        status: { .granted },
+                        requestAccess: { .granted }
+                    ),
+                    eventTapClient: triggerTestTap,
+                    trigger: .rightCommand
+                )
+            }
+        )
+
+        services.startRuntime()
+        XCTAssertEqual(runtimeTap.startCount, 1)
+
+        controller.start(suspending: services)
+
+        XCTAssertEqual(runtimeTap.stopCount, 1)
+        XCTAssertEqual(triggerTestTap.startCount, 1)
+
+        controller.stop()
+
+        XCTAssertEqual(triggerTestTap.stopCount, 1)
+        XCTAssertEqual(runtimeTap.startCount, 2)
+    }
+
+    @MainActor
+    func testTriggerTestControllerPassesAfterRecognizedHoldAndRelease() async throws {
+        let runtimeTap = FakeCGEventTapClient()
+        let services = try Self.makeServices(
+            hotkeyMonitor: GlobalHotkeyMonitor(
+                permissionClient: InputMonitoringPermissionClient(
+                    status: { .granted },
+                    requestAccess: { .granted }
+                ),
+                eventTapClient: runtimeTap
+            )
+        )
+        let triggerTestTap = FakeCGEventTapClient()
+        let controller = OnboardingTriggerTestController(
+            activationDelayMilliseconds: 250,
+            sleepMilliseconds: { _ in },
+            makeMonitor: {
+                GlobalHotkeyMonitor(
+                    permissionClient: InputMonitoringPermissionClient(
+                        status: { .granted },
+                        requestAccess: { .granted }
+                    ),
+                    eventTapClient: triggerTestTap,
+                    trigger: .rightCommand
+                )
+            }
+        )
+
+        controller.start(suspending: services)
+        triggerTestTap.send(.keyboardEvent(KeyboardEventSnapshot(
+            type: .flagsChanged,
+            keyCode: TriggerKeyMatcher.rightCommandKeyCode,
+            flags: TriggerKeyMatcher.commandFlagMask,
+            timestampMs: 1_000,
+            isAutoRepeat: false
+        )))
+        triggerTestTap.send(.keyboardEvent(KeyboardEventSnapshot(
+            type: .flagsChanged,
+            keyCode: TriggerKeyMatcher.rightCommandKeyCode,
+            flags: 0,
+            timestampMs: 1_300,
+            isAutoRepeat: false
+        )))
+
+        for _ in 0..<10 where !controller.result.passed {
+            await Task.yield()
+        }
+
+        XCTAssertTrue(controller.result.passed)
+        XCTAssertFalse(controller.isRunning)
+        XCTAssertEqual(triggerTestTap.stopCount, 1)
+    }
+
+    @MainActor
+    func testTriggerTestControllerResumesProductionRuntimeWhenTestMonitorFails() async throws {
+        let runtimeTap = FakeCGEventTapClient()
+        var preferences = AppPreferences.defaults
+        preferences.onboardingCompleted = true
+        let services = try Self.makeServices(
+            preferences: preferences,
+            hotkeyMonitor: GlobalHotkeyMonitor(
+                permissionClient: InputMonitoringPermissionClient(
+                    status: { .granted },
+                    requestAccess: { .granted }
+                ),
+                eventTapClient: runtimeTap
+            )
+        )
+        let triggerTestTap = FakeCGEventTapClient()
+        let controller = OnboardingTriggerTestController(
+            makeMonitor: {
+                GlobalHotkeyMonitor(
+                    permissionClient: InputMonitoringPermissionClient(
+                        status: { .granted },
+                        requestAccess: { .granted }
+                    ),
+                    eventTapClient: triggerTestTap,
+                    trigger: .rightCommand
+                )
+            }
+        )
+
+        services.startRuntime()
+        controller.start(suspending: services)
+        triggerTestTap.send(.tapDisabledByUserInput)
+
+        for _ in 0..<10 where runtimeTap.startCount == 1 {
+            await Task.yield()
+        }
+
+        XCTAssertFalse(controller.isRunning)
+        XCTAssertEqual(runtimeTap.startCount, 2)
+    }
+
+    @MainActor
+    func testTriggerTestControllerDoesNotResumeRuntimeWhenOnboardingIncomplete() throws {
+        let runtimeTap = FakeCGEventTapClient()
+        var preferences = AppPreferences.defaults
+        preferences.onboardingCompleted = false
+        let services = try Self.makeServices(
+            preferences: preferences,
+            hotkeyMonitor: GlobalHotkeyMonitor(
+                permissionClient: InputMonitoringPermissionClient(
+                    status: { .granted },
+                    requestAccess: { .granted }
+                ),
+                eventTapClient: runtimeTap
+            )
+        )
+        let triggerTestTap = FakeCGEventTapClient()
+        let controller = OnboardingTriggerTestController(
+            makeMonitor: {
+                GlobalHotkeyMonitor(
+                    permissionClient: InputMonitoringPermissionClient(
+                        status: { .granted },
+                        requestAccess: { .granted }
+                    ),
+                    eventTapClient: triggerTestTap,
+                    trigger: .rightCommand
+                )
+            }
+        )
+
+        controller.start(suspending: services)
+        controller.stop()
+
+        XCTAssertEqual(runtimeTap.startCount, 0)
+    }
+
+    @MainActor
+    func testCompleteOnboardingUsesLaunchAtLoginBridgeAndNormalizesUnsupportedLocation() async throws {
+        let launchAtLogin = FakeLaunchAtLoginManager(status: .enabled)
+        let services = try Self.makeServices(
+            launchAtLogin: launchAtLogin,
+            launchAtLoginLocation: FixedLaunchAtLoginLocation(isSupported: false)
+        )
+
+        let status = await services.completeOnboarding(launchAtLogin: true)
+
+        XCTAssertEqual(status, .unsupportedLocation)
+        XCTAssertTrue(services.preferences.onboardingCompleted)
+        XCTAssertFalse(services.preferences.launchAtLoginEnabled)
+        XCTAssertEqual(launchAtLogin.requestedEnabledValues, [])
+        let reloaded = services.settingsStore.load()
+        XCTAssertTrue(reloaded.onboardingCompleted)
+        XCTAssertFalse(reloaded.launchAtLoginEnabled)
+    }
+
+    @MainActor
+    func testCompleteOnboardingUsesLaunchAtLoginBridgeAndNormalizesRequiresApproval() async throws {
+        let launchAtLogin = FakeLaunchAtLoginManager(status: .disabled)
+        launchAtLogin.setResult = .requiresApproval
+        let services = try Self.makeServices(launchAtLogin: launchAtLogin)
+
+        let status = await services.completeOnboarding(launchAtLogin: true)
+
+        XCTAssertEqual(status, .requiresApproval)
+        XCTAssertTrue(services.preferences.onboardingCompleted)
+        XCTAssertFalse(services.preferences.launchAtLoginEnabled)
+        XCTAssertEqual(launchAtLogin.requestedEnabledValues, [true])
+        let reloaded = services.settingsStore.load()
+        XCTAssertTrue(reloaded.onboardingCompleted)
+        XCTAssertFalse(reloaded.launchAtLoginEnabled)
+    }
+
+    @MainActor
     func testProductionCompositionUsesStoredTriggerPreferenceForHotkeyAndDictation() throws {
         let paths = try Self.makeTemporaryPaths()
         var preferences = AppPreferences.defaults
@@ -365,6 +650,7 @@ private final class MutableInputMonitoringPermission: @unchecked Sendable {
 private final class FakeCGEventTapClient: CGEventTapClient, @unchecked Sendable {
     private var handler: (@Sendable (CGEventTapMessage) -> Void)?
     private(set) var startCount = 0
+    private(set) var stopCount = 0
 
     func start(handler: @escaping @Sendable (CGEventTapMessage) -> Void) throws -> CGEventTapHandle {
         startCount += 1
@@ -374,7 +660,9 @@ private final class FakeCGEventTapClient: CGEventTapClient, @unchecked Sendable 
 
     func setEnabled(_ handle: CGEventTapHandle, enabled: Bool) {}
 
-    func stop(_ handle: CGEventTapHandle) {}
+    func stop(_ handle: CGEventTapHandle) {
+        stopCount += 1
+    }
 
     func send(_ message: CGEventTapMessage) {
         handler?(message)

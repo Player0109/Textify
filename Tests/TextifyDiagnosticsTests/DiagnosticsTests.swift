@@ -267,6 +267,27 @@ final class DiagnosticsTests: XCTestCase {
         XCTAssertEqual(launchObject["errorDomain"] as? String, "SMAppServiceErrorDomain")
     }
 
+    func testDiagnosticEventsNormalizeScaffoldModelIDs() throws {
+        let scaffoldModelIDs = [
+            "whisper-base-en-fast",
+            "whisper-medium-en-accurate",
+            "whisper-small-en-balanced"
+        ]
+
+        for modelID in scaffoldModelIDs {
+            let modelLoad = DiagnosticEvent.modelLoad(
+                modelID: modelID,
+                tier: "balanced",
+                durationMs: 42,
+                result: "ready"
+            )
+            let (object, json) = try encodedJSONObject(for: modelLoad)
+
+            XCTAssertEqual(object["modelID"] as? String, "unknown")
+            XCTAssertFalse(json.contains(modelID))
+        }
+    }
+
     func testExporterNormalizesSensitiveModelIDAndErrorDomainValues() throws {
         let directory = try makeTemporaryDirectory()
         defer {

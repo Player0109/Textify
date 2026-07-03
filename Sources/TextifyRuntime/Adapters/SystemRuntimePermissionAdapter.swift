@@ -19,10 +19,21 @@ public struct SystemRuntimePermissionAdapter: RuntimePermissionChecking {
 
     public func permissionSnapshot() async -> RuntimePermissionSnapshot {
         RuntimePermissionSnapshot(
-            microphone: microphone.status() == .granted ? .granted : .denied,
+            microphone: microphoneState(),
             accessibility: accessibility.status() == .trusted ? .granted : .denied,
             inputMonitoring: inputMonitoringState()
         )
+    }
+
+    private func microphoneState() -> RuntimePermissionState {
+        switch microphone.status() {
+        case .granted:
+            return .granted
+        case .notDetermined:
+            return .unknown
+        case .denied, .restricted:
+            return .denied
+        }
     }
 
     private func inputMonitoringState() -> RuntimePermissionState {
