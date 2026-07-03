@@ -7,7 +7,7 @@ public enum SettingsStorage: Equatable, Sendable {
 
 public final class SettingsStore {
     public let storage: SettingsStorage
-    public private(set) var lastError: Error?
+    public private(set) var lastError: SettingsStoreError?
 
     private var memoryData: Data?
     private let decoder = JSONDecoder()
@@ -24,27 +24,43 @@ public final class SettingsStore {
     }
 
     public func load() -> AppPreferences {
+        let data: Data?
         do {
-            guard let data = try loadData() else {
-                lastError = nil
-                return .defaults
-            }
-
-            lastError = nil
-            return try decoder.decode(AppPreferences.self, from: data)
+            data = try loadData()
         } catch {
-            lastError = error
+            lastError = .loadingFailed
+            return .defaults
+        }
+
+        guard let data else {
+            lastError = nil
+            return .defaults
+        }
+
+        do {
+            let preferences = try decoder.decode(AppPreferences.self, from: data)
+            lastError = nil
+            return preferences
+        } catch {
+            lastError = .decodingFailed
             return .defaults
         }
     }
 
     public func save(_ preferences: AppPreferences) {
+        let data: Data
         do {
-            let data = try encoder.encode(preferences)
+            data = try encoder.encode(preferences)
+        } catch {
+            lastError = .encodingFailed
+            return
+        }
+
+        do {
             try saveData(data)
             lastError = nil
         } catch {
-            lastError = error
+            lastError = .savingFailed
         }
     }
 

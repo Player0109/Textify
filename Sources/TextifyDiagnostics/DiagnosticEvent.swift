@@ -12,6 +12,12 @@ public enum DiagnosticEvent: Encodable, Sendable {
         durationMs: Int
     )
     case dictationBlockedExcludedApp
+    case transcriptionCompleted(
+        modelID: String,
+        audioDurationMs: Int,
+        inferenceDurationMs: Int,
+        textLengthBucket: String
+    )
     case launchAtLoginChange(
         requestedAction: String,
         statusBefore: String,
@@ -34,6 +40,8 @@ public enum DiagnosticEvent: Encodable, Sendable {
         case fallbackAttempted
         case fallbackBlockedReason
         case durationMs
+        case audioDurationMs
+        case inferenceDurationMs
         case requestedAction
         case statusBefore
         case statusAfter
@@ -75,6 +83,18 @@ public enum DiagnosticEvent: Encodable, Sendable {
 
         case .dictationBlockedExcludedApp:
             try container.encode("dictation_blocked_excluded_app", forKey: .event)
+
+        case let .transcriptionCompleted(
+            modelID,
+            audioDurationMs,
+            inferenceDurationMs,
+            textLengthBucket
+        ):
+            try container.encode("speech_recognition_completed", forKey: .event)
+            try container.encode(modelID, forKey: .modelID)
+            try container.encode(audioDurationMs, forKey: .audioDurationMs)
+            try container.encode(inferenceDurationMs, forKey: .inferenceDurationMs)
+            try container.encode(textLengthBucket, forKey: .textLengthBucket)
 
         case let .launchAtLoginChange(
             requestedAction,

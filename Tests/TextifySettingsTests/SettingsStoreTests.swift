@@ -11,8 +11,25 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(preferences.modelSelectionScope, .curatedInstalledModels)
         XCTAssertFalse(preferences.showInDock)
         XCTAssertTrue(preferences.automaticallyCheckForUpdates)
-        XCTAssertTrue(preferences.launchAtLoginRequestedByOnboarding)
+        XCTAssertTrue(preferences.launchAtLoginEnabled)
         XCTAssertTrue(preferences.excludedApps.isEmpty)
+    }
+
+    func testDecodesOldLaunchAtLoginRequestedByOnboardingIntoLaunchAtLoginEnabled() throws {
+        let json = """
+        {
+          "trigger": "rightCommand",
+          "microphoneSelection": "systemDefault",
+          "transcriptionLanguage": "en",
+          "modelSelectionScope": "curatedInstalledModels",
+          "launchAtLoginRequestedByOnboarding": false,
+          "onboardingCompleted": true
+        }
+        """
+        let preferences = try JSONDecoder().decode(AppPreferences.self, from: Data(json.utf8))
+
+        XCTAssertFalse(preferences.launchAtLoginEnabled)
+        XCTAssertTrue(preferences.onboardingCompleted)
     }
 
     func testResetOnboardingDoesNotDeleteUserData() throws {
@@ -60,6 +77,9 @@ final class SettingsStoreTests: XCTestCase {
         let json = String(decoding: try Data(contentsOf: fileURL), as: UTF8.self)
         XCTAssertTrue(json.contains("\"trigger\""))
         XCTAssertTrue(json.contains("rightOption"))
+        XCTAssertTrue(json.contains("\"launchAtLoginEnabled\""))
+        XCTAssertFalse(json.contains("launchAtLoginRequestedByOnboarding"))
+        XCTAssertFalse(json.contains("developerModeEnabled"))
         XCTAssertFalse(json.contains("encrypted"))
     }
 
@@ -67,5 +87,23 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(AppPreferences.supportedTranscriptionLanguages, [.english])
         XCTAssertFalse(AppPreferences.allowsArbitraryModelImports)
         XCTAssertFalse(AppPreferences.supportsPerAppProfiles)
+    }
+
+    func testInvalidStoredPreferencesRecordsSettingsStoreError() throws {
+        let directory = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+        }
+
+        let fileURL = directory.appendingPathComponent("preferences.json")
+        try Data("{".utf8).write(to: fileURL)
+
+        let store = SettingsStore(storage: .file(fileURL))
+        let preferences = store.load()
+
+        XCTAssertEqual(preferences, .defaults)
+        XCTAssertEqual(store.lastError, .decodingFailed)
     }
 }
