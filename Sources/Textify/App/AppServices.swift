@@ -19,18 +19,41 @@ final class AppServices {
     let dictation: AppDictationService
     let hotkeyMonitor: GlobalHotkeyMonitor
     let launchAtLogin: any LaunchAtLoginManaging
+    let startupIssue: AppStartupIssue?
 
     var preferences: AppPreferences
+    var launchAtLoginStatus: LaunchAtLoginStatus
     var onboardingStep = OnboardingStep.welcome
     var overlayState = RecordingOverlayState.hidden
 
     @ObservationIgnored private var runtimeStarted = false
 
     static func production() -> AppServices {
+        production(
+            pathFactory: { try AppPaths.production() },
+            launchAtLogin: LaunchAtLoginController()
+        )
+    }
+
+    static func production(
+        pathFactory: () throws -> AppPaths,
+        fileManager: FileManager = .default,
+        launchAtLogin: any LaunchAtLoginManaging
+    ) -> AppServices {
         do {
-            return try production(fileManager: .default)
+            return production(
+                paths: try pathFactory(),
+                fileManager: fileManager,
+                launchAtLogin: launchAtLogin,
+                startupIssue: nil
+            )
         } catch {
-            preconditionFailure("Failed to prepare Textify application paths: \(error)")
+            return production(
+                paths: AppPaths.temporaryFallback(fileManager: fileManager),
+                fileManager: fileManager,
+                launchAtLogin: launchAtLogin,
+                startupIssue: .applicationPathsUnavailable(String(describing: error))
+            )
         }
     }
 
@@ -40,7 +63,8 @@ final class AppServices {
         diagnosticsLogger: DiagnosticsLogger,
         dictation: AppDictationService,
         hotkeyMonitor: GlobalHotkeyMonitor,
-        launchAtLogin: any LaunchAtLoginManaging
+        launchAtLogin: any LaunchAtLoginManaging,
+        startupIssue: AppStartupIssue? = nil
     ) {
         self.paths = paths
         self.settingsStore = settingsStore
@@ -48,7 +72,9 @@ final class AppServices {
         self.dictation = dictation
         self.hotkeyMonitor = hotkeyMonitor
         self.launchAtLogin = launchAtLogin
+        self.startupIssue = startupIssue
         self.preferences = settingsStore.load()
+        self.launchAtLoginStatus = launchAtLogin.status()
     }
 
     func startRuntime() {
@@ -56,14 +82,13 @@ final class AppServices {
             return
         }
 
-        runtimeStarted = true
         let dictation = dictation
 
         Task { @MainActor in
             await dictation.refreshReadiness()
         }
 
-        hotkeyMonitor.start(
+        let result = hotkeyMonitor.start(
             onEvent: { event in
                 Task { @MainActor in
                     await dictation.handleTriggerEvent(event)
@@ -75,20 +100,56 @@ final class AppServices {
                 }
             }
         )
+        if case .success = result {
+            runtimeStarted = true
+        }
     }
 
     func savePreferences() {
         settingsStore.save(preferences)
     }
 
-    private static func production(fileManager: FileManager) throws -> AppServices {
-        let paths = try AppPaths.production(fileManager: fileManager)
+    @discardableResult
+    func refreshLaunchAtLoginStatus() -> LaunchAtLoginStatus {
+        let status = launchAtLogin.status()
+        launchAtLoginStatus = status
+        return status
+    }
+
+    @discardableResult
+    func setLaunchAtLoginEnabled(_ enabled: Bool) async -> LaunchAtLoginStatus {
+        let status = await launchAtLogin.setEnabled(enabled)
+        launchAtLoginStatus = status
+
+        switch status {
+        case .enabled:
+            preferences.launchAtLoginEnabled = true
+            savePreferences()
+        case .disabled, .requiresApproval, .unavailable:
+            preferences.launchAtLoginEnabled = false
+            savePreferences()
+        case .failed:
+            break
+        }
+
+        return status
+    }
+
+    private static func production(
+        paths: AppPaths,
+        fileManager: FileManager,
+        launchAtLogin: any LaunchAtLoginManaging,
+        startupIssue: AppStartupIssue?
+    ) -> AppServices {
         let settingsStore = SettingsStore(storage: .file(paths.settingsFileURL), fileManager: fileManager)
+        let runtimeSettingsStore = SettingsStore(storage: .file(paths.settingsFileURL), fileManager: fileManager)
         let diagnosticsLogger = DiagnosticsLogger(directory: paths.logsDirectory)
         let modelLayout = ModelStorageLayout(rootDirectory: paths.modelsDirectory)
         let whisperRuntime = WhisperRuntime()
+        let preferences = settingsStore.load()
+        let trigger = hotkeyTrigger(for: preferences.trigger)
         let dependencies = RuntimeDependencies(
-            settings: RuntimeSettingsStoreAdapter(store: settingsStore),
+            settings: RuntimeSettingsStoreAdapter(store: runtimeSettingsStore),
             permissions: SystemRuntimePermissionAdapter(),
             models: RuntimeModelResolverAdapter(layout: modelLayout),
             audio: RuntimeAudioRecorderAdapter(),
@@ -108,11 +169,34 @@ final class AppServices {
             paths: paths,
             settingsStore: settingsStore,
             diagnosticsLogger: diagnosticsLogger,
-            dictation: AppDictationService(dependencies: dependencies),
-            hotkeyMonitor: GlobalHotkeyMonitor(),
-            launchAtLogin: LaunchAtLoginController()
+            dictation: AppDictationService(
+                dependencies: dependencies,
+                triggerStateMachine: TriggerStateMachine(trigger: trigger)
+            ),
+            hotkeyMonitor: GlobalHotkeyMonitor(trigger: trigger),
+            launchAtLogin: launchAtLogin,
+            startupIssue: startupIssue
         )
     }
+
+    private static func hotkeyTrigger(
+        for preference: TextifySettings.TriggerPreference
+    ) -> TextifyHotkeys.TriggerPreference {
+        switch preference {
+        case .rightCommand:
+            return .rightCommand
+        case .rightOption:
+            return .rightOption
+        case .rightControl:
+            return .rightControl
+        case .controlSpace:
+            return .controlSpace
+        }
+    }
+}
+
+enum AppStartupIssue: Equatable {
+    case applicationPathsUnavailable(String)
 }
 
 @Observable

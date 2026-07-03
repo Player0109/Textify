@@ -14,11 +14,12 @@ final class GlobalHotkeyMonitorTests: XCTestCase {
         )
         let failures = Recorder<HotkeyMonitorError>()
 
-        monitor.start(
+        let result: Result<Void, HotkeyMonitorError> = monitor.start(
             onEvent: { _ in XCTFail("Denied permission should not emit events") },
             onFailure: { failures.append($0) }
         )
 
+        XCTAssertEqual(result.failureValue, .inputMonitoringDenied)
         XCTAssertEqual(failures.values, [.inputMonitoringDenied])
         XCTAssertEqual(tap.startCount, 0)
     }
@@ -34,13 +35,35 @@ final class GlobalHotkeyMonitorTests: XCTestCase {
         )
         let failures = Recorder<HotkeyMonitorError>()
 
-        monitor.start(
+        let result: Result<Void, HotkeyMonitorError> = monitor.start(
             onEvent: { _ in XCTFail("Unknown permission should not emit events") },
             onFailure: { failures.append($0) }
         )
 
+        XCTAssertEqual(result.failureValue, .inputMonitoringPermissionRequired)
         XCTAssertEqual(failures.values, [.inputMonitoringPermissionRequired])
         XCTAssertEqual(tap.startCount, 0)
+    }
+
+    func testStartReturnsSuccessWhenTapStarts() {
+        let tap = FakeCGEventTapClient()
+        let monitor = GlobalHotkeyMonitor(
+            permissionClient: InputMonitoringPermissionClient(
+                status: { .granted },
+                requestAccess: { .granted }
+            ),
+            eventTapClient: tap
+        )
+        let failures = Recorder<HotkeyMonitorError>()
+
+        let result: Result<Void, HotkeyMonitorError> = monitor.start(
+            onEvent: { _ in },
+            onFailure: { failures.append($0) }
+        )
+
+        XCTAssertTrue(result.isSuccess)
+        XCTAssertEqual(failures.values, [])
+        XCTAssertEqual(tap.startCount, 1)
     }
 
     func testRightCommandEventsAreMappedFromTapSnapshots() async {
@@ -320,5 +343,21 @@ private final class Recorder<Value>: @unchecked Sendable {
 
     func append(_ value: Value) {
         values.append(value)
+    }
+}
+
+private extension Result where Success == Void {
+    var isSuccess: Bool {
+        if case .success = self {
+            return true
+        }
+        return false
+    }
+
+    var failureValue: Failure? {
+        if case let .failure(error) = self {
+            return error
+        }
+        return nil
     }
 }

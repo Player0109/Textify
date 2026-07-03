@@ -19,6 +19,18 @@ struct AppPaths: Equatable {
             appropriateFor: nil,
             create: true
         )
+        return try make(
+            applicationSupportBase: applicationSupportBase,
+            libraryDirectory: libraryDirectory,
+            fileManager: fileManager
+        )
+    }
+
+    static func make(
+        applicationSupportBase: URL,
+        libraryDirectory: URL,
+        fileManager: FileManager = .default
+    ) throws -> AppPaths {
         let applicationSupportDirectory = applicationSupportBase
             .appendingPathComponent("Textify", isDirectory: true)
         let modelsDirectory = applicationSupportDirectory
@@ -45,6 +57,31 @@ struct AppPaths: Equatable {
             settingsFileURL: applicationSupportDirectory.appendingPathComponent("settings.json"),
             modelsDirectory: modelsDirectory,
             logsDirectory: logsDirectory
+        )
+    }
+
+    static func temporaryFallback(fileManager: FileManager = .default) -> AppPaths {
+        let root = fileManager.temporaryDirectory
+            .appendingPathComponent("TextifyStartupFallback", isDirectory: true)
+        if let paths = try? make(
+            applicationSupportBase: root.appendingPathComponent("Application Support", isDirectory: true),
+            libraryDirectory: root.appendingPathComponent("Library", isDirectory: true),
+            fileManager: fileManager
+        ) {
+            return paths
+        }
+
+        let applicationSupportDirectory = root
+            .appendingPathComponent("Application Support", isDirectory: true)
+            .appendingPathComponent("Textify", isDirectory: true)
+        return AppPaths(
+            applicationSupportDirectory: applicationSupportDirectory,
+            settingsFileURL: applicationSupportDirectory.appendingPathComponent("settings.json"),
+            modelsDirectory: applicationSupportDirectory.appendingPathComponent("Models", isDirectory: true),
+            logsDirectory: root
+                .appendingPathComponent("Library", isDirectory: true)
+                .appendingPathComponent("Logs", isDirectory: true)
+                .appendingPathComponent("Textify", isDirectory: true)
         )
     }
 }

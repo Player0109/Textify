@@ -7,6 +7,10 @@ public final class GlobalHotkeyMonitor {
     private var handle: CGEventTapHandle?
     private var sessionGeneration = 0
 
+    public var configuredTrigger: TriggerPreference {
+        trigger
+    }
+
     public init(
         permissionClient: InputMonitoringPermissionClient = .live,
         eventTapClient: any CGEventTapClient = SystemCGEventTapClient(),
@@ -24,23 +28,27 @@ public final class GlobalHotkeyMonitor {
         }
     }
 
+    @discardableResult
     public func start(
         onEvent: @escaping @Sendable (TriggerEvent) -> Void,
         onFailure: @escaping @Sendable (HotkeyMonitorError) -> Void
-    ) {
+    ) -> Result<Void, HotkeyMonitorError> {
         guard handle == nil else {
-            onFailure(.alreadyRunning)
-            return
+            let error = HotkeyMonitorError.alreadyRunning
+            onFailure(error)
+            return .failure(error)
         }
         switch permissionClient.status() {
         case .granted:
             break
         case .unknown:
-            onFailure(.inputMonitoringPermissionRequired)
-            return
+            let error = HotkeyMonitorError.inputMonitoringPermissionRequired
+            onFailure(error)
+            return .failure(error)
         case .denied:
-            onFailure(.inputMonitoringDenied)
-            return
+            let error = HotkeyMonitorError.inputMonitoringDenied
+            onFailure(error)
+            return .failure(error)
         }
         do {
             sessionGeneration += 1
@@ -56,10 +64,14 @@ public final class GlobalHotkeyMonitor {
                     )
                 }
             }
+            return .success(())
         } catch let error as HotkeyMonitorError {
             onFailure(error)
+            return .failure(error)
         } catch {
-            onFailure(.eventTapCreationFailed)
+            let monitorError = HotkeyMonitorError.eventTapCreationFailed
+            onFailure(monitorError)
+            return .failure(monitorError)
         }
     }
 

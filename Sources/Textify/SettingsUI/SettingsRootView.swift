@@ -56,7 +56,9 @@ private struct GeneralSettingsPane: View {
 
         SettingsPaneLayout(title: "General") {
             SettingsSection("Startup") {
-                Toggle("Launch at Login", isOn: $services.preferences.launchAtLoginRequestedByOnboarding)
+                Toggle("Launch at Login", isOn: launchAtLoginBinding)
+                Text(launchAtLoginStatusText)
+                    .foregroundStyle(.secondary)
                 Toggle("Show in Dock", isOn: $services.preferences.showInDock)
             }
 
@@ -72,6 +74,37 @@ private struct GeneralSettingsPane: View {
         }
         .onChange(of: services.preferences) { _, _ in
             services.savePreferences()
+        }
+        .onAppear {
+            services.refreshLaunchAtLoginStatus()
+        }
+    }
+
+    private var launchAtLoginBinding: Binding<Bool> {
+        Binding(
+            get: {
+                services.launchAtLoginStatus == .enabled
+            },
+            set: { isEnabled in
+                Task {
+                    await services.setLaunchAtLoginEnabled(isEnabled)
+                }
+            }
+        )
+    }
+
+    private var launchAtLoginStatusText: String {
+        switch services.launchAtLoginStatus {
+        case .enabled:
+            return "Textify will open at login."
+        case .disabled:
+            return "Textify will not open at login."
+        case .requiresApproval:
+            return "macOS needs approval before Textify can open at login."
+        case .unavailable:
+            return "Textify could not check Launch at Login status."
+        case .failed:
+            return "Textify could not update Launch at Login."
         }
     }
 }

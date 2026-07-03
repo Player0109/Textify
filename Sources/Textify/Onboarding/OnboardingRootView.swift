@@ -66,6 +66,13 @@ struct OnboardingRootView: View {
     }
 
     private func advance() {
+        if services.onboardingStep == .completion {
+            Task {
+                await services.setLaunchAtLoginEnabled(launchAtLogin)
+            }
+            return
+        }
+
         guard let index = OnboardingStep.allCases.firstIndex(of: services.onboardingStep) else {
             return
         }

@@ -34,6 +34,10 @@ public final class AppDictationService {
         )
     }
 
+    public var configuredTrigger: TriggerPreference {
+        triggerStateMachine.trigger
+    }
+
     @discardableResult
     public func refreshReadiness() async -> ReadinessSnapshot {
         let preferences = await dependencies.settings.loadPreferences()

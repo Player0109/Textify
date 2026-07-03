@@ -182,7 +182,19 @@ let package = Package(
         .testTarget(name: "TextifyDiagnosticsTests", dependencies: ["TextifyDiagnostics"]),
         .testTarget(name: "TextifySettingsTests", dependencies: ["TextifySettings"]),
         .testTarget(name: "TextifyRuntimeTests", dependencies: ["TextifyRuntime"]),
-        .testTarget(name: "TextifyAppTests", dependencies: ["Textify"])
+        .testTarget(
+            name: "TextifyAppTests",
+            dependencies: [
+                "Textify",
+                "TextifyAudio",
+                "TextifyDiagnostics",
+                "TextifyHotkeys",
+                "TextifyInsertion",
+                "TextifyRuntime",
+                "TextifySettings",
+                "TextifyTranscription"
+            ]
+        )
     ],
     cLanguageStandard: .c11,
     cxxLanguageStandard: .cxx17
