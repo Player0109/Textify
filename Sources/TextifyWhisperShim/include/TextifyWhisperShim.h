@@ -14,7 +14,12 @@ void textify_whisper_free(TextifyWhisperContext *context);
 int32_t textify_whisper_transcribe(
     TextifyWhisperContext *context,
     const float *pcm_mono_f32_16khz,
-    int32_t sample_count
+    int32_t sample_count,
+    const char *language,
+    int32_t translate,
+    float temperature,
+    int32_t no_context,
+    const char *initial_prompt
 );
 
 const char *textify_whisper_last_text(TextifyWhisperContext *context);
