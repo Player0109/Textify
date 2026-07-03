@@ -211,7 +211,7 @@ private struct DictationSettingsPane: View {
 
 private struct ModelsSettingsPane: View {
     @Environment(AppServices.self) private var services
-    @State private var isInstalling = false
+    @State private var modelDownloadState: DownloadState?
     @State private var modelMessage: String?
 
     var body: some View {
@@ -258,6 +258,10 @@ private struct ModelsSettingsPane: View {
                         .foregroundStyle(.secondary)
                 }
 
+                if let modelDownloadState {
+                    ModelInstallProgressView(state: modelDownloadState)
+                }
+
                 if let modelMessage {
                     Text(modelMessage)
                         .foregroundStyle(.secondary)
@@ -269,16 +273,27 @@ private struct ModelsSettingsPane: View {
         }
     }
 
+    private var isInstalling: Bool {
+        modelDownloadState?.isActive ?? false
+    }
+
+    @MainActor
     private func installModel() async {
+        guard !isInstalling else {
+            return
+        }
+
         guard let configuration = ProductionModelInstallConfiguration.current else {
             modelMessage = "Signed model manifest is not configured in this build."
             return
         }
 
-        isInstalling = true
-        defer {
-            isInstalling = false
-        }
+        modelMessage = nil
+        modelDownloadState = DownloadState(
+            modelID: ProductionModelPolicy.requiredModelID,
+            phase: .checkingSpace,
+            message: "Preparing model download."
+        )
 
         do {
             let verifier = ManifestVerifier(trustedKeys: configuration.trustedKeys)
@@ -294,13 +309,22 @@ private struct ModelsSettingsPane: View {
             _ = try await installer.install(
                 modelID: ProductionModelPolicy.requiredModelID,
                 from: manifest
-            )
+            ) { state in
+                Task { @MainActor in
+                    modelDownloadState = state
+                }
+            }
             services.preferences.activeModelID = ProductionModelPolicy.requiredModelID
             services.savePreferences()
             _ = await services.dictation.refreshReadiness()
-            modelMessage = "Model installed and verified."
+            modelMessage = nil
         } catch {
-            modelMessage = "Model install failed: \(String(describing: error))"
+            modelDownloadState = DownloadState(
+                modelID: ProductionModelPolicy.requiredModelID,
+                phase: .failed,
+                message: "Model install failed: \(String(describing: error))"
+            )
+            modelMessage = nil
         }
     }
 }

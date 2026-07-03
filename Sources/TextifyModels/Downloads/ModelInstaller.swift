@@ -43,7 +43,32 @@ public struct ModelInstaller {
         self.nowISO8601 = nowISO8601
     }
 
-    public func install(modelID: String, from manifest: ModelManifest) async throws -> InstalledModelRecord {
+    public func install(
+        modelID: String,
+        from manifest: ModelManifest,
+        onStateChange: @escaping @Sendable (DownloadState) -> Void = { _ in }
+    ) async throws -> InstalledModelRecord {
+        do {
+            return try await installReportingFailures(
+                modelID: modelID,
+                from: manifest,
+                onStateChange: onStateChange
+            )
+        } catch {
+            onStateChange(DownloadState(
+                modelID: modelID,
+                phase: .failed,
+                message: String(describing: error)
+            ))
+            throw error
+        }
+    }
+
+    private func installReportingFailures(
+        modelID: String,
+        from manifest: ModelManifest,
+        onStateChange: @escaping @Sendable (DownloadState) -> Void
+    ) async throws -> InstalledModelRecord {
         try ProductionModelPolicy.validateV1_1ProductionManifest(manifest)
 
         guard let model = manifest.models.first(where: { $0.id == modelID }) else {
@@ -66,13 +91,47 @@ public struct ModelInstaller {
         try? fileManager.removeItem(at: temporaryURL)
         try? fileManager.removeItem(at: replacementURL)
 
-        _ = try await transport.downloadFile(URLRequest(url: url), to: temporaryURL)
+        onStateChange(DownloadState(
+            modelID: model.id,
+            phase: .checkingSpace,
+            totalBytes: file.sizeBytes,
+            message: "Preparing model download."
+        ))
+        onStateChange(DownloadState(
+            modelID: model.id,
+            phase: .downloading,
+            totalBytes: file.sizeBytes,
+            message: "Downloading model."
+        ))
+        _ = try await transport.downloadFile(URLRequest(url: url), to: temporaryURL) { progress in
+            onStateChange(DownloadState(
+                modelID: model.id,
+                phase: .downloading,
+                bytesDownloaded: progress.bytesDownloaded,
+                totalBytes: progress.totalBytes > 0 ? progress.totalBytes : file.sizeBytes,
+                message: "Downloading model."
+            ))
+        }
+        onStateChange(DownloadState(
+            modelID: model.id,
+            phase: .verifying,
+            bytesDownloaded: file.sizeBytes,
+            totalBytes: file.sizeBytes,
+            message: "Verifying model."
+        ))
         let actualChecksum = try sha256Hex(fileURL: temporaryURL)
         guard actualChecksum.lowercased() == file.sha256.lowercased() else {
             try? fileManager.removeItem(at: temporaryURL)
             throw ModelInstallError.checksumMismatch(expected: file.sha256, actual: actualChecksum)
         }
 
+        onStateChange(DownloadState(
+            modelID: model.id,
+            phase: .installing,
+            bytesDownloaded: file.sizeBytes,
+            totalBytes: file.sizeBytes,
+            message: "Installing model."
+        ))
         try fileManager.createDirectory(
             at: installedModelDirectory,
             withIntermediateDirectories: true
@@ -94,6 +153,13 @@ public struct ModelInstaller {
             localFilesByManifestFilename: [file.filename: installedURL.path]
         )
         try upsertInstalledRecord(record)
+        onStateChange(DownloadState(
+            modelID: model.id,
+            phase: .installed,
+            bytesDownloaded: file.sizeBytes,
+            totalBytes: file.sizeBytes,
+            message: "Model installed and verified."
+        ))
         return record
     }
 

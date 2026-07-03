@@ -3,6 +3,21 @@ import Foundation
 public protocol DownloadTransport {
     func fetch(_ request: URLRequest) async throws -> DownloadResponse
     func downloadFile(_ request: URLRequest, to temporaryURL: URL) async throws -> DownloadFileResponse
+    func downloadFile(
+        _ request: URLRequest,
+        to temporaryURL: URL,
+        progress: @escaping @Sendable (DownloadFileProgress) -> Void
+    ) async throws -> DownloadFileResponse
+}
+
+public extension DownloadTransport {
+    func downloadFile(
+        _ request: URLRequest,
+        to temporaryURL: URL,
+        progress: @escaping @Sendable (DownloadFileProgress) -> Void
+    ) async throws -> DownloadFileResponse {
+        try await downloadFile(request, to: temporaryURL)
+    }
 }
 
 public struct DownloadResponse: Equatable, Sendable {
@@ -94,7 +109,16 @@ public final class URLSessionDownloadTransport: DownloadTransport {
     }
 
     public func downloadFile(_ request: URLRequest, to temporaryURL: URL) async throws -> DownloadFileResponse {
-        let (downloadedURL, response) = try await session.download(for: request)
+        try await downloadFile(request, to: temporaryURL) { _ in }
+    }
+
+    public func downloadFile(
+        _ request: URLRequest,
+        to temporaryURL: URL,
+        progress: @escaping @Sendable (DownloadFileProgress) -> Void
+    ) async throws -> DownloadFileResponse {
+        let delegate = URLSessionDownloadProgressDelegate(progress: progress)
+        let (downloadedURL, response) = try await session.download(for: request, delegate: delegate)
         let httpResponse = response as? HTTPURLResponse
 
         if let statusCode = httpResponse?.statusCode,
@@ -111,6 +135,34 @@ public final class URLSessionDownloadTransport: DownloadTransport {
             lastModified: httpResponse?.value(forHTTPHeaderField: "Last-Modified"),
             statusCode: httpResponse?.statusCode
         )
+    }
+}
+
+private final class URLSessionDownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
+    private let progress: @Sendable (DownloadFileProgress) -> Void
+
+    init(progress: @escaping @Sendable (DownloadFileProgress) -> Void) {
+        self.progress = progress
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        downloadTask: URLSessionDownloadTask,
+        didFinishDownloadingTo location: URL
+    ) {
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        downloadTask: URLSessionDownloadTask,
+        didWriteData bytesWritten: Int64,
+        totalBytesWritten: Int64,
+        totalBytesExpectedToWrite: Int64
+    ) {
+        progress(DownloadFileProgress(
+            bytesDownloaded: totalBytesWritten,
+            totalBytes: totalBytesExpectedToWrite
+        ))
     }
 }
 

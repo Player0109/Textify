@@ -45,6 +45,54 @@ final class ModelInstallerTests: XCTestCase {
         XCTAssertEqual(store.record(forModelID: model.id)?.installedAt, "2026-07-03T00:00:00Z")
     }
 
+    func testInstallerReportsDownloadAndInstallProgress() async throws {
+        let manifest = try Self.fixtureManifest()
+        let model = try XCTUnwrap(manifest.models.first)
+        let file = try XCTUnwrap(model.files.first)
+        let rootDirectory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectory) }
+        let modelData = try Self.fixtureData("model.bin")
+        let transport = FixtureFileDownloadTransport(
+            dataByURL: [
+                try XCTUnwrap(URL(string: file.url)): modelData
+            ],
+            progressEvents: [
+                DownloadFileProgress(bytesDownloaded: 1, totalBytes: Int64(modelData.count)),
+                DownloadFileProgress(bytesDownloaded: Int64(modelData.count), totalBytes: Int64(modelData.count))
+            ]
+        )
+        let installer = ModelInstaller(
+            layout: ModelStorageLayout(rootDirectory: rootDirectory),
+            transport: transport
+        )
+        let recorder = InstallStateRecorder()
+
+        _ = try await installer.install(
+            modelID: ProductionModelPolicy.requiredModelID,
+            from: manifest,
+            onStateChange: { state in
+                recorder.append(state)
+            }
+        )
+
+        let states = recorder.states()
+        XCTAssertEqual(states.map(\.phase), [
+            .checkingSpace,
+            .downloading,
+            .downloading,
+            .downloading,
+            .verifying,
+            .installing,
+            .installed
+        ])
+        XCTAssertTrue(states.contains { state in
+            state.phase == .downloading
+                && state.bytesDownloaded == 1
+                && state.totalBytes == Int64(modelData.count)
+        })
+        XCTAssertEqual(states.last?.progressFraction, 1)
+    }
+
     func testInstallerDeletesPartialOnChecksumMismatch() async throws {
         let manifest = try Self.fixtureManifest()
         let model = try XCTUnwrap(manifest.models.first)
@@ -291,9 +339,11 @@ final class ModelInstallerTests: XCTestCase {
 
 private final class FixtureFileDownloadTransport: DownloadTransport {
     private let dataByURL: [URL: Data]
+    private let progressEvents: [DownloadFileProgress]
 
-    init(dataByURL: [URL: Data]) {
+    init(dataByURL: [URL: Data], progressEvents: [DownloadFileProgress] = []) {
         self.dataByURL = dataByURL
+        self.progressEvents = progressEvents
     }
 
     func fetch(_ request: URLRequest) async throws -> DownloadResponse {
@@ -308,10 +358,41 @@ private final class FixtureFileDownloadTransport: DownloadTransport {
         try response.data.write(to: temporaryURL)
         return DownloadFileResponse(fileURL: temporaryURL)
     }
+
+    func downloadFile(
+        _ request: URLRequest,
+        to temporaryURL: URL,
+        progress: @escaping @Sendable (DownloadFileProgress) -> Void
+    ) async throws -> DownloadFileResponse {
+        let response = try await fetch(request)
+        for event in progressEvents {
+            progress(event)
+        }
+        try response.data.write(to: temporaryURL)
+        return DownloadFileResponse(fileURL: temporaryURL)
+    }
 }
 
 private enum FixtureFileDownloadTransportError: Error {
     case missingResponse
+}
+
+private final class InstallStateRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recordedStates: [DownloadState] = []
+
+    func append(_ state: DownloadState) {
+        lock.lock()
+        recordedStates.append(state)
+        lock.unlock()
+    }
+
+    func states() -> [DownloadState] {
+        lock.lock()
+        let result = recordedStates
+        lock.unlock()
+        return result
+    }
 }
 
 private final class InstalledPathRecordingFileManager: FileManager {

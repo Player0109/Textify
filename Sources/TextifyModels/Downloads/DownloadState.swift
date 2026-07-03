@@ -1,5 +1,15 @@
 import Foundation
 
+public struct DownloadFileProgress: Codable, Equatable, Sendable {
+    public let bytesDownloaded: Int64
+    public let totalBytes: Int64
+
+    public init(bytesDownloaded: Int64, totalBytes: Int64) {
+        self.bytesDownloaded = max(0, bytesDownloaded)
+        self.totalBytes = max(0, totalBytes)
+    }
+}
+
 public enum DownloadPhase: String, CaseIterable, Codable, Equatable, Sendable {
     case checkingSpace
     case downloading
@@ -39,5 +49,14 @@ public struct DownloadState: Codable, Equatable, Sendable {
 
         let progress = Double(bytesDownloaded) / Double(totalBytes)
         return min(max(progress, 0), 1)
+    }
+
+    public var isActive: Bool {
+        switch phase {
+        case .checkingSpace, .downloading, .verifying, .installing:
+            return true
+        case .interrupted, .installed, .failed, .cancelled:
+            return false
+        }
     }
 }

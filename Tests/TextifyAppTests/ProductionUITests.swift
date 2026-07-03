@@ -71,6 +71,19 @@ final class ProductionUITests: XCTestCase {
         XCTAssertFalse(ProductionModelInstallConfiguration.current?.trustedKeys.first?.publicKeyBase64.isEmpty ?? true)
     }
 
+    func testModelInstallProgressPresentationShowsDownloadProgress() {
+        let state = DownloadState(
+            modelID: ProductionModelPolicy.requiredModelID,
+            phase: .downloading,
+            bytesDownloaded: 95_000_000,
+            totalBytes: 190_000_000
+        )
+
+        XCTAssertEqual(ModelInstallProgressPresentation.title(for: state), "Downloading model")
+        XCTAssertEqual(ModelInstallProgressPresentation.percentText(for: state), "50%")
+        XCTAssertEqual(ModelInstallProgressPresentation.progressValue(for: state), 0.5)
+    }
+
     func testLaunchAtLoginToggleUsesLiveStatus() {
         XCTAssertTrue(LaunchAtLoginToggleModel.isOn(status: .enabled))
         XCTAssertFalse(LaunchAtLoginToggleModel.isOn(status: .disabled))

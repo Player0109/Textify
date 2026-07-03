@@ -13,6 +13,7 @@ struct OnboardingRootView: View {
     @State private var launchAtLogin = true
     @State private var permissionMessage: String?
     @State private var modelMessage: String?
+    @State private var modelDownloadState: DownloadState?
     @State private var launchAtLoginCompletionStatus: LaunchAtLoginStatus?
     @State private var didCompleteOnboarding = false
     @State private var triggerTest = OnboardingTriggerTestController()
@@ -133,12 +134,16 @@ struct OnboardingRootView: View {
                             await installModel()
                         }
                     }
-                    .disabled(ProductionModelInstallConfiguration.current == nil)
+                    .disabled(isInstallingModel || ProductionModelInstallConfiguration.current == nil)
                 }
 
                 if ProductionModelInstallConfiguration.current == nil {
                     Text("Signed model manifest is not configured in this build.")
                         .foregroundStyle(.secondary)
+                }
+
+                if let modelDownloadState {
+                    ModelInstallProgressView(state: modelDownloadState)
                 }
 
                 if let modelMessage {
@@ -260,6 +265,10 @@ struct OnboardingRootView: View {
         services.dictation.readiness.model.settingsModelStatus
     }
 
+    private var isInstallingModel: Bool {
+        modelDownloadState?.isActive ?? false
+    }
+
     private func primaryAction() {
         if services.onboardingStep == .completion {
             Task {
@@ -294,11 +303,23 @@ struct OnboardingRootView: View {
         return index < currentStepIndex
     }
 
+    @MainActor
     private func installModel() async {
+        guard !isInstallingModel else {
+            return
+        }
+
         guard let configuration = ProductionModelInstallConfiguration.current else {
             modelMessage = "Signed model manifest is not configured in this build."
             return
         }
+
+        modelMessage = nil
+        modelDownloadState = DownloadState(
+            modelID: ProductionModelPolicy.requiredModelID,
+            phase: .checkingSpace,
+            message: "Preparing model download."
+        )
 
         do {
             let verifier = ManifestVerifier(trustedKeys: configuration.trustedKeys)
@@ -314,13 +335,22 @@ struct OnboardingRootView: View {
             _ = try await installer.install(
                 modelID: ProductionModelPolicy.requiredModelID,
                 from: manifest
-            )
+            ) { state in
+                Task { @MainActor in
+                    modelDownloadState = state
+                }
+            }
             services.preferences.activeModelID = ProductionModelPolicy.requiredModelID
             services.savePreferences()
             _ = await services.dictation.refreshReadiness()
-            modelMessage = "Model installed and verified."
+            modelMessage = nil
         } catch {
-            modelMessage = "Model install failed: \(String(describing: error))"
+            modelDownloadState = DownloadState(
+                modelID: ProductionModelPolicy.requiredModelID,
+                phase: .failed,
+                message: "Model install failed: \(String(describing: error))"
+            )
+            modelMessage = nil
         }
     }
 
