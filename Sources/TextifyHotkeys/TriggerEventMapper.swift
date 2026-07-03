@@ -24,15 +24,15 @@ public struct TriggerEventMapper: Sendable {
         }
         if event.keyCode == TriggerKeyMatcher.rightCommandKeyCode {
             let commandPresent = (event.flags & TriggerKeyMatcher.commandFlagMask) != 0
-            if commandPresent, !rightCommandDown {
+            if !rightCommandDown {
+                guard commandPresent else {
+                    return nil
+                }
                 rightCommandDown = true
                 return .triggerDown(timestampMs: event.timestampMs)
             }
-            if !commandPresent, rightCommandDown {
-                rightCommandDown = false
-                return .triggerUp(timestampMs: event.timestampMs)
-            }
-            return nil
+            rightCommandDown = false
+            return .triggerUp(timestampMs: event.timestampMs)
         }
         if rightCommandDown {
             return .nonTriggerKeyDown(timestampMs: event.timestampMs, isModifierOnly: true)
