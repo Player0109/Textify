@@ -1,4 +1,5 @@
 import SwiftUI
+import TextifyRuntime
 
 struct SettingsRootView: View {
     @Environment(AppServices.self) private var services
@@ -112,34 +113,30 @@ private struct ModelsSettingsPane: View {
     var body: some View {
         SettingsPaneLayout(title: "Models") {
             SettingsSection("Installed Model") {
-                if let activeModelID = services.modelCatalog.activeModelID {
-                    LabeledContent("Active Model ID", value: activeModelID)
-                } else {
-                    Text("No model installed.")
-                        .foregroundStyle(.secondary)
-                }
+                LabeledContent("Readiness", value: modelReadinessText)
+                LabeledContent("Active Model ID", value: services.preferences.activeModelID ?? "None")
             }
 
             SettingsSection("Curated Models") {
-                ForEach(services.modelCatalog.curatedModels) { model in
-                    HStack(alignment: .firstTextBaseline) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(model.tier)
-                                .font(.headline)
-                            Text(model.name)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        Text(model.size)
-                            .foregroundStyle(.secondary)
-
-                        Button("Download") {}
-                            .disabled(true)
-                    }
-                }
+                EmptySettingsRow("No curated model manifest loaded.")
             }
+        }
+    }
+
+    private var modelReadinessText: String {
+        switch services.dictation.readiness.model {
+        case .noActiveModel:
+            return "No active model"
+        case let .missing(modelID):
+            return "Missing \(modelID)"
+        case let .loading(modelID):
+            return "Loading \(modelID)"
+        case let .warming(modelID):
+            return "Preparing \(modelID)"
+        case let .ready(modelID):
+            return "Ready \(modelID)"
+        case let .failed(modelID, _):
+            return "Failed \(modelID)"
         }
     }
 }
@@ -217,15 +214,38 @@ private struct AdvancedSettingsPane: View {
             }
 
             SettingsSection("Runtime Status") {
-                LabeledContent("Active Runtime", value: "Mock")
-                LabeledContent("Metal Acceleration", value: "Not loaded")
-                LabeledContent("Thread Count", value: "Automatic")
-                LabeledContent("Mock Dictation", value: services.mockDictationStatus.menuTitle ?? "Idle")
+                LabeledContent("Active Runtime", value: "Whisper")
+                LabeledContent("Metal Acceleration", value: "Automatic")
+                LabeledContent("Thread Count", value: "\(ProcessInfo.processInfo.activeProcessorCount)")
+                LabeledContent("Dictation", value: dictationStatusText)
             }
 
             SettingsSection("Developer Mode") {
                 Toggle("Developer Mode", isOn: $developerMode)
             }
+        }
+    }
+
+    private var dictationStatusText: String {
+        switch services.dictation.status {
+        case .idle:
+            return "Idle"
+        case .waitingForActivation:
+            return "Waiting"
+        case .recording:
+            return "Recording"
+        case .processing:
+            return "Processing"
+        case .inserting:
+            return "Inserting"
+        case .completed:
+            return "Completed"
+        case .cancelled:
+            return "Cancelled"
+        case .blocked:
+            return "Blocked"
+        case .failed:
+            return "Failed"
         }
     }
 }

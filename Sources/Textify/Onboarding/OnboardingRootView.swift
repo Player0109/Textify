@@ -49,13 +49,9 @@ struct OnboardingRootView: View {
     private var onboardingContent: some View {
         switch services.onboardingStep {
         case .welcome:
-            Text("Textify setup is ready for the mock app shell.")
+            Text("Textify setup is ready.")
         case .model:
-            if let firstModel = services.modelCatalog.curatedModels.first {
-                Text("Choose and download \(firstModel.name) or another curated English model during onboarding. No model is bundled with the app.")
-            } else {
-                Text("Choose and download a curated English model during onboarding. No model is bundled with the app.")
-            }
+            Text("Choose and download a curated English model during onboarding. No model is bundled with the app.")
         case .microphone:
             Text("Microphone permission status is not checked in this milestone.")
         case .accessibility:
@@ -63,7 +59,7 @@ struct OnboardingRootView: View {
         case .inputMonitoring:
             Text("Input Monitoring permission status is not checked in this milestone.")
         case .triggerTest:
-            Text("Trigger testing is disabled until the native hotkey path is wired. Use the debug menu mock dictation action for the current integration proof.")
+            Text("Trigger testing is disabled until the native hotkey path is wired.")
         case .completion:
             Text("Onboarding completion is not persisted in this milestone.")
         }
