@@ -26,6 +26,14 @@ public struct PasteboardWriteResult: Equatable, Sendable {
     }
 }
 
+public struct PasteboardWriteFailure: Error, Equatable, Sendable {
+    public let failedMutationChangeCount: Int?
+
+    public init(failedMutationChangeCount: Int? = nil) {
+        self.failedMutationChangeCount = failedMutationChangeCount
+    }
+}
+
 public protocol PasteboardClient: Sendable {
     func snapshot() async throws -> PasteboardSnapshot
     func clearAndWritePlainText(_ text: String, marker: PasteboardMarker) async throws -> PasteboardWriteResult

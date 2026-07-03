@@ -43,8 +43,12 @@ public actor PasteInsertionService: InsertionService {
         let writeResult: PasteboardWriteResult
         do {
             writeResult = try await pasteboard.clearAndWritePlainText(request.text, marker: marker)
+        } catch let failure as PasteboardWriteFailure {
+            if let failedMutationChangeCount = failure.failedMutationChangeCount {
+                await restoreAfterWriteFailure(snapshot, failedWriteChangeCount: failedMutationChangeCount)
+            }
+            return .notInserted(.pasteboardWriteFailed)
         } catch {
-            await restoreAfterWriteFailure(snapshot)
             return .notInserted(.pasteboardWriteFailed)
         }
 
@@ -89,11 +93,10 @@ public actor PasteInsertionService: InsertionService {
         try? await Task.sleep(nanoseconds: UInt64(restoreDelayMilliseconds) * 1_000_000)
     }
 
-    private func restoreAfterWriteFailure(_ snapshot: PasteboardSnapshot) async {
-        let currentChangeCount = await pasteboard.currentChangeCount()
+    private func restoreAfterWriteFailure(_ snapshot: PasteboardSnapshot, failedWriteChangeCount: Int) async {
         _ = try? await pasteboard.restore(
             snapshot,
-            ifCurrentChangeCountMatches: currentChangeCount
+            ifCurrentChangeCountMatches: failedWriteChangeCount
         )
     }
 

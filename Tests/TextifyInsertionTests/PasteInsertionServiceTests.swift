@@ -204,6 +204,28 @@ final class PasteInsertionServiceTests: XCTestCase {
         XCTAssertEqual(pasteboard.restoreCount, 1)
         XCTAssertEqual(poster.pasteCount, 0)
     }
+
+    func testPasteboardWriteFailureDoesNotRestoreOverLaterClipboardChange() async {
+        let pasteboard = FakePasteboardClient(
+            changeCountAfterFailedWrite: 8,
+            thirdPartyChangeCountBeforeRestore: 9,
+            writeError: TestInsertionError.operationFailed
+        )
+        let poster = FakeEventPoster()
+        let service = PasteInsertionService(
+            pasteboard: pasteboard,
+            eventPoster: poster,
+            accessibility: AccessibilityTrustClient(status: { .trusted }),
+            targetChecker: FakeTargetChecker(status: .allowed),
+            restoreDelayMilliseconds: 0
+        )
+
+        let outcome = await service.insert(InsertionRequest(text: "hello"))
+
+        XCTAssertEqual(outcome, .notInserted(.pasteboardWriteFailed))
+        XCTAssertEqual(pasteboard.restoreCount, 0)
+        XCTAssertEqual(poster.pasteCount, 0)
+    }
 }
 
 private enum TestInsertionError: Error {
@@ -222,6 +244,8 @@ private final class FakePasteboardClient: PasteboardClient, @unchecked Sendable 
     private let writeChangeCount: Int
     private var currentChangeCountValue: Int
     private let changeCountAfterFailedWrite: Int?
+    private let thirdPartyChangeCountBeforeRestore: Int?
+    private var appliedThirdPartyChangeBeforeRestore = false
     private let snapshotError: (any Error)?
     private let writeError: (any Error)?
     private let containsMarkerError: (any Error)?
@@ -232,6 +256,7 @@ private final class FakePasteboardClient: PasteboardClient, @unchecked Sendable 
         writeChangeCount: Int = 8,
         currentChangeCount: Int? = nil,
         changeCountAfterFailedWrite: Int? = nil,
+        thirdPartyChangeCountBeforeRestore: Int? = nil,
         snapshotError: (any Error)? = nil,
         writeError: (any Error)? = nil,
         containsMarkerError: (any Error)? = nil,
@@ -241,6 +266,7 @@ private final class FakePasteboardClient: PasteboardClient, @unchecked Sendable 
         self.writeChangeCount = writeChangeCount
         self.currentChangeCountValue = currentChangeCount ?? writeChangeCount
         self.changeCountAfterFailedWrite = changeCountAfterFailedWrite
+        self.thirdPartyChangeCountBeforeRestore = thirdPartyChangeCountBeforeRestore
         self.snapshotError = snapshotError
         self.writeError = writeError
         self.containsMarkerError = containsMarkerError
@@ -267,6 +293,7 @@ private final class FakePasteboardClient: PasteboardClient, @unchecked Sendable 
         if let writeError {
             if let changeCountAfterFailedWrite {
                 currentChangeCountValue = changeCountAfterFailedWrite
+                throw PasteboardWriteFailure(failedMutationChangeCount: changeCountAfterFailedWrite)
             }
             throw writeError
         }
@@ -284,13 +311,15 @@ private final class FakePasteboardClient: PasteboardClient, @unchecked Sendable 
     }
 
     func currentChangeCount() async -> Int {
-        currentChangeCountValue
+        applyThirdPartyChangeBeforeRestoreIfNeeded()
+        return currentChangeCountValue
     }
 
     func restore(
         _ snapshot: PasteboardSnapshot,
         ifCurrentChangeCountMatches expectedChangeCount: Int
     ) async throws -> Bool {
+        applyThirdPartyChangeBeforeRestoreIfNeeded()
         guard currentChangeCountValue == expectedChangeCount else {
             return false
         }
@@ -299,6 +328,14 @@ private final class FakePasteboardClient: PasteboardClient, @unchecked Sendable 
             throw restoreError
         }
         return true
+    }
+
+    private func applyThirdPartyChangeBeforeRestoreIfNeeded() {
+        guard let thirdPartyChangeCountBeforeRestore, !appliedThirdPartyChangeBeforeRestore else {
+            return
+        }
+        currentChangeCountValue = thirdPartyChangeCountBeforeRestore
+        appliedThirdPartyChangeBeforeRestore = true
     }
 }
 
