@@ -16,6 +16,8 @@ protocol WhisperRuntimeLoading: Sendable {
         _ audio: TranscriptionAudioBuffer,
         options: WhisperTranscriptionOptions
     ) async throws -> TranscriptionResult
+
+    func unload() async
 }
 
 extension WhisperRuntime: WhisperRuntimeLoading {}
@@ -23,6 +25,7 @@ extension WhisperRuntime: WhisperRuntimeLoading {}
 public actor WhisperRuntimeTranscribingAdapter: RuntimeTranscribing {
     private let runtime: any WhisperRuntimeLoading
     private var inFlightPreparations: [PreparationKey: InFlightPreparation] = [:]
+    private var activeOptions = WhisperTranscriptionOptions.v1_1English
 
     public init(runtime: WhisperRuntime) {
         self.runtime = runtime
@@ -48,10 +51,12 @@ public actor WhisperRuntimeTranscribingAdapter: RuntimeTranscribing {
         )
         let state = await runtime.state
         if case let .ready(modelID) = state, modelID == model.id {
+            activeOptions = Self.options(for: model)
             return
         }
         if let inFlightPreparation = inFlightPreparations[key] {
             try await inFlightPreparation.task.value
+            activeOptions = Self.options(for: model)
             return
         }
 
@@ -71,6 +76,7 @@ public actor WhisperRuntimeTranscribingAdapter: RuntimeTranscribing {
         do {
             try await task.value
             clearInFlightPreparation(key: key, id: preparationID)
+            activeOptions = Self.options(for: model)
         } catch {
             clearInFlightPreparation(key: key, id: preparationID)
             throw error
@@ -78,7 +84,25 @@ public actor WhisperRuntimeTranscribingAdapter: RuntimeTranscribing {
     }
 
     public func transcribe(_ audio: TranscriptionAudioBuffer) async throws -> TranscriptionResult {
-        try await runtime.transcribe(audio, options: .v1_1English)
+        try await runtime.transcribe(audio, options: activeOptions)
+    }
+
+    public func unload() async {
+        inFlightPreparations.removeAll()
+        activeOptions = .v1_1English
+        await runtime.unload()
+    }
+
+    private static func options(for model: RuntimeActiveModel) -> WhisperTranscriptionOptions {
+        let parameters = model.runtimeParameters
+        return WhisperTranscriptionOptions(
+            language: parameters.detectLanguage ? "auto" : parameters.language,
+            translate: parameters.translate,
+            temperature: Float(parameters.temperature),
+            temperatureFallback: parameters.temperatureFallback.map(Float.init),
+            usePreviousContext: !parameters.noContext,
+            initialPrompt: nil
+        )
     }
 
     private static func map(state: WhisperRuntimeState) -> RuntimeModelReadiness {

@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.4,
+    "characterErrors" : 10,
+    "deletions" : 2,
+    "hypothesisCharacterCount" : 28,
+    "hypothesisText" : "長らく土佐回りが続いたが戦後はどうとんぼり門座に出演した",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 25,
+    "referenceText" : "長らくドサ廻りが続いたが、戦後は、道頓堀角座に出演した。",
+    "referenceWordCount" : 3,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 3
+  },
+  "audio" : {
+    "durationMs" : 5140,
+    "sampleCount" : 82240,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime CPU (4 threads)",
+  "engine" : "reazonspeech-k2-v2",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ReazonSpeech K2 V2 int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 494813184,
+    "systemCpuMs" : 11,
+    "userCpuMs" : 291
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 79,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 1176,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.01536964980544747,
+    "releaseToFinalMs" : 79,
+    "warmupMs" : 176
+  }
+}

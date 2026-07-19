@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.10344827586206896,
+    "characterErrors" : 3,
+    "deletions" : 1,
+    "hypothesisCharacterCount" : 27,
+    "hypothesisText" : "夏の暑さを割り切るにはクーラーよりも扇風機が体にはいい",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 29,
+    "referenceText" : "夏の暑さをの割り切るには、クーラーよりも扇風機が身体には良い。",
+    "referenceWordCount" : 2,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 2
+  },
+  "audio" : {
+    "durationMs" : 5360,
+    "sampleCount" : 85760,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-kotoba-whisper-v2.0-q5_0",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 632635392,
+    "systemCpuMs" : 10,
+    "userCpuMs" : 23
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : false
+  },
+  "timing" : {
+    "inferenceWorkMs" : 700,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 324,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.13059701492537312,
+    "releaseToFinalMs" : 700,
+    "warmupMs" : 17
+  }
+}

@@ -13,6 +13,11 @@ public struct RuntimeActiveModel: Equatable, Sendable {
     public let localModelPath: String
     public let useGPU: Bool
     public let threadCount: Int?
+    public let engine: TranscriptionEngine
+    public let variant: String
+    public let accelerator: ModelAccelerator
+    public let artifactLayout: ModelArtifactLayout
+    public let runtimeParameters: RuntimeParameters
 
     public init(
         id: String,
@@ -22,12 +27,45 @@ public struct RuntimeActiveModel: Equatable, Sendable {
         useGPU: Bool,
         threadCount: Int?
     ) {
+        self.init(
+            id: id,
+            displayName: displayName,
+            tier: tier,
+            localModelPath: localModelPath,
+            useGPU: useGPU,
+            threadCount: threadCount,
+            engine: .whisperCpp,
+            variant: ModelRuntimeDescriptor.legacyWhisper.variant,
+            accelerator: .metalGPU,
+            artifactLayout: .singleFile,
+            runtimeParameters: .legacyEnglishWhisper
+        )
+    }
+
+    public init(
+        id: String,
+        displayName: String,
+        tier: String,
+        localModelPath: String,
+        useGPU: Bool,
+        threadCount: Int?,
+        engine: TranscriptionEngine,
+        variant: String,
+        accelerator: ModelAccelerator,
+        artifactLayout: ModelArtifactLayout,
+        runtimeParameters: RuntimeParameters
+    ) {
         self.id = id
         self.displayName = displayName
         self.tier = tier
         self.localModelPath = localModelPath
         self.useGPU = useGPU
         self.threadCount = threadCount
+        self.engine = engine
+        self.variant = variant
+        self.accelerator = accelerator
+        self.artifactLayout = artifactLayout
+        self.runtimeParameters = runtimeParameters
     }
 }
 
@@ -37,6 +75,7 @@ public struct RuntimeDependencies: Sendable {
     public let models: any RuntimeModelResolving
     public let audio: any RuntimeAudioRecording
     public let transcriber: any RuntimeTranscribing
+    public let targetCapturer: any InsertionTargetCapturing
     public let inserter: any InsertionService
     public let diagnostics: any RuntimeDiagnosticsLogging
     public let postProcessor: any RuntimePostProcessing
@@ -48,6 +87,7 @@ public struct RuntimeDependencies: Sendable {
         models: any RuntimeModelResolving,
         audio: any RuntimeAudioRecording,
         transcriber: any RuntimeTranscribing,
+        targetCapturer: any InsertionTargetCapturing,
         inserter: any InsertionService,
         diagnostics: any RuntimeDiagnosticsLogging,
         postProcessor: any RuntimePostProcessing,
@@ -58,6 +98,7 @@ public struct RuntimeDependencies: Sendable {
         self.models = models
         self.audio = audio
         self.transcriber = transcriber
+        self.targetCapturer = targetCapturer
         self.inserter = inserter
         self.diagnostics = diagnostics
         self.postProcessor = postProcessor
@@ -82,7 +123,9 @@ public protocol RuntimeModelResolving: Sendable {
 public protocol RuntimeAudioRecording: Sendable {
     func startRecording(
         microphone: MicrophoneSelection,
-        onSpeechDetected: @escaping @Sendable () -> Void
+        maximumDurationSeconds: Double,
+        onSpeechDetected: @escaping @Sendable () -> Void,
+        onMaximumDurationReached: @escaping @Sendable () -> Void
     ) async throws
     func finishRecording() async throws -> CanonicalAudioBuffer
     func discardRecording() async

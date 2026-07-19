@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0,
+    "characterErrors" : 0,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 54,
+    "hypothesisText" : "The last two days of the voyage, Bartley found almost intolerable.",
+    "hypothesisWordCount" : 11,
+    "insertions" : 0,
+    "referenceCharacterCount" : 54,
+    "referenceText" : "THE LAST TWO DAYS OF THE VOYAGE BARTLEY FOUND ALMOST INTOLERABLE",
+    "referenceWordCount" : 11,
+    "substitutions" : 0,
+    "wordErrorRate" : 0,
+    "wordErrors" : 0
+  },
+  "audio" : {
+    "durationMs" : 4715,
+    "sampleCount" : 75440,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (4 threads)",
+  "engine" : "sensevoice-small-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "SenseVoiceSmall int8 2024-07-17",
+  "modelLicense" : "FunASR Model License 1.1",
+  "resources" : {
+    "peakResidentBytes" : 586219520,
+    "systemCpuMs" : 1,
+    "userCpuMs" : 580
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 146,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 317,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.030965005302226935,
+    "releaseToFinalMs" : 146,
+    "warmupMs" : 24
+  }
+}

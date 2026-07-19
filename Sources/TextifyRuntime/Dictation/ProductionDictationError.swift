@@ -1,5 +1,6 @@
 public enum ProductionDictationError: Error, Equatable, Sendable {
     case readinessBlocked(ReadinessBlocker)
+    case excludedApp
     case concurrentDictation
     case audioStartFailed
     case audioFinishFailed

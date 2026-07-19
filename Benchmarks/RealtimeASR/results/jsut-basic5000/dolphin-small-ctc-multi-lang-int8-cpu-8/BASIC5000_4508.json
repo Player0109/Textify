@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.5,
+    "characterErrors" : 3,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 8,
+    "hypothesisText" : "わらべ歌は楽しい",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 6,
+    "referenceText" : "童歌は楽しい",
+    "referenceWordCount" : 1,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 1
+  },
+  "audio" : {
+    "durationMs" : 1850,
+    "sampleCount" : 29600,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "dolphin-small-ctc-multi-lang-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Dolphin Small CTC multilingual int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 587956224,
+    "systemCpuMs" : 2,
+    "userCpuMs" : 294
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 40,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 217,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.021621621621621623,
+    "releaseToFinalMs" : 40,
+    "warmupMs" : 13
+  }
+}

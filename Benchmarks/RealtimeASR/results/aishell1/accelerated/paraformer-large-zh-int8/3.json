@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.2222222222222222,
+    "characterErrors" : 4,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 14,
+    "hypothesisText" : "为了规避三四线城市明显过剩的",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 18,
+    "referenceText" : "为了规避三四线城市明显过剩的市场风险",
+    "referenceWordCount" : 1,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 1
+  },
+  "audio" : {
+    "durationMs" : 5237,
+    "sampleCount" : 83792,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "Core ML CPU preprocessor + CPU/Apple Neural Engine inference",
+  "engine" : "paraformer-large-zh-int8",
+  "engineVersion" : "Textify ParaformerRuntime / FluidAudio 0.15.5",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "paraformer-large-zh int8",
+  "modelLicense" : "Apache-2.0 upstream model; conversion inherits upstream terms",
+  "resources" : {
+    "peakResidentBytes" : 68108288,
+    "systemCpuMs" : 1,
+    "userCpuMs" : 59
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 71,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 357,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.013557380179492075,
+    "releaseToFinalMs" : 71,
+    "warmupMs" : 42
+  }
+}

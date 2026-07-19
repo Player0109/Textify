@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Foundation
 
@@ -11,17 +12,29 @@ public struct CGEventTapHandle: @unchecked Sendable {
     fileprivate let port: CFMachPort?
     fileprivate let source: CFRunLoopSource?
     fileprivate let refcon: UnsafeMutableRawPointer?
+    fileprivate let eventMonitors: [Any]
+
+    var appKitEventMonitorCount: Int { eventMonitors.count }
 
     init() {
         self.port = nil
         self.source = nil
         self.refcon = nil
+        self.eventMonitors = []
     }
 
     fileprivate init(port: CFMachPort, source: CFRunLoopSource, refcon: UnsafeMutableRawPointer) {
         self.port = port
         self.source = source
         self.refcon = refcon
+        self.eventMonitors = []
+    }
+
+    fileprivate init(eventMonitors: [Any]) {
+        self.port = nil
+        self.source = nil
+        self.refcon = nil
+        self.eventMonitors = eventMonitors
     }
 }
 
@@ -31,12 +44,47 @@ public protocol CGEventTapClient: Sendable {
     func stop(_ handle: CGEventTapHandle)
 }
 
+public final class SystemKeyboardEventMonitorClient: CGEventTapClient, @unchecked Sendable {
+    public init() {}
+
+    public func start(handler: @escaping @Sendable (CGEventTapMessage) -> Void) throws -> CGEventTapHandle {
+        let eventMask: NSEvent.EventTypeMask = [.flagsChanged, .keyDown, .keyUp]
+        guard let globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: eventMask, handler: { event in
+            guard let snapshot = KeyboardEventSnapshot(event: event) else {
+                return
+            }
+            handler(.keyboardEvent(snapshot))
+        }) else {
+            throw HotkeyMonitorError.eventTapCreationFailed
+        }
+        guard let localMonitor = NSEvent.addLocalMonitorForEvents(matching: eventMask, handler: { event in
+            if let snapshot = KeyboardEventSnapshot(event: event) {
+                handler(.keyboardEvent(snapshot))
+            }
+            return event
+        }) else {
+            NSEvent.removeMonitor(globalMonitor)
+            throw HotkeyMonitorError.eventTapCreationFailed
+        }
+        return CGEventTapHandle(eventMonitors: [globalMonitor, localMonitor])
+    }
+
+    public func setEnabled(_ handle: CGEventTapHandle, enabled: Bool) {}
+
+    public func stop(_ handle: CGEventTapHandle) {
+        for eventMonitor in handle.eventMonitors {
+            NSEvent.removeMonitor(eventMonitor)
+        }
+    }
+}
+
 public final class SystemCGEventTapClient: CGEventTapClient, @unchecked Sendable {
     public init() {}
 
     public func start(handler: @escaping @Sendable (CGEventTapMessage) -> Void) throws -> CGEventTapHandle {
         let mask = (CGEventMask(1) << CGEventType.flagsChanged.rawValue)
             | (CGEventMask(1) << CGEventType.keyDown.rawValue)
+            | (CGEventMask(1) << CGEventType.keyUp.rawValue)
         let box = EventHandlerBox(handler: handler)
         let refcon = UnsafeMutableRawPointer(Unmanaged.passRetained(box).toOpaque())
         guard let port = CGEvent.tapCreate(

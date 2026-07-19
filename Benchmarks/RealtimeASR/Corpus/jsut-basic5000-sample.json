@@ -1,0 +1,79 @@
+{
+  "name": "JSUT basic5000 fixed ten-utterance sample",
+  "source": "https://sites.google.com/site/shinnosuketakamichi/publication/jsut",
+  "repository": "FluidInference/JSUT-basic5000",
+  "revision": "cd13cc9c9fe70d8d4f62ffe6fbbb872aef79835c",
+  "license": "basic5000 text: mixed CC-BY-SA 3.0, CC-BY 2.0, and CC-BY-SA 4.0; see LICENCE.txt",
+  "items": [
+    {
+      "id": "BASIC5000_4501",
+      "audio": "basic5000/wav/BASIC5000_4501.wav",
+      "reference": "だが、エーアイセンター稼動を快く思わない法医学者、警察は、内部瓦解を目論み、エーアイセンターの副センター長に就任して、叩き潰そうとする。",
+      "sha256": "d2057769bc15c83c742adf3ac9ff2cf078a4aa4d86e82cb5122d015642fb0775",
+      "sizeBytes": 1029164
+    },
+    {
+      "id": "BASIC5000_4502",
+      "audio": "basic5000/wav/BASIC5000_4502.wav",
+      "reference": "また、サイコロに姿を変えることもでき、転がると強力な魔力が発動し、出た目の数だけ死者が出る。",
+      "sha256": "f3edc7c835c00c0c376ff74db44427ddd8871465592613c9b19a3b0fd7674712",
+      "sizeBytes": 733484
+    },
+    {
+      "id": "BASIC5000_4503",
+      "audio": "basic5000/wav/BASIC5000_4503.wav",
+      "reference": "羨ましいほどの落ち着きぶりであった。",
+      "sha256": "2cbc696620062993d387a3a7bfe617947d2fd54c8d6a6b57c1881dab7931a236",
+      "sizeBytes": 270764
+    },
+    {
+      "id": "BASIC5000_4504",
+      "audio": "basic5000/wav/BASIC5000_4504.wav",
+      "reference": "戦乱を静めるための傭兵団である、ディーグル傭兵団を設立する。",
+      "sha256": "e979f8ddde9dad9e68b004e16327d484f6bf2a652b4b759b65499c5538522620",
+      "sizeBytes": 477164
+    },
+    {
+      "id": "BASIC5000_4505",
+      "audio": "basic5000/wav/BASIC5000_4505.wav",
+      "reference": "桜子と双璧をなす、商店街の人気者。",
+      "sha256": "492ffb2cf6355d90d9c753fa5d232b3d4bda811ca64dc6c1abeaa5a2b7279c4e",
+      "sizeBytes": 338924
+    },
+    {
+      "id": "BASIC5000_4506",
+      "audio": "basic5000/wav/BASIC5000_4506.wav",
+      "reference": "長らくドサ廻りが続いたが、戦後は、道頓堀角座に出演した。",
+      "sha256": "0d3019adaa296d6381685acf3725ca636c2cefc605f1e51e37cae367261204ec",
+      "sizeBytes": 493484
+    },
+    {
+      "id": "BASIC5000_4507",
+      "audio": "basic5000/wav/BASIC5000_4507.wav",
+      "reference": "東京都を流れる朝潮運河に架かる橋のカテゴリ。",
+      "sha256": "ad5bc9a89ca8564f4080bedff7b55c941d46170c92f01ba0046f659903ba91bd",
+      "sizeBytes": 382124
+    },
+    {
+      "id": "BASIC5000_4508",
+      "audio": "basic5000/wav/BASIC5000_4508.wav",
+      "reference": "童歌は楽しい",
+      "sha256": "a75574549182ee4134f29927a15265bdd5ad62b09bf75614e4af79ed7a3ef5ec",
+      "sizeBytes": 177644
+    },
+    {
+      "id": "BASIC5000_4509",
+      "audio": "basic5000/wav/BASIC5000_4509.wav",
+      "reference": "お酒に酔っぱらって転んで、顔をうって鼻血が出た。",
+      "sha256": "4058b823f90f30373159d545c4754546e5eda249f3d3875f0c3f6e9a443f483d",
+      "sizeBytes": 342764
+    },
+    {
+      "id": "BASIC5000_4510",
+      "audio": "basic5000/wav/BASIC5000_4510.wav",
+      "reference": "夏の暑さをの割り切るには、クーラーよりも扇風機が身体には良い。",
+      "sha256": "61673949e096ee5d792b98474be02ab8cfcc3d3d3bf06b9e13f674272e6b19c1",
+      "sizeBytes": 514604
+    }
+  ]
+}

@@ -1,16 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${TEXTIFY_MODEL_MANIFEST_PRIVATE_KEY_BASE64:?local private key required}"
 : "${TEXTIFY_MODEL_MANIFEST_KEY_ID:?key id required}"
+
+keychain_service="${TEXTIFY_MODEL_MANIFEST_KEYCHAIN_SERVICE:-io.github.Player0109.Textify.model-manifest-signing}"
+private_key="${TEXTIFY_MODEL_MANIFEST_PRIVATE_KEY_BASE64:-}"
+if [[ -z "$private_key" ]]; then
+  private_key="$(security find-generic-password \
+    -a "$TEXTIFY_MODEL_MANIFEST_KEY_ID" \
+    -s "$keychain_service" \
+    -w 2>/dev/null)" || {
+      echo "error: no manifest private key in the environment or macOS Keychain" >&2
+      exit 1
+    }
+fi
+export TEXTIFY_MODEL_MANIFEST_PRIVATE_KEY_BASE64="$private_key"
+unset private_key
 
 usage() {
   cat >&2 <<'USAGE'
 Usage: script/models/sign_model_manifest.sh [manifest.json] [manifest.json.sig]
 
-Signs the exact manifest JSON bytes with the local Textify model-manifest
-Ed25519 private key. TEXTIFY_MODEL_MANIFEST_PRIVATE_KEY_BASE64 must be the
-base64-encoded CryptoKit raw private key representation, not a PEM file.
+Signs the V1 canonical model-manifest envelope with the local Ed25519 private
+key. The key is read from TEXTIFY_MODEL_MANIFEST_PRIVATE_KEY_BASE64 when set,
+or from the macOS Keychain account matching TEXTIFY_MODEL_MANIFEST_KEY_ID.
 USAGE
 }
 
@@ -35,9 +48,13 @@ import Foundation
 
 struct SignatureEnvelope: Encodable {
     let signatureVersion: Int
-    let keyId: String
+    let signatureType: String
     let algorithm: String
-    let signatureBase64: String
+    let keyId: String
+    let manifestFile: String
+    let contentType: String
+    let contentSHA256: String
+    let signature: String
 }
 
 func fail(_ message: String) -> Never {
@@ -62,16 +79,42 @@ guard let keyID = environment["TEXTIFY_MODEL_MANIFEST_KEY_ID"],
 
 let manifestURL = URL(fileURLWithPath: args[0])
 let signatureURL = URL(fileURLWithPath: args[1])
+let signatureType = "io.github.Player0109.Textify.model-manifest"
+let algorithm = "Ed25519"
+let manifestFile = "manifest.json"
+let contentType = "application/vnd.textify.model-manifest+json;version=1"
 
 do {
     let manifestData = try Data(contentsOf: manifestURL)
+    let contentSHA256 = SHA256.hash(data: manifestData)
+        .map { String(format: "%02x", $0) }
+        .joined()
+    let canonicalPayload = Data("""
+    TEXTIFY-MODEL-MANIFEST-SIGNATURE-V1
+    signatureVersion=1
+    signatureType=\(signatureType)
+    algorithm=\(algorithm)
+    keyId=\(keyID)
+    manifestFile=\(manifestFile)
+    contentType=\(contentType)
+    contentSHA256=\(contentSHA256)
+
+    """.utf8)
     let privateKey = try Curve25519.Signing.PrivateKey(rawRepresentation: privateKeyData)
-    let signature = try privateKey.signature(for: manifestData)
+    let signature = try privateKey.signature(for: canonicalPayload)
+        .base64EncodedString()
+        .replacingOccurrences(of: "+", with: "-")
+        .replacingOccurrences(of: "/", with: "_")
+        .replacingOccurrences(of: "=", with: "")
     let envelope = SignatureEnvelope(
         signatureVersion: 1,
+        signatureType: signatureType,
+        algorithm: algorithm,
         keyId: keyID,
-        algorithm: "Ed25519",
-        signatureBase64: signature.base64EncodedString()
+        manifestFile: manifestFile,
+        contentType: contentType,
+        contentSHA256: contentSHA256,
+        signature: signature
     )
 
     let encoder = JSONEncoder()
@@ -85,3 +128,4 @@ do {
 SWIFT
 
 echo "Wrote $signature_path"
+unset TEXTIFY_MODEL_MANIFEST_PRIVATE_KEY_BASE64

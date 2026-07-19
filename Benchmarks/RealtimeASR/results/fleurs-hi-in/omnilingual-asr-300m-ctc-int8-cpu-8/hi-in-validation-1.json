@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.15789473684210525,
+    "characterErrors" : 9,
+    "deletions" : 4,
+    "hypothesisCharacterCount" : 54,
+    "hypothesisText" : "ज्ञानिकों का मानना है कि ओसे लोट्स गंद के द्वारा जानवरों का पीछा करते और खाते हैं यह सूहते हुए कि वह ज़मीन पर कहाँ रहे होंगे",
+    "hypothesisWordCount" : 44,
+    "insertions" : 0,
+    "referenceCharacterCount" : 57,
+    "referenceText" : "वैज्ञानिकों का मानना है कि ओसेलोट्स गंध के द्वारा जानवरों का पीछा करते और खाते शिकार हैं यह सूँघते हुए कि वे ज़मीन पर कहाँ रहे होंगे।",
+    "referenceWordCount" : 48,
+    "substitutions" : 3,
+    "wordErrorRate" : 0.14583333333333334,
+    "wordErrors" : 7
+  },
+  "audio" : {
+    "durationMs" : 10260,
+    "sampleCount" : 164160,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "omnilingual-asr-300m-ctc-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Omnilingual ASR CTC 300M int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 852934656,
+    "systemCpuMs" : 72,
+    "userCpuMs" : 5397
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 696,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 266,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.06783625730994151,
+    "releaseToFinalMs" : 696,
+    "warmupMs" : 35
+  }
+}

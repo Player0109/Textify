@@ -4142,6 +4142,19 @@ int whisper_is_multilingual(struct whisper_context * ctx) {
     return ctx->vocab.is_multilingual() ? 1 : 0;
 }
 
+int whisper_uses_gpu(struct whisper_context * ctx) {
+    if (ctx == nullptr || ctx->state == nullptr) {
+        return 0;
+    }
+    for (ggml_backend_t backend : ctx->state->backends) {
+        ggml_backend_dev_t device = ggml_backend_get_device(backend);
+        if (device != nullptr && ggml_backend_dev_type(device) == GGML_BACKEND_DEVICE_TYPE_GPU) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 float * whisper_get_logits(struct whisper_context * ctx) {
     return ctx->state->logits.data();
 }

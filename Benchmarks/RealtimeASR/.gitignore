@@ -1,0 +1,4 @@
+.build/
+.swiftpm/
+.benchmark-data/
+results/*.json

@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.10869565217391304,
+    "characterErrors" : 5,
+    "deletions" : 1,
+    "hypothesisCharacterCount" : 46,
+    "hypothesisText" : "अभी भी वे यह पता लगाने की कोशिश कर रहे हैं कि क्रैश कितना बड़ा था और धैतhi की तरह से प्रभावित होगी.",
+    "hypothesisWordCount" : 34,
+    "insertions" : 1,
+    "referenceCharacterCount" : 46,
+    "referenceText" : "अभी भी वे यह पता लगाने की कोशिश कर रहे हैं कि क्रैश कितना बड़ा था और धरती किस तरह से प्रभावित होगी",
+    "referenceWordCount" : 34,
+    "substitutions" : 1,
+    "wordErrorRate" : 0.08823529411764706,
+    "wordErrors" : 3
+  },
+  "audio" : {
+    "durationMs" : 9120,
+    "sampleCount" : 145920,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "qwen3-asr-0.6b",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Qwen3-ASR 0.6B int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 1681244160,
+    "systemCpuMs" : 72,
+    "userCpuMs" : 12506
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : false
+  },
+  "timing" : {
+    "inferenceWorkMs" : 1624,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 1111,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.1780701754385965,
+    "releaseToFinalMs" : 1624,
+    "warmupMs" : 135
+  }
+}

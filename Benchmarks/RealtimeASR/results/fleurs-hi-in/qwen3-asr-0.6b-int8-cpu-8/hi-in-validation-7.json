@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.2222222222222222,
+    "characterErrors" : 14,
+    "deletions" : 1,
+    "hypothesisCharacterCount" : 60,
+    "hypothesisText" : "यदि आप सर्दियों में आर्टिक्या, अंतार्थिक शिक्षितों में जाते हैं, तो आप द्रुवीय रात का अनुभव करेंगे, जिसका अर्थ है कि सूर्य श्रीतिज से ऊपर नहीं उगता है।",
+    "hypothesisWordCount" : 54,
+    "insertions" : 2,
+    "referenceCharacterCount" : 63,
+    "referenceText" : "यदि आप सर्दियों में आर्कटिक या अंटार्कटिक क्षेत्रों में जाते हैं तो आप ध्रुवीय रात का अनुभव करेंगे जिसका अर्थ है कि सूरज क्षितिज से ऊपर नहीं उगता है",
+    "referenceWordCount" : 53,
+    "substitutions" : 7,
+    "wordErrorRate" : 0.18867924528301888,
+    "wordErrors" : 10
+  },
+  "audio" : {
+    "durationMs" : 14160,
+    "sampleCount" : 226560,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "qwen3-asr-0.6b",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Qwen3-ASR 0.6B int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 1859829760,
+    "systemCpuMs" : 119,
+    "userCpuMs" : 20569
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : false
+  },
+  "timing" : {
+    "inferenceWorkMs" : 2634,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 1088,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.18601694915254238,
+    "releaseToFinalMs" : 2634,
+    "warmupMs" : 135
+  }
+}

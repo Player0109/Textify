@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0,
+    "characterErrors" : 0,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 53,
+    "hypothesisText" : "He was young. No spear had touched him. No poison lurked in his wine.",
+    "hypothesisWordCount" : 14,
+    "insertions" : 0,
+    "referenceCharacterCount" : 53,
+    "referenceText" : "HE WAS YOUNG NO SPEAR HAD TOUCHED HIM NO POISON LURKED IN HIS WINE",
+    "referenceWordCount" : 14,
+    "substitutions" : 0,
+    "wordErrorRate" : 0,
+    "wordErrors" : 0
+  },
+  "audio" : {
+    "durationMs" : 6260,
+    "sampleCount" : 100160,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (4 threads)",
+  "engine" : "sensevoice-small-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "SenseVoiceSmall int8 2024-07-17",
+  "modelLicense" : "FunASR Model License 1.1",
+  "resources" : {
+    "peakResidentBytes" : 599130112,
+    "systemCpuMs" : 3,
+    "userCpuMs" : 756
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 192,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 320,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.030670926517571886,
+    "releaseToFinalMs" : 192,
+    "warmupMs" : 24
+  }
+}

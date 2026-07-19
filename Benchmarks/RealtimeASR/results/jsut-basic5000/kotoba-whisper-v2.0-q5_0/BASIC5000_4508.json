@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.8333333333333334,
+    "characterErrors" : 5,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 9,
+    "hypothesisText" : "わらべうたは楽しい",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 6,
+    "referenceText" : "童歌は楽しい",
+    "referenceWordCount" : 1,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 1
+  },
+  "audio" : {
+    "durationMs" : 1850,
+    "sampleCount" : 29600,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-kotoba-whisper-v2.0-q5_0",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 632078336,
+    "systemCpuMs" : 7,
+    "userCpuMs" : 10
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 612,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 405,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.3308108108108108,
+    "releaseToFinalMs" : 612,
+    "warmupMs" : 1
+  }
+}

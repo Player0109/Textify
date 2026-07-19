@@ -222,6 +222,34 @@ final class LiveAudioRecorderTests: XCTestCase {
         XCTAssertEqual(audio.samples.count, 320)
     }
 
+    func testPerRecordingMaximumDurationOverridesLongerConfiguredMaximum() async throws {
+        let permission = MicrophonePermissionClient(
+            status: { .granted },
+            requestAccess: { .granted }
+        )
+        let engine = FakeAudioEngineClient()
+        let recorder = LiveAudioRecorder(
+            permissionClient: permission,
+            configuration: LiveAudioRecordingConfiguration(
+                maximumDurationSeconds: 60,
+                postReleaseGraceMilliseconds: 0
+            ),
+            engineClient: engine
+        )
+        let maximumDurationReached = expectation(description: "model maximum duration reached")
+
+        try await recorder.startRecording(
+            maximumDurationSeconds: 0.01,
+            onSpeechDetected: {},
+            onMaximumDurationReached: { maximumDurationReached.fulfill() }
+        )
+        try engine.emit(samples: Array(repeating: 0.1, count: 320), sampleRate: 16_000)
+
+        await fulfillment(of: [maximumDurationReached], timeout: 1)
+        let audio = try await recorder.finishRecording()
+        XCTAssertEqual(audio.samples.count, 320)
+    }
+
     func testFinishRecordingSurfacesConversionErrorDuringPostReleaseGrace() async throws {
         let permission = MicrophonePermissionClient(
             status: { .granted },

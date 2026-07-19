@@ -3,7 +3,15 @@ import XCTest
 
 @MainActor
 final class GlobalHotkeyMonitorTests: XCTestCase {
-    func testDeniedInputMonitoringReportsFailureAndDoesNotStartTap() {
+    func testSystemKeyboardMonitorCoversGlobalAndLocalAppEvents() throws {
+        let client = SystemKeyboardEventMonitorClient()
+        let handle = try client.start(handler: { _ in })
+        defer { client.stop(handle) }
+
+        XCTAssertEqual(handle.appKitEventMonitorCount, 2)
+    }
+
+    func testInputMonitoringDoesNotGateMonitorStart() {
         let tap = FakeCGEventTapClient()
         let monitor = GlobalHotkeyMonitor(
             permissionClient: InputMonitoringPermissionClient(
@@ -15,34 +23,13 @@ final class GlobalHotkeyMonitorTests: XCTestCase {
         let failures = Recorder<HotkeyMonitorError>()
 
         let result: Result<Void, HotkeyMonitorError> = monitor.start(
-            onEvent: { _ in XCTFail("Denied permission should not emit events") },
+            onEvent: { _ in },
             onFailure: { failures.append($0) }
         )
 
-        XCTAssertEqual(result.failureValue, .inputMonitoringDenied)
-        XCTAssertEqual(failures.values, [.inputMonitoringDenied])
-        XCTAssertEqual(tap.startCount, 0)
-    }
-
-    func testUnknownInputMonitoringReportsPermissionRequiredAndDoesNotStartTap() {
-        let tap = FakeCGEventTapClient()
-        let monitor = GlobalHotkeyMonitor(
-            permissionClient: InputMonitoringPermissionClient(
-                status: { .unknown },
-                requestAccess: { .granted }
-            ),
-            eventTapClient: tap
-        )
-        let failures = Recorder<HotkeyMonitorError>()
-
-        let result: Result<Void, HotkeyMonitorError> = monitor.start(
-            onEvent: { _ in XCTFail("Unknown permission should not emit events") },
-            onFailure: { failures.append($0) }
-        )
-
-        XCTAssertEqual(result.failureValue, .inputMonitoringPermissionRequired)
-        XCTAssertEqual(failures.values, [.inputMonitoringPermissionRequired])
-        XCTAssertEqual(tap.startCount, 0)
+        XCTAssertTrue(result.isSuccess)
+        XCTAssertEqual(failures.values, [])
+        XCTAssertEqual(tap.startCount, 1)
     }
 
     func testStartReturnsSuccessWhenTapStarts() {
@@ -92,6 +79,29 @@ final class GlobalHotkeyMonitorTests: XCTestCase {
         )
         await Task.yield()
 
+        XCTAssertEqual(events.values, [.triggerDown(timestampMs: 100)])
+    }
+
+    func testUpdateTriggerRemapsSubsequentMonitorSession() async {
+        let tap = FakeCGEventTapClient()
+        let monitor = GlobalHotkeyMonitor(eventTapClient: tap)
+        let events = Recorder<TriggerEvent>()
+        monitor.updateTrigger(.rightOption)
+
+        monitor.start(
+            onEvent: { events.append($0) },
+            onFailure: { _ in XCTFail("Expected monitor start to succeed") }
+        )
+        tap.send(.keyboardEvent(KeyboardEventSnapshot(
+            type: .flagsChanged,
+            keyCode: TriggerKeyMatcher.rightOptionKeyCode,
+            flags: TriggerKeyMatcher.optionFlagMask,
+            timestampMs: 100,
+            isAutoRepeat: false
+        )))
+        await Task.yield()
+
+        XCTAssertEqual(monitor.configuredTrigger, .rightOption)
         XCTAssertEqual(events.values, [.triggerDown(timestampMs: 100)])
     }
 

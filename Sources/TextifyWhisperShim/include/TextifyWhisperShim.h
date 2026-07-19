@@ -24,6 +24,10 @@ int32_t textify_whisper_transcribe(
 
 const char *textify_whisper_last_text(TextifyWhisperContext *context);
 const char *textify_whisper_last_error(TextifyWhisperContext *context);
+float textify_whisper_last_no_speech_probability(TextifyWhisperContext *context);
+float textify_whisper_last_average_log_probability(TextifyWhisperContext *context);
+float textify_whisper_last_compression_ratio(TextifyWhisperContext *context);
+int32_t textify_whisper_uses_gpu(TextifyWhisperContext *context);
 
 int32_t textify_whisper_compiled_with_metal(void);
 

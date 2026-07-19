@@ -1,0 +1,48 @@
+{
+  "accuracy" : {
+    "deletions" : 0,
+    "hypothesisWordCount" : 42,
+    "insertions" : 0,
+    "referenceWordCount" : 42,
+    "substitutions" : 1,
+    "wordErrorRate" : 0.023809523809523808,
+    "wordErrors" : 1
+  },
+  "audio" : {
+    "durationMs" : 13305,
+    "sampleCount" : 212880,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "realtime",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-small.en-q5_1",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 332496896,
+    "systemCpuMs" : 9,
+    "userCpuMs" : 36
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 207,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 103,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.015558060879368658,
+    "releaseToFinalMs" : 207,
+    "warmupMs" : 1
+  }
+}

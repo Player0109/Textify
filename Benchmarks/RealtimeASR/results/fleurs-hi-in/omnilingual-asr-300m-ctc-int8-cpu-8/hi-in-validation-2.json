@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.1,
+    "characterErrors" : 7,
+    "deletions" : 3,
+    "hypothesisCharacterCount" : 69,
+    "hypothesisText" : "आर्मड वर्षास ने कहा मैंने अपनी बहन और उनकी दोस्त को खोदिया और रास्ते में हुलचर में दो दिब्यांग लोग थे और लोग उनपर उछल रहे थे और उन्हें धक्का दे रहे थे",
+    "hypothesisWordCount" : 51,
+    "insertions" : 0,
+    "referenceCharacterCount" : 70,
+    "referenceText" : "आर्मंड वर्सास ने कहा मैंने अपनी बहन और उसकी दोस्त को खो दिया और रास्ते में व्हीलचेयर में दो दिव्यांग लोग थे और लोग उनपर उछल रहे थे और उन्हें धक्का दे रहे थे",
+    "referenceWordCount" : 54,
+    "substitutions" : 5,
+    "wordErrorRate" : 0.14814814814814814,
+    "wordErrors" : 8
+  },
+  "audio" : {
+    "durationMs" : 21360,
+    "sampleCount" : 341760,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "omnilingual-asr-300m-ctc-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Omnilingual ASR CTC 300M int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 1023557632,
+    "systemCpuMs" : 128,
+    "userCpuMs" : 11829
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : false
+  },
+  "timing" : {
+    "inferenceWorkMs" : 1500,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 263,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.0702247191011236,
+    "releaseToFinalMs" : 1500,
+    "warmupMs" : 35
+  }
+}

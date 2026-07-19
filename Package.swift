@@ -59,6 +59,7 @@ let whisperLinkerSettings: [LinkerSetting] = [
     .linkedFramework("Accelerate", .when(platforms: [.macOS])),
     .linkedFramework("Metal", .when(platforms: [.macOS])),
     .linkedFramework("Foundation", .when(platforms: [.macOS])),
+    .linkedLibrary("compression", .when(platforms: [.macOS])),
     .linkedLibrary("c++", .when(platforms: [.macOS]))
 ]
 
@@ -79,6 +80,12 @@ let package = Package(
         .library(name: "TextifyRuntime", targets: ["TextifyRuntime"]),
         .library(name: "TextifyWhisperShim", targets: ["TextifyWhisperShim"]),
         .executable(name: "Textify", targets: ["Textify"])
+    ],
+    dependencies: [
+        .package(
+            url: "https://github.com/FluidInference/FluidAudio.git",
+            exact: "0.15.5"
+        )
     ],
     targets: [
         .target(
@@ -126,13 +133,26 @@ let package = Package(
             cxxSettings: whisperShimCXXSettings,
             linkerSettings: whisperLinkerSettings
         ),
+        .target(
+            name: "TextifySherpaShim",
+            path: "Sources/TextifySherpaShim",
+            publicHeadersPath: "include"
+        ),
+        .target(
+            name: "TextifyTranscribeCppShim",
+            path: "Sources/TextifyTranscribeCppShim",
+            publicHeadersPath: "include"
+        ),
         .target(name: "TextifyCore"),
         .target(name: "TextifyAudio"),
         .target(
             name: "TextifyTranscription",
             dependencies: [
                 "TextifyCore",
-                "TextifyWhisperShim"
+                "TextifyWhisperShim",
+                "TextifySherpaShim",
+                "TextifyTranscribeCppShim",
+                .product(name: "FluidAudio", package: "FluidAudio")
             ]
         ),
         .target(name: "TextifyModels", dependencies: ["TextifyDiagnostics"]),
@@ -190,6 +210,7 @@ let package = Package(
                 "TextifyDiagnostics",
                 "TextifyHotkeys",
                 "TextifyInsertion",
+                "TextifyModels",
                 "TextifyRuntime",
                 "TextifySettings",
                 "TextifyTranscription"

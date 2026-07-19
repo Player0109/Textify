@@ -40,10 +40,6 @@ public struct ReadinessSnapshot: Equatable, Sendable {
         if permissions.accessibility != .granted {
             blockers.append(.accessibilityPermissionDenied)
         }
-        if permissions.inputMonitoring != .granted {
-            blockers.append(.inputMonitoringPermissionDenied)
-        }
-
         switch model {
         case .ready:
             break
@@ -102,7 +98,6 @@ public enum RuntimeModelFailure: Equatable, Sendable {
 public enum ReadinessBlocker: Equatable, Sendable {
     case microphonePermissionDenied
     case accessibilityPermissionDenied
-    case inputMonitoringPermissionDenied
     case noActiveModel
     case activeModelMissing(modelID: String)
     case activeModelNotReady(modelID: String)

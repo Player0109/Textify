@@ -10,15 +10,18 @@ public actor RuntimeAudioRecorderAdapter: RuntimeAudioRecording {
 
     public func startRecording(
         microphone: MicrophoneSelection,
-        onSpeechDetected: @escaping @Sendable () -> Void
+        maximumDurationSeconds: Double,
+        onSpeechDetected: @escaping @Sendable () -> Void,
+        onMaximumDurationReached: @escaping @Sendable () -> Void
     ) async throws {
         guard microphone == .systemDefault else {
             throw LiveAudioRecorderError.unsupportedInput
         }
 
         try await recorder.startRecording(
+            maximumDurationSeconds: maximumDurationSeconds,
             onSpeechDetected: onSpeechDetected,
-            onMaximumDurationReached: {}
+            onMaximumDurationReached: onMaximumDurationReached
         )
     }
 

@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0,
+    "characterErrors" : 0,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 13,
+    "hypothesisText" : "甚至出现交易几乎停滞的情况。",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 13,
+    "referenceText" : "甚至出现交易几乎停滞的情况",
+    "referenceWordCount" : 1,
+    "substitutions" : 0,
+    "wordErrorRate" : 0,
+    "wordErrors" : 0
+  },
+  "audio" : {
+    "durationMs" : 4204,
+    "sampleCount" : 67263,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (4 threads)",
+  "engine" : "sensevoice-small-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "SenseVoiceSmall int8 2024-07-17",
+  "modelLicense" : "FunASR Model License 1.1",
+  "resources" : {
+    "peakResidentBytes" : 583892992,
+    "systemCpuMs" : 1,
+    "userCpuMs" : 508
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 130,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 316,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.03092293054234063,
+    "releaseToFinalMs" : 130,
+    "warmupMs" : 24
+  }
+}

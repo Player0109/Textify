@@ -1,0 +1,70 @@
+{
+  "accuracy" : {
+    "deletions" : 0,
+    "hypothesisWordCount" : 11,
+    "insertions" : 0,
+    "referenceWordCount" : 11,
+    "substitutions" : 0,
+    "wordErrorRate" : 0,
+    "wordErrors" : 0
+  },
+  "audio" : {
+    "durationMs" : 4715,
+    "sampleCount" : 75440,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "Apple on-device Speech service; hardware backend managed by macOS",
+  "engine" : "apple-speech-analyzer",
+  "engineVersion" : "Apple Speech framework on macOS 26",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Apple SpeechTranscriber en-US fast volatile results",
+  "modelLicense" : "Apple system asset; OS license terms",
+  "resources" : {
+    "peakResidentBytes" : 22118400,
+    "systemCpuMs" : 2,
+    "userCpuMs" : 8
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "firstPartialUnder500Ms" : true,
+    "fullyOffline" : true,
+    "partialMedianBetween200And400Ms" : false,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "firstPartialMs" : 12,
+    "inferenceWorkMs" : 84,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 31,
+    "partialUpdateIntervalsMs" : [
+      6,
+      1,
+      1,
+      1,
+      1,
+      6,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      5,
+      1,
+      5,
+      1,
+      1,
+      1,
+      50
+    ],
+    "partialUpdateMedianMs" : 1,
+    "realTimeFactor" : 0.017815482502651112,
+    "releaseToFinalMs" : 84,
+    "warmupMs" : 0
+  }
+}

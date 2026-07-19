@@ -24,16 +24,23 @@ final class DiagnosticsTests: XCTestCase {
     func testDiagnosticsEventDoesNotEncodeContentFields() throws {
         let event = DiagnosticEvent.transcriptionCompleted(
             modelID: "ggml-small.en-q5_1",
+            engine: "whisper_cpp",
+            accelerator: "metal_gpu",
+            backendReadiness: "ready",
             audioDurationMs: 5_000,
             inferenceDurationMs: 1_500,
             textLengthBucket: "1-50"
         )
         let data = try JSONEncoder().encode(event)
         let json = String(decoding: data, as: UTF8.self)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
         XCTAssertFalse(json.localizedCaseInsensitiveContains("transcript"))
         XCTAssertFalse(json.localizedCaseInsensitiveContains("clipboard"))
         XCTAssertFalse(json.localizedCaseInsensitiveContains("audioSamples"))
+        XCTAssertEqual(object["engine"] as? String, "whisper_cpp")
+        XCTAssertEqual(object["accelerator"] as? String, "metal_gpu")
+        XCTAssertEqual(object["backendReadiness"] as? String, "ready")
     }
 
     func testExportIsSingleJSONDocument() throws {
@@ -59,12 +66,47 @@ final class DiagnosticsTests: XCTestCase {
         let logger = DiagnosticsLogger(directory: directory)
 
         try await logger.log(.appStarted(appVersion: "1.0.0", macOSVersion: "14.0"))
-        try await logger.log(.modelLoad(modelID: "whisper-base-en-fast", tier: "fast", durationMs: 42, result: "ready"))
+        try await logger.log(
+            .modelLoad(
+                modelID: "whisper-base-en-fast",
+                tier: "fast",
+                engine: "whisper_cpp",
+                accelerator: "metal_gpu",
+                durationMs: 42,
+                result: "ready"
+            )
+        )
 
         let contents = try String(contentsOf: logger.logFileURL, encoding: .utf8)
         let lines = contents.split(separator: "\n")
         XCTAssertEqual(lines.count, 2)
         XCTAssertTrue(lines.allSatisfy { $0.first == "{" && $0.last == "}" })
+    }
+
+    func testLoggerRollsDailyAndAppliesRetentionWithoutRestart() async throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let clock = MutableDiagnosticsClock(date: Date())
+        let logger = DiagnosticsLogger(
+            directory: directory,
+            date: clock.date,
+            now: { clock.date }
+        )
+
+        try await logger.log(.appStarted(appVersion: "1.0.0", macOSVersion: "14.0"))
+        let firstLogURL = logger.logFileURL
+        XCTAssertTrue(FileManager.default.fileExists(atPath: firstLogURL.path))
+
+        clock.advance(days: 15)
+        try await logger.log(.appStarted(appVersion: "1.0.0", macOSVersion: "14.0"))
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: firstLogURL.path))
+        let remainingLogs = try FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: nil
+        ).filter { $0.pathExtension == "jsonl" }
+        XCTAssertEqual(remainingLogs.count, 1)
+        XCTAssertNotEqual(remainingLogs.first, firstLogURL)
     }
 
     func testLoggerClearRemovesDiagnosticLogFiles() async throws {
@@ -183,6 +225,8 @@ final class DiagnosticsTests: XCTestCase {
         let event = DiagnosticEvent.modelLoad(
             modelID: "ggml-small.en-q5_1",
             tier: "fast",
+            engine: "whisper_cpp",
+            accelerator: "metal_gpu",
             durationMs: 42,
             result: "raw error transcript=hello"
         )
@@ -222,6 +266,8 @@ final class DiagnosticsTests: XCTestCase {
             let modelLoad = DiagnosticEvent.modelLoad(
                 modelID: testCase.value,
                 tier: "fast",
+                engine: "whisper_cpp",
+                accelerator: "metal_gpu",
                 durationMs: 42,
                 result: "ready"
             )
@@ -248,6 +294,8 @@ final class DiagnosticsTests: XCTestCase {
         let modelLoad = DiagnosticEvent.modelLoad(
             modelID: "ggml-small.en-q5_1",
             tier: "balanced",
+            engine: "whisper_cpp",
+            accelerator: "metal_gpu",
             durationMs: 42,
             result: "ready"
         )
@@ -278,6 +326,8 @@ final class DiagnosticsTests: XCTestCase {
             let modelLoad = DiagnosticEvent.modelLoad(
                 modelID: modelID,
                 tier: "balanced",
+                engine: "whisper_cpp",
+                accelerator: "metal_gpu",
                 durationMs: 42,
                 result: "ready"
             )
@@ -341,6 +391,8 @@ final class DiagnosticsTests: XCTestCase {
         let event = DiagnosticEvent.modelLoad(
             modelID: "ggml-small.en-q5_1",
             tier: "fast",
+            engine: "whisper_cpp",
+            accelerator: "metal_gpu",
             durationMs: 42,
             result: "/Users/alice/Library/Application Support/Textify/model load failed"
         )
@@ -472,6 +524,28 @@ final class DiagnosticsTests: XCTestCase {
         for fragment in fragments {
             XCTAssertFalse(string.contains(fragment), "Leaked fragment: \(fragment)", file: file, line: line)
         }
+    }
+}
+
+private final class MutableDiagnosticsClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: Date
+
+    init(date: Date) {
+        value = date
+    }
+
+    var date: Date {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
+
+    func advance(days: Int) {
+        lock.lock()
+        value = Calendar(identifier: .gregorian)
+            .date(byAdding: .day, value: days, to: value) ?? value
+        lock.unlock()
     }
 }
 

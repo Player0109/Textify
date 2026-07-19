@@ -27,6 +27,7 @@ public actor DiagnosticsLogger {
     private let encoder: JSONEncoder
     private let fileManager: FileManager
     private let fileDeleter: any DiagnosticsFileDeleting
+    private let now: @Sendable () -> Date
 
     public init(
         directory: URL,
@@ -34,24 +35,47 @@ public actor DiagnosticsLogger {
         fileManager: FileManager = .default,
         fileDeleter: any DiagnosticsFileDeleting = FoundationDiagnosticsFileDeleter()
     ) {
+        self.init(
+            directory: directory,
+            date: date,
+            fileManager: fileManager,
+            fileDeleter: fileDeleter,
+            now: { Date() }
+        )
+    }
+
+    public init(
+        directory: URL,
+        date: Date,
+        fileManager: FileManager = .default,
+        fileDeleter: any DiagnosticsFileDeleting = FoundationDiagnosticsFileDeleter(),
+        now: @escaping @Sendable () -> Date
+    ) {
         self.directory = directory
         self.logFileURL = directory.appendingPathComponent(Self.logFileName(for: date), isDirectory: false)
         self.encoder = JSONEncoder()
         self.fileManager = fileManager
         self.fileDeleter = fileDeleter
+        self.now = now
     }
 
     public func log(_ event: DiagnosticEvent) throws {
+        let currentDate = now()
+        try rotate(now: currentDate)
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        let currentLogFileURL = directory.appendingPathComponent(
+            Self.logFileName(for: currentDate),
+            isDirectory: false
+        )
 
-        if !fileManager.fileExists(atPath: logFileURL.path) {
-            _ = fileManager.createFile(atPath: logFileURL.path, contents: nil)
+        if !fileManager.fileExists(atPath: currentLogFileURL.path) {
+            _ = fileManager.createFile(atPath: currentLogFileURL.path, contents: nil)
         }
 
         var data = try encoder.encode(event)
         data.append(0x0A)
 
-        let handle = try FileHandle(forWritingTo: logFileURL)
+        let handle = try FileHandle(forWritingTo: currentLogFileURL)
         defer {
             try? handle.close()
         }

@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.09523809523809523,
+    "characterErrors" : 2,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 22,
+    "hypothesisText" : "東京都を流れる朝汐運河に架かる橋のカテゴリー。",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 21,
+    "referenceText" : "東京都を流れる朝潮運河に架かる橋のカテゴリ。",
+    "referenceWordCount" : 1,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 1
+  },
+  "audio" : {
+    "durationMs" : 3980,
+    "sampleCount" : 63680,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "Core ML CPU preprocessor + CPU/Apple Neural Engine inference",
+  "engine" : "parakeet-tdt-ja",
+  "engineVersion" : "Textify ParakeetRuntime / FluidAudio 0.15.5",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "parakeet-tdt-0.6b Japanese int8",
+  "modelLicense" : "CC-BY-4.0",
+  "resources" : {
+    "peakResidentBytes" : 97370112,
+    "systemCpuMs" : 4,
+    "userCpuMs" : 28
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 56,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 733,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.01407035175879397,
+    "releaseToFinalMs" : 56,
+    "warmupMs" : 63
+  }
+}

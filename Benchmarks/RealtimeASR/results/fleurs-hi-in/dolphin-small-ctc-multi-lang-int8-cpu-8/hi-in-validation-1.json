@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.9122807017543859,
+    "characterErrors" : 52,
+    "deletions" : 41,
+    "hypothesisCharacterCount" : 6,
+    "hypothesisText" : "वैज्ञानिकोंों  होंगे।",
+    "hypothesisWordCount" : 7,
+    "insertions" : 0,
+    "referenceCharacterCount" : 57,
+    "referenceText" : "वैज्ञानिकों का मानना है कि ओसेलोट्स गंध के द्वारा जानवरों का पीछा करते और खाते शिकार हैं यह सूँघते हुए कि वे ज़मीन पर कहाँ रहे होंगे।",
+    "referenceWordCount" : 48,
+    "substitutions" : 0,
+    "wordErrorRate" : 0.8541666666666666,
+    "wordErrors" : 41
+  },
+  "audio" : {
+    "durationMs" : 10260,
+    "sampleCount" : 164160,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "dolphin-small-ctc-multi-lang-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Dolphin Small CTC multilingual int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 666746880,
+    "systemCpuMs" : 81,
+    "userCpuMs" : 1569
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 213,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 212,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.020760233918128656,
+    "releaseToFinalMs" : 213,
+    "warmupMs" : 19
+  }
+}

@@ -64,9 +64,11 @@ public struct DiagnosticsRedactor: Sendable {
         "appLocationCategory",
         "appVersion",
         "audioDurationMs",
+        "accelerator",
         "averageLogProbability",
         "compressionRatio",
         "durationMs",
+        "engine",
         "errorCode",
         "errorDomain",
         "event",
@@ -77,6 +79,7 @@ public struct DiagnosticsRedactor: Sendable {
         "macOSVersion",
         "manifestSource",
         "modelID",
+        "backendReadiness",
         "noSpeechProbability",
         "pasteEventPosted",
         "pasteOutcomeObservable",
@@ -114,6 +117,10 @@ enum DiagnosticsStringSanitizer {
     static func sanitize(_ value: String, forKey key: String) -> String {
         let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
 
+        if key == "modelID" {
+            return sanitizeModelID(normalized)
+        }
+
         if let allowedValues = closedValueAllowlists[key] {
             return allowedValues.contains(normalized) ? normalized : unknownValue
         }
@@ -131,6 +138,30 @@ enum DiagnosticsStringSanitizer {
         return normalized
     }
 
+    private static func sanitizeModelID(_ value: String) -> String {
+        let allowedPrefixes = [
+            "canary-",
+            "cohere-",
+            "custom-whisper-",
+            "distil-whisper-",
+            "ggml-",
+            "moonshine-",
+            "parakeet-",
+            "paraformer-",
+            "qwen-",
+            "reazonspeech-",
+            "sensevoice-",
+            "whisperkit-"
+        ]
+        guard allowedPrefixes.contains(where: value.hasPrefix),
+              value.count <= 128,
+              value.range(of: #"^[A-Za-z0-9][A-Za-z0-9._-]+$"#, options: .regularExpression) != nil
+        else {
+            return unknownValue
+        }
+        return value
+    }
+
     private static let unknownValue = "unknown"
 
     private static let closedValueAllowlists: [String: Set<String>] = [
@@ -141,6 +172,24 @@ enum DiagnosticsStringSanitizer {
             "user_applications",
             unknownValue
         ],
+        "accelerator": [
+            "coreml_neural_engine",
+            "cpu",
+            "metal_gpu",
+            unknownValue
+        ],
+        "backendReadiness": [
+            "failed",
+            "ready",
+            unknownValue
+        ],
+        "engine": [
+            "fluid_audio_parakeet",
+            "fluid_audio_paraformer",
+            "sherpa_onnx",
+            "whisper_cpp",
+            unknownValue
+        ],
         "event": [
             "app_started",
             "dictation_blocked_excluded_app",
@@ -148,6 +197,7 @@ enum DiagnosticsStringSanitizer {
             "launch_at_login_change",
             "model_load",
             "speech_recognition_completed",
+            "speech_recognition_discarded",
             unknownValue
         ],
         "errorDomain": [
@@ -170,10 +220,6 @@ enum DiagnosticsStringSanitizer {
             "bundled",
             "cached",
             "remote",
-            unknownValue
-        ],
-        "modelID": [
-            "ggml-small.en-q5_1",
             unknownValue
         ],
         "requestedAction": [
@@ -218,6 +264,7 @@ enum DiagnosticsStringSanitizer {
         "tier": [
             "accurate",
             "balanced",
+            "custom",
             "fast",
             unknownValue
         ]

@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 1.125,
+    "characterErrors" : 27,
+    "deletions" : 4,
+    "hypothesisCharacterCount" : 33,
+    "hypothesisText" : "ڪुتوهل گاव में આدي گهنتि टहلنا سمय की هاني نहીं هي",
+    "hypothesisWordCount" : 12,
+    "insertions" : 0,
+    "referenceCharacterCount" : 24,
+    "referenceText" : "कुतूहल गांव में आधे घंटे टहलना समय की हानि नहीं है",
+    "referenceWordCount" : 16,
+    "substitutions" : 10,
+    "wordErrorRate" : 0.875,
+    "wordErrors" : 14
+  },
+  "audio" : {
+    "durationMs" : 6420,
+    "sampleCount" : 102720,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "omnilingual-asr-300m-ctc-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Omnilingual ASR CTC 300M int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 780566528,
+    "systemCpuMs" : 48,
+    "userCpuMs" : 3230
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 412,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 260,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.06417445482866044,
+    "releaseToFinalMs" : 412,
+    "warmupMs" : 33
+  }
+}

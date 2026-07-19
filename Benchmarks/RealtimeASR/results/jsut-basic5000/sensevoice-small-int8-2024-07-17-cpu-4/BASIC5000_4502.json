@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0,
+    "characterErrors" : 0,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 42,
+    "hypothesisText" : "また、サイコロ に 姿 を 変える こ とも でき、転がる と 強 力な 魔力 が 発動し、出 た目の 数 だけ 死者 が 出る。",
+    "hypothesisWordCount" : 23,
+    "insertions" : 19,
+    "referenceCharacterCount" : 42,
+    "referenceText" : "また、サイコロに姿を変えることもでき、転がると強力な魔力が発動し、出た目の数だけ死者が出る。",
+    "referenceWordCount" : 4,
+    "substitutions" : 3,
+    "wordErrorRate" : 5.5,
+    "wordErrors" : 22
+  },
+  "audio" : {
+    "durationMs" : 7640,
+    "sampleCount" : 122240,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (4 threads)",
+  "engine" : "sensevoice-small-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "SenseVoiceSmall int8 2024-07-17",
+  "modelLicense" : "FunASR Model License 1.1",
+  "resources" : {
+    "peakResidentBytes" : 600588288,
+    "systemCpuMs" : 4,
+    "userCpuMs" : 897
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 229,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 313,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.029973821989528797,
+    "releaseToFinalMs" : 229,
+    "warmupMs" : 24
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0,
+    "characterErrors" : 0,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 113,
+    "hypothesisText" : "She was four years older than I, to be sure and had seen more of the world. But I was a boy, and she was a girl, and I resented her protecting manner.",
+    "hypothesisWordCount" : 33,
+    "insertions" : 0,
+    "referenceCharacterCount" : 113,
+    "referenceText" : "SHE WAS FOUR YEARS OLDER THAN I TO BE SURE AND HAD SEEN MORE OF THE WORLD BUT I WAS A BOY AND SHE WAS A GIRL AND I RESENTED HER PROTECTING MANNER",
+    "referenceWordCount" : 33,
+    "substitutions" : 0,
+    "wordErrorRate" : 0,
+    "wordErrors" : 0
+  },
+  "audio" : {
+    "durationMs" : 9020,
+    "sampleCount" : 144320,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (4 threads)",
+  "engine" : "sensevoice-small-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "SenseVoiceSmall int8 2024-07-17",
+  "modelLicense" : "FunASR Model License 1.1",
+  "resources" : {
+    "peakResidentBytes" : 604160000,
+    "systemCpuMs" : 6,
+    "userCpuMs" : 1058
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 267,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 314,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.02960088691796009,
+    "releaseToFinalMs" : 267,
+    "warmupMs" : 24
+  }
+}

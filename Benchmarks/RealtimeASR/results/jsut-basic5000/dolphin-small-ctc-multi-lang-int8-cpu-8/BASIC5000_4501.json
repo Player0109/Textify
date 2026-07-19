@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.2903225806451613,
+    "characterErrors" : 18,
+    "deletions" : 5,
+    "hypothesisCharacterCount" : 57,
+    "hypothesisText" : "だがAIセンター稼働を思わない法医学者警察は内部界をもくろみAIセンターの副センター長に就任して叩たきつそうとする。",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 62,
+    "referenceText" : "だが、エーアイセンター稼動を快く思わない法医学者、警察は、内部瓦解を目論み、エーアイセンターの副センター長に就任して、叩き潰そうとする。",
+    "referenceWordCount" : 6,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 6
+  },
+  "audio" : {
+    "durationMs" : 10720,
+    "sampleCount" : 171520,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "dolphin-small-ctc-multi-lang-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Dolphin Small CTC multilingual int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 676462592,
+    "systemCpuMs" : 81,
+    "userCpuMs" : 1585
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 212,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 218,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.019776119402985074,
+    "releaseToFinalMs" : 212,
+    "warmupMs" : 13
+  }
+}

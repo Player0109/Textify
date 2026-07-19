@@ -1,0 +1,37 @@
+name: Feature Request
+description: Suggest a focused improvement to Textify.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the user problem and desired outcome. Textify has no public roadmap, and filing a request does not guarantee implementation or a timeline.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is difficult today, and who does it affect?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe the behavior you would like without prescribing an implementation unless it matters.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional workarounds or alternatives you have tried.
+  - type: checkboxes
+    id: privacy_confirmation
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I did not include dictated text, clipboard contents, window titles, document names, URLs, or credentials.
+          required: true
+

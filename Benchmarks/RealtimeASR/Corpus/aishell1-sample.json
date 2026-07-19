@@ -1,0 +1,68 @@
+{
+  "name": "AISHELL-1 Mandarin fixed ten-utterance sample",
+  "license": "Apache-2.0",
+  "source": "https://huggingface.co/datasets/AudioLLMs/aishell_1_zh_test",
+  "datasetRevision": "e73dc7f096ecea5c8e5c722446c8d3b4014fdd18",
+  "items": [
+    {
+      "id": "0",
+      "audio": "0.wav",
+      "sha256": "46dbc998c9d1d48111267c40741dd3200f2e5bcf4075f8c4c97f4451160dce50",
+      "reference": "甚至出现交易几乎停滞的情况"
+    },
+    {
+      "id": "1",
+      "audio": "1.wav",
+      "sha256": "5760c7ace0923a499f605d373011c7aaf658e304a0999a493c63669c756384e1",
+      "reference": "一二线城市虽然也处于调整中"
+    },
+    {
+      "id": "2",
+      "audio": "2.wav",
+      "sha256": "2c566703c6b1b075568cac56810846a48bb127c740d7a36de66084816035dd42",
+      "reference": "但因为聚集了过多公共资源"
+    },
+    {
+      "id": "3",
+      "audio": "3.wav",
+      "sha256": "dd10ccc5fd8c9077b421b8f126157bdbdf5e81029a59c056f33870bdf266acef",
+      "reference": "为了规避三四线城市明显过剩的市场风险"
+    },
+    {
+      "id": "4",
+      "audio": "4.wav",
+      "sha256": "d71591e70d4e5f35a793ea4d69dbfb5cddda2beb4b8d3e0409283e4b63a8d7ea",
+      "reference": "中原地产首席分析师张大伟说"
+    },
+    {
+      "id": "5",
+      "audio": "5.wav",
+      "sha256": "f5430b710e5b27a3174ee7e5964cc307eeee47443bba6fce32179a88e60b1a92",
+      "reference": "一线城市土地供应量减少"
+    },
+    {
+      "id": "6",
+      "audio": "6.wav",
+      "sha256": "0d12af0837abd1c0526a92ecdcefb0f309d7bb5a540675b0308b2373932c0243",
+      "reference": "也助推了土地市场的火爆"
+    },
+    {
+      "id": "7",
+      "audio": "7.wav",
+      "sha256": "1a21763add9914c77978064719c2af8d35ca1c7f8471c3482d829d9b04a605f4",
+      "reference": "北京仅新增住宅土地供应十宗"
+    },
+    {
+      "id": "8",
+      "audio": "8.wav",
+      "sha256": "6df514cd243f7d23f23c96f1bb9512f3e30befa77a3a54191bb2d13f45463612",
+      "reference": "开发边界将作为城市发展的刚性约定"
+    },
+    {
+      "id": "9",
+      "audio": "9.wav",
+      "sha256": "e7d9712ea6809ad347cdea03d8100a7488c6932ac3316ea2b42d21b490150878",
+      "reference": "不得超越界限盲目扩张"
+    }
+  ]
+}

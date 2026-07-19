@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.13636363636363635,
+    "characterErrors" : 3,
+    "deletions" : 1,
+    "hypothesisCharacterCount" : 21,
+    "hypothesisText" : "お酒に酔っ払って転んで顔を打って鼻血が出た",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 22,
+    "referenceText" : "お酒に酔っぱらって転んで、顔をうって鼻血が出た。",
+    "referenceWordCount" : 2,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 2
+  },
+  "audio" : {
+    "durationMs" : 3570,
+    "sampleCount" : 57120,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-kotoba-whisper-v2.0-q5_0",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 632832000,
+    "systemCpuMs" : 10,
+    "userCpuMs" : 21
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 518,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 743,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.1450980392156863,
+    "releaseToFinalMs" : 518,
+    "warmupMs" : 2
+  }
+}

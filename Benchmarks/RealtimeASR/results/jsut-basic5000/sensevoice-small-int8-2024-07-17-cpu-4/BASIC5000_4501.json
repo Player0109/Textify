@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.1774193548387097,
+    "characterErrors" : 11,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 56,
+    "hypothesisText" : "だが、アセンター稼どを快く思わない包医学者、警察は内部画会を目論み、アセンターの 副センター庁 に就任して叩き潰そう とする。",
+    "hypothesisWordCount" : 7,
+    "insertions" : 1,
+    "referenceCharacterCount" : 62,
+    "referenceText" : "だが、エーアイセンター稼動を快く思わない法医学者、警察は、内部瓦解を目論み、エーアイセンターの副センター長に就任して、叩き潰そうとする。",
+    "referenceWordCount" : 6,
+    "substitutions" : 5,
+    "wordErrorRate" : 1,
+    "wordErrors" : 6
+  },
+  "audio" : {
+    "durationMs" : 10720,
+    "sampleCount" : 171520,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (4 threads)",
+  "engine" : "sensevoice-small-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "SenseVoiceSmall int8 2024-07-17",
+  "modelLicense" : "FunASR Model License 1.1",
+  "resources" : {
+    "peakResidentBytes" : 605405184,
+    "systemCpuMs" : 5,
+    "userCpuMs" : 1226
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 311,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 319,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.029011194029850747,
+    "releaseToFinalMs" : 311,
+    "warmupMs" : 24
+  }
+}

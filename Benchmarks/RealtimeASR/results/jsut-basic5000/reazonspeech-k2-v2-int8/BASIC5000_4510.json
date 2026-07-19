@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.10344827586206896,
+    "characterErrors" : 3,
+    "deletions" : 1,
+    "hypothesisCharacterCount" : 27,
+    "hypothesisText" : "夏の暑さを割り切るにはクーラーよりも扇風機が体にはいい",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 29,
+    "referenceText" : "夏の暑さをの割り切るには、クーラーよりも扇風機が身体には良い。",
+    "referenceWordCount" : 2,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 2
+  },
+  "audio" : {
+    "durationMs" : 5360,
+    "sampleCount" : 85760,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime CPU (4 threads)",
+  "engine" : "reazonspeech-k2-v2",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ReazonSpeech K2 V2 int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 502759424,
+    "systemCpuMs" : 12,
+    "userCpuMs" : 397
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 361,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 1306,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.06735074626865671,
+    "releaseToFinalMs" : 361,
+    "warmupMs" : 82
+  }
+}

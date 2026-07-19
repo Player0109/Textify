@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.3225806451612903,
+    "characterErrors" : 20,
+    "deletions" : 3,
+    "hypothesisCharacterCount" : 62,
+    "hypothesisText" : "だがAIセンター稼働を心よく思わない法医学者、警察は内部課会をむくろみ、AIセンターの副センター長に就任してたたきつぶそうとする。",
+    "hypothesisWordCount" : 3,
+    "insertions" : 0,
+    "referenceCharacterCount" : 62,
+    "referenceText" : "だが、エーアイセンター稼動を快く思わない法医学者、警察は、内部瓦解を目論み、エーアイセンターの副センター長に就任して、叩き潰そうとする。",
+    "referenceWordCount" : 6,
+    "substitutions" : 3,
+    "wordErrorRate" : 1,
+    "wordErrors" : 6
+  },
+  "audio" : {
+    "durationMs" : 10720,
+    "sampleCount" : 171520,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-kotoba-whisper-v2.0-q5_0",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 633061376,
+    "systemCpuMs" : 19,
+    "userCpuMs" : 51
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 573,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 24681,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.05345149253731343,
+    "releaseToFinalMs" : 573,
+    "warmupMs" : 1
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.22058823529411764,
+    "characterErrors" : 15,
+    "deletions" : 3,
+    "hypothesisCharacterCount" : 70,
+    "hypothesisText" : " मेजर किन खाना भूम अध्य सागर में सामान शेतरों की तरह रोटी सबजियों और मास विशेश रूप से सुवर का मास पर आधारित है और जैतून के तेल का उप्योग करता है",
+    "hypothesisWordCount" : 56,
+    "insertions" : 4,
+    "referenceCharacterCount" : 68,
+    "referenceText" : "मेजरकेन खाना भूमध्य सागर में समान क्षेत्रों की तरह रोटी सब्जियों और मांस विशेष रूप से सूअर का मांस पर आधारित है और जैतून के तेल का उपयोग करता है।",
+    "referenceWordCount" : 55,
+    "substitutions" : 9,
+    "wordErrorRate" : 0.2909090909090909,
+    "wordErrors" : 16
+  },
+  "audio" : {
+    "durationMs" : 12240,
+    "sampleCount" : 195840,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-large-v3-turbo-q5_0",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 690585600,
+    "systemCpuMs" : 33,
+    "userCpuMs" : 228
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : false
+  },
+  "timing" : {
+    "inferenceWorkMs" : 734,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 208,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.05996732026143791,
+    "releaseToFinalMs" : 734,
+    "warmupMs" : 1
+  }
+}

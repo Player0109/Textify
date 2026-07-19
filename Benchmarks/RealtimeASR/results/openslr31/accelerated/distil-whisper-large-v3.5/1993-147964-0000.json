@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.04716981132075472,
+    "characterErrors" : 5,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 108,
+    "hypothesisText" : "they sought about the house most of the day as if it were sunday greasing their boots mending their suspenders plating whiplashes",
+    "hypothesisWordCount" : 22,
+    "insertions" : 0,
+    "referenceCharacterCount" : 106,
+    "referenceText" : "THEY SAT ABOUT THE HOUSE MOST OF THE DAY AS IF IT WERE SUNDAY GREASING THEIR BOOTS MENDING THEIR SUSPENDERS PLAITING WHIPLASHES",
+    "referenceWordCount" : 22,
+    "substitutions" : 2,
+    "wordErrorRate" : 0.09090909090909091,
+    "wordErrors" : 2
+  },
+  "audio" : {
+    "durationMs" : 8420,
+    "sampleCount" : 134720,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-model",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 1616314368,
+    "systemCpuMs" : 10,
+    "userCpuMs" : 54
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 374,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 363,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.044418052256532066,
+    "releaseToFinalMs" : 374,
+    "warmupMs" : 1
+  }
+}

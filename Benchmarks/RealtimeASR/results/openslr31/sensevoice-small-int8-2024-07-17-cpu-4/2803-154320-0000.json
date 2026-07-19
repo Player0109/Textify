@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.058823529411764705,
+    "characterErrors" : 6,
+    "deletions" : 2,
+    "hypothesisCharacterCount" : 103,
+    "hypothesisText" : "Fortunately, Will Halley was not a man in a hurry and did not use oppressive canvas, or his mass would inevitably have come down.",
+    "hypothesisWordCount" : 24,
+    "insertions" : 0,
+    "referenceCharacterCount" : 102,
+    "referenceText" : "FORTUNATELY WILL HALLEY WAS NOT A MAN IN A HURRY AND DID NOT USE A PRESS OF CANVAS OR HIS MASTS WOULD INEVITABLY HAVE COME DOWN",
+    "referenceWordCount" : 26,
+    "substitutions" : 2,
+    "wordErrorRate" : 0.15384615384615385,
+    "wordErrors" : 4
+  },
+  "audio" : {
+    "durationMs" : 11480,
+    "sampleCount" : 183680,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (4 threads)",
+  "engine" : "sensevoice-small-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "SenseVoiceSmall int8 2024-07-17",
+  "modelLicense" : "FunASR Model License 1.1",
+  "resources" : {
+    "peakResidentBytes" : 608731136,
+    "systemCpuMs" : 5,
+    "userCpuMs" : 1332
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 336,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 317,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.02926829268292683,
+    "releaseToFinalMs" : 336,
+    "warmupMs" : 24
+  }
+}

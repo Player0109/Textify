@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.24074074074074073,
+    "characterErrors" : 13,
+    "deletions" : 6,
+    "hypothesisCharacterCount" : 42,
+    "hypothesisText" : "समय के साथ जैसे जैसेन आबा माहौल डलती जाती भी दूसरीबादी की अनदेखी करना शुरू कर देती है।",
+    "hypothesisWordCount" : 31,
+    "insertions" : 0,
+    "referenceCharacterCount" : 54,
+    "referenceText" : "समय के साथ जैसे-जैसे नई आबादी नए माहौल में ढलती जाती है वह भी दूसरी आबादी की तरह अनदेखी करना शुरू कर देती है",
+    "referenceWordCount" : 37,
+    "substitutions" : 3,
+    "wordErrorRate" : 0.24324324324324326,
+    "wordErrors" : 9
+  },
+  "audio" : {
+    "durationMs" : 9720,
+    "sampleCount" : 155520,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "dolphin-small-ctc-multi-lang-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Dolphin Small CTC multilingual int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 722337792,
+    "systemCpuMs" : 73,
+    "userCpuMs" : 1421
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 189,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 226,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.019444444444444445,
+    "releaseToFinalMs" : 189,
+    "warmupMs" : 13
+  }
+}

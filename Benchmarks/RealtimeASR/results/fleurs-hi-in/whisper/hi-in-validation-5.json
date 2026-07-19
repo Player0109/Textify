@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.26666666666666666,
+    "characterErrors" : 16,
+    "deletions" : 3,
+    "hypothesisCharacterCount" : 60,
+    "hypothesisText" : " पूर्व हाउस स्पीकर नूट ग्रिंकिच टैकसास के गवर्नर रिक पैरी और कॉंग्रेस बूमेन मिशल बैच मैन ने क्रमशा चौथा पांचों और छटा स्थान हासिल किया।",
+    "hypothesisWordCount" : 55,
+    "insertions" : 3,
+    "referenceCharacterCount" : 60,
+    "referenceText" : "पूर्व हाउस स्पीकर न्यूट गिंग्रिच टेक्सास के गर्वनर रिक पैरी और कांग्रेसवुमन मिशेल बैचमैन ने क्रमश चौथा पांचवां और छठा स्थान हासिल किया",
+    "referenceWordCount" : 55,
+    "substitutions" : 10,
+    "wordErrorRate" : 0.2909090909090909,
+    "wordErrors" : 16
+  },
+  "audio" : {
+    "durationMs" : 14220,
+    "sampleCount" : 227520,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-large-v3-turbo-q5_0",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 688996352,
+    "systemCpuMs" : 17,
+    "userCpuMs" : 70
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 544,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 165,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.03825597749648382,
+    "releaseToFinalMs" : 544,
+    "warmupMs" : 1
+  }
+}

@@ -6,7 +6,41 @@ public enum TriggerPreference: String, Codable, CaseIterable, Equatable, Sendabl
 }
 
 public enum TranscriptionLanguage: String, Codable, CaseIterable, Equatable, Sendable {
+    case automatic = "auto"
     case english = "en"
+    case spanish = "es"
+    case french = "fr"
+    case german = "de"
+    case italian = "it"
+    case portuguese = "pt"
+    case dutch = "nl"
+    case polish = "pl"
+    case czech = "cs"
+    case slovak = "sk"
+    case slovenian = "sl"
+    case croatian = "hr"
+    case bosnian = "bs"
+    case romanian = "ro"
+    case danish = "da"
+    case swedish = "sv"
+    case finnish = "fi"
+    case hungarian = "hu"
+    case estonian = "et"
+    case latvian = "lv"
+    case lithuanian = "lt"
+    case maltese = "mt"
+    case russian = "ru"
+    case ukrainian = "uk"
+    case belarusian = "be"
+    case bulgarian = "bg"
+    case serbian = "sr"
+    case greek = "el"
+    case hindi = "hi"
+    case chinese = "zh"
+    case cantonese = "yue"
+    case japanese = "ja"
+    case korean = "ko"
+    case arabic = "ar"
 }
 
 public enum ModelSelectionScope: String, Codable, Equatable, Sendable {
@@ -14,8 +48,8 @@ public enum ModelSelectionScope: String, Codable, Equatable, Sendable {
 }
 
 public struct AppPreferences: Codable, Equatable, Sendable {
-    public static let supportedTranscriptionLanguages: [TranscriptionLanguage] = [.english]
-    public static let allowsArbitraryModelImports = false
+    public static let supportedTranscriptionLanguages: [TranscriptionLanguage] = TranscriptionLanguage.allCases
+    public static let allowsArbitraryModelImports = true
     public static let supportsPerAppProfiles = false
 
     public var trigger: TriggerPreference
@@ -23,7 +57,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
     public var transcriptionLanguage: TranscriptionLanguage
     public var modelSelectionScope: ModelSelectionScope
     public var activeModelID: String?
-    public var showInDock: Bool
+    public var keepTextifyInDock: Bool
     public var automaticallyCheckForUpdates: Bool
     public var launchAtLoginEnabled: Bool
     public var onboardingCompleted: Bool
@@ -44,7 +78,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         transcriptionLanguage: TranscriptionLanguage = .english,
         modelSelectionScope: ModelSelectionScope = .curatedInstalledModels,
         activeModelID: String? = nil,
-        showInDock: Bool = false,
+        keepTextifyInDock: Bool = true,
         automaticallyCheckForUpdates: Bool = true,
         launchAtLoginEnabled: Bool = true,
         onboardingCompleted: Bool = false,
@@ -59,7 +93,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         self.transcriptionLanguage = transcriptionLanguage
         self.modelSelectionScope = modelSelectionScope
         self.activeModelID = activeModelID
-        self.showInDock = showInDock
+        self.keepTextifyInDock = keepTextifyInDock
         self.automaticallyCheckForUpdates = automaticallyCheckForUpdates
         self.launchAtLoginEnabled = launchAtLoginEnabled
         self.onboardingCompleted = onboardingCompleted
@@ -92,7 +126,8 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         case transcriptionLanguage
         case modelSelectionScope
         case activeModelID
-        case showInDock
+        case keepTextifyInDock
+        case legacyShowInDock = "showInDock"
         case automaticallyCheckForUpdates
         case launchAtLoginEnabled
         case launchAtLoginRequestedByOnboarding
@@ -110,6 +145,17 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         let launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLoginEnabled)
             ?? container.decodeIfPresent(Bool.self, forKey: .launchAtLoginRequestedByOnboarding)
             ?? defaults.launchAtLoginEnabled
+        let keepTextifyInDock: Bool
+        if container.contains(.keepTextifyInDock) {
+            keepTextifyInDock = try container.decodeIfPresent(Bool.self, forKey: .keepTextifyInDock)
+                ?? defaults.keepTextifyInDock
+        } else {
+            // Legacy installs could not distinguish the old default from an
+            // explicit opt-out. Migrate them once to the new hybrid default;
+            // subsequent opt-outs persist through the new key.
+            _ = try container.decodeIfPresent(Bool.self, forKey: .legacyShowInDock)
+            keepTextifyInDock = defaults.keepTextifyInDock
+        }
 
         self.init(
             trigger: try container.decodeIfPresent(TriggerPreference.self, forKey: .trigger) ?? defaults.trigger,
@@ -117,7 +163,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
             transcriptionLanguage: try container.decodeIfPresent(TranscriptionLanguage.self, forKey: .transcriptionLanguage) ?? defaults.transcriptionLanguage,
             modelSelectionScope: try container.decodeIfPresent(ModelSelectionScope.self, forKey: .modelSelectionScope) ?? defaults.modelSelectionScope,
             activeModelID: try container.decodeIfPresent(String.self, forKey: .activeModelID) ?? defaults.activeModelID,
-            showInDock: try container.decodeIfPresent(Bool.self, forKey: .showInDock) ?? defaults.showInDock,
+            keepTextifyInDock: keepTextifyInDock,
             automaticallyCheckForUpdates: try container.decodeIfPresent(Bool.self, forKey: .automaticallyCheckForUpdates) ?? defaults.automaticallyCheckForUpdates,
             launchAtLoginEnabled: launchAtLogin,
             onboardingCompleted: try container.decodeIfPresent(Bool.self, forKey: .onboardingCompleted) ?? defaults.onboardingCompleted,
@@ -136,7 +182,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         try container.encode(transcriptionLanguage, forKey: .transcriptionLanguage)
         try container.encode(modelSelectionScope, forKey: .modelSelectionScope)
         try container.encodeIfPresent(activeModelID, forKey: .activeModelID)
-        try container.encode(showInDock, forKey: .showInDock)
+        try container.encode(keepTextifyInDock, forKey: .keepTextifyInDock)
         try container.encode(automaticallyCheckForUpdates, forKey: .automaticallyCheckForUpdates)
         try container.encode(launchAtLoginEnabled, forKey: .launchAtLoginEnabled)
         try container.encode(onboardingCompleted, forKey: .onboardingCompleted)

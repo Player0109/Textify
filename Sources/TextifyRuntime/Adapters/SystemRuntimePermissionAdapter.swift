@@ -4,7 +4,6 @@ import TextifyInsertion
 
 public struct SystemRuntimePermissionAdapter: RuntimePermissionChecking {
     private let microphone: MicrophonePermissionClient
-    private let inputMonitoring: InputMonitoringPermissionClient
     private let accessibility: AccessibilityTrustClient
 
     public init(
@@ -13,7 +12,7 @@ public struct SystemRuntimePermissionAdapter: RuntimePermissionChecking {
         accessibility: AccessibilityTrustClient = .live
     ) {
         self.microphone = microphone
-        self.inputMonitoring = inputMonitoring
+        _ = inputMonitoring
         self.accessibility = accessibility
     }
 
@@ -21,7 +20,7 @@ public struct SystemRuntimePermissionAdapter: RuntimePermissionChecking {
         RuntimePermissionSnapshot(
             microphone: microphoneState(),
             accessibility: accessibility.status() == .trusted ? .granted : .denied,
-            inputMonitoring: inputMonitoringState()
+            inputMonitoring: .granted
         )
     }
 
@@ -34,9 +33,5 @@ public struct SystemRuntimePermissionAdapter: RuntimePermissionChecking {
         case .denied, .restricted:
             return .denied
         }
-    }
-
-    private func inputMonitoringState() -> RuntimePermissionState {
-        inputMonitoring.status() == .granted ? .granted : .unknown
     }
 }

@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0,
+    "characterErrors" : 0,
+    "deletions" : 1,
+    "hypothesisCharacterCount" : 15,
+    "hypothesisText" : "桜子と双璧をなす商店街の人気者",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 15,
+    "referenceText" : "桜子と双璧をなす、商店街の人気者。",
+    "referenceWordCount" : 2,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 2
+  },
+  "audio" : {
+    "durationMs" : 3530,
+    "sampleCount" : 56480,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime CPU (4 threads)",
+  "engine" : "reazonspeech-k2-v2",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ReazonSpeech K2 V2 int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 500908032,
+    "systemCpuMs" : 10,
+    "userCpuMs" : 231
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 60,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 1526,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.0169971671388102,
+    "releaseToFinalMs" : 60,
+    "warmupMs" : 12
+  }
+}

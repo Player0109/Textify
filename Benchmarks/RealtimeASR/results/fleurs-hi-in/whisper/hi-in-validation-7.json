@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.23809523809523808,
+    "characterErrors" : 15,
+    "deletions" : 3,
+    "hypothesisCharacterCount" : 61,
+    "hypothesisText" : " यदि आप सर्दियों में आर्टिक या अंटार्टिक शेत्रों में जाते हैं तो आप धुरूब ये रात का अनुभव करेंगे जिसका अर्थ है कि सूरत शिती से उपर नहीं उपता है",
+    "hypothesisWordCount" : 50,
+    "insertions" : 0,
+    "referenceCharacterCount" : 63,
+    "referenceText" : "यदि आप सर्दियों में आर्कटिक या अंटार्कटिक क्षेत्रों में जाते हैं तो आप ध्रुवीय रात का अनुभव करेंगे जिसका अर्थ है कि सूरज क्षितिज से ऊपर नहीं उगता है",
+    "referenceWordCount" : 53,
+    "substitutions" : 8,
+    "wordErrorRate" : 0.20754716981132076,
+    "wordErrors" : 11
+  },
+  "audio" : {
+    "durationMs" : 14160,
+    "sampleCount" : 226560,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-large-v3-turbo-q5_0",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 690847744,
+    "systemCpuMs" : 17,
+    "userCpuMs" : 70
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 549,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 188,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.038771186440677965,
+    "releaseToFinalMs" : 549,
+    "warmupMs" : 1
+  }
+}

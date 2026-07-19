@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.17647058823529413,
+    "characterErrors" : 3,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 19,
+    "hypothesisText" : "うらやましいほどの落ち着きぶりであった",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 17,
+    "referenceText" : "羨ましいほどの落ち着きぶりであった。",
+    "referenceWordCount" : 1,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 1
+  },
+  "audio" : {
+    "durationMs" : 2820,
+    "sampleCount" : 45120,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-kotoba-whisper-v2.0-q5_0",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 630767616,
+    "systemCpuMs" : 8,
+    "userCpuMs" : 15
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 497,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 738,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.17624113475177305,
+    "releaseToFinalMs" : 497,
+    "warmupMs" : 1
+  }
+}

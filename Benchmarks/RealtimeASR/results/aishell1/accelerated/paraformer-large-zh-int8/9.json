@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0,
+    "characterErrors" : 0,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 10,
+    "hypothesisText" : "不得超越界限盲目扩张",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 10,
+    "referenceText" : "不得超越界限盲目扩张",
+    "referenceWordCount" : 1,
+    "substitutions" : 0,
+    "wordErrorRate" : 0,
+    "wordErrors" : 0
+  },
+  "audio" : {
+    "durationMs" : 3658,
+    "sampleCount" : 58528,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "Core ML CPU preprocessor + CPU/Apple Neural Engine inference",
+  "engine" : "paraformer-large-zh-int8",
+  "engineVersion" : "Textify ParaformerRuntime / FluidAudio 0.15.5",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "paraformer-large-zh int8",
+  "modelLicense" : "Apache-2.0 upstream model; conversion inherits upstream terms",
+  "resources" : {
+    "peakResidentBytes" : 66600960,
+    "systemCpuMs" : 1,
+    "userCpuMs" : 42
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 52,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 348,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.014215418261344996,
+    "releaseToFinalMs" : 52,
+    "warmupMs" : 38
+  }
+}

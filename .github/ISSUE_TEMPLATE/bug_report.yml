@@ -1,0 +1,131 @@
+name: Bug Report
+description: Report a reproducible problem in Textify.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Do not paste dictated text, clipboard contents, window titles, document names, URLs, diagnostics secrets, or other private content.
+  - type: input
+    id: textify_version
+    attributes:
+      label: Textify version
+      placeholder: "1.1.0 (1)"
+    validations:
+      required: true
+  - type: input
+    id: macos_version
+    attributes:
+      label: macOS version
+      placeholder: "14.6.1"
+    validations:
+      required: true
+  - type: input
+    id: mac_model
+    attributes:
+      label: Mac model and chip
+      placeholder: "MacBook Air, Apple M2"
+    validations:
+      required: true
+  - type: dropdown
+    id: model_tier
+    attributes:
+      label: Model tier
+      options:
+        - Fast
+        - Balanced
+        - Accurate
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: trigger
+    attributes:
+      label: Dictation trigger
+      options:
+        - Right Command
+        - Right Option
+        - Right Control
+        - Control + Space
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: target_app
+    attributes:
+      label: Target app
+      description: Select the app involved, if relevant.
+      options:
+        - Not applicable
+        - TextEdit
+        - Notes
+        - Mail
+        - Safari
+        - Chrome
+        - Slack
+        - Messages
+        - Terminal
+        - VS Code
+        - Pages
+        - Microsoft Word
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: target_app_other
+    attributes:
+      label: Other target app
+      description: App name only. Do not include window titles, document names, URLs, or dictated text.
+      placeholder: App name
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: Frequency
+      options:
+        - Every time
+        - Often
+        - Sometimes
+        - Once
+    validations:
+      required: true
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened?
+      description: Describe the behavior without including dictated text or private content.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Use placeholder text instead of real dictated or clipboard content.
+      placeholder: |
+        1. Open ...
+        2. Hold ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: checkboxes
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Export diagnostics from Textify only if you are comfortable attaching them.
+      options:
+        - label: I reviewed any attached diagnostics and removed information I do not want to share.
+  - type: checkboxes
+    id: privacy_confirmation
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I did not include dictated text, clipboard contents, window titles, document names, URLs, or credentials.
+          required: true
+

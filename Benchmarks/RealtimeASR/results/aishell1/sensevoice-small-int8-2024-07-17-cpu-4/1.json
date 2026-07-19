@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0,
+    "characterErrors" : 0,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 13,
+    "hypothesisText" : "一二线城市虽然也处于调整中。",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 13,
+    "referenceText" : "一二线城市虽然也处于调整中",
+    "referenceWordCount" : 1,
+    "substitutions" : 0,
+    "wordErrorRate" : 0,
+    "wordErrors" : 0
+  },
+  "audio" : {
+    "durationMs" : 4115,
+    "sampleCount" : 65840,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (4 threads)",
+  "engine" : "sensevoice-small-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "SenseVoiceSmall int8 2024-07-17",
+  "modelLicense" : "FunASR Model License 1.1",
+  "resources" : {
+    "peakResidentBytes" : 583565312,
+    "systemCpuMs" : 1,
+    "userCpuMs" : 488
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 126,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 323,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.030619684082624544,
+    "releaseToFinalMs" : 126,
+    "warmupMs" : 24
+  }
+}

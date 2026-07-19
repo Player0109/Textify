@@ -1,0 +1,17 @@
+[
+  {
+    "id": "short",
+    "audio": ".benchmark-data/synthetic/short.aiff",
+    "reference": "Textify should show useful words while I am still speaking."
+  },
+  {
+    "id": "technical",
+    "audio": ".benchmark-data/synthetic/technical.aiff",
+    "reference": "Please review the Swift package, verify the checksum, and keep the transcription entirely offline."
+  },
+  {
+    "id": "paragraph",
+    "audio": ".benchmark-data/synthetic/paragraph.aiff",
+    "reference": "A responsive dictation utility should begin understanding speech before the recording ends. It should preserve stable words, revise uncertain words quietly, and insert the final sentence without making the user wait."
+  }
+]

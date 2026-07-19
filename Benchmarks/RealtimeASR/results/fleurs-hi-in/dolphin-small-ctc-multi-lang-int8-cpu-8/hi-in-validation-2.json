@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.07142857142857142,
+    "characterErrors" : 5,
+    "deletions" : 3,
+    "hypothesisCharacterCount" : 71,
+    "hypothesisText" : "आर्मड वर्षस ने कहा मैंने अपनी बहन और उनकी दोस्त को खो दिया और रास्ते में हुलचेयर में दो दिव्यांग लोगग थे और लोग उन पर उछल रहे थे और उन्हें धक्का दे रहे थे।",
+    "hypothesisWordCount" : 52,
+    "insertions" : 1,
+    "referenceCharacterCount" : 70,
+    "referenceText" : "आर्मंड वर्सास ने कहा मैंने अपनी बहन और उसकी दोस्त को खो दिया और रास्ते में व्हीलचेयर में दो दिव्यांग लोग थे और लोग उनपर उछल रहे थे और उन्हें धक्का दे रहे थे",
+    "referenceWordCount" : 54,
+    "substitutions" : 5,
+    "wordErrorRate" : 0.16666666666666666,
+    "wordErrors" : 9
+  },
+  "audio" : {
+    "durationMs" : 21360,
+    "sampleCount" : 341760,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "dolphin-small-ctc-multi-lang-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Dolphin Small CTC multilingual int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 814465024,
+    "systemCpuMs" : 118,
+    "userCpuMs" : 3313
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 440,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 210,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.020599250936329586,
+    "releaseToFinalMs" : 440,
+    "warmupMs" : 12
+  }
+}

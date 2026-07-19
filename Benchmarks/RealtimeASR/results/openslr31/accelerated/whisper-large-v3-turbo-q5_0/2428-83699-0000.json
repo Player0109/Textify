@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.011428571428571429,
+    "characterErrors" : 2,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 175,
+    "hypothesisText" : " i imagine there were several kinds of old-fashioned christmases but it could hardly be worse than a chop at my chambers or horror of horrors at the club or my cousin lucy's notion of what she calls the festive season",
+    "hypothesisWordCount" : 42,
+    "insertions" : 0,
+    "referenceCharacterCount" : 175,
+    "referenceText" : "I IMAGINE THERE WERE SEVERAL KINDS OF OLD FASHIONED CHRISTMASES BUT IT COULD HARDLY BE WORSE THAN A CHOP IN MY CHAMBERS OR HORROR OF HORRORS AT THE CLUB OR MY COUSIN LUCY'S NOTION OF WHAT SHE CALLS THE FESTIVE SEASON",
+    "referenceWordCount" : 42,
+    "substitutions" : 1,
+    "wordErrorRate" : 0.023809523809523808,
+    "wordErrors" : 1
+  },
+  "audio" : {
+    "durationMs" : 13305,
+    "sampleCount" : 212880,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-large-v3-turbo-q5_0",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 691159040,
+    "systemCpuMs" : 10,
+    "userCpuMs" : 40
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 397,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 172,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.029838406614054867,
+    "releaseToFinalMs" : 397,
+    "warmupMs" : 1
+  }
+}

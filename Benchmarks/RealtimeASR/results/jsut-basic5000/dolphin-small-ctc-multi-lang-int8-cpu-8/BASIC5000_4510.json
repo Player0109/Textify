@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.13793103448275862,
+    "characterErrors" : 4,
+    "deletions" : 1,
+    "hypothesisCharacterCount" : 26,
+    "hypothesisText" : "夏の暑さを割り切るにはクーラーよりも扇風機体にはいい",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 29,
+    "referenceText" : "夏の暑さをの割り切るには、クーラーよりも扇風機が身体には良い。",
+    "referenceWordCount" : 2,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 2
+  },
+  "audio" : {
+    "durationMs" : 5360,
+    "sampleCount" : 85760,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "dolphin-small-ctc-multi-lang-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Dolphin Small CTC multilingual int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 611549184,
+    "systemCpuMs" : 48,
+    "userCpuMs" : 781
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 106,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 214,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.019776119402985074,
+    "releaseToFinalMs" : 106,
+    "warmupMs" : 12
+  }
+}

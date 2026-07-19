@@ -23,6 +23,28 @@ final class ProductionUITests: XCTestCase {
         )
     }
 
+    func testHybridWindowPresentationUsesFirstClassOpenActionAndDockCopy() {
+        XCTAssertEqual(MenuBarPresentation.openTextifyTitle, "Open Textify…")
+        XCTAssertEqual(DockPreferencePresentation.title, "Keep Textify in the Dock")
+    }
+
+    func testExcludedAppsSettingsAddsByBundleIdentityWithoutDuplicates() {
+        let candidate = ExcludedAppCandidate(
+            bundleIdentifier: "com.example.Editor",
+            displayName: "Editor",
+            iconData: nil,
+            path: "/Applications/Editor.app"
+        )
+
+        let once = ExcludedAppsSettingsModel.adding(candidate, to: [])
+        let twice = ExcludedAppsSettingsModel.adding(candidate, to: once)
+
+        XCTAssertEqual(once.count, 1)
+        XCTAssertEqual(twice, once)
+        XCTAssertEqual(once.first?.bundleIdentifier, "com.example.Editor")
+        XCTAssertEqual(once.first?.lastKnownPath, "/Applications/Editor.app")
+    }
+
     func testMenuStatusAndBlockerSummariesAreProductionSafe() {
         XCTAssertEqual(DictationRuntimeStatus.idle.menuStatusTitle, "Ready")
         XCTAssertEqual(DictationRuntimeStatus.waitingForActivation.menuStatusTitle, "Waiting")
@@ -36,10 +58,19 @@ final class ProductionUITests: XCTestCase {
         )
     }
 
+    func testOverlayIsVisibleOnlyWhileRecording() {
+        XCTAssertEqual(
+            DictationOverlayPresentation.state(for: .recording(speechDetected: false)),
+            .recording(elapsedSeconds: 0)
+        )
+        XCTAssertEqual(DictationOverlayPresentation.state(for: .processing), .hidden)
+        XCTAssertEqual(DictationOverlayPresentation.state(for: .idle), .hidden)
+    }
+
     func testOnboardingFlowAndDonePreferenceMutation() {
         XCTAssertEqual(
             OnboardingStep.productionFlow,
-            [.welcome, .model, .microphone, .accessibility, .inputMonitoring, .triggerTest, .completion]
+            [.welcome, .model, .microphone, .accessibility, .triggerTest, .completion]
         )
 
         var preferences = AppPreferences.defaults
@@ -67,8 +98,104 @@ final class ProductionUITests: XCTestCase {
             ProductionModelInstallConfiguration.current?.trustedKeys.first?.keyId,
             "textify-model-manifest-2026-primary"
         )
-        XCTAssertEqual(ProductionModelInstallConfiguration.current?.trustedKeys.count, 2)
+        XCTAssertEqual(ProductionModelInstallConfiguration.current?.trustedKeys.count, 3)
         XCTAssertFalse(ProductionModelInstallConfiguration.current?.trustedKeys.first?.publicKeyBase64.isEmpty ?? true)
+        XCTAssertEqual(
+            ProductionModelInstallConfiguration.current?.trustedKeys.last?.keyId,
+            "textify-model-manifest-2026-huggingface"
+        )
+    }
+
+    func testBundledModelCatalogWinsWhenRemoteCatalogIsOlder() throws {
+        let bundled = ModelManifest(
+            manifestVersion: 1,
+            generatedAt: "2026-07-19T09:43:39Z",
+            models: []
+        )
+        let remote = ModelManifest(
+            manifestVersion: 1,
+            generatedAt: "2026-07-03T00:00:00Z",
+            models: []
+        )
+
+        XCTAssertEqual(
+            try ProductionModelManifestLoader.newest(bundled: bundled, remote: remote),
+            bundled
+        )
+    }
+
+    func testRemoteModelCatalogWinsWhenItIsAtLeastAsNewAsBundledCatalog() throws {
+        let bundled = ModelManifest(
+            manifestVersion: 1,
+            generatedAt: "2026-07-19T09:43:39Z",
+            models: []
+        )
+        let remote = ModelManifest(
+            manifestVersion: 1,
+            generatedAt: "2026-07-20T00:00:00Z",
+            models: []
+        )
+
+        XCTAssertEqual(
+            try ProductionModelManifestLoader.newest(bundled: bundled, remote: remote),
+            remote
+        )
+    }
+
+    func testBundledSignedCatalogLoadsWhenRemoteCatalogIsUnavailable() async throws {
+        let temporaryResources = FileManager.default.temporaryDirectory
+            .appendingPathComponent("TextifyModelCatalog-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: temporaryResources) }
+        let bundledDirectory = temporaryResources.appendingPathComponent(
+            ProductionModelManifestLoader.bundledDirectoryName,
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: bundledDirectory,
+            withIntermediateDirectories: true
+        )
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        try FileManager.default.copyItem(
+            at: repositoryRoot.appendingPathComponent("models/manifest.json"),
+            to: bundledDirectory.appendingPathComponent("manifest.json")
+        )
+        try FileManager.default.copyItem(
+            at: repositoryRoot.appendingPathComponent("models/manifest.json.sig"),
+            to: bundledDirectory.appendingPathComponent("manifest.json.sig")
+        )
+        let configuration = ProductionModelInstallConfiguration(
+            manifestURL: URL(string: "http://invalid.example/manifest.json")!,
+            signatureURL: URL(string: "http://invalid.example/manifest.json.sig")!,
+            trustedKeys: [
+                TrustedModelManifestKey(
+                    keyId: "textify-model-manifest-2026-huggingface",
+                    publicKeyBase64: "eg6XVGVQ4Kqh1dtN3B8JcFTtK0RSxkxd79W5tfIlfos="
+                )
+            ]
+        )
+
+        let manifest = try await ProductionModelManifestLoader(
+            configuration: configuration,
+            resourceDirectory: temporaryResources
+        ).load()
+
+        XCTAssertEqual(
+            manifest.models.map(\.id),
+            [
+                "ggml-small.en-q5_1",
+                "whisper-large-v3-turbo-q5_0",
+                "parakeet-tdt-0.6b-v3",
+                "parakeet-tdt-ctc-110m",
+                "parakeet-tdt-0.6b-v2",
+                "parakeet-ja",
+                "paraformer-large-zh-int8",
+                "reazonspeech-k2-v2-int8",
+                "sensevoice-small-int8-2024-07-17",
+            ]
+        )
     }
 
     func testModelInstallProgressPresentationShowsDownloadProgress() {

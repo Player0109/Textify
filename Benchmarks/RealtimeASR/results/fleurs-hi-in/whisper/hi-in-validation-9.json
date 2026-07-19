@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.037037037037037035,
+    "characterErrors" : 2,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 53,
+    "hypothesisText" : " समय के साथ जैसे जैसे नई आबादी नए माहौल में ढलती जाती है वह भी दूसरी आबादी की तरह अंदेखी करना शुरू कर देती है",
+    "hypothesisWordCount" : 38,
+    "insertions" : 1,
+    "referenceCharacterCount" : 54,
+    "referenceText" : "समय के साथ जैसे-जैसे नई आबादी नए माहौल में ढलती जाती है वह भी दूसरी आबादी की तरह अनदेखी करना शुरू कर देती है",
+    "referenceWordCount" : 37,
+    "substitutions" : 1,
+    "wordErrorRate" : 0.05405405405405406,
+    "wordErrors" : 2
+  },
+  "audio" : {
+    "durationMs" : 9720,
+    "sampleCount" : 155520,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-large-v3-turbo-q5_0",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 688357376,
+    "systemCpuMs" : 14,
+    "userCpuMs" : 52
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 490,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 164,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.050411522633744855,
+    "releaseToFinalMs" : 490,
+    "warmupMs" : 1
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 1.3125,
+    "characterErrors" : 63,
+    "deletions" : 3,
+    "hypothesisCharacterCount" : 76,
+    "hypothesisText" : "راबिن  उتھपा نے केव इताلیस گیندوں میں گیا्याرہ चौک اور دو چھकोंوں کی مدد سے سत्त رن بناकर पारी کا सर्वोच्च سکور بنایا",
+    "hypothesisWordCount" : 35,
+    "insertions" : 0,
+    "referenceCharacterCount" : 48,
+    "referenceText" : "रॉबिन उथप्पा ने केवल 41 गेंदों में 11 चौकों और 2 छक्कों की मदद से 70 रन बना कर पारी का सर्वोच्च स्कोर बनाया",
+    "referenceWordCount" : 38,
+    "substitutions" : 28,
+    "wordErrorRate" : 0.8157894736842105,
+    "wordErrors" : 31
+  },
+  "audio" : {
+    "durationMs" : 9480,
+    "sampleCount" : 151680,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "dolphin-small-ctc-multi-lang-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Dolphin Small CTC multilingual int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 655376384,
+    "systemCpuMs" : 78,
+    "userCpuMs" : 1380
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 186,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 212,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.019620253164556962,
+    "releaseToFinalMs" : 186,
+    "warmupMs" : 12
+  }
+}

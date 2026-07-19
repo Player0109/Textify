@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.2857142857142857,
+    "characterErrors" : 6,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 24,
+    "hypothesisText" : "東京都を流れるアサシオ運河にかかる橋のカテゴリー",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 21,
+    "referenceText" : "東京都を流れる朝潮運河に架かる橋のカテゴリ。",
+    "referenceWordCount" : 1,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 1
+  },
+  "audio" : {
+    "durationMs" : 3980,
+    "sampleCount" : 63680,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-kotoba-whisper-v2.0-q5_0",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 632553472,
+    "systemCpuMs" : 11,
+    "userCpuMs" : 26
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 616,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 678,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.15477386934673368,
+    "releaseToFinalMs" : 616,
+    "warmupMs" : 41
+  }
+}

@@ -2,9 +2,13 @@ import Foundation
 
 public struct ManifestSignature: Codable, Equatable, Sendable {
     public let signatureVersion: Int
-    public let keyId: String
+    public let signatureType: String
     public let algorithm: String
-    public let signatureBase64: String
+    public let keyId: String
+    public let manifestFile: String
+    public let contentType: String
+    public let contentSHA256: String
+    public let signature: String
 
     public static func decode(_ data: Data) throws -> ManifestSignature {
         try JSONDecoder().decode(ManifestSignature.self, from: data)
@@ -12,14 +16,22 @@ public struct ManifestSignature: Codable, Equatable, Sendable {
 
     public init(
         signatureVersion: Int,
-        keyId: String,
+        signatureType: String,
         algorithm: String,
-        signatureBase64: String
+        keyId: String,
+        manifestFile: String,
+        contentType: String,
+        contentSHA256: String,
+        signature: String
     ) {
         self.signatureVersion = signatureVersion
-        self.keyId = keyId
+        self.signatureType = signatureType
         self.algorithm = algorithm
-        self.signatureBase64 = signatureBase64
+        self.keyId = keyId
+        self.manifestFile = manifestFile
+        self.contentType = contentType
+        self.contentSHA256 = contentSHA256
+        self.signature = signature
     }
 
     public init(from decoder: Decoder) throws {
@@ -29,15 +41,23 @@ public struct ManifestSignature: Codable, Equatable, Sendable {
         )
         let container = try decoder.container(keyedBy: CodingKeys.self)
         signatureVersion = try container.decode(Int.self, forKey: .signatureVersion)
-        keyId = try container.decode(String.self, forKey: .keyId)
+        signatureType = try container.decode(String.self, forKey: .signatureType)
         algorithm = try container.decode(String.self, forKey: .algorithm)
-        signatureBase64 = try container.decode(String.self, forKey: .signatureBase64)
+        keyId = try container.decode(String.self, forKey: .keyId)
+        manifestFile = try container.decode(String.self, forKey: .manifestFile)
+        contentType = try container.decode(String.self, forKey: .contentType)
+        contentSHA256 = try container.decode(String.self, forKey: .contentSHA256)
+        signature = try container.decode(String.self, forKey: .signature)
     }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
         case signatureVersion
-        case keyId
+        case signatureType
         case algorithm
-        case signatureBase64
+        case keyId
+        case manifestFile
+        case contentType
+        case contentSHA256
+        case signature
     }
 }

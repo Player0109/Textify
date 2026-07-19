@@ -1,8 +1,7 @@
 @MainActor
 public final class GlobalHotkeyMonitor {
-    private let permissionClient: InputMonitoringPermissionClient
     private let eventTapClient: any CGEventTapClient
-    private let trigger: TriggerPreference
+    private var trigger: TriggerPreference
     private var mapper: TriggerEventMapper
     private var handle: CGEventTapHandle?
     private var sessionGeneration = 0
@@ -17,10 +16,10 @@ public final class GlobalHotkeyMonitor {
 
     public init(
         permissionClient: InputMonitoringPermissionClient = .live,
-        eventTapClient: any CGEventTapClient = SystemCGEventTapClient(),
+        eventTapClient: any CGEventTapClient = SystemKeyboardEventMonitorClient(),
         trigger: TriggerPreference = .defaultTrigger
     ) {
-        self.permissionClient = permissionClient
+        _ = permissionClient
         self.eventTapClient = eventTapClient
         self.trigger = trigger
         self.mapper = TriggerEventMapper(trigger: trigger)
@@ -39,18 +38,6 @@ public final class GlobalHotkeyMonitor {
     ) -> Result<Void, HotkeyMonitorError> {
         guard handle == nil else {
             let error = HotkeyMonitorError.alreadyRunning
-            onFailure(error)
-            return .failure(error)
-        }
-        switch permissionClient.status() {
-        case .granted:
-            break
-        case .unknown:
-            let error = HotkeyMonitorError.inputMonitoringPermissionRequired
-            onFailure(error)
-            return .failure(error)
-        case .denied:
-            let error = HotkeyMonitorError.inputMonitoringDenied
             onFailure(error)
             return .failure(error)
         }
@@ -87,6 +74,12 @@ public final class GlobalHotkeyMonitor {
         mapper = TriggerEventMapper(trigger: trigger)
         eventTapClient.stop(handle)
         self.handle = nil
+    }
+
+    public func updateTrigger(_ trigger: TriggerPreference) {
+        stop()
+        self.trigger = trigger
+        mapper = TriggerEventMapper(trigger: trigger)
     }
 
     private func handle(

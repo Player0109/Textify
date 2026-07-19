@@ -1,0 +1,59 @@
+{
+  "name": "OpenSLR Mini LibriSpeech dev-clean-2 fixed subset",
+  "license": "CC BY 4.0",
+  "source": "https://www.openslr.org/31/",
+  "archive": "https://www.openslr.org/resources/31/dev-clean-2.tar.gz",
+  "archiveMD5": "6d7ab67ac6a1d2c993d050e16d61080d",
+  "items": [
+    {
+      "id": "1272-141231-0000",
+      "audio": "LibriSpeech/dev-clean-2/1272/141231/1272-141231-0000.flac",
+      "reference": "A MAN SAID TO THE UNIVERSE SIR I EXIST"
+    },
+    {
+      "id": "1462-170142-0000",
+      "audio": "LibriSpeech/dev-clean-2/1462/170142/1462-170142-0000.flac",
+      "reference": "THE LAST TWO DAYS OF THE VOYAGE BARTLEY FOUND ALMOST INTOLERABLE"
+    },
+    {
+      "id": "174-168635-0000",
+      "audio": "LibriSpeech/dev-clean-2/174/168635/174-168635-0000.flac",
+      "reference": "HE HAD NEVER BEEN FATHER LOVER HUSBAND FRIEND"
+    },
+    {
+      "id": "1988-24833-0000",
+      "audio": "LibriSpeech/dev-clean-2/1988/24833/1988-24833-0000.flac",
+      "reference": "THE TWO STRAY KITTENS GRADUALLY MAKE THEMSELVES AT HOME"
+    },
+    {
+      "id": "1993-147964-0000",
+      "audio": "LibriSpeech/dev-clean-2/1993/147964/1993-147964-0000.flac",
+      "reference": "THEY SAT ABOUT THE HOUSE MOST OF THE DAY AS IF IT WERE SUNDAY GREASING THEIR BOOTS MENDING THEIR SUSPENDERS PLAITING WHIPLASHES"
+    },
+    {
+      "id": "2035-147960-0000",
+      "audio": "LibriSpeech/dev-clean-2/2035/147960/2035-147960-0000.flac",
+      "reference": "SHE WAS FOUR YEARS OLDER THAN I TO BE SURE AND HAD SEEN MORE OF THE WORLD BUT I WAS A BOY AND SHE WAS A GIRL AND I RESENTED HER PROTECTING MANNER"
+    },
+    {
+      "id": "2412-153948-0000",
+      "audio": "LibriSpeech/dev-clean-2/2412/153948/2412-153948-0000.flac",
+      "reference": "IF THE READER WILL EXCUSE ME I WILL SAY NOTHING OF MY ANTECEDENTS NOR OF THE CIRCUMSTANCES WHICH LED ME TO LEAVE MY NATIVE COUNTRY THE NARRATIVE WOULD BE TEDIOUS TO HIM AND PAINFUL TO MYSELF"
+    },
+    {
+      "id": "2428-83699-0000",
+      "audio": "LibriSpeech/dev-clean-2/2428/83699/2428-83699-0000.flac",
+      "reference": "I IMAGINE THERE WERE SEVERAL KINDS OF OLD FASHIONED CHRISTMASES BUT IT COULD HARDLY BE WORSE THAN A CHOP IN MY CHAMBERS OR HORROR OF HORRORS AT THE CLUB OR MY COUSIN LUCY'S NOTION OF WHAT SHE CALLS THE FESTIVE SEASON"
+    },
+    {
+      "id": "251-118436-0000",
+      "audio": "LibriSpeech/dev-clean-2/251/118436/251-118436-0000.flac",
+      "reference": "HE WAS YOUNG NO SPEAR HAD TOUCHED HIM NO POISON LURKED IN HIS WINE"
+    },
+    {
+      "id": "2803-154320-0000",
+      "audio": "LibriSpeech/dev-clean-2/2803/154320/2803-154320-0000.flac",
+      "reference": "FORTUNATELY WILL HALLEY WAS NOT A MAN IN A HURRY AND DID NOT USE A PRESS OF CANVAS OR HIS MASTS WOULD INEVITABLY HAVE COME DOWN"
+    }
+  ]
+}

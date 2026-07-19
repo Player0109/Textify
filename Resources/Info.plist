@@ -6,9 +6,11 @@
   <string>Textify</string>
   <key>CFBundleIconName</key>
   <string>AppIcon</string>
-  <key>CFBundleIdentifier</key>
-  <string>io.github.Player0109.Textify</string>
-  <key>CFBundleName</key>
+	<key>CFBundleIdentifier</key>
+	<string>io.github.Player0109.Textify</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.utilities</string>
+	<key>CFBundleName</key>
   <string>Textify</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>

@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0,
+    "characterErrors" : 0,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 47,
+    "hypothesisText" : " The two stray kittens gradually make themselves at home.",
+    "hypothesisWordCount" : 9,
+    "insertions" : 0,
+    "referenceCharacterCount" : 47,
+    "referenceText" : "THE TWO STRAY KITTENS GRADUALLY MAKE THEMSELVES AT HOME",
+    "referenceWordCount" : 9,
+    "substitutions" : 0,
+    "wordErrorRate" : 0,
+    "wordErrors" : 0
+  },
+  "audio" : {
+    "durationMs" : 3320,
+    "sampleCount" : 53120,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-large-v3-turbo-q5_0",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 689045504,
+    "systemCpuMs" : 5,
+    "userCpuMs" : 10
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 332,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 178,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.1,
+    "releaseToFinalMs" : 332,
+    "warmupMs" : 1
+  }
+}

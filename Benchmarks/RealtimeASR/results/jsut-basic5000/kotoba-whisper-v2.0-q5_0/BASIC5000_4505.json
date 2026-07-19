@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.13333333333333333,
+    "characterErrors" : 2,
+    "deletions" : 1,
+    "hypothesisCharacterCount" : 15,
+    "hypothesisText" : "桜子と壮壁をなす商店街の人気者",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 15,
+    "referenceText" : "桜子と双璧をなす、商店街の人気者。",
+    "referenceWordCount" : 2,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 2
+  },
+  "audio" : {
+    "durationMs" : 3530,
+    "sampleCount" : 56480,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-kotoba-whisper-v2.0-q5_0",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 632487936,
+    "systemCpuMs" : 8,
+    "userCpuMs" : 17
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 398,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 463,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.11274787535410764,
+    "releaseToFinalMs" : 398,
+    "warmupMs" : 1
+  }
+}

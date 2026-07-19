@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.16,
+    "characterErrors" : 4,
+    "deletions" : 1,
+    "hypothesisCharacterCount" : 25,
+    "hypothesisText" : "長らくどさ回りが続いたが、戦後は道頓堀門座に出演した。",
+    "hypothesisWordCount" : 2,
+    "insertions" : 0,
+    "referenceCharacterCount" : 25,
+    "referenceText" : "長らくドサ廻りが続いたが、戦後は、道頓堀角座に出演した。",
+    "referenceWordCount" : 3,
+    "substitutions" : 2,
+    "wordErrorRate" : 1,
+    "wordErrors" : 3
+  },
+  "audio" : {
+    "durationMs" : 5140,
+    "sampleCount" : 82240,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "Core ML CPU preprocessor + CPU/Apple Neural Engine inference",
+  "engine" : "parakeet-tdt-ja",
+  "engineVersion" : "Textify ParakeetRuntime / FluidAudio 0.15.5",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "parakeet-tdt-0.6b Japanese int8",
+  "modelLicense" : "CC-BY-4.0",
+  "resources" : {
+    "peakResidentBytes" : 98123776,
+    "systemCpuMs" : 5,
+    "userCpuMs" : 30
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 64,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 297,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.012451361867704281,
+    "releaseToFinalMs" : 64,
+    "warmupMs" : 58
+  }
+}

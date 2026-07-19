@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0,
+    "characterErrors" : 0,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 17,
+    "hypothesisText" : "羨ましい ほどの 落ち着きぶり であっ た。",
+    "hypothesisWordCount" : 5,
+    "insertions" : 4,
+    "referenceCharacterCount" : 17,
+    "referenceText" : "羨ましいほどの落ち着きぶりであった。",
+    "referenceWordCount" : 1,
+    "substitutions" : 1,
+    "wordErrorRate" : 5,
+    "wordErrors" : 5
+  },
+  "audio" : {
+    "durationMs" : 2820,
+    "sampleCount" : 45120,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (4 threads)",
+  "engine" : "sensevoice-small-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "SenseVoiceSmall int8 2024-07-17",
+  "modelLicense" : "FunASR Model License 1.1",
+  "resources" : {
+    "peakResidentBytes" : 583680000,
+    "systemCpuMs" : 1,
+    "userCpuMs" : 360
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 91,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 314,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.03226950354609929,
+    "releaseToFinalMs" : 91,
+    "warmupMs" : 24
+  }
+}

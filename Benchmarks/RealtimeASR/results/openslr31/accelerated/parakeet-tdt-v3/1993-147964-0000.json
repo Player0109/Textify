@@ -1,0 +1,48 @@
+{
+  "accuracy" : {
+    "deletions" : 0,
+    "hypothesisWordCount" : 22,
+    "insertions" : 0,
+    "referenceWordCount" : 22,
+    "substitutions" : 1,
+    "wordErrorRate" : 0.045454545454545456,
+    "wordErrors" : 1
+  },
+  "audio" : {
+    "durationMs" : 8420,
+    "sampleCount" : 134720,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "Core ML CPU preprocessor + CPU/Apple Neural Engine inference",
+  "engine" : "parakeet-tdt-v3",
+  "engineVersion" : "Textify ParakeetRuntime / FluidAudio 0.15.5",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "parakeet-tdt-0.6b-v3 int8",
+  "modelLicense" : "CC-BY-4.0",
+  "resources" : {
+    "peakResidentBytes" : 89391104,
+    "systemCpuMs" : 14,
+    "userCpuMs" : 54
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 71,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 83,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.00843230403800475,
+    "releaseToFinalMs" : 71,
+    "warmupMs" : 54
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.21666666666666667,
+    "characterErrors" : 13,
+    "deletions" : 4,
+    "hypothesisCharacterCount" : 56,
+    "hypothesisText" : "पूर्व हाउस स्पीकर न्यूट ड्रिकिच टैक्स के गर रिकपैरी और कांग्रेस भूुमेन मिशेल बैचमैन ने क्रमशा चौथा पांचों और छटा स्थान हासिल किया",
+    "hypothesisWordCount" : 54,
+    "insertions" : 3,
+    "referenceCharacterCount" : 60,
+    "referenceText" : "पूर्व हाउस स्पीकर न्यूट गिंग्रिच टेक्सास के गर्वनर रिक पैरी और कांग्रेसवुमन मिशेल बैचमैन ने क्रमश चौथा पांचवां और छठा स्थान हासिल किया",
+    "referenceWordCount" : 55,
+    "substitutions" : 6,
+    "wordErrorRate" : 0.23636363636363636,
+    "wordErrors" : 13
+  },
+  "audio" : {
+    "durationMs" : 14220,
+    "sampleCount" : 227520,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "dolphin-small-ctc-multi-lang-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Dolphin Small CTC multilingual int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 723468288,
+    "systemCpuMs" : 87,
+    "userCpuMs" : 2216
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 296,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 217,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.02081575246132208,
+    "releaseToFinalMs" : 296,
+    "warmupMs" : 13
+  }
+}

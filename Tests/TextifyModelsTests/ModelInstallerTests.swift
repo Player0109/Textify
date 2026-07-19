@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import TextifyModels
 import XCTest
@@ -43,6 +44,60 @@ final class ModelInstallerTests: XCTestCase {
         let storeData = try Data(contentsOf: layout.installedStoreURL)
         let store = try JSONDecoder().decode(InstalledModelsStore.self, from: storeData)
         XCTAssertEqual(store.record(forModelID: model.id)?.installedAt, "2026-07-03T00:00:00Z")
+    }
+
+    func testInstallerAtomicallyStagesMultiFileDirectoryModel() async throws {
+        let preprocessorData = Data("compiled preprocessor".utf8)
+        let vocabularyData = Data("{\"0\":\"hello\"}".utf8)
+        let manifest = try Self.directoryModelManifest(
+            files: [
+                (
+                    filename: "parakeet-preprocessor-coremldata.bin",
+                    relativePath: "Preprocessor.mlmodelc/coremldata.bin",
+                    data: preprocessorData
+                ),
+                (
+                    filename: "parakeet-vocabulary.json",
+                    relativePath: "parakeet_vocab.json",
+                    data: vocabularyData
+                )
+            ]
+        )
+        let model = try XCTUnwrap(manifest.models.first)
+        let rootDirectory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectory) }
+        let layout = ModelStorageLayout(rootDirectory: rootDirectory)
+        let dataByURL = Dictionary(uniqueKeysWithValues: try model.files.map { file in
+            let data = file.filename.contains("vocabulary") ? vocabularyData : preprocessorData
+            return (try XCTUnwrap(URL(string: file.url)), data)
+        })
+        let installer = ModelInstaller(
+            layout: layout,
+            transport: FixtureFileDownloadTransport(dataByURL: dataByURL),
+            nowISO8601: { "2026-07-19T00:00:00Z" }
+        )
+
+        let record = try await installer.install(modelID: model.id, from: manifest)
+
+        let preprocessorURL = try layout.installedArtifactURL(
+            modelID: model.id,
+            relativePath: "Preprocessor.mlmodelc/coremldata.bin"
+        )
+        let vocabularyURL = try layout.installedArtifactURL(
+            modelID: model.id,
+            relativePath: "parakeet_vocab.json"
+        )
+        XCTAssertEqual(try Data(contentsOf: preprocessorURL), preprocessorData)
+        XCTAssertEqual(try Data(contentsOf: vocabularyURL), vocabularyData)
+        XCTAssertEqual(
+            record.localFilesByManifestFilename["parakeet-preprocessor-coremldata.bin"],
+            preprocessorURL.path
+        )
+        XCTAssertEqual(
+            record.localFilesByManifestFilename["parakeet-vocabulary.json"],
+            vocabularyURL.path
+        )
+        XCTAssertEqual(record.installedAt, "2026-07-19T00:00:00Z")
     }
 
     func testInstallerReportsDownloadAndInstallProgress() async throws {
@@ -93,6 +148,156 @@ final class ModelInstallerTests: XCTestCase {
         XCTAssertEqual(states.last?.progressFraction, 1)
     }
 
+    func testInstallerRejectsInsufficientDiskSpaceBeforeDownload() async throws {
+        let manifest = try Self.fixtureManifest()
+        let model = try XCTUnwrap(manifest.models.first)
+        let file = try XCTUnwrap(model.files.first)
+        let rootDirectory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectory) }
+        let transport = FixtureFileDownloadTransport(dataByURL: [
+            try XCTUnwrap(URL(string: file.url)): try Self.fixtureData("model.bin")
+        ])
+        let installer = ModelInstaller(
+            layout: ModelStorageLayout(rootDirectory: rootDirectory),
+            transport: transport,
+            availableCapacity: { _ in 100 }
+        )
+        let recorder = InstallStateRecorder()
+        let requiredBytes = ModelDownloader.requiredFreeBytes(modelSizeBytes: file.sizeBytes)
+
+        do {
+            _ = try await installer.install(
+                modelID: model.id,
+                from: manifest,
+                onStateChange: { recorder.append($0) }
+            )
+            XCTFail("Expected insufficient disk space")
+        } catch let error as ModelInstallError {
+            XCTAssertEqual(error, .insufficientDiskSpace(requiredBytes: requiredBytes, availableBytes: 100))
+        }
+
+        XCTAssertEqual(transport.downloadFileCallCount, 0)
+        XCTAssertEqual(recorder.states().map(\.phase), [.checkingSpace, .failed])
+    }
+
+    func testInstallerRejectsModelRequiringNewerAppVersionBeforeDownload() async throws {
+        let manifest = try Self.fixtureManifest(replacingMinimumAppVersion: "1.2.0")
+        let model = try XCTUnwrap(manifest.models.first)
+        let rootDirectory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectory) }
+        let transport = FixtureFileDownloadTransport(dataByURL: [:])
+        let installer = ModelInstaller(
+            layout: ModelStorageLayout(rootDirectory: rootDirectory),
+            transport: transport,
+            currentAppVersion: "1.1.0"
+        )
+
+        do {
+            _ = try await installer.install(modelID: model.id, from: manifest)
+            XCTFail("Expected minimum app version rejection")
+        } catch let error as ModelInstallError {
+            XCTAssertEqual(
+                error,
+                .minimumAppVersionRequired(
+                    modelID: model.id,
+                    required: "1.2.0",
+                    current: "1.1.0"
+                )
+            )
+        }
+
+        XCTAssertEqual(transport.downloadFileCallCount, 0)
+    }
+
+    func testInstallerDoesNotDownloadWhenInstalledRecordAndFileAreAlreadyValid() async throws {
+        let manifest = try Self.fixtureManifest()
+        let model = try XCTUnwrap(manifest.models.first)
+        let file = try XCTUnwrap(model.files.first)
+        let rootDirectory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectory) }
+        let layout = ModelStorageLayout(rootDirectory: rootDirectory)
+        let installedURL = try layout.installedFileURL(modelID: model.id, filename: file.filename)
+        try FileManager.default.createDirectory(
+            at: installedURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let modelData = try Self.fixtureData("model.bin")
+        try modelData.write(to: installedURL)
+        try FileManager.default.createDirectory(
+            at: layout.rootDirectory,
+            withIntermediateDirectories: true
+        )
+        let existingRecord = InstalledModelRecord(
+            model: model,
+            installedAt: "2026-07-03T00:00:00Z",
+            localFilesByManifestFilename: [file.filename: installedURL.path]
+        )
+        let storeData = try JSONEncoder().encode(InstalledModelsStore(records: [existingRecord]))
+        try storeData.write(to: layout.installedStoreURL, options: [.atomic])
+        let transport = FixtureFileDownloadTransport(dataByURL: [:])
+        let installer = ModelInstaller(layout: layout, transport: transport)
+        let recorder = InstallStateRecorder()
+
+        let record = try await installer.install(
+            modelID: ProductionModelPolicy.requiredModelID,
+            from: manifest,
+            onStateChange: { state in
+                recorder.append(state)
+            }
+        )
+
+        XCTAssertEqual(record, existingRecord)
+        XCTAssertEqual(transport.downloadFileCallCount, 0)
+        XCTAssertEqual(recorder.states().map(\.phase), [.installed])
+        XCTAssertEqual(try Data(contentsOf: installedURL), modelData)
+    }
+
+    func testInstallerRefreshesSignedManifestMetadataWithoutRedownloadingValidBytes() async throws {
+        let originalManifest = try Self.fixtureManifest()
+        let updatedManifest = try Self.fixtureManifest(
+            replacingDescription: "Updated signed model description."
+        )
+        let originalModel = try XCTUnwrap(originalManifest.models.first)
+        let updatedModel = try XCTUnwrap(updatedManifest.models.first)
+        let file = try XCTUnwrap(originalModel.files.first)
+        let rootDirectory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectory) }
+        let layout = ModelStorageLayout(rootDirectory: rootDirectory)
+        let installedURL = try layout.installedFileURL(
+            modelID: originalModel.id,
+            filename: file.filename
+        )
+        try FileManager.default.createDirectory(
+            at: installedURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Self.fixtureData("model.bin").write(to: installedURL)
+        let existingRecord = InstalledModelRecord(
+            model: originalModel,
+            installedAt: "2026-07-03T00:00:00Z",
+            localFilesByManifestFilename: [file.filename: installedURL.path]
+        )
+        try JSONEncoder()
+            .encode(InstalledModelsStore(records: [existingRecord]))
+            .write(to: layout.installedStoreURL, options: [.atomic])
+        let transport = FixtureFileDownloadTransport(dataByURL: [:])
+        let installer = ModelInstaller(layout: layout, transport: transport)
+
+        let refreshed = try await installer.install(
+            modelID: ProductionModelPolicy.requiredModelID,
+            from: updatedManifest
+        )
+
+        XCTAssertEqual(transport.downloadFileCallCount, 0)
+        XCTAssertEqual(refreshed.model, updatedModel)
+        XCTAssertEqual(refreshed.installedAt, existingRecord.installedAt)
+        let stored = try JSONDecoder().decode(
+            InstalledModelsStore.self,
+            from: Data(contentsOf: layout.installedStoreURL)
+        )
+        XCTAssertEqual(stored.record(forModelID: originalModel.id), refreshed)
+    }
+
     func testInstallerDeletesPartialOnChecksumMismatch() async throws {
         let manifest = try Self.fixtureManifest()
         let model = try XCTUnwrap(manifest.models.first)
@@ -100,8 +305,9 @@ final class ModelInstallerTests: XCTestCase {
         let rootDirectory = Self.temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: rootDirectory) }
         let layout = ModelStorageLayout(rootDirectory: rootDirectory)
+        let expectedData = try Self.fixtureData("model.bin")
         let transport = FixtureFileDownloadTransport(dataByURL: [
-            try XCTUnwrap(URL(string: file.url)): Data("wrong bytes".utf8)
+            try XCTUnwrap(URL(string: file.url)): Data(repeating: 0, count: expectedData.count)
         ])
         let installer = ModelInstaller(layout: layout, transport: transport)
 
@@ -121,7 +327,38 @@ final class ModelInstallerTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: layout.installedStoreURL.path))
     }
 
-    func testInstallerRejectsArbitraryManifest() async throws {
+    func testInstallerDeletesDownloadWhoseSizeDoesNotMatchSignedManifest() async throws {
+        let manifest = try Self.fixtureManifest()
+        let model = try XCTUnwrap(manifest.models.first)
+        let file = try XCTUnwrap(model.files.first)
+        let rootDirectory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectory) }
+        let layout = ModelStorageLayout(rootDirectory: rootDirectory)
+        let oversizedData = try Self.fixtureData("model.bin") + Data([0])
+        let transport = FixtureFileDownloadTransport(dataByURL: [
+            try XCTUnwrap(URL(string: file.url)): oversizedData
+        ])
+        let installer = ModelInstaller(layout: layout, transport: transport)
+
+        do {
+            _ = try await installer.install(modelID: model.id, from: manifest)
+            XCTFail("Expected signed-size mismatch")
+        } catch let error as ModelInstallError {
+            XCTAssertEqual(
+                error,
+                .unexpectedDownloadSize(
+                    expectedBytes: file.sizeBytes,
+                    actualBytes: Int64(oversizedData.count)
+                )
+            )
+        }
+
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: try layout.temporaryDownloadURL(modelID: model.id, filename: file.filename).path
+        ))
+    }
+
+    func testInstallerAcceptsAdditionalModelFromVerifiedCatalog() async throws {
         let manifest = try Self.fixtureManifest(replacingModelID: "custom-local-model")
         let model = try XCTUnwrap(manifest.models.first)
         let file = try XCTUnwrap(model.files.first)
@@ -135,12 +372,9 @@ final class ModelInstallerTests: XCTestCase {
             transport: transport
         )
 
-        do {
-            _ = try await installer.install(modelID: model.id, from: manifest)
-            XCTFail("Expected production policy to reject arbitrary model manifests")
-        } catch let error as ProductionModelPolicyError {
-            XCTAssertEqual(error, .wrongModelID("custom-local-model"))
-        }
+        let record = try await installer.install(modelID: model.id, from: manifest)
+
+        XCTAssertEqual(record.model.id, "custom-local-model")
     }
 
     func testStorageLayoutRejectsTraversalModelID() throws {
@@ -171,6 +405,7 @@ final class ModelInstallerTests: XCTestCase {
     func testInstallerRejectsNonHTTPSModelFileURLBeforeDownload() async throws {
         let manifest = try Self.fixtureManifest(replacingFileURL: "http://github.com/Player0109/Textify/releases/download/models-v1/model.bin")
         let rootDirectory = Self.temporaryDirectory()
+        try FileManager.default.createDirectory(at: rootDirectory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: rootDirectory) }
         let installer = ModelInstaller(
             layout: ModelStorageLayout(rootDirectory: rootDirectory),
@@ -180,14 +415,21 @@ final class ModelInstallerTests: XCTestCase {
         do {
             _ = try await installer.install(modelID: ProductionModelPolicy.requiredModelID, from: manifest)
             XCTFail("Expected non-HTTPS model file URL rejection")
-        } catch let error as ModelDownloadPolicyError {
-            XCTAssertEqual(error, .nonHTTPSURL("http://github.com/Player0109/Textify/releases/download/models-v1/model.bin"))
+        } catch let error as ProductionModelPolicyError {
+            XCTAssertEqual(
+                error,
+                .invalidModelFileURL(
+                    modelID: ProductionModelPolicy.requiredModelID,
+                    url: "http://github.com/Player0109/Textify/releases/download/models-v1/model.bin"
+                )
+            )
         }
     }
 
     func testInstallerRejectsWrongModelFileHostBeforeDownload() async throws {
         let manifest = try Self.fixtureManifest(replacingFileURL: "https://example.com/Player0109/Textify/releases/download/models-v1/model.bin")
         let rootDirectory = Self.temporaryDirectory()
+        try FileManager.default.createDirectory(at: rootDirectory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: rootDirectory) }
         let installer = ModelInstaller(
             layout: ModelStorageLayout(rootDirectory: rootDirectory),
@@ -197,9 +439,36 @@ final class ModelInstallerTests: XCTestCase {
         do {
             _ = try await installer.install(modelID: ProductionModelPolicy.requiredModelID, from: manifest)
             XCTFail("Expected unsupported model file URL rejection")
-        } catch let error as ModelDownloadPolicyError {
-            XCTAssertEqual(error, .unsupportedModelFileURL("https://example.com/Player0109/Textify/releases/download/models-v1/model.bin"))
+        } catch let error as ProductionModelPolicyError {
+            XCTAssertEqual(
+                error,
+                .invalidModelFileURL(
+                    modelID: ProductionModelPolicy.requiredModelID,
+                    url: "https://example.com/Player0109/Textify/releases/download/models-v1/model.bin"
+                )
+            )
         }
+    }
+
+    func testInstallerAcceptsCommitPinnedHuggingFaceModelFile() async throws {
+        let pinnedURL = "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/parakeet_vocab.json"
+        let manifest = try Self.fixtureManifest(replacingFileURL: pinnedURL)
+        let model = try XCTUnwrap(manifest.models.first)
+        let file = try XCTUnwrap(model.files.first)
+        let rootDirectory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectory) }
+        let modelData = try Self.fixtureData("model.bin")
+        let installer = ModelInstaller(
+            layout: ModelStorageLayout(rootDirectory: rootDirectory),
+            transport: FixtureFileDownloadTransport(dataByURL: [
+                try XCTUnwrap(URL(string: pinnedURL)): modelData
+            ])
+        )
+
+        let record = try await installer.install(modelID: model.id, from: manifest)
+
+        XCTAssertEqual(record.model.id, model.id)
+        XCTAssertEqual(record.localFilesByManifestFilename.keys.sorted(), [file.filename])
     }
 
     func testExistingInstallUsesAtomicReplacementWithoutMovingInstalledFile() async throws {
@@ -283,10 +552,17 @@ final class ModelInstallerTests: XCTestCase {
     private static func fixtureManifest(
         replacingModelID modelID: String? = nil,
         replacingFilename filename: String? = nil,
-        replacingFileURL fileURL: String? = nil
+        replacingFileURL fileURL: String? = nil,
+        replacingDescription description: String? = nil,
+        replacingMinimumAppVersion minimumAppVersion: String? = nil
     ) throws -> ModelManifest {
         let manifest = try ModelManifest.decode(try fixtureData("manifest.json"))
-        guard modelID != nil || filename != nil || fileURL != nil else {
+        guard modelID != nil
+                || filename != nil
+                || fileURL != nil
+                || description != nil
+                || minimumAppVersion != nil
+        else {
             return manifest
         }
 
@@ -303,14 +579,14 @@ final class ModelInstallerTests: XCTestCase {
                 id: modelID ?? model.id,
                 displayName: model.displayName,
                 tier: model.tier,
-                description: model.description,
+                description: description ?? model.description,
                 sizeBytes: model.sizeBytes,
                 files: files,
                 licenses: model.licenses,
                 provenance: model.provenance,
                 runtimeParameters: model.runtimeParameters,
                 hallucinationThresholds: model.hallucinationThresholds,
-                minAppVersion: model.minAppVersion
+                minAppVersion: minimumAppVersion ?? model.minAppVersion
             )
         }
         return ModelManifest(
@@ -318,6 +594,55 @@ final class ModelInstallerTests: XCTestCase {
             generatedAt: manifest.generatedAt,
             models: models
         )
+    }
+
+    private static func directoryModelManifest(
+        files: [(filename: String, relativePath: String, data: Data)]
+    ) throws -> ModelManifest {
+        let fixtureModel = try XCTUnwrap(try fixtureManifest().models.first)
+        let modelFiles = files.map { file in
+            ModelFile(
+                filename: file.filename,
+                relativePath: file.relativePath,
+                url: "https://github.com/Player0109/Textify/releases/download/models-v2/\(file.filename)",
+                sha256: sha256Hex(file.data),
+                sizeBytes: Int64(file.data.count)
+            )
+        }
+        let sizeBytes = modelFiles.reduce(Int64(0)) { $0 + $1.sizeBytes }
+        let model = ModelEntry(
+            id: "parakeet-tdt-0.6b-v3",
+            displayName: "Parakeet TDT 0.6B V3",
+            tier: "fast",
+            description: "Multilingual local dictation on Apple Neural Engine.",
+            sizeBytes: sizeBytes,
+            files: modelFiles,
+            licenses: fixtureModel.licenses,
+            provenance: fixtureModel.provenance,
+            runtimeParameters: .legacyEnglishWhisper,
+            hallucinationThresholds: fixtureModel.hallucinationThresholds,
+            minAppVersion: "0.2.0",
+            runtime: ModelRuntimeDescriptor(
+                engine: .fluidAudioParakeet,
+                variant: "parakeet-tdt-0.6b-v3",
+                accelerator: .coreMLNeuralEngine,
+                artifactLayout: .modelDirectory
+            ),
+            capabilities: ModelCapabilities(
+                languages: ["en", "es", "de", "fr"],
+                supportsTranslation: false,
+                supportsCustomVocabulary: false
+            )
+        )
+        return ModelManifest(
+            manifestVersion: 1,
+            generatedAt: "2026-07-19T00:00:00Z",
+            models: [model]
+        )
+    }
+
+    private static func sha256Hex(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     private static func fixtureData(_ name: String) throws -> Data {
@@ -340,6 +665,7 @@ final class ModelInstallerTests: XCTestCase {
 private final class FixtureFileDownloadTransport: DownloadTransport {
     private let dataByURL: [URL: Data]
     private let progressEvents: [DownloadFileProgress]
+    private(set) var downloadFileCallCount = 0
 
     init(dataByURL: [URL: Data], progressEvents: [DownloadFileProgress] = []) {
         self.dataByURL = dataByURL
@@ -354,6 +680,7 @@ private final class FixtureFileDownloadTransport: DownloadTransport {
     }
 
     func downloadFile(_ request: URLRequest, to temporaryURL: URL) async throws -> DownloadFileResponse {
+        downloadFileCallCount += 1
         let response = try await fetch(request)
         try response.data.write(to: temporaryURL)
         return DownloadFileResponse(fileURL: temporaryURL)
@@ -364,6 +691,7 @@ private final class FixtureFileDownloadTransport: DownloadTransport {
         to temporaryURL: URL,
         progress: @escaping @Sendable (DownloadFileProgress) -> Void
     ) async throws -> DownloadFileResponse {
+        downloadFileCallCount += 1
         let response = try await fetch(request)
         for event in progressEvents {
             progress(event)

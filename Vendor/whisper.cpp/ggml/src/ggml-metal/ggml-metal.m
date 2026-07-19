@@ -873,6 +873,9 @@ static id<MTLLibrary> ggml_metal_load_library(id<MTLDevice> device, bool use_bfl
 
     NSString * path_lib = [bundle pathForResource:@"default" ofType:@"metallib"];
     if (path_lib == nil) {
+        path_lib = [[NSBundle mainBundle] pathForResource:@"default" ofType:@"metallib"];
+    }
+    if (path_lib == nil) {
         // Try to find the resource in the directory where the current binary located.
         NSString * current_binary = [[NSProcessInfo processInfo] arguments][0];
         NSString * bin_dir = [current_binary stringByDeletingLastPathComponent];

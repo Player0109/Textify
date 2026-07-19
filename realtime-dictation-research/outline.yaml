@@ -1,0 +1,42 @@
+topic: "Near-real-time, strictly offline dictation for Textify on Apple Silicon"
+current_date: "2026-07-19"
+time_range: "last 12 months"
+product_constraints:
+  - "Audio and transcripts remain on-device"
+  - "macOS on Apple Silicon"
+  - "Production-quality system-wide insertion"
+  - "Preserve or improve current English dictation accuracy"
+items:
+  - id: current_whisper_cpp
+    name: "Current whisper.cpp small.en q5_1 pipeline"
+    role: "Baseline; Metal-accelerated whole-utterance inference"
+  - id: whisper_cpp_rolling
+    name: "whisper.cpp rolling-window partial transcription"
+    role: "Smallest integration change; simulated streaming over a non-streaming model"
+  - id: whisperkit
+    name: "WhisperKit Core ML streaming"
+    role: "Whisper-compatible Swift/Core ML alternative with incremental output"
+  - id: fluidaudio_parakeet
+    name: "FluidAudio Parakeet TDT sliding-window transcription"
+    role: "Fast local English ASR using Core ML and Apple Neural Engine"
+  - id: fluidaudio_parakeet_streaming
+    name: "FluidAudio Parakeet Realtime EOU or Parakeet Unified"
+    role: "Streaming-native English ASR with partial/final and end-of-utterance semantics"
+  - id: apple_speech_analyzer
+    name: "Apple SpeechAnalyzer / SpeechTranscriber"
+    role: "System-managed on-device model with volatile and finalized live results on macOS 26+"
+competitor_reference_items:
+  - id: wispr_flow
+    name: "Wispr Flow"
+    confirmed_pattern: "Cloud-streamed transcription; proprietary model is not publicly disclosed"
+  - id: superwhisper
+    name: "Superwhisper"
+    confirmed_pattern: "Cloud Nova models provide live words-as-you-speak output; local models are separate options"
+  - id: spokenly
+    name: "Spokenly"
+    confirmed_pattern: "Routes among cloud streaming, Apple Speech Analyzer, and local Whisper/Parakeet engines"
+execution:
+  batch_size: 1
+  items_per_agent: 1
+  output_dir: "./results"
+  note: "Local sequential evaluation is used because this workspace run does not authorize delegated deep-research agents."

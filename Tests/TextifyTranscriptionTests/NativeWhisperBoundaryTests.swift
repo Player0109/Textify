@@ -1,4 +1,5 @@
 import XCTest
+import Foundation
 import TextifyTranscription
 import TextifyWhisperShim
 
@@ -46,5 +47,31 @@ final class NativeWhisperBoundaryTests: XCTestCase {
         )
 
         XCTAssertEqual(returnCode, -1)
+    }
+
+    func testNativeWhisperVerifiesMetalBackendWhenIntegrationTestsAreEnabled() async throws {
+        guard ProcessInfo.processInfo.environment["TEXTIFY_RUN_WHISPER_INTEGRATION_TESTS"] == "1" else {
+            throw XCTSkip("Set TEXTIFY_RUN_WHISPER_INTEGRATION_TESTS=1 to run the local Metal smoke test.")
+        }
+        let applicationSupport = try XCTUnwrap(
+            FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        )
+        let modelURL = applicationSupport
+            .appendingPathComponent("Textify/Models/installed/ggml-small.en-q5_1", isDirectory: true)
+            .appendingPathComponent("ggml-small.en-q5_1.bin")
+        guard FileManager.default.fileExists(atPath: modelURL.path) else {
+            throw XCTSkip("The curated Whisper model is not installed.")
+        }
+        let runtime = WhisperRuntime()
+
+        try await runtime.load(
+            modelID: "whisper-metal-integration",
+            modelPath: modelURL.path,
+            useGPU: true
+        )
+
+        let state = await runtime.state
+        XCTAssertEqual(state, .ready(modelID: "whisper-metal-integration"))
+        await runtime.unload()
     }
 }

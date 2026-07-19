@@ -14,9 +14,18 @@ public enum DiagnosticEvent: Encodable, Sendable {
     case dictationBlockedExcludedApp
     case transcriptionCompleted(
         modelID: String,
+        engine: String,
+        accelerator: String,
+        backendReadiness: String,
         audioDurationMs: Int,
         inferenceDurationMs: Int,
         textLengthBucket: String
+    )
+    case transcriptionDiscarded(
+        modelID: String,
+        noSpeechProbability: Double,
+        averageLogProbability: Double,
+        compressionRatio: Double
     )
     case launchAtLoginChange(
         requestedAction: String,
@@ -27,7 +36,14 @@ public enum DiagnosticEvent: Encodable, Sendable {
         errorDomain: String?,
         errorCode: Int?
     )
-    case modelLoad(modelID: String, tier: String, durationMs: Int, result: String)
+    case modelLoad(
+        modelID: String,
+        tier: String,
+        engine: String,
+        accelerator: String,
+        durationMs: Int,
+        result: String
+    )
 
     private enum CodingKeys: String, CodingKey {
         case event
@@ -42,6 +58,9 @@ public enum DiagnosticEvent: Encodable, Sendable {
         case durationMs
         case audioDurationMs
         case inferenceDurationMs
+        case noSpeechProbability
+        case averageLogProbability
+        case compressionRatio
         case requestedAction
         case statusBefore
         case statusAfter
@@ -50,6 +69,9 @@ public enum DiagnosticEvent: Encodable, Sendable {
         case errorDomain
         case errorCode
         case modelID
+        case engine
+        case accelerator
+        case backendReadiness
         case tier
         case result
     }
@@ -86,15 +108,33 @@ public enum DiagnosticEvent: Encodable, Sendable {
 
         case let .transcriptionCompleted(
             modelID,
+            engine,
+            accelerator,
+            backendReadiness,
             audioDurationMs,
             inferenceDurationMs,
             textLengthBucket
         ):
             try container.encode("speech_recognition_completed", forKey: .event)
             try container.encode(sanitize(modelID, forKey: .modelID), forKey: .modelID)
+            try container.encode(sanitize(engine, forKey: .engine), forKey: .engine)
+            try container.encode(sanitize(accelerator, forKey: .accelerator), forKey: .accelerator)
+            try container.encode(sanitize(backendReadiness, forKey: .backendReadiness), forKey: .backendReadiness)
             try container.encode(audioDurationMs, forKey: .audioDurationMs)
             try container.encode(inferenceDurationMs, forKey: .inferenceDurationMs)
             try container.encode(sanitize(textLengthBucket, forKey: .textLengthBucket), forKey: .textLengthBucket)
+
+        case let .transcriptionDiscarded(
+            modelID,
+            noSpeechProbability,
+            averageLogProbability,
+            compressionRatio
+        ):
+            try container.encode("speech_recognition_discarded", forKey: .event)
+            try container.encode(sanitize(modelID, forKey: .modelID), forKey: .modelID)
+            try container.encode(noSpeechProbability, forKey: .noSpeechProbability)
+            try container.encode(averageLogProbability, forKey: .averageLogProbability)
+            try container.encode(compressionRatio, forKey: .compressionRatio)
 
         case let .launchAtLoginChange(
             requestedAction,
@@ -114,10 +154,12 @@ public enum DiagnosticEvent: Encodable, Sendable {
             try container.encodeIfPresent(sanitize(errorDomain, forKey: .errorDomain), forKey: .errorDomain)
             try container.encodeIfPresent(errorCode, forKey: .errorCode)
 
-        case let .modelLoad(modelID, tier, durationMs, result):
+        case let .modelLoad(modelID, tier, engine, accelerator, durationMs, result):
             try container.encode("model_load", forKey: .event)
             try container.encode(sanitize(modelID, forKey: .modelID), forKey: .modelID)
             try container.encode(sanitize(tier, forKey: .tier), forKey: .tier)
+            try container.encode(sanitize(engine, forKey: .engine), forKey: .engine)
+            try container.encode(sanitize(accelerator, forKey: .accelerator), forKey: .accelerator)
             try container.encode(durationMs, forKey: .durationMs)
             try container.encode(sanitize(result, forKey: .result), forKey: .result)
         }

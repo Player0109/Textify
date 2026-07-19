@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0,
+    "characterErrors" : 0,
+    "deletions" : 3,
+    "hypothesisCharacterCount" : 42,
+    "hypothesisText" : "またサイコロに姿を変えることもでき転がると強力な魔力が発動し出た目の数だけ死者が出る",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 42,
+    "referenceText" : "また、サイコロに姿を変えることもでき、転がると強力な魔力が発動し、出た目の数だけ死者が出る。",
+    "referenceWordCount" : 4,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 4
+  },
+  "audio" : {
+    "durationMs" : 7640,
+    "sampleCount" : 122240,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime CPU (4 threads)",
+  "engine" : "reazonspeech-k2-v2",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ReazonSpeech K2 V2 int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 519569408,
+    "systemCpuMs" : 15,
+    "userCpuMs" : 382
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 93,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 1316,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.012172774869109948,
+    "releaseToFinalMs" : 93,
+    "warmupMs" : 12
+  }
+}

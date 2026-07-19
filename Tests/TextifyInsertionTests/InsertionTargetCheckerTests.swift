@@ -22,6 +22,10 @@ final class InsertionTargetCheckerTests: XCTestCase {
 private struct StaticTargetChecker: InsertionTargetChecking {
     let status: InsertionTargetStatus
 
+    func currentTargetIdentity() async -> InsertionTargetIdentity? {
+        nil
+    }
+
     func currentTargetStatus() async -> InsertionTargetStatus {
         status
     }

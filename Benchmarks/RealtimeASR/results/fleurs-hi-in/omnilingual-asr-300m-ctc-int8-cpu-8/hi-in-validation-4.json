@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.07462686567164178,
+    "characterErrors" : 5,
+    "deletions" : 1,
+    "hypothesisCharacterCount" : 65,
+    "hypothesisText" : "जब घायलों को लड़ाई बंद होने के बाद अस्पताल ले जाया गया तो लगभग अन्य बचे हुए कैदी यार्ड में रुके और अपनी कोटरियों में लॉटने से इनकान कर दिया",
+    "hypothesisWordCount" : 49,
+    "insertions" : 0,
+    "referenceCharacterCount" : 67,
+    "referenceText" : "जब घायलों को लड़ाई बंद होने के बाद अस्पताल ले जाया गया तो लगभग 40 अन्य बचे हुए कैदी यार्ड में रुके और अपनी कोठरियों में लौटने से इनकार कर दिया",
+    "referenceWordCount" : 50,
+    "substitutions" : 2,
+    "wordErrorRate" : 0.06,
+    "wordErrors" : 3
+  },
+  "audio" : {
+    "durationMs" : 13620,
+    "sampleCount" : 217920,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "omnilingual-asr-300m-ctc-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Omnilingual ASR CTC 300M int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 872038400,
+    "systemCpuMs" : 96,
+    "userCpuMs" : 7220
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : false
+  },
+  "timing" : {
+    "inferenceWorkMs" : 919,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 263,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.06747430249632892,
+    "releaseToFinalMs" : 919,
+    "warmupMs" : 33
+  }
+}

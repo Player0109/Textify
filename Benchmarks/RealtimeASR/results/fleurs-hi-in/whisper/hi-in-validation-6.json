@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.4583333333333333,
+    "characterErrors" : 22,
+    "deletions" : 5,
+    "hypothesisCharacterCount" : 56,
+    "hypothesisText" : " रॉबिन उतपपा ने केवल एक तालिस गेंदों में ग्यारा चौकों और दो च्छकों की मदद से सतर रन बना कर पारी का सरवच चेसकूर बनाया।",
+    "hypothesisWordCount" : 39,
+    "insertions" : 6,
+    "referenceCharacterCount" : 48,
+    "referenceText" : "रॉबिन उथप्पा ने केवल 41 गेंदों में 11 चौकों और 2 छक्कों की मदद से 70 रन बना कर पारी का सर्वोच्च स्कोर बनाया",
+    "referenceWordCount" : 38,
+    "substitutions" : 7,
+    "wordErrorRate" : 0.47368421052631576,
+    "wordErrors" : 18
+  },
+  "audio" : {
+    "durationMs" : 9480,
+    "sampleCount" : 151680,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-large-v3-turbo-q5_0",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 688111616,
+    "systemCpuMs" : 16,
+    "userCpuMs" : 83
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 529,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 164,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.05580168776371308,
+    "releaseToFinalMs" : 529,
+    "warmupMs" : 1
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.07142857142857142,
+    "characterErrors" : 2,
+    "deletions" : 1,
+    "hypothesisCharacterCount" : 28,
+    "hypothesisText" : "戦乱を沈めるための傭兵団であるディーグル養兵団を設立する",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 28,
+    "referenceText" : "戦乱を静めるための傭兵団である、ディーグル傭兵団を設立する。",
+    "referenceWordCount" : 2,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 2
+  },
+  "audio" : {
+    "durationMs" : 4970,
+    "sampleCount" : 79520,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-kotoba-whisper-v2.0-q5_0",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 632143872,
+    "systemCpuMs" : 9,
+    "userCpuMs" : 24
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 433,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 458,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.08712273641851107,
+    "releaseToFinalMs" : 433,
+    "warmupMs" : 1
+  }
+}

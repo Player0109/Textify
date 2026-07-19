@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.2698412698412698,
+    "characterErrors" : 17,
+    "deletions" : 11,
+    "hypothesisCharacterCount" : 53,
+    "hypothesisText" : "यदि आप सर्दियों में आिक या अटािक क्षेत्रों में जाते हैं तो आपद्रु रात का अनुव करेंगे जिसका अर्थ कि सूरज क्षती ऊपर नहीं उकता है",
+    "hypothesisWordCount" : 42,
+    "insertions" : 0,
+    "referenceCharacterCount" : 63,
+    "referenceText" : "यदि आप सर्दियों में आर्कटिक या अंटार्कटिक क्षेत्रों में जाते हैं तो आप ध्रुवीय रात का अनुभव करेंगे जिसका अर्थ है कि सूरज क्षितिज से ऊपर नहीं उगता है",
+    "referenceWordCount" : 53,
+    "substitutions" : 6,
+    "wordErrorRate" : 0.32075471698113206,
+    "wordErrors" : 17
+  },
+  "audio" : {
+    "durationMs" : 14160,
+    "sampleCount" : 226560,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "dolphin-small-ctc-multi-lang-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Dolphin Small CTC multilingual int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 722157568,
+    "systemCpuMs" : 98,
+    "userCpuMs" : 2108
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 282,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 222,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.019915254237288134,
+    "releaseToFinalMs" : 282,
+    "warmupMs" : 12
+  }
+}

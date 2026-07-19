@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.04477611940298507,
+    "characterErrors" : 3,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 66,
+    "hypothesisText" : "जब घायलों को लड़ाई बंद होने के बाद अस्पताल ले जाया गया तो लगभग 40 अन्य बच्चे हुए कैदी यार्ड में रुके और अपनी कोट्रियों में लौटने से इनकार कर दिया.",
+    "hypothesisWordCount" : 52,
+    "insertions" : 2,
+    "referenceCharacterCount" : 67,
+    "referenceText" : "जब घायलों को लड़ाई बंद होने के बाद अस्पताल ले जाया गया तो लगभग 40 अन्य बचे हुए कैदी यार्ड में रुके और अपनी कोठरियों में लौटने से इनकार कर दिया",
+    "referenceWordCount" : 50,
+    "substitutions" : 1,
+    "wordErrorRate" : 0.06,
+    "wordErrors" : 3
+  },
+  "audio" : {
+    "durationMs" : 13620,
+    "sampleCount" : 217920,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "qwen3-asr-0.6b",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Qwen3-ASR 0.6B int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 1865449472,
+    "systemCpuMs" : 123,
+    "userCpuMs" : 20073
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : false
+  },
+  "timing" : {
+    "inferenceWorkMs" : 2591,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 1108,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.19023494860499265,
+    "releaseToFinalMs" : 2591,
+    "warmupMs" : 135
+  }
+}

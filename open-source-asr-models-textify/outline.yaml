@@ -1,0 +1,141 @@
+topic: "High-quality open-source speech-to-text models for Textify"
+current_date: "2026-07-19"
+time_range: "since 2024"
+priority: "Transcription quality first, then offline Apple Silicon product fit"
+product_constraints:
+  - "Audio and transcripts remain on-device after model download"
+  - "macOS 14 or later on Apple Silicon"
+  - "Final text should appear almost immediately after trigger release"
+  - "Only immutable, checksummed, signed model artifacts may ship"
+  - "Model, tokenizer, runtime, conversion, and auxiliary-asset licenses must permit distribution"
+shipping_baseline:
+  - id: whisper_small_en_q5_1
+    name: "Whisper small.en q5_1"
+    status: "shipping"
+  - id: parakeet_tdt_0_6b_v3
+    name: "NVIDIA Parakeet TDT 0.6B V3"
+    status: "shipping"
+  - id: paraformer_large_zh_int8
+    name: "Paraformer-large Chinese INT8"
+    status: "shipping specialist"
+items:
+  - id: whisper_large_v3_turbo
+    name: "OpenAI Whisper Large V3 Turbo"
+    proposed_tier: "add-now benchmark"
+    value: "High-quality multilingual Whisper tier on the existing Metal runtime"
+  - id: distil_whisper_large_v3_5
+    name: "Distil-Whisper Large V3.5"
+    proposed_tier: "add-now benchmark"
+    value: "English quality tier with official whisper.cpp support and lower decoder cost"
+  - id: parakeet_tdt_0_6b_v2
+    name: "NVIDIA Parakeet TDT 0.6B V2"
+    proposed_tier: "add-now benchmark"
+    value: "English specialist on Textify's existing FluidAudio/Core ML engine"
+  - id: parakeet_tdt_ctc_110m
+    name: "NVIDIA Parakeet TDT-CTC 110M"
+    proposed_tier: "add-now benchmark"
+    value: "Compact and very fast English tier with released Core ML artifacts"
+  - id: parakeet_tdt_japanese
+    name: "NVIDIA Parakeet TDT Japanese"
+    proposed_tier: "add-now specialist benchmark"
+    value: "Japanese specialist on Textify's existing FluidAudio/Core ML engine"
+  - id: moonshine_v2_streaming
+    name: "Moonshine V2 Tiny/Small/Medium Streaming"
+    proposed_tier: "benchmark next"
+    value: "Compact MIT-licensed English models with an official native macOS runtime"
+  - id: qwen3_asr_0_6b
+    name: "Qwen3-ASR 0.6B Core ML"
+    proposed_tier: "benchmark next"
+    value: "Hindi and broad Asian-language coverage with an emerging Core ML path"
+  - id: cohere_transcribe_03_2026
+    name: "Cohere Transcribe 03-2026"
+    proposed_tier: "premium benchmark"
+    value: "Top-tier English and 14-language quality with a released Core ML conversion"
+  - id: granite_4_0_1b_speech
+    name: "IBM Granite 4.0 1B Speech"
+    proposed_tier: "premium benchmark"
+    value: "Strong English quality, six languages, keyword biasing, and an MLX path"
+  - id: ai4bharat_indicconformer_600m
+    name: "AI4Bharat IndicConformer 600M Multilingual"
+    proposed_tier: "Indic specialist benchmark"
+    value: "All 22 scheduled Indian languages; gated artifacts and runtime need resolution"
+  - id: fun_asr_mlt_nano_2512
+    name: "Fun-ASR MLT-Nano 2512"
+    proposed_tier: "multilingual benchmark"
+    value: "31 languages including Hindi, inverse text normalization, and hotwords"
+  - id: sensevoice_small
+    name: "SenseVoiceSmall"
+    proposed_tier: "license-gated benchmark"
+    value: "Fast non-autoregressive Core ML path and broad language detection"
+  - id: dolphin_small
+    name: "Dataocean Dolphin Small"
+    proposed_tier: "Asian specialist benchmark"
+    value: "Forty Eastern languages, dialects, timestamps, hotwords, and sherpa-onnx conversions"
+  - id: kyutai_stt_1b_en_fr
+    name: "Kyutai STT 1B English/French MLX"
+    proposed_tier: "runtime experiment"
+    value: "First-party Apple Silicon artifacts and low-latency streaming architecture"
+  - id: canary_180m_flash
+    name: "NVIDIA Canary 180M Flash"
+    proposed_tier: "runtime watchlist"
+    value: "Compact four-language transcription/translation model without a proven native Apple path"
+  - id: canary_1b_v2
+    name: "NVIDIA Canary 1B V2"
+    proposed_tier: "runtime watchlist"
+    value: "High-quality 25-language transcription and translation without a proven native Apple path"
+  - id: fireredasr2_aed
+    name: "FireRedASR2-AED"
+    proposed_tier: "Chinese specialist watchlist"
+    value: "Strong Mandarin, dialect, English, and code-switching quality; CUDA-oriented runtime"
+  - id: glm_asr_nano_2512
+    name: "GLM-ASR-Nano-2512"
+    proposed_tier: "Chinese specialist watchlist"
+    value: "Mandarin, Cantonese, English, and quiet-speech quality; no mature native Apple runtime"
+  - id: omnilingual_asr_ctc_300m
+    name: "Meta Omnilingual ASR CTC 300M V2"
+    proposed_tier: "coverage watchlist"
+    value: "Apache-2.0 coverage for more than 1,600 languages; large artifacts and research runtime"
+  - id: owsm_v4
+    name: "ESPnet OWSM V4 / OWSM-CTC"
+    proposed_tier: "coverage watchlist"
+    value: "Fully open public-data models with ASR, language ID, timestamps, and translation"
+  - id: voxtral_mini_4b_realtime
+    name: "Mistral Voxtral Mini 4B Realtime 2602"
+    proposed_tier: "high-memory experiment"
+    value: "Thirteen-language Apache-2.0 model with community Apple runtimes, but a large footprint"
+  - id: nemotron_3_5_asr_streaming
+    name: "NVIDIA Nemotron 3.5 ASR Streaming 0.6B"
+    proposed_tier: "license/runtime watchlist"
+    value: "Broad locale coverage and language detection under a custom commercial-use license"
+  - id: moss_transcribe_diarize
+    name: "MOSS Transcribe Diarize 0.9B"
+    proposed_tier: "new-model watchlist"
+    value: "Very new Apache-2.0 long-context transcription, timestamps, hotwords, and diarization model"
+  - id: reazonspeech_k2_v2
+    name: "ReazonSpeech K2 V2"
+    proposed_tier: "Japanese specialist watchlist"
+    value: "Compact Apache-2.0 Zipformer RNN-T/ONNX model"
+  - id: kotoba_whisper_v2
+    name: "Kotoba-Whisper V2"
+    proposed_tier: "Japanese specialist watchlist"
+    value: "Distilled Japanese Whisper model with whisper.cpp artifacts"
+explicit_exclusions:
+  - id: moonshine_non_english
+    reason: "Non-English weights use a non-commercial license"
+  - id: reverb_asr
+    reason: "Weights are non-commercial"
+  - id: medasr
+    reason: "Gated health-model terms are not suitable for the general production catalog"
+  - id: vibevoice_asr_9b
+    reason: "Approximately 17 GB BF16 footprint is disproportionate for short-form dictation"
+execution:
+  batch_size: 1
+  items_per_agent: 5
+  output_dir: "./results"
+  first_batch:
+    - whisper_large_v3_turbo
+    - parakeet_tdt_0_6b_v2
+    - parakeet_tdt_ctc_110m
+    - moonshine_v2_streaming
+    - qwen3_asr_0_6b
+

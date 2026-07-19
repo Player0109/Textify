@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.21428571428571427,
+    "characterErrors" : 6,
+    "deletions" : 1,
+    "hypothesisCharacterCount" : 23,
+    "hypothesisText" : "戦乱を沈めるための傭兵団である傭兵団を設立する",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 28,
+    "referenceText" : "戦乱を静めるための傭兵団である、ディーグル傭兵団を設立する。",
+    "referenceWordCount" : 2,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 2
+  },
+  "audio" : {
+    "durationMs" : 4970,
+    "sampleCount" : 79520,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "dolphin-small-ctc-multi-lang-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Dolphin Small CTC multilingual int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 673464320,
+    "systemCpuMs" : 51,
+    "userCpuMs" : 734
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 101,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 222,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.020321931589537223,
+    "releaseToFinalMs" : 101,
+    "warmupMs" : 13
+  }
+}

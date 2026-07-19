@@ -37,14 +37,25 @@ public final class SettingsStore {
             return .defaults
         }
 
+        let preferences: AppPreferences
         do {
-            let preferences = try decoder.decode(AppPreferences.self, from: data)
-            lastError = nil
-            return preferences
+            preferences = try decoder.decode(AppPreferences.self, from: data)
         } catch {
             lastError = .decodingFailed
             return .defaults
         }
+
+        if requiresDockPreferenceMigration(data) {
+            do {
+                try saveData(encoder.encode(preferences))
+            } catch {
+                lastError = .savingFailed
+                return preferences
+            }
+        }
+
+        lastError = nil
+        return preferences
     }
 
     public func save(_ preferences: AppPreferences) {
@@ -96,5 +107,16 @@ public final class SettingsStore {
             try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
             try data.write(to: url, options: [.atomic])
         }
+    }
+
+    private func requiresDockPreferenceMigration(_ data: Data) -> Bool {
+        guard
+            let object = try? JSONSerialization.jsonObject(with: data),
+            let dictionary = object as? [String: Any]
+        else {
+            return false
+        }
+
+        return dictionary["keepTextifyInDock"] == nil
     }
 }

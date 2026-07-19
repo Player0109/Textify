@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.2916666666666667,
+    "characterErrors" : 7,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 24,
+    "hypothesisText" : " कुतुहल गाउं में आदे गंति टहलना समय की हानी नहीं है।",
+    "hypothesisWordCount" : 16,
+    "insertions" : 0,
+    "referenceCharacterCount" : 24,
+    "referenceText" : "कुतूहल गांव में आधे घंटे टहलना समय की हानि नहीं है",
+    "referenceWordCount" : 16,
+    "substitutions" : 4,
+    "wordErrorRate" : 0.25,
+    "wordErrors" : 4
+  },
+  "audio" : {
+    "durationMs" : 6420,
+    "sampleCount" : 102720,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-large-v3-turbo-q5_0",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 689553408,
+    "systemCpuMs" : 13,
+    "userCpuMs" : 59
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 432,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 162,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.06728971962616823,
+    "releaseToFinalMs" : 432,
+    "warmupMs" : 1
+  }
+}

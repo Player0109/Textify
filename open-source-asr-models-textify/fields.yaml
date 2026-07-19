@@ -1,0 +1,98 @@
+field_categories:
+  identity_and_provenance:
+    detail_level: detailed
+    fields:
+      - name: upstream_model
+        description: "Official publisher repository and exact model identifier."
+      - name: immutable_revision
+        description: "Exact source commit and converted-artifact commit used by Textify."
+      - name: conversion_fidelity
+        description: "Deterministic conversion recipe, output parity, and WER/CER delta from the publisher runtime."
+      - name: auxiliary_assets
+        description: "Tokenizer, vocabulary, aligner, VAD, LID, punctuation, and preprocessing files needed offline."
+  license_and_distribution:
+    detail_level: detailed
+    fields:
+      - name: license_layers
+        description: "Separate licenses for code, weights, tokenizer, conversion, and auxiliary assets."
+      - name: commercial_redistribution
+        description: "Whether Textify may commercially redistribute or directly download the exact artifacts."
+      - name: gated_access
+        description: "Account, click-through, contact-sharing, or access-token requirements."
+      - name: attribution_requirements
+        description: "Required model naming, notices, citations, and attribution text."
+  dictation_quality:
+    detail_level: detailed
+    fields:
+      - name: corpus_wer_or_cer
+        description: "Accuracy on Textify's fixed per-language, accent, noise, and domain corpus."
+      - name: output_formatting
+        description: "Punctuation, capitalization, inverse text normalization, numerals, abbreviations, and paragraphs."
+      - name: short_utterance_robustness
+        description: "Sub-second audio, one-word commands, clipped starts/ends, and trailing-word retention."
+      - name: silence_hallucination_rate
+        description: "False output on silence, breathing, room noise, music, and non-speech."
+      - name: technical_term_accuracy
+        description: "Names, acronyms, URLs, code terms, and uncommon vocabulary."
+  language_behavior:
+    detail_level: detailed
+    fields:
+      - name: claimed_languages
+        description: "Out-of-box languages and scripts, separated from adaptation-only support."
+      - name: per_language_evidence
+        description: "Independent WER/CER and sample count for every language Textify claims."
+      - name: language_selection
+        description: "Automatic detection accuracy, manual selection, and failure behavior."
+      - name: code_switching
+        description: "Accuracy and formatting when a speaker changes language within an utterance."
+  latency_and_runtime:
+    detail_level: detailed
+    fields:
+      - name: release_to_final_ms
+        description: "P50 and p95 from trigger release through final text insertion."
+      - name: prefeed_and_flush
+        description: "Whether hidden pre-processing during recording reduces post-release work without showing partials."
+      - name: cold_warm_breakdown
+        description: "Download, compile, load, warmup, first inference, warm inference, and switch latency."
+      - name: runtime_identity
+        description: "Exact native engine, version, adapter revision, and cancellation/thread-safety behavior."
+      - name: max_audio_duration
+        description: "Hard per-call limit, chunking strategy, overlap, stitching, and degradation near the limit."
+  apple_hardware:
+    detail_level: detailed
+    fields:
+      - name: acceleration_path
+        description: "Actual ANE, Metal, MPS, MLX, Core ML GPU, or CPU execution with fallback detection."
+      - name: minimum_platform
+        description: "Minimum macOS and Apple Silicon generation required by model and runtime."
+      - name: memory_and_disk
+        description: "Download, installed, compiled-cache, warm-resident, and peak unified-memory sizes."
+      - name: energy_and_thermals
+        description: "Energy per utterance and sustained contention with other GPU/ANE workloads."
+  security_and_product_fit:
+    detail_level: detailed
+    fields:
+      - name: artifact_safety
+        description: "Data-only formats versus pickle, trust_remote_code, dynamic Python, or executable native content."
+      - name: offline_guarantee
+        description: "Network behavior after installation and enforcement against cloud fallback."
+      - name: model_residency
+        description: "Whether the model can remain warm, coexist with other engines, and switch deterministically."
+      - name: fallback_behavior
+        description: "Failure recovery, cancellation, previous-model rollback, and Whisper fallback."
+      - name: support_tier
+        description: "Recommended, specialist, experimental, deferred, or rejected with measurable promotion gates."
+  evidence_quality:
+    detail_level: detailed
+    fields:
+      - name: evidence_source
+        description: "Publisher-reported versus independently reproduced results."
+      - name: benchmark_comparability
+        description: "Dataset version, normalization, hardware, sample count, metric definition, and contamination risk."
+      - name: runtime_maturity
+        description: "Release cadence, API stability, maintainer activity, issue backlog, and supported platforms."
+uncertain:
+  - "Real Textify release-to-final latency until every candidate runs through the production adapter."
+  - "Community-converted artifact fidelity until compared against the publisher's reference implementation."
+  - "Commercial redistribution of gated repositories until the exact click-through terms are reviewed."
+  - "Real-world noisy and far-field rankings until candidates run on the same held-out corpus."

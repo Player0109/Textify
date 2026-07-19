@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0,
+    "characterErrors" : 0,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 38,
+    "hypothesisText" : " He had never been father, lover, husband, friend.",
+    "hypothesisWordCount" : 8,
+    "insertions" : 0,
+    "referenceCharacterCount" : 38,
+    "referenceText" : "HE HAD NEVER BEEN FATHER LOVER HUSBAND FRIEND",
+    "referenceWordCount" : 8,
+    "substitutions" : 0,
+    "wordErrorRate" : 0,
+    "wordErrors" : 0
+  },
+  "audio" : {
+    "durationMs" : 4530,
+    "sampleCount" : 72480,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-large-v3-turbo-q5_0",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 689537024,
+    "systemCpuMs" : 7,
+    "userCpuMs" : 18
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 352,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 167,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.07770419426048565,
+    "releaseToFinalMs" : 352,
+    "warmupMs" : 1
+  }
+}

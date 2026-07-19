@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.005714285714285714,
+    "characterErrors" : 1,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 176,
+    "hypothesisText" : "I imagine there were several kinds of old fashioned Christmases, but it could hardly be worse than a chop in my chambers or a horror of horrors at the club or my cousin Lucy's notion of what she calls the festive season.",
+    "hypothesisWordCount" : 43,
+    "insertions" : 1,
+    "referenceCharacterCount" : 175,
+    "referenceText" : "I IMAGINE THERE WERE SEVERAL KINDS OF OLD FASHIONED CHRISTMASES BUT IT COULD HARDLY BE WORSE THAN A CHOP IN MY CHAMBERS OR HORROR OF HORRORS AT THE CLUB OR MY COUSIN LUCY'S NOTION OF WHAT SHE CALLS THE FESTIVE SEASON",
+    "referenceWordCount" : 42,
+    "substitutions" : 0,
+    "wordErrorRate" : 0.023809523809523808,
+    "wordErrors" : 1
+  },
+  "audio" : {
+    "durationMs" : 13305,
+    "sampleCount" : 212880,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (4 threads)",
+  "engine" : "sensevoice-small-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "SenseVoiceSmall int8 2024-07-17",
+  "modelLicense" : "FunASR Model License 1.1",
+  "resources" : {
+    "peakResidentBytes" : 612417536,
+    "systemCpuMs" : 7,
+    "userCpuMs" : 1541
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 390,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 317,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.029312288613303268,
+    "releaseToFinalMs" : 390,
+    "warmupMs" : 23
+  }
+}

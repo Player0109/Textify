@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0,
+    "characterErrors" : 0,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 16,
+    "hypothesisText" : "开发边界将作为城市发展的刚性约定",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 16,
+    "referenceText" : "开发边界将作为城市发展的刚性约定",
+    "referenceWordCount" : 1,
+    "substitutions" : 0,
+    "wordErrorRate" : 0,
+    "wordErrors" : 0
+  },
+  "audio" : {
+    "durationMs" : 5000,
+    "sampleCount" : 80000,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "Core ML CPU preprocessor + CPU/Apple Neural Engine inference",
+  "engine" : "paraformer-large-zh-int8",
+  "engineVersion" : "Textify ParaformerRuntime / FluidAudio 0.15.5",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "paraformer-large-zh int8",
+  "modelLicense" : "Apache-2.0 upstream model; conversion inherits upstream terms",
+  "resources" : {
+    "peakResidentBytes" : 67059712,
+    "systemCpuMs" : 1,
+    "userCpuMs" : 64
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 75,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 352,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.015,
+    "releaseToFinalMs" : 75,
+    "warmupMs" : 39
+  }
+}

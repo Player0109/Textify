@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.12,
+    "characterErrors" : 3,
+    "deletions" : 1,
+    "hypothesisCharacterCount" : 26,
+    "hypothesisText" : "長らく度サ回りが続いたが、戦後は道頓堀り角座に出演した。",
+    "hypothesisWordCount" : 2,
+    "insertions" : 0,
+    "referenceCharacterCount" : 25,
+    "referenceText" : "長らくドサ廻りが続いたが、戦後は、道頓堀角座に出演した。",
+    "referenceWordCount" : 3,
+    "substitutions" : 2,
+    "wordErrorRate" : 1,
+    "wordErrors" : 3
+  },
+  "audio" : {
+    "durationMs" : 5140,
+    "sampleCount" : 82240,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (4 threads)",
+  "engine" : "sensevoice-small-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "SenseVoiceSmall int8 2024-07-17",
+  "modelLicense" : "FunASR Model License 1.1",
+  "resources" : {
+    "peakResidentBytes" : 592789504,
+    "systemCpuMs" : 2,
+    "userCpuMs" : 625
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 157,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 315,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.03054474708171206,
+    "releaseToFinalMs" : 157,
+    "warmupMs" : 24
+  }
+}

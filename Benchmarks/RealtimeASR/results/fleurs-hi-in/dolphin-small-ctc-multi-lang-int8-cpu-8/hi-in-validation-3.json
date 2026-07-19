@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.25,
+    "characterErrors" : 6,
+    "deletions" : 1,
+    "hypothesisCharacterCount" : 23,
+    "hypothesisText" : "कुतुहल गांव में आधेगंंत डहलला समय की हानि नहीं",
+    "hypothesisWordCount" : 15,
+    "insertions" : 0,
+    "referenceCharacterCount" : 24,
+    "referenceText" : "कुतूहल गांव में आधे घंटे टहलना समय की हानि नहीं है",
+    "referenceWordCount" : 16,
+    "substitutions" : 3,
+    "wordErrorRate" : 0.25,
+    "wordErrors" : 4
+  },
+  "audio" : {
+    "durationMs" : 6420,
+    "sampleCount" : 102720,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "dolphin-small-ctc-multi-lang-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Dolphin Small CTC multilingual int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 730136576,
+    "systemCpuMs" : 71,
+    "userCpuMs" : 941
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 127,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 219,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.019781931464174455,
+    "releaseToFinalMs" : 127,
+    "warmupMs" : 13
+  }
+}

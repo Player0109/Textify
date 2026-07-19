@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.19047619047619047,
+    "characterErrors" : 4,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 20,
+    "hypothesisText" : "東京都を流れる旭潮運河に架橋のカテゴリー",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 21,
+    "referenceText" : "東京都を流れる朝潮運河に架かる橋のカテゴリ。",
+    "referenceWordCount" : 1,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 1
+  },
+  "audio" : {
+    "durationMs" : 3980,
+    "sampleCount" : 63680,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "dolphin-small-ctc-multi-lang-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Dolphin Small CTC multilingual int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 587235328,
+    "systemCpuMs" : 36,
+    "userCpuMs" : 622
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 85,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 214,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.02135678391959799,
+    "releaseToFinalMs" : 85,
+    "warmupMs" : 30
+  }
+}

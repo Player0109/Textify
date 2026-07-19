@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0,
+    "characterErrors" : 0,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 113,
+    "hypothesisText" : "She was four years older than I, to be sure, and had seen more of the world. But I was a boy, and she was a girl, and I resented her protecting manner.",
+    "hypothesisWordCount" : 33,
+    "insertions" : 0,
+    "referenceCharacterCount" : 113,
+    "referenceText" : "SHE WAS FOUR YEARS OLDER THAN I TO BE SURE AND HAD SEEN MORE OF THE WORLD BUT I WAS A BOY AND SHE WAS A GIRL AND I RESENTED HER PROTECTING MANNER",
+    "referenceWordCount" : 33,
+    "substitutions" : 0,
+    "wordErrorRate" : 0,
+    "wordErrors" : 0
+  },
+  "audio" : {
+    "durationMs" : 9020,
+    "sampleCount" : 144320,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-model",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 1616723968,
+    "systemCpuMs" : 9,
+    "userCpuMs" : 25
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 351,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 353,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.03891352549889135,
+    "releaseToFinalMs" : 351,
+    "warmupMs" : 1
+  }
+}

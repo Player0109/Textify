@@ -392,6 +392,7 @@ extern "C" {
     WHISPER_API int whisper_n_text_ctx      (struct whisper_context * ctx);
     WHISPER_API int whisper_n_audio_ctx     (struct whisper_context * ctx);
     WHISPER_API int whisper_is_multilingual (struct whisper_context * ctx);
+    WHISPER_API int whisper_uses_gpu         (struct whisper_context * ctx);
 
     WHISPER_API int whisper_model_n_vocab      (struct whisper_context * ctx);
     WHISPER_API int whisper_model_n_audio_ctx  (struct whisper_context * ctx);

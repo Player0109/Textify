@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.07407407407407407,
+    "characterErrors" : 4,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 53,
+    "hypothesisText" : "समय के साथ जैसे-जैसे नई आबादी ने माहौल में डलती जाती है, वह भी दूसरी आबादी की तरह अनदेखी करना शुरू कर देती हैं।",
+    "hypothesisWordCount" : 37,
+    "insertions" : 0,
+    "referenceCharacterCount" : 54,
+    "referenceText" : "समय के साथ जैसे-जैसे नई आबादी नए माहौल में ढलती जाती है वह भी दूसरी आबादी की तरह अनदेखी करना शुरू कर देती है",
+    "referenceWordCount" : 37,
+    "substitutions" : 2,
+    "wordErrorRate" : 0.05405405405405406,
+    "wordErrors" : 2
+  },
+  "audio" : {
+    "durationMs" : 9720,
+    "sampleCount" : 155520,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "qwen3-asr-0.6b",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Qwen3-ASR 0.6B int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 1730969600,
+    "systemCpuMs" : 89,
+    "userCpuMs" : 14990
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : false
+  },
+  "timing" : {
+    "inferenceWorkMs" : 1943,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 1140,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.1998971193415638,
+    "releaseToFinalMs" : 1943,
+    "warmupMs" : 135
+  }
+}

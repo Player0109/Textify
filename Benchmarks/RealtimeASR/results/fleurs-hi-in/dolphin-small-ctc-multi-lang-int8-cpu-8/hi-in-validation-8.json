@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.06521739130434782,
+    "characterErrors" : 3,
+    "deletions" : 2,
+    "hypothesisCharacterCount" : 45,
+    "hypothesisText" : "अभी भी वे यह पता लगाने की कोशिश कर रहे हैं कि क्रश कितना बड़ा था और धरती की तरह से प्रभावित होगी",
+    "hypothesisWordCount" : 32,
+    "insertions" : 0,
+    "referenceCharacterCount" : 46,
+    "referenceText" : "अभी भी वे यह पता लगाने की कोशिश कर रहे हैं कि क्रैश कितना बड़ा था और धरती किस तरह से प्रभावित होगी",
+    "referenceWordCount" : 34,
+    "substitutions" : 1,
+    "wordErrorRate" : 0.08823529411764706,
+    "wordErrors" : 3
+  },
+  "audio" : {
+    "durationMs" : 9120,
+    "sampleCount" : 145920,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "dolphin-small-ctc-multi-lang-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Dolphin Small CTC multilingual int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 660668416,
+    "systemCpuMs" : 82,
+    "userCpuMs" : 1347
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 181,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 218,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.019846491228070175,
+    "releaseToFinalMs" : 181,
+    "warmupMs" : 12
+  }
+}

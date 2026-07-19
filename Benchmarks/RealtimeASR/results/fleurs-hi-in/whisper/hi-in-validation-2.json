@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.14285714285714285,
+    "characterErrors" : 10,
+    "deletions" : 2,
+    "hypothesisCharacterCount" : 67,
+    "hypothesisText" : " आर्म्ड वर्षास ने कहा मैंने अपनी बहन और उनकी दोस्त को खो दिया और रास्ते में हुल्चेर में दो दिव्यांग लोग थे और लोग उन पर उचल रहे थे और उने धक्का दे रहे थे",
+    "hypothesisWordCount" : 54,
+    "insertions" : 2,
+    "referenceCharacterCount" : 70,
+    "referenceText" : "आर्मंड वर्सास ने कहा मैंने अपनी बहन और उसकी दोस्त को खो दिया और रास्ते में व्हीलचेयर में दो दिव्यांग लोग थे और लोग उनपर उछल रहे थे और उन्हें धक्का दे रहे थे",
+    "referenceWordCount" : 54,
+    "substitutions" : 6,
+    "wordErrorRate" : 0.18518518518518517,
+    "wordErrors" : 10
+  },
+  "audio" : {
+    "durationMs" : 21360,
+    "sampleCount" : 341760,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-large-v3-turbo-q5_0",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 689979392,
+    "systemCpuMs" : 17,
+    "userCpuMs" : 81
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 558,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 161,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.026123595505617977,
+    "releaseToFinalMs" : 558,
+    "warmupMs" : 1
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0,
+    "characterErrors" : 0,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 54,
+    "hypothesisText" : "The last two days of the voyage, Bartley found almost intolerable.",
+    "hypothesisWordCount" : 11,
+    "insertions" : 0,
+    "referenceCharacterCount" : 54,
+    "referenceText" : "THE LAST TWO DAYS OF THE VOYAGE BARTLEY FOUND ALMOST INTOLERABLE",
+    "referenceWordCount" : 11,
+    "substitutions" : 0,
+    "wordErrorRate" : 0,
+    "wordErrors" : 0
+  },
+  "audio" : {
+    "durationMs" : 4715,
+    "sampleCount" : 75440,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-model",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 1613905920,
+    "systemCpuMs" : 6,
+    "userCpuMs" : 15
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 353,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 353,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.07486744432661718,
+    "releaseToFinalMs" : 353,
+    "warmupMs" : 1
+  }
+}

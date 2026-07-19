@@ -7,6 +7,23 @@ grill session through Q350. It is a current-state decision snapshot, not a publi
 roadmap. Items listed as out of scope are boundaries for V1, not commitments for
 future versions.
 
+### Current V1.1 release profile
+
+The shipping target began with the narrower V1.1 implementation plan in
+`docs/superpowers/plans/2026-07-03-textify-v1-parallel-implementation.md`.
+The production hardening and multi-model workstream recorded in
+`docs/implementation/coordination.md` now supersedes that plan's single-model,
+Whisper-only, and no-Core-ML boundaries. Textify remains arm64-only, uses the
+system-default microphone, and is distributed as a manually updated GitHub
+Release DMG. It now supports a signed multi-model catalog, multiple installed
+models, safe switching/deletion, verified custom Whisper import, Whisper on
+Metal, and released FluidAudio batch engines on Core ML/Apple Neural Engine.
+It still omits Sparkle, history, vocabulary/custom words, per-app profiles,
+cloud ASR, and live partial transcription. The trigger is user-selectable from
+the four curated choices, with Right Command as the default. A runtime is not a
+public model promise until its exact artifacts and metadata are published in
+the signed catalog.
+
 Last external grill respondent:
 
 - Claude session used through Q329: `02de4aa5-d168-4f20-a2dc-e9ffd8afa33c`
@@ -15,7 +32,7 @@ Last external grill respondent:
 
 ## 1. Product Summary
 
-Textify is a native macOS menu bar dictation utility.
+Textify is a native macOS hybrid Dock and menu-bar dictation utility.
 
 Core V1 loop:
 
@@ -34,10 +51,11 @@ V1 optimizes for short, fast dictation:
 - Max recording duration defaults to about 60 seconds.
 - Long-form transcription, file transcription, and streaming partial captions are out of scope.
 
-The app should feel like a quiet system utility:
+The app should feel like a quiet system utility with a dependable home:
 
-- No Dock icon by default.
+- Dock icon by default so Textify is easy to reopen.
 - Menu bar icon always visible.
+- One persistent main window for setup, status, and settings.
 - Minimal overlay while recording.
 - No confirmation UI before insertion.
 - Normal successful dictation should disappear visually as soon as possible.
@@ -126,16 +144,16 @@ V1 hosting uses GitHub-owned project infrastructure only:
 - Signed remote model manifest:
   `https://player0109.github.io/Textify/models/manifest.json`
   and `https://player0109.github.io/Textify/models/manifest.json.sig`
-- Model binaries:
-  Textify GitHub Release assets, for example
+- Model files:
+  immutable Textify GitHub Release assets, for example
   `https://github.com/Player0109/Textify/releases/download/models-v1/ggml-small.en-q5_1.bin`
+  or exact commit-pinned Hugging Face files, for example
+  `https://huggingface.co/<owner>/<repo>/resolve/<40-character-lowercase-commit>/<file>`
 
-Model binaries are mirrored under Textify GitHub Releases instead of being
-referenced directly from upstream Hugging Face or whisper.cpp URLs.
-
-Reason: Textify curates exact model bytes. The manifest records upstream source,
-license, and provenance, but download URLs point to Textify-controlled immutable
-release assets with pinned SHA-256 checksums.
+Reason: Textify curates exact model bytes rather than trusting a mutable model
+name. Every signed file record binds an immutable approved URL, exact byte size,
+and SHA-256 together with upstream license and provenance. Hugging Face branch
+or tag URLs such as `resolve/main` are never accepted.
 
 ## 5. Signing, Notarization, Entitlements
 
@@ -168,7 +186,8 @@ Recommended microphone usage text:
 
 > Textify uses your microphone to transcribe speech while you're actively dictating. Audio is processed on-device and never leaves your Mac.
 
-No usage description keys exist for Accessibility or Input Monitoring.
+No usage description key exists for Accessibility or AppKit keyboard event
+monitoring.
 
 `NSAppleEventsUsageDescription` is not needed because V1 does not use Apple
 Events automation.
@@ -303,10 +322,10 @@ README language should be factual:
 README model wording:
 
 > Textify does not bundle speech model binaries. During onboarding, Textify can
-> download curated Whisper-compatible ggml model files mirrored under Textify
-> GitHub Releases. Whisper was developed and released by OpenAI; the mirrored
-> ggml model files are sourced from upstream whisper.cpp/ggerganov artifacts.
-> Exact source links, licenses, checksums, and provenance are listed in
+> download curated model files from immutable Textify GitHub Release assets or
+> exact commit-pinned public Hugging Face files. Whisper was developed and
+> released by OpenAI, Parakeet by NVIDIA, and Paraformer by the FunASR ecosystem.
+> Exact source links, revisions, licenses, byte sizes, checksums, and provenance are listed in
 > `ACKNOWLEDGMENTS.md`, `THIRD_PARTY_NOTICES.md`, and the signed model manifest.
 
 Also state:
@@ -341,7 +360,7 @@ Also state:
 - Public issues should not contain exploit details.
 - Acknowledge reports within about 5 business days.
 - No fixed remediation SLA.
-- In scope: Accessibility/Input Monitoring paths, insertion, model downloads,
+- In scope: Accessibility/keyboard-monitoring paths, insertion, model downloads,
   manifest verification, Sparkle, signing/notarization, vendored dependencies.
 - Out of scope: documented punctuation command collisions and best-effort
   clipboard transient marking.
@@ -418,24 +437,33 @@ Top disclaimer:
 
 ## 10. App Shape
 
-Textify is a menu bar utility.
+Textify is a hybrid Dock and menu-bar utility.
 
 Default behavior:
 
-- No Dock icon.
-- App launches quietly after onboarding.
+- Dock icon is visible.
+- After onboarding, an ordinary launch opens the main Textify window.
 - Menu bar icon always visible.
-- No main window at ordinary launch.
-- Settings opens from menu/notices.
+- The existing Settings `TabView` is the main Textify window; do not create a
+  second settings surface.
+- Closing the main window keeps Textify running for menu-bar dictation.
+- Only an explicit Quit action terminates Textify.
+- Clicking the Dock icon opens or focuses the same main window.
+- The first menu-bar action, "Open Textify…", opens or focuses that window.
 - Onboarding opens only on fresh install or reset.
 
-Show in Dock:
+Keep Textify in the Dock:
 
 - General setting.
-- Default off.
+- Default on.
 - Requires relaunch.
 - Persist preference immediately.
-- Offer "Relaunch Now".
+- Persist new choices under `keepTextifyInDock`.
+- Legacy settings stored under `showInDock` migrate once to the new Dock-on
+  default because the legacy format did not distinguish its old default from
+  an explicit opt-out.
+- Users may opt out after migration; the menu-bar Open Textify action remains
+  the dependable reopen path in accessory mode.
 - Apply activation policy at next launch only.
 - Do not switch activation policy live mid-session.
 
@@ -443,9 +471,10 @@ Launch sequencing:
 
 - `LSUIElement=true` in Info.plist.
 - In `applicationWillFinishLaunching`, set activation policy early based on
-  Show in Dock preference.
+  Keep Textify in the Dock preference.
 - If regular Dock mode is enabled, implement Dock reopen handling:
-  - Clicking Dock icon with no windows should open Settings.
+  - Clicking Dock icon with no windows opens the main window.
+  - Clicking Dock icon with a visible main window focuses it.
 - If a window appears at launch, activate the app explicitly.
 
 Launch at Login:
@@ -487,10 +516,11 @@ at Login. Use System Settings -> General -> Login Items."
 
 Login launch behavior:
 
-- If launched at login and onboarding is complete, start quietly as menu bar
-  only.
+- If launched at login and onboarding is complete, start the runtime and show
+  the main window using the same launch path as an ordinary app launch.
 - If onboarding is incomplete or was reset, show onboarding.
-- `LSUIElement` remains default; no Dock icon unless Show in Dock is enabled.
+- `LSUIElement` remains in the bundle metadata; the early activation policy
+  shows the Dock icon unless Keep Textify in the Dock is disabled.
 
 Launch at Login diagnostics may include:
 
@@ -522,8 +552,8 @@ Menu bar icon:
 Menu dropdown:
 
 ```text
+[Open Textify…]
 [optional status lines]
-Settings...
 Check for Updates...
 About Textify
 Quit Textify
@@ -534,7 +564,7 @@ Status line rules:
 - At most two lines.
 - Permissions line:
   - shown if any required permission is missing or revoked
-  - collapsed across Microphone, Accessibility, Input Monitoring
+  - collapsed across Microphone and Accessibility
   - opens Settings -> Privacy
 - Model line:
   - shown if no model is installed/ready or a model is downloading
@@ -559,7 +589,7 @@ When Textify is active, keep normal macOS menus.
 App menu:
 
 - About Textify
-- Settings...
+- Open Textify…
 - Hide Textify
 - Hide Others
 - Show All
@@ -587,9 +617,10 @@ Help menu:
 
 No File or View menu content for V1.
 
-## 13. Settings
+## 13. Main Window And Settings
 
-Use SwiftUI `Settings` scene with `TabView`.
+Use one AppKit-managed window hosting the SwiftUI `SettingsRootView` `TabView`.
+The presenter retains that window after close so every open route reuses it.
 
 Panes:
 
@@ -606,15 +637,15 @@ Settings pane routing:
 
 - Shared `@Observable` `SettingsRouter`.
 - `selectedPane` bound to `TabView(selection:)`.
-- SwiftUI callers use `openSettings`.
-- AppKit/menu callers set router state and send `showSettingsWindow:`.
+- SwiftUI, menu, launch, and Dock callers set router state as needed and call
+  the shared main-window presenter.
 
 ### 13.1 General
 
 Controls:
 
 - Launch at Login
-- Show in Dock
+- Keep Textify in the Dock
 - Automatically check for updates
 - Check for Updates Now
 - App version
@@ -762,7 +793,6 @@ Permissions:
 
 - Microphone
 - Accessibility
-- Input Monitoring
 
 Show status and System Settings links. Do not fake toggles.
 
@@ -886,9 +916,8 @@ Final onboarding order:
 2. Model tier selection
 3. Microphone permission
 4. Accessibility permission
-5. Input Monitoring permission
-6. Trigger/test dictation step
-7. Completion screen with Launch at Login checkbox checked by default
+5. Trigger/test dictation step
+6. Completion screen with Launch at Login checkbox checked by default
 
 Model download branch behavior:
 
@@ -915,7 +944,6 @@ Required permissions:
 
 - Microphone
 - Accessibility
-- Input Monitoring
 
 Microphone:
 
@@ -928,11 +956,12 @@ Accessibility:
 - Required for secure-field check.
 - Requested with `AXIsProcessTrustedWithOptions`.
 
-Input Monitoring:
+Keyboard monitoring:
 
-- Required for global CGEventTap trigger detection.
-- Hard V1 requirement.
-- Requested just-in-time before trigger test.
+- Use paired AppKit global and local event monitors for trigger detection.
+- Accessibility trust covers global keyboard event delivery and synthetic
+  insertion; Textify does not request Input Monitoring separately.
+- The local monitor keeps trigger tests functional while Textify is frontmost.
 
 Permission revocation behavior:
 
@@ -942,17 +971,14 @@ Permission revocation behavior:
   - one-time notice per episode
   - menu Permissions status line
   - Settings -> Privacy shows exact status
-- Input Monitoring revoked:
-  - trigger may not fire at all
-  - detect opportunistically on app activation, Settings open, or periodic check
-  - menu Permissions status line
 
 One-time notice flags:
 
 - `hasShownNoModelNotice`
 - `hasShownMicRevokedNotice`
 - `hasShownAccessibilityRevokedNotice`
-- `hasShownInputMonitoringRevokedNotice`
+- `hasShownInputMonitoringRevokedNotice` remains decode-compatible legacy
+  storage only and is ignored by V1.1 runtime readiness.
 
 Flags reset when their condition resolves.
 
@@ -978,10 +1004,11 @@ No arbitrary custom trigger capture in V1.
 
 Implementation:
 
-- Session-level listen-only `CGEventTap`.
-- Observe `flagsChanged` and relevant key events.
+- Paired AppKit global/local monitors.
+- Observe `flagsChanged`, `keyDown`, and `keyUp` events needed by the configured
+  curated trigger.
 - Do not consume events.
-- Keep tap callback minimal and fast.
+- Keep monitor callbacks minimal and fast.
 - Hop to `DictationController`.
 
 Runtime trigger state:
@@ -1285,11 +1312,14 @@ No bundled model files.
 
 Onboarding downloads a curated model or lets user skip.
 
-Model tiers:
+Current catalog support tiers:
 
 - Fast
+- Recommended
 - Balanced
 - Accurate
+- Specialist
+- Experimental
 
 UI shows both friendly tier and actual model name.
 
@@ -1312,7 +1342,9 @@ Tiers are curated presets:
 - decoding parameters
 - optional hallucination thresholds
 
-Users cannot import arbitrary local models in V1.
+Users may import verified Whisper-compatible GGML/GGUF files into managed
+storage. Arbitrary runtime plugins and non-Whisper file formats remain
+unsupported.
 
 Multiple installed models are allowed.
 
@@ -1323,7 +1355,7 @@ Model switching:
 - immediate
 - no app restart
 - not during active recording/transcription
-- `WhisperRuntime` serializes/awaits in-flight work
+- the active engine runtime serializes/awaits in-flight work
 - switch controls are disabled during recording/transcription with "Finish
   current dictation to switch models."
 - on switch, unload old model, load and warm up new model, then persist it as
@@ -1513,18 +1545,24 @@ Remote manifest:
 Remote manifest hosting:
 
 - `manifest.json` and `manifest.json.sig` live on GitHub Pages.
-- Model file URLs inside the manifest point to immutable Textify GitHub Release
-  assets.
+- Model file URLs inside the manifest point either to immutable Textify GitHub
+  Release assets or exact Hugging Face
+  `resolve/<40-character-lowercase-commit>/<path>` files.
+- Reject mutable refs, credentials, ports, queries, fragments, percent-encoded
+  or traversing paths, and every unapproved host or URL shape.
 - The manifest includes upstream source/provenance/license metadata for each
   model.
-- New model bytes require a new release asset URL, new checksum, and newly
-  signed manifest.
+- New model bytes require a new immutable URL or commit, new size/checksum, and
+  newly signed manifest.
 
 Fallback precedence:
 
-1. Fresh fetched and verified remote manifest.
-2. Last verified cached remote manifest.
-3. Built-in manifest.
+1. Verify the complete bundled manifest/signature pair and the fetched remote
+   manifest/signature pair independently.
+2. If both are valid, select the one with the newer signed `generatedAt`
+   timestamp; an equal timestamp may select remote.
+3. If remote fetch or verification fails, use the valid bundled manifest.
+4. An incomplete or invalid bundled pair is a release-integrity failure.
 
 Select one manifest source wholesale. Do not merge sources.
 
@@ -1615,18 +1653,27 @@ Model source/license UI:
 - Onboarding and Settings -> Models show a small Source & License link for each
   model.
 - Model detail view shows upstream source, original model, license SPDX IDs,
-  mirrored filename, and SHA-256.
+  selected source filename/path, and SHA-256.
 - Do not show legal walls or download-blocking license modals in V1.
 
 Model license text storage:
 
 - Store V1 curated model license/notices in app resources so they are visible
   before download and offline.
-- Publish the same license/provenance files as GitHub Release assets next to
-  each mirrored model binary.
+- For Textify-hosted mirrors, publish the same license/provenance files as
+  GitHub Release assets next to each model binary. For commit-pinned upstream
+  files, keep the applicable notices in the app and exact provenance in the
+  signed catalog.
 - Installed model metadata caches the manifest's license/provenance fields.
 
 Runtime parameter policy for all initial V1 models:
+
+This block documents the initial English Whisper presets. The current
+multi-model catalog may declare a fixed supported language or language
+detection according to an engine's verified capabilities. Capture uses each
+entry's `maxAudioSeconds`; production policy accepts 1–60 seconds generally and
+at most 29 seconds for Paraformer so its 30-second native input window cannot
+silently truncate post-release audio.
 
 ```json
 {
@@ -1677,13 +1724,14 @@ Before adding or updating a curated model:
 
 - Confirm there is a model suggestion issue or maintainer decision.
 - Verify the upstream artifact has a clear redistribution license.
-- Record exact upstream URL, revision/commit, filename, size, and date mirrored.
+- Record exact upstream URL, revision/commit, filename, size, and audit date.
 - Download from upstream directly; never accept user-uploaded binaries.
 - Compute SHA-256 locally.
-- Run a local whisper.cpp smoke test.
+- Run the engine-specific native smoke test and prove the declared accelerator.
 - Add/update license text and notices.
-- Upload model binary plus `.LICENSES.txt` and `.provenance.json` to Textify
-  GitHub Releases.
+- Use either an immutable Textify GitHub Release asset or an exact commit-pinned
+  Hugging Face file. If Textify mirrors the bytes, publish the applicable
+  license and provenance sidecars with the release asset.
 - Update built-in/remote manifest with URL, size, SHA-256, licenses,
   provenance, runtime preset, and min app version.
 - Sign the manifest and verify a clean install download path.
@@ -2160,11 +2208,12 @@ Build flag ownership:
 
 Core ML:
 
-- Exclude Core ML from V1.
-- Do not vendor Core ML encoder files.
-- Do not vendor generated `.mlmodelc` artifacts.
+- Do not bundle Core ML model artifacts in the app.
+- Install only exact signed catalog artifacts into managed model storage.
 - Do not enable `WHISPER_COREML` build paths.
-- Metal is the supported V1 acceleration path.
+- Whisper uses the Metal path. Released FluidAudio batch engines may use Core
+  ML only when Textify proves Neural Engine-preferred operations and fails
+  closed instead of silently accepting CPU fallback.
 
 Exclude from the V1 vendor snapshot:
 
@@ -2205,7 +2254,7 @@ Dependency policy:
 Concurrency:
 
 - `DictationController`: `@MainActor`
-- CGEventTap callback: minimal, hop to MainActor
+- AppKit keyboard-monitor callback: minimal, hop to MainActor
 - Audio capture: actor plus real-time callback discipline
 - Whisper inference: actor state plus serial GCD queue for blocking C call
 - Diagnostics logger: actor
@@ -2239,7 +2288,8 @@ Periodic regression checks:
 
 - each fallback trigger
 - overlay timing threshold
-- Show in Dock relaunch behavior
+- Keep Textify in the Dock migration, opt-out, and relaunch behavior
+- main-window close, Dock reopen, and menu-bar Open Textify behavior
 - Reset Onboarding
 - Reset All Settings
 - Vocabulary and Custom Words
@@ -2271,7 +2321,7 @@ Day-one automated tests:
 
 Manual-only:
 
-- real CGEventTap behavior
+- real AppKit global/local keyboard-monitor behavior
 - real TCC permissions
 - real cross-app insertion
 - secure field behavior
@@ -2289,14 +2339,13 @@ These are not V1 commitments:
 - sandboxing
 - cloud transcription
 - Apple Speech fallback
-- arbitrary model imports
+- arbitrary runtime plugins and unverified non-Whisper model formats
 - arbitrary hotkey capture
 - Fn/Globe trigger
 - toggle recording mode
 - streaming partial transcription
 - long-form transcription workspace
 - file transcription
-- multi-language dictation
 - per-app profiles
 - per-app vocabulary
 - cleanup intensity settings
@@ -2325,7 +2374,7 @@ The V1 product decisions are sufficient to start implementation.
 No product decision blocks coding.
 
 Start with a mock-first vertical path. Do not start with whisper.cpp, Sparkle,
-notarization, or CGEventTap.
+notarization, or real global keyboard monitoring.
 
 ### 31.1 Milestone Sequence
 
@@ -2382,9 +2431,9 @@ notarization, or CGEventTap.
    - Proof: local `.app` launches, onboarding completes, settings persist, and
      mock dictation inserts.
 
-9. Hotkeys And Event Tap
-   - Implement curated triggers, Trigger Test, Input Monitoring/Accessibility
-     status, and fallback trigger behavior.
+9. Hotkeys And Keyboard Monitoring
+   - Implement curated triggers, Trigger Test, Accessibility status, paired
+     AppKit global/local monitoring, and fallback trigger behavior.
    - Proof: state tests with fakes plus manual full-app TCC test.
 
 10. Model Downloads

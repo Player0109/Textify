@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.2222222222222222,
+    "characterErrors" : 4,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 14,
+    "hypothesisText" : "为了规避三四线城市明显过剩的。",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 18,
+    "referenceText" : "为了规避三四线城市明显过剩的市场风险",
+    "referenceWordCount" : 1,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 1
+  },
+  "audio" : {
+    "durationMs" : 5237,
+    "sampleCount" : 83792,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (4 threads)",
+  "engine" : "sensevoice-small-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "SenseVoiceSmall int8 2024-07-17",
+  "modelLicense" : "FunASR Model License 1.1",
+  "resources" : {
+    "peakResidentBytes" : 592625664,
+    "systemCpuMs" : 2,
+    "userCpuMs" : 622
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 158,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 317,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.030169944624785183,
+    "releaseToFinalMs" : 158,
+    "warmupMs" : 24
+  }
+}

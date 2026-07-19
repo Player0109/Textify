@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.22580645161290322,
+    "characterErrors" : 14,
+    "deletions" : 5,
+    "hypothesisCharacterCount" : 60,
+    "hypothesisText" : "だがAIセンター稼働を快く思わない法医学者警察は内部瓦解をもくろみAIセンターの副センター長に就任してたたき潰そうとする",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 62,
+    "referenceText" : "だが、エーアイセンター稼動を快く思わない法医学者、警察は、内部瓦解を目論み、エーアイセンターの副センター長に就任して、叩き潰そうとする。",
+    "referenceWordCount" : 6,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 6
+  },
+  "audio" : {
+    "durationMs" : 10720,
+    "sampleCount" : 171520,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime CPU (4 threads)",
+  "engine" : "reazonspeech-k2-v2",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ReazonSpeech K2 V2 int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 551370752,
+    "systemCpuMs" : 25,
+    "userCpuMs" : 731
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 413,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 1309,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.03852611940298507,
+    "releaseToFinalMs" : 413,
+    "warmupMs" : 13
+  }
+}

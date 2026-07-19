@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.09090909090909091,
+    "characterErrors" : 2,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 22,
+    "hypothesisText" : "お酒 に 酔っ払ら って転んで 顔 を 打 って 鼻血 が出 た。",
+    "hypothesisWordCount" : 11,
+    "insertions" : 9,
+    "referenceCharacterCount" : 22,
+    "referenceText" : "お酒に酔っぱらって転んで、顔をうって鼻血が出た。",
+    "referenceWordCount" : 2,
+    "substitutions" : 2,
+    "wordErrorRate" : 5.5,
+    "wordErrors" : 11
+  },
+  "audio" : {
+    "durationMs" : 3570,
+    "sampleCount" : 57120,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (4 threads)",
+  "engine" : "sensevoice-small-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "SenseVoiceSmall int8 2024-07-17",
+  "modelLicense" : "FunASR Model License 1.1",
+  "resources" : {
+    "peakResidentBytes" : 582860800,
+    "systemCpuMs" : 1,
+    "userCpuMs" : 450
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 116,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 315,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.032492997198879554,
+    "releaseToFinalMs" : 116,
+    "warmupMs" : 24
+  }
+}

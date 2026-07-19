@@ -13,7 +13,6 @@ struct OnboardingRootView: View {
     @State private var launchAtLogin = true
     @State private var permissionMessage: String?
     @State private var modelMessage: String?
-    @State private var modelDownloadState: DownloadState?
     @State private var launchAtLoginCompletionStatus: LaunchAtLoginStatus?
     @State private var didCompleteOnboarding = false
     @State private var triggerTest = OnboardingTriggerTestController()
@@ -83,6 +82,14 @@ struct OnboardingRootView: View {
         }
         .padding(28)
         .frame(width: 680, height: 470)
+        .disabled(services.startupIssue != nil)
+        .overlay {
+            if services.startupIssue != nil {
+                PersistentStorageUnavailableView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(.regularMaterial)
+            }
+        }
         .onAppear {
             launchAtLogin = services.preferences.onboardingCompleted
                 ? services.preferences.launchAtLoginEnabled
@@ -130,11 +137,20 @@ struct OnboardingRootView: View {
                     }
 
                     Button("Install Model") {
-                        Task {
-                            await installModel()
+                        services.modelInstallCoordinator.start()
+                    }
+                    .disabled(services.modelInstallCoordinator.isActive || ProductionModelInstallConfiguration.current == nil)
+
+                    if services.modelInstallCoordinator.isActive {
+                        Button("Cancel") {
+                            services.modelInstallCoordinator.cancel()
+                        }
+                    } else if services.modelInstallCoordinator.state?.phase == .failed
+                        || services.modelInstallCoordinator.state?.phase == .cancelled {
+                        Button("Retry") {
+                            services.modelInstallCoordinator.retry()
                         }
                     }
-                    .disabled(isInstallingModel || ProductionModelInstallConfiguration.current == nil)
                 }
 
                 if ProductionModelInstallConfiguration.current == nil {
@@ -142,7 +158,7 @@ struct OnboardingRootView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                if let modelDownloadState {
+                if let modelDownloadState = services.modelInstallCoordinator.state {
                     ModelInstallProgressView(state: modelDownloadState)
                 }
 
@@ -189,27 +205,15 @@ struct OnboardingRootView: View {
                     .foregroundStyle(.secondary)
             }
 
-        case .inputMonitoring:
-            PermissionStepView(
-                name: "Input Monitoring",
-                status: services.dictation.readiness.permissions.inputMonitoring.settingsStatusLabel,
-                details: "Required to detect the Right Command trigger globally.",
-                actionTitle: "Request Input Monitoring"
-            ) {
-                Task {
-                    let state = await ProductionPermissionRequester.requestInputMonitoring()
-                    permissionMessage = state.permissionRequestMessage(for: "Input Monitoring")
-                    _ = await services.dictation.refreshReadiness()
-                }
-            }
-            if let permissionMessage {
-                Text(permissionMessage)
-                    .foregroundStyle(.secondary)
-            }
-
         case .triggerTest:
             VStack(alignment: .leading, spacing: 12) {
-                Text("Hold Right Command until the check appears, then release.")
+                Picker("Dictation Trigger", selection: triggerBinding) {
+                    ForEach(TextifySettings.TriggerPreference.allCases, id: \.self) { trigger in
+                        Text(trigger.displayName).tag(trigger)
+                    }
+                }
+
+                Text("Hold \(services.preferences.trigger.displayName) until the check appears, then release.")
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 12) {
@@ -231,7 +235,7 @@ struct OnboardingRootView: View {
 
         case .completion:
             VStack(alignment: .leading, spacing: 10) {
-                Text("Textify will stay in the menu bar and listen for Right Command.")
+                Text("Textify will stay in the menu bar and listen for \(services.preferences.trigger.displayName).")
                 Text("Dictation starts only after setup is complete and readiness has no blockers.")
 
                 if let message = OnboardingLaunchAtLoginNotice.message(for: launchAtLoginCompletionStatus) {
@@ -265,8 +269,14 @@ struct OnboardingRootView: View {
         services.dictation.readiness.model.settingsModelStatus
     }
 
-    private var isInstallingModel: Bool {
-        modelDownloadState?.isActive ?? false
+    private var triggerBinding: Binding<TextifySettings.TriggerPreference> {
+        Binding(
+            get: { services.preferences.trigger },
+            set: { trigger in
+                triggerTest.stop()
+                services.setTrigger(trigger)
+            }
+        )
     }
 
     private func primaryAction() {
@@ -301,57 +311,6 @@ struct OnboardingRootView: View {
             return false
         }
         return index < currentStepIndex
-    }
-
-    @MainActor
-    private func installModel() async {
-        guard !isInstallingModel else {
-            return
-        }
-
-        guard let configuration = ProductionModelInstallConfiguration.current else {
-            modelMessage = "Signed model manifest is not configured in this build."
-            return
-        }
-
-        modelMessage = nil
-        modelDownloadState = DownloadState(
-            modelID: ProductionModelPolicy.requiredModelID,
-            phase: .checkingSpace,
-            message: "Preparing model download."
-        )
-
-        do {
-            let verifier = ManifestVerifier(trustedKeys: configuration.trustedKeys)
-            let downloader = ModelDownloader(manifestVerifier: verifier)
-            let manifest = try await downloader.downloadManifest(
-                manifestURL: configuration.manifestURL,
-                signatureURL: configuration.signatureURL
-            )
-            let installer = ModelInstaller(
-                layout: ModelStorageLayout(rootDirectory: services.paths.modelsDirectory),
-                transport: URLSessionDownloadTransport()
-            )
-            _ = try await installer.install(
-                modelID: ProductionModelPolicy.requiredModelID,
-                from: manifest
-            ) { state in
-                Task { @MainActor in
-                    modelDownloadState = state
-                }
-            }
-            services.preferences.activeModelID = ProductionModelPolicy.requiredModelID
-            services.savePreferences()
-            _ = await services.dictation.refreshReadiness()
-            modelMessage = nil
-        } catch {
-            modelDownloadState = DownloadState(
-                modelID: ProductionModelPolicy.requiredModelID,
-                phase: .failed,
-                message: "Model install failed: \(String(describing: error))"
-            )
-            modelMessage = nil
-        }
     }
 
     private func completeOnboarding() async {
@@ -416,7 +375,6 @@ extension OnboardingStep {
         .model,
         .microphone,
         .accessibility,
-        .inputMonitoring,
         .triggerTest,
         .completion
     ]
@@ -431,8 +389,6 @@ extension OnboardingStep {
             return "Allow Microphone"
         case .accessibility:
             return "Allow Accessibility"
-        case .inputMonitoring:
-            return "Allow Input Monitoring"
         case .triggerTest:
             return "Test Right Command"
         case .completion:
@@ -448,7 +404,7 @@ extension OnboardingStep {
 @MainActor
 @Observable
 final class OnboardingTriggerTestController: @unchecked Sendable {
-    private let makeMonitor: @MainActor () -> GlobalHotkeyMonitor
+    private let makeMonitor: @MainActor (TextifyHotkeys.TriggerPreference) -> GlobalHotkeyMonitor
     private let activationDelayMilliseconds: Int
     private let sleepMilliseconds: @Sendable (Int) async -> Void
     private var monitor: GlobalHotkeyMonitor?
@@ -475,8 +431,8 @@ final class OnboardingTriggerTestController: @unchecked Sendable {
             let (nanoseconds, overflow) = UInt64(milliseconds).multipliedReportingOverflow(by: 1_000_000)
             try? await Task.sleep(nanoseconds: overflow ? UInt64.max : nanoseconds)
         },
-        makeMonitor: @escaping @MainActor () -> GlobalHotkeyMonitor = {
-            GlobalHotkeyMonitor(trigger: .rightCommand)
+        makeMonitor: @escaping @MainActor (TextifyHotkeys.TriggerPreference) -> GlobalHotkeyMonitor = {
+            GlobalHotkeyMonitor(trigger: $0)
         }
     ) {
         self.activationDelayMilliseconds = activationDelayMilliseconds
@@ -499,9 +455,9 @@ final class OnboardingTriggerTestController: @unchecked Sendable {
             sawBeginRecording: false,
             sawUp: false
         )
-        statusText = "Listening for Right Command."
+        statusText = "Listening for \(services.preferences.trigger.displayName)."
 
-        let monitor = makeMonitor()
+        let monitor = makeMonitor(services.configuredHotkeyTrigger)
         self.monitor = monitor
         isRunning = true
 
@@ -562,10 +518,10 @@ final class OnboardingTriggerTestController: @unchecked Sendable {
 
         result = await session.ingest(event)
         if result.passed {
-            statusText = "Right Command detected."
+            statusText = "Dictation trigger detected."
             finish()
         } else {
-            statusText = "Keep holding Right Command until recording begins, then release."
+            statusText = "Keep holding the dictation trigger until recording begins, then release."
         }
     }
 
@@ -657,10 +613,6 @@ private struct TriggerCheckRow: View {
 extension HotkeyMonitorError {
     var triggerTestStatusText: String {
         switch self {
-        case .inputMonitoringPermissionRequired:
-            return "Input Monitoring permission is required."
-        case .inputMonitoringDenied:
-            return "Input Monitoring permission is denied."
         case .eventTapDisabledByUserInput:
             return "macOS disabled the trigger monitor. Start the test again."
         case .eventTapCreationFailed, .runLoopSourceCreationFailed:

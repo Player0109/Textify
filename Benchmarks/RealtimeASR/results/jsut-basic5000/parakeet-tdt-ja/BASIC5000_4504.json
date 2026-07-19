@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.17857142857142858,
+    "characterErrors" : 5,
+    "deletions" : 1,
+    "hypothesisCharacterCount" : 30,
+    "hypothesisText" : "戦乱を鎮めるためのよう兵団であるディーグルよう兵団を設立する。",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 28,
+    "referenceText" : "戦乱を静めるための傭兵団である、ディーグル傭兵団を設立する。",
+    "referenceWordCount" : 2,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 2
+  },
+  "audio" : {
+    "durationMs" : 4970,
+    "sampleCount" : 79520,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "Core ML CPU preprocessor + CPU/Apple Neural Engine inference",
+  "engine" : "parakeet-tdt-ja",
+  "engineVersion" : "Textify ParakeetRuntime / FluidAudio 0.15.5",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "parakeet-tdt-0.6b Japanese int8",
+  "modelLicense" : "CC-BY-4.0",
+  "resources" : {
+    "peakResidentBytes" : 96649216,
+    "systemCpuMs" : 5,
+    "userCpuMs" : 30
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 58,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 739,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.011670020120724347,
+    "releaseToFinalMs" : 58,
+    "warmupMs" : 56
+  }
+}

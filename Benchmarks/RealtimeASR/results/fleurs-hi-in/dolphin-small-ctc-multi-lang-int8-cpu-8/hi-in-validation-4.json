@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.16417910447761194,
+    "characterErrors" : 11,
+    "deletions" : 4,
+    "hypothesisCharacterCount" : 61,
+    "hypothesisText" : "जब घायलों को लड़ाई बंद होने के बाद अस्पताल ले जाया गया तो लगभग चालीस अन्य बचे हुए कैदी र्ड में रुके और अपनी कोियों में लौटने से  कर दिया",
+    "hypothesisWordCount" : 48,
+    "insertions" : 2,
+    "referenceCharacterCount" : 67,
+    "referenceText" : "जब घायलों को लड़ाई बंद होने के बाद अस्पताल ले जाया गया तो लगभग 40 अन्य बचे हुए कैदी यार्ड में रुके और अपनी कोठरियों में लौटने से इनकार कर दिया",
+    "referenceWordCount" : 50,
+    "substitutions" : 1,
+    "wordErrorRate" : 0.14,
+    "wordErrors" : 7
+  },
+  "audio" : {
+    "durationMs" : 13620,
+    "sampleCount" : 217920,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "dolphin-small-ctc-multi-lang-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Dolphin Small CTC multilingual int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 717111296,
+    "systemCpuMs" : 91,
+    "userCpuMs" : 2029
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 271,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 214,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.019897209985315713,
+    "releaseToFinalMs" : 271,
+    "warmupMs" : 12
+  }
+}

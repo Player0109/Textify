@@ -6,6 +6,8 @@ import TextifyDiagnostics
 import TextifyHotkeys
 import TextifyModels
 import TextifyRuntime
+import TextifySettings
+import UniformTypeIdentifiers
 
 struct SettingsRootView: View {
     @Environment(AppServices.self) private var services
@@ -13,13 +15,19 @@ struct SettingsRootView: View {
     var body: some View {
         @Bindable var router = services.settingsRouter
 
-        TabView(selection: $router.selectedPane) {
-            ForEach(SettingsPane.productionVisiblePanes) { pane in
-                paneView(for: pane)
-                    .tabItem {
-                        Label(pane.title, systemImage: pane.productionSystemImage)
+        Group {
+            if services.startupIssue != nil {
+                PersistentStorageUnavailableView()
+            } else {
+                TabView(selection: $router.selectedPane) {
+                    ForEach(SettingsPane.productionVisiblePanes) { pane in
+                        paneView(for: pane)
+                            .tabItem {
+                                Label(pane.title, systemImage: pane.productionSystemImage)
+                            }
+                            .tag(pane)
                     }
-                    .tag(pane)
+                }
             }
         }
         .frame(width: 680, height: 500)
@@ -39,6 +47,26 @@ struct SettingsRootView: View {
         case .advanced:
             AdvancedSettingsPane()
         }
+    }
+}
+
+struct PersistentStorageUnavailableView: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "externaldrive.badge.exclamationmark")
+                .font(.system(size: 42))
+                .foregroundStyle(.orange)
+            Text("Textify Storage Is Unavailable")
+                .font(.title2.bold())
+            Text(AppRuntimeIssue.persistentStorageUnavailable.userMessage)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: 460)
+            Button("Quit Textify") {
+                NSApplication.shared.terminate(nil)
+            }
+        }
+        .padding(32)
     }
 }
 
@@ -83,8 +111,11 @@ private struct GeneralSettingsPane: View {
             }
 
             SettingsSection("Dock") {
-                Toggle("Show in Dock", isOn: $services.preferences.showInDock)
-                Text("Quit and reopen Textify to apply Dock changes.")
+                Toggle(
+                    DockPreferencePresentation.title,
+                    isOn: $services.preferences.keepTextifyInDock
+                )
+                Text("Quit and reopen Textify to apply this change.")
                     .foregroundStyle(.secondary)
                 Button("Quit Textify") {
                     NSApplication.shared.terminate(nil)
@@ -154,6 +185,10 @@ private struct GeneralSettingsPane: View {
     }
 }
 
+enum DockPreferencePresentation {
+    static let title = "Keep Textify in the Dock"
+}
+
 struct LoginItemsSettingsOpener {
     static let loginItemsSettingsURL = URL(
         string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension"
@@ -177,7 +212,16 @@ private struct DictationSettingsPane: View {
     var body: some View {
         SettingsPaneLayout(title: "Dictation") {
             SettingsSection("Input") {
-                LabeledContent("Dictation Trigger", value: "Right Command")
+                Picker("Dictation Trigger", selection: triggerBinding) {
+                    ForEach(TextifySettings.TriggerPreference.allCases, id: \.self) { trigger in
+                        Text(trigger.displayName).tag(trigger)
+                    }
+                }
+                Picker("Language", selection: languageBinding) {
+                    ForEach(services.availableTranscriptionLanguages, id: \.self) { language in
+                        Text(language.displayName).tag(language)
+                    }
+                }
                 LabeledContent("Microphone", value: "System Default")
             }
 
@@ -201,29 +245,79 @@ private struct DictationSettingsPane: View {
             SettingsSection("Runtime") {
                 LabeledContent("Status", value: services.dictation.status.menuStatusTitle)
                 LabeledContent("Readiness", value: services.dictation.readiness.canDictate ? "Ready" : "Setup Required")
+                if services.runtimeIssue == .hotkeyMonitorUnavailable {
+                    Text(AppRuntimeIssue.hotkeyMonitorUnavailable.userMessage)
+                        .foregroundStyle(.orange)
+                    Button("Retry Trigger") {
+                        services.startRuntime()
+                    }
+                }
             }
         }
         .onDisappear {
             triggerTest.stop()
         }
     }
+
+    private var triggerBinding: Binding<TextifySettings.TriggerPreference> {
+        Binding(
+            get: { services.preferences.trigger },
+            set: { services.setTrigger($0) }
+        )
+    }
+
+    private var languageBinding: Binding<TranscriptionLanguage> {
+        Binding(
+            get: { services.preferences.transcriptionLanguage },
+            set: { services.setTranscriptionLanguage($0) }
+        )
+    }
+}
+
+extension TextifySettings.TriggerPreference {
+    var displayName: String {
+        switch self {
+        case .rightCommand:
+            return "Right Command"
+        case .rightOption:
+            return "Right Option"
+        case .rightControl:
+            return "Right Control"
+        case .controlSpace:
+            return "Control-Space"
+        }
+    }
+}
+
+extension TranscriptionLanguage {
+    var displayName: String {
+        if self == .automatic {
+            return "Automatic"
+        }
+        return Locale.current.localizedString(forLanguageCode: rawValue)?.capitalized
+            ?? rawValue.uppercased()
+    }
 }
 
 private struct ModelsSettingsPane: View {
     @Environment(AppServices.self) private var services
-    @State private var modelDownloadState: DownloadState?
     @State private var modelMessage: String?
+    @State private var activatingModelID: String?
+    @State private var pendingImportURL: URL?
+    @State private var showsImportConfirmation = false
+    @State private var isImporting = false
+    @State private var pendingRemovalModel: ProductionModelPresentation?
 
     var body: some View {
         SettingsPaneLayout(title: "Models") {
             SettingsSection("Active Model") {
-                LabeledContent("Model", value: ProductionModelPresentation.v1_1.displayName)
-                LabeledContent("Identifier", value: ProductionModelPresentation.v1_1.id)
+                LabeledContent("Model", value: activeModel?.displayName ?? "None")
+                LabeledContent("Identifier", value: services.preferences.activeModelID ?? "Not selected")
                 LabeledContent("Status", value: services.dictation.readiness.model.settingsModelStatus)
             }
 
-            SettingsSection("Curated Model") {
-                ForEach(ProductionModelPresentation.visibleCatalog) { model in
+            SettingsSection("Curated Models") {
+                ForEach(catalog) { model in
                     VStack(alignment: .leading, spacing: 6) {
                         Text(model.displayName)
                             .font(.headline)
@@ -232,7 +326,68 @@ private struct ModelsSettingsPane: View {
                             .foregroundStyle(.secondary)
                         Text(model.description)
                             .foregroundStyle(.secondary)
+
+                        Text(model.supportTier)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+
+                        if let details = model.details {
+                            Text(details)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        LabeledContent("Finalization", value: model.expectedFinalization)
+                            .font(.caption)
+                        LabeledContent("Accuracy", value: model.accuracyTradeoff)
+                            .font(.caption)
+                        LabeledContent("Requires", value: model.requirements)
+                            .font(.caption)
+
+                        HStack(spacing: 10) {
+                            if services.isModelInstalled(model.id) {
+                                Button(services.preferences.activeModelID == model.id ? "Active" : "Use") {
+                                    activatingModelID = model.id
+                                    Task {
+                                        let activated = await services.activateInstalledModel(model.id)
+                                        modelMessage = activated
+                                            ? "\(model.displayName) is active and ready."
+                                            : "Textify kept the previous model because \(model.displayName) could not be prepared."
+                                        activatingModelID = nil
+                                    }
+                                }
+                                .disabled(
+                                    services.preferences.activeModelID == model.id
+                                        || activatingModelID != nil
+                                        || isInstalling
+                                )
+                            }
+
+                            Button(services.isModelInstalled(model.id) ? "Reinstall" : "Install") {
+                                services.modelInstallCoordinator.start(modelID: model.id)
+                            }
+                            .disabled(isInstalling || ProductionModelInstallConfiguration.current == nil)
+
+                            if services.isModelInstalled(model.id) {
+                                Button("Delete", role: .destructive) {
+                                    pendingRemovalModel = model
+                                }
+                                .disabled(
+                                    services.preferences.activeModelID == model.id
+                                        || isInstalling
+                                        || isImporting
+                                )
+                            }
+                        }
                     }
+                }
+
+                if services.modelCatalogCoordinator.isLoading {
+                    ProgressView("Loading signed catalog")
+                        .controlSize(.small)
+                } else if let errorMessage = services.modelCatalogCoordinator.errorMessage {
+                    Text(errorMessage)
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -245,12 +400,21 @@ private struct ModelsSettingsPane: View {
                         }
                     }
 
-                    Button(isInstalling ? "Installing" : "Install Model") {
-                        Task {
-                            await installModel()
+                    Button(isImporting ? "Importing" : "Import Whisper GGML/GGUF") {
+                        chooseCustomWhisperModel()
+                    }
+                    .disabled(isInstalling || isImporting)
+
+                    if isInstalling {
+                        Button("Cancel") {
+                            services.modelInstallCoordinator.cancel()
+                        }
+                    } else if services.modelInstallCoordinator.state?.phase == .failed
+                        || services.modelInstallCoordinator.state?.phase == .cancelled {
+                        Button("Retry") {
+                            services.modelInstallCoordinator.retry()
                         }
                     }
-                    .disabled(isInstalling || ProductionModelInstallConfiguration.current == nil)
                 }
 
                 if ProductionModelInstallConfiguration.current == nil {
@@ -258,7 +422,7 @@ private struct ModelsSettingsPane: View {
                         .foregroundStyle(.secondary)
                 }
 
-                if let modelDownloadState {
+                if let modelDownloadState = services.modelInstallCoordinator.state {
                     ModelInstallProgressView(state: modelDownloadState)
                 }
 
@@ -270,61 +434,111 @@ private struct ModelsSettingsPane: View {
         }
         .task {
             _ = await services.dictation.refreshReadiness()
+            await services.modelCatalogCoordinator.refresh()
+        }
+        .alert("Import local Whisper model?", isPresented: $showsImportConfirmation) {
+            Button("Cancel", role: .cancel) {
+                pendingImportURL = nil
+            }
+            Button("Import") {
+                importPendingWhisperModel()
+            }
+        } message: {
+            Text("Textify validates the file and loads it locally with Whisper.cpp. Only continue if you trust the file and its license permits your use. Textify cannot verify third-party model licenses.")
+        }
+        .alert(
+            "Delete installed model?",
+            isPresented: Binding(
+                get: { pendingRemovalModel != nil },
+                set: { if !$0 { pendingRemovalModel = nil } }
+            ),
+            presenting: pendingRemovalModel
+        ) { model in
+            Button("Cancel", role: .cancel) {
+                pendingRemovalModel = nil
+            }
+            Button("Delete", role: .destructive) {
+                pendingRemovalModel = nil
+                Task {
+                    do {
+                        try await services.removeInstalledModel(model.id)
+                        modelMessage = "\(model.displayName) was deleted."
+                    } catch {
+                        modelMessage = error.localizedDescription
+                    }
+                }
+            }
+        } message: { model in
+            Text("This removes \(model.displayName) from this Mac. You can download it again later.")
         }
     }
 
     private var isInstalling: Bool {
-        modelDownloadState?.isActive ?? false
+        services.modelInstallCoordinator.isActive
     }
 
-    @MainActor
-    private func installModel() async {
-        guard !isInstalling else {
+    private var catalog: [ProductionModelPresentation] {
+        let models = services.modelCatalogCoordinator.models
+        let signedCatalog = models.isEmpty
+            ? ProductionModelPresentation.visibleCatalog
+            : models.map(ProductionModelPresentation.init(model:))
+        let signedIDs = Set(signedCatalog.map(\.id))
+        return signedCatalog + services.installedModels
+            .filter { !signedIDs.contains($0.id) }
+            .map(ProductionModelPresentation.init(model:))
+    }
+
+    private var activeModel: ProductionModelPresentation? {
+        guard let activeModelID = services.preferences.activeModelID else {
+            return nil
+        }
+        return catalog.first { $0.id == activeModelID }
+            ?? ProductionModelPresentation(
+                id: activeModelID,
+                displayName: activeModelID,
+                description: "Installed local model.",
+                details: nil
+            )
+    }
+
+    private func chooseCustomWhisperModel() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.data]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.message = "Choose a Whisper-compatible GGML or GGUF model file."
+        guard panel.runModal() == .OK, let url = panel.url else {
             return
         }
+        pendingImportURL = url
+        showsImportConfirmation = true
+    }
 
-        guard let configuration = ProductionModelInstallConfiguration.current else {
-            modelMessage = "Signed model manifest is not configured in this build."
+    private func importPendingWhisperModel() {
+        guard let url = pendingImportURL else {
             return
         }
-
-        modelMessage = nil
-        modelDownloadState = DownloadState(
-            modelID: ProductionModelPolicy.requiredModelID,
-            phase: .checkingSpace,
-            message: "Preparing model download."
-        )
-
-        do {
-            let verifier = ManifestVerifier(trustedKeys: configuration.trustedKeys)
-            let downloader = ModelDownloader(manifestVerifier: verifier)
-            let manifest = try await downloader.downloadManifest(
-                manifestURL: configuration.manifestURL,
-                signatureURL: configuration.signatureURL
-            )
-            let installer = ModelInstaller(
-                layout: ModelStorageLayout(rootDirectory: services.paths.modelsDirectory),
-                transport: URLSessionDownloadTransport()
-            )
-            _ = try await installer.install(
-                modelID: ProductionModelPolicy.requiredModelID,
-                from: manifest
-            ) { state in
-                Task { @MainActor in
-                    modelDownloadState = state
+        pendingImportURL = nil
+        isImporting = true
+        let didAccess = url.startAccessingSecurityScopedResource()
+        Task {
+            defer {
+                if didAccess {
+                    url.stopAccessingSecurityScopedResource()
                 }
+                isImporting = false
             }
-            services.preferences.activeModelID = ProductionModelPolicy.requiredModelID
-            services.savePreferences()
-            _ = await services.dictation.refreshReadiness()
-            modelMessage = nil
-        } catch {
-            modelDownloadState = DownloadState(
-                modelID: ProductionModelPolicy.requiredModelID,
-                phase: .failed,
-                message: "Model install failed: \(String(describing: error))"
-            )
-            modelMessage = nil
+            do {
+                let name = url.deletingPathExtension().lastPathComponent
+                let model = try await services.importCustomWhisperModel(
+                    from: url,
+                    displayName: name.isEmpty ? "Imported Whisper Model" : name
+                )
+                modelMessage = "\(model.displayName) was validated, imported, and is ready."
+            } catch {
+                modelMessage = "Import failed: \(String(describing: error))"
+            }
         }
     }
 }
@@ -361,18 +575,6 @@ private struct PrivacySettingsPane: View {
                     }
                 }
 
-                PermissionRow(
-                    name: "Input Monitoring",
-                    status: services.dictation.readiness.permissions.inputMonitoring.settingsStatusLabel,
-                    actionTitle: "Request Access"
-                ) {
-                    Task {
-                        let state = await ProductionPermissionRequester.requestInputMonitoring()
-                        permissionMessage = state.permissionRequestMessage(for: "Input Monitoring")
-                        _ = await services.dictation.refreshReadiness()
-                    }
-                }
-
                 if let permissionMessage {
                     Text(permissionMessage)
                         .foregroundStyle(.secondary)
@@ -383,10 +585,194 @@ private struct PrivacySettingsPane: View {
                 Text("Textify keeps normal dictation content in memory only.")
                     .foregroundStyle(.secondary)
             }
+
+            SettingsSection("Excluded Apps") {
+                if services.preferences.excludedApps.isEmpty {
+                    Text("No excluded apps.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(services.preferences.excludedApps) { app in
+                        HStack(spacing: 10) {
+                            ExcludedAppIcon(app: app)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(app.displayName)
+                                Text(app.bundleIdentifier)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+                            Button("Remove") {
+                                removeExcludedApp(bundleIdentifier: app.bundleIdentifier)
+                            }
+                        }
+                    }
+                }
+
+                HStack(spacing: 12) {
+                    Menu("Add Running App") {
+                        let candidates = ExcludedAppsSettingsModel.runningCandidates()
+                            .filter { candidate in
+                                !services.preferences.excludedApps.contains {
+                                    $0.bundleIdentifier == candidate.bundleIdentifier
+                                }
+                            }
+                        if candidates.isEmpty {
+                            Text("No available running apps")
+                        } else {
+                            ForEach(candidates) { candidate in
+                                Button(candidate.displayName) {
+                                    addExcludedApp(candidate)
+                                }
+                            }
+                        }
+                    }
+
+                    Button("Add Application…") {
+                        chooseExcludedApplication()
+                    }
+                }
+            }
         }
         .task {
             _ = await services.dictation.refreshReadiness()
         }
+    }
+
+    private func addExcludedApp(_ candidate: ExcludedAppCandidate) {
+        services.preferences.excludedApps = ExcludedAppsSettingsModel.adding(
+            candidate,
+            to: services.preferences.excludedApps
+        )
+        services.savePreferences()
+    }
+
+    private func removeExcludedApp(bundleIdentifier: String) {
+        services.preferences.excludedApps.removeAll {
+            $0.bundleIdentifier == bundleIdentifier
+        }
+        services.savePreferences()
+    }
+
+    private func chooseExcludedApplication() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose an application to exclude"
+        panel.prompt = "Exclude"
+        panel.allowedContentTypes = [.applicationBundle]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.treatsFilePackagesAsDirectories = false
+        panel.directoryURL = URL(fileURLWithPath: "/Applications", isDirectory: true)
+
+        guard panel.runModal() == .OK,
+              let url = panel.url,
+              let candidate = ExcludedAppsSettingsModel.candidate(for: url) else {
+            return
+        }
+        addExcludedApp(candidate)
+    }
+}
+
+struct ExcludedAppCandidate: Equatable, Identifiable {
+    var id: String { bundleIdentifier }
+
+    let bundleIdentifier: String
+    let displayName: String
+    let iconData: Data?
+    let path: String?
+}
+
+enum ExcludedAppsSettingsModel {
+    static func adding(
+        _ candidate: ExcludedAppCandidate,
+        to apps: [ExcludedApp]
+    ) -> [ExcludedApp] {
+        guard !apps.contains(where: { $0.bundleIdentifier == candidate.bundleIdentifier }) else {
+            return apps
+        }
+        return apps + [
+            ExcludedApp(
+                bundleIdentifier: candidate.bundleIdentifier,
+                displayName: candidate.displayName,
+                cachedIconData: candidate.iconData,
+                lastKnownPath: candidate.path
+            )
+        ]
+    }
+
+    @MainActor
+    static func runningCandidates(workspace: NSWorkspace = .shared) -> [ExcludedAppCandidate] {
+        var seen = Set<String>()
+        return workspace.runningApplications
+            .filter { $0.activationPolicy == .regular }
+            .compactMap { application -> ExcludedAppCandidate? in
+                guard let bundleIdentifier = application.bundleIdentifier,
+                      bundleIdentifier != Bundle.main.bundleIdentifier,
+                      seen.insert(bundleIdentifier).inserted else {
+                    return nil
+                }
+                return ExcludedAppCandidate(
+                    bundleIdentifier: bundleIdentifier,
+                    displayName: application.localizedName ?? bundleIdentifier,
+                    iconData: application.bundleURL.flatMap(iconData),
+                    path: application.bundleURL?.path
+                )
+            }
+            .sorted {
+                $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+            }
+    }
+
+    @MainActor
+    static func candidate(for applicationURL: URL) -> ExcludedAppCandidate? {
+        guard let bundle = Bundle(url: applicationURL),
+              let bundleIdentifier = bundle.bundleIdentifier else {
+            return nil
+        }
+        let displayName = FileManager.default.displayName(atPath: applicationURL.path)
+            .replacingOccurrences(of: ".app", with: "")
+        return ExcludedAppCandidate(
+            bundleIdentifier: bundleIdentifier,
+            displayName: displayName,
+            iconData: iconData(applicationURL),
+            path: applicationURL.path
+        )
+    }
+
+    @MainActor
+    private static func iconData(_ applicationURL: URL) -> Data? {
+        NSWorkspace.shared.icon(forFile: applicationURL.path).tiffRepresentation
+    }
+}
+
+private struct ExcludedAppIcon: View {
+    let app: ExcludedApp
+
+    var body: some View {
+        Group {
+            if let image = resolvedImage {
+                Image(nsImage: image)
+                    .resizable()
+            } else {
+                Image(systemName: "app")
+                    .resizable()
+            }
+        }
+        .scaledToFit()
+        .frame(width: 28, height: 28)
+    }
+
+    private var resolvedImage: NSImage? {
+        if let cachedIconData = app.cachedIconData,
+           let image = NSImage(data: cachedIconData) {
+            return image
+        }
+        if let path = app.lastKnownPath,
+           FileManager.default.fileExists(atPath: path) {
+            return NSWorkspace.shared.icon(forFile: path)
+        }
+        return nil
     }
 }
 
@@ -425,7 +811,6 @@ private struct AdvancedSettingsPane: View {
                 LabeledContent("Model", value: services.dictation.readiness.model.settingsModelStatus)
                 LabeledContent("Microphone", value: services.dictation.readiness.permissions.microphone.settingsStatusLabel)
                 LabeledContent("Accessibility", value: services.dictation.readiness.permissions.accessibility.settingsStatusLabel)
-                LabeledContent("Input Monitoring", value: services.dictation.readiness.permissions.inputMonitoring.settingsStatusLabel)
             }
 
             SettingsSection("Timing") {
@@ -488,14 +873,95 @@ struct ProductionModelPresentation: Equatable, Identifiable {
     let id: String
     let displayName: String
     let description: String
+    let details: String?
+    let supportTier: String
+    let expectedFinalization: String
+    let accuracyTradeoff: String
+    let requirements: String
+
+    init(
+        id: String,
+        displayName: String,
+        description: String,
+        details: String?,
+        supportTier: String = "Custom",
+        expectedFinalization: String = "Varies by model",
+        accuracyTradeoff: String = "See model description",
+        requirements: String = "Apple Silicon"
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.description = description
+        self.details = details
+        self.supportTier = supportTier
+        self.expectedFinalization = expectedFinalization
+        self.accuracyTradeoff = accuracyTradeoff
+        self.requirements = requirements
+    }
 
     static let v1_1 = ProductionModelPresentation(
         id: ProductionModelPolicy.requiredModelID,
         displayName: "Balanced - Whisper small.en q5_1",
-        description: "Local English dictation model for Textify V1.1."
+        description: "Local English dictation model for Textify V1.1.",
+        details: "Whisper.cpp • Metal GPU • English",
+        supportTier: "Recommended",
+        expectedFinalization: "Near-instant after release",
+        accuracyTradeoff: "Balanced English speed and accuracy",
+        requirements: "Apple Silicon • about 182 MB download"
     )
 
     static let visibleCatalog: [ProductionModelPresentation] = [v1_1]
+
+    init(model: ModelEntry) {
+        id = model.id
+        displayName = model.displayName
+        description = model.description
+        let engine = switch model.runtime.engine {
+        case .whisperCpp: "Whisper.cpp"
+        case .fluidAudioParakeet: "Parakeet"
+        case .fluidAudioParaformer: "Paraformer"
+        case .sherpaOnnx: "sherpa-onnx"
+        case .transcribeCpp: "transcribe.cpp"
+        }
+        let accelerator = switch model.runtime.accelerator {
+        case .metalGPU: "Metal GPU"
+        case .coreMLNeuralEngine: "Core ML / Neural Engine"
+        case .cpu: "Apple Silicon CPU"
+        }
+        let languages = model.capabilities.languages.count == 1
+            ? model.capabilities.languages[0]
+            : "\(model.capabilities.languages.count) languages"
+        let size = ByteCountFormatter.string(fromByteCount: model.sizeBytes, countStyle: .file)
+        let license = model.licenses.first?.name ?? "License metadata unavailable"
+        details = "\(engine) • \(accelerator) • \(languages) • \(size) • \(license)"
+        supportTier = Self.supportTier(for: model.tier)
+        expectedFinalization = model.presentation?.expectedFinalization
+            ?? Self.fallbackFinalization(for: model.tier)
+        accuracyTradeoff = model.presentation?.accuracyTradeoff ?? model.description
+        requirements = model.presentation?.requirements ?? "Apple Silicon • \(accelerator)"
+    }
+
+    private static func supportTier(for tier: String) -> String {
+        switch tier.lowercased() {
+        case "balanced", "recommended": "Recommended"
+        case "fast": "Fast"
+        case "accurate": "Accurate"
+        case "specialist": "Specialist"
+        case "experimental": "Experimental"
+        case "custom": "Custom"
+        default: "Experimental"
+        }
+    }
+
+    private static func fallbackFinalization(for tier: String) -> String {
+        switch tier.lowercased() {
+        case "fast": "Fastest available tier"
+        case "balanced", "recommended": "Near-instant after release"
+        case "accurate": "May take longer for higher accuracy"
+        case "specialist": "Varies by specialist model"
+        default: "Experimental; benchmark data incomplete"
+        }
+    }
 }
 
 struct ProductionModelInstallConfiguration: Equatable {
@@ -514,6 +980,10 @@ struct ProductionModelInstallConfiguration: Equatable {
             TrustedModelManifestKey(
                 keyId: "textify-model-manifest-2026-reserve",
                 publicKeyBase64: "4U2qV+TakjtL2HleKRPAhpd9LTTIfhGEmvZR4Opc1ZM="
+            ),
+            TrustedModelManifestKey(
+                keyId: "textify-model-manifest-2026-huggingface",
+                publicKeyBase64: "eg6XVGVQ4Kqh1dtN3B8JcFTtK0RSxkxd79W5tfIlfos="
             )
         ]
     )
@@ -524,10 +994,6 @@ enum ProductionPermissionRequester {
 
     static func requestMicrophone() async -> RuntimePermissionState {
         await MicrophonePermissionClient.live.requestAccess().runtimeState
-    }
-
-    static func requestInputMonitoring() async -> RuntimePermissionState {
-        await InputMonitoringPermissionClient.live.requestAccess().runtimeState
     }
 
     static func requestAccessibilityPrompt() {
@@ -589,19 +1055,6 @@ extension MicrophonePermissionStatus {
         case .notDetermined:
             return .unknown
         case .denied, .restricted:
-            return .denied
-        }
-    }
-}
-
-extension InputMonitoringPermissionStatus {
-    var runtimeState: RuntimePermissionState {
-        switch self {
-        case .granted:
-            return .granted
-        case .unknown:
-            return .unknown
-        case .denied:
             return .denied
         }
     }

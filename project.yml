@@ -24,6 +24,12 @@ targets:
     sources:
       - path: Sources/Textify
       - path: Resources/Assets.xcassets
+      - path: ACKNOWLEDGMENTS.md
+        buildPhase: resources
+      - path: THIRD_PARTY_NOTICES.md
+        buildPhase: resources
+      - path: THIRD_PARTY_LICENSES
+        buildPhase: resources
 
     dependencies:
       - package: TextifyPackage
@@ -63,12 +69,58 @@ targets:
         SDKROOT: macosx
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CURRENT_PROJECT_VERSION: "1"
-        MARKETING_VERSION: "0.1.0"
+        MARKETING_VERSION: "1.1.0"
       configs:
         Debug:
           ONLY_ACTIVE_ARCH: YES
         Release:
           ONLY_ACTIVE_ARCH: NO
+
+    postBuildScripts:
+      - name: Embed Signed Model Catalog
+        script: |
+          CATALOG_DIRECTORY="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/ModelCatalog"
+          mkdir -p "$CATALOG_DIRECTORY"
+          /bin/cp "$SRCROOT/models/manifest.json" "$CATALOG_DIRECTORY/manifest.json"
+          /bin/cp "$SRCROOT/models/manifest.json.sig" "$CATALOG_DIRECTORY/manifest.json.sig"
+        inputFiles:
+          - $(SRCROOT)/models/manifest.json
+          - $(SRCROOT)/models/manifest.json.sig
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ModelCatalog/manifest.json
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ModelCatalog/manifest.json.sig
+      - name: Compile Whisper Metal Library
+        script: |
+          "$SRCROOT/script/build_whisper_metallib.sh" \
+            "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/default.metallib"
+        inputFiles:
+          - $(SRCROOT)/script/build_whisper_metallib.sh
+          - $(SRCROOT)/Vendor/whisper.cpp/ggml/src/ggml-metal/ggml-metal.metal
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/default.metallib
+      - name: Embed sherpa-onnx Runtime
+        script: |
+          "$SRCROOT/script/runtime/embed_sherpa_runtime.sh" \
+            "$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH" \
+            "${EXPANDED_CODE_SIGN_IDENTITY:--}"
+        inputFiles:
+          - $(SRCROOT)/script/runtime/embed_sherpa_runtime.sh
+          - $(SRCROOT)/Vendor/sherpa-onnx/v1.13.2/lib/libsherpa-onnx-c-api.dylib
+          - $(SRCROOT)/Vendor/sherpa-onnx/v1.13.2/lib/libonnxruntime.1.24.4.dylib
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/libsherpa-onnx-c-api.dylib
+          - $(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/libonnxruntime.1.24.4.dylib
+      - name: Embed transcribe.cpp Runtime
+        script: |
+          "$SRCROOT/script/runtime/embed_transcribe_cpp_runtime.sh" \
+            "$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH" \
+            "${EXPANDED_CODE_SIGN_IDENTITY:--}"
+        inputFiles:
+          - $(SRCROOT)/script/runtime/embed_transcribe_cpp_runtime.sh
+          - $(SRCROOT)/Vendor/transcribe.cpp/v0.1.3/lib/libtextify-transcribe.0.1.3.dylib
+          - $(SRCROOT)/Vendor/transcribe.cpp/v0.1.3/EXPORTED_SYMBOLS
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/libtextify-transcribe.0.1.3.dylib
 
 schemes:
   Textify:

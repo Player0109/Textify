@@ -1,0 +1,59 @@
+name: Model Suggestion
+description: Suggest a redistributable Whisper-compatible ggml model for curation.
+title: "[Model]: "
+labels:
+  - model-suggestion
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Model suggestions are reviewed by maintainers and added at their discretion based on license compatibility, quality, and fit. Filing this issue does not guarantee inclusion or a timeline.
+
+        Do not attach or submit model binaries. Textify maintainers obtain eligible artifacts directly from their upstream source.
+  - type: input
+    id: model_name
+    attributes:
+      label: Model name
+    validations:
+      required: true
+  - type: input
+    id: source_url
+    attributes:
+      label: Source URL
+      description: Link to the authoritative upstream model page or repository.
+      placeholder: "https://..."
+    validations:
+      required: true
+  - type: input
+    id: license
+    attributes:
+      label: License
+      description: Include the SPDX identifier when known.
+      placeholder: "MIT"
+    validations:
+      required: true
+  - type: input
+    id: approximate_size
+    attributes:
+      label: Approximate size
+      placeholder: "500 MB"
+    validations:
+      required: true
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Why should Textify consider it?
+      description: Explain its quality, performance, and fit for short English dictation.
+    validations:
+      required: true
+  - type: dropdown
+    id: tested_with_whisper_cpp
+    attributes:
+      label: Tested with whisper.cpp?
+      options:
+        - "Yes"
+        - "No"
+        - Not sure
+    validations:
+      required: true
+

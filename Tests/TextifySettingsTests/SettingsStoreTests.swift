@@ -2,17 +2,58 @@ import TextifySettings
 import XCTest
 
 final class SettingsStoreTests: XCTestCase {
-    func testDefaultsMatchV1Spec() throws {
+    func testDefaultsUseHybridDockExperience() throws {
         let store = SettingsStore(storage: .memory)
         let preferences = store.load()
         XCTAssertEqual(preferences.trigger, .rightCommand)
         XCTAssertEqual(preferences.microphoneSelection, .systemDefault)
         XCTAssertEqual(preferences.transcriptionLanguage, .english)
         XCTAssertEqual(preferences.modelSelectionScope, .curatedInstalledModels)
-        XCTAssertFalse(preferences.showInDock)
+        XCTAssertTrue(preferences.keepTextifyInDock)
         XCTAssertTrue(preferences.automaticallyCheckForUpdates)
         XCTAssertTrue(preferences.launchAtLoginEnabled)
         XCTAssertTrue(preferences.excludedApps.isEmpty)
+    }
+
+    func testLegacyShowInDockPreferenceMigratesToHybridDockDefault() throws {
+        let json = """
+        {
+          "showInDock": false,
+          "onboardingCompleted": true
+        }
+        """
+
+        let preferences = try JSONDecoder().decode(AppPreferences.self, from: Data(json.utf8))
+
+        XCTAssertTrue(preferences.keepTextifyInDock)
+    }
+
+    func testFileStorePersistsLegacyDockMigrationOnce() throws {
+        let directory = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let fileURL = directory.appendingPathComponent("preferences.json")
+        try Data("{\"showInDock\":false}".utf8).write(to: fileURL)
+
+        let preferences = SettingsStore(storage: .file(fileURL)).load()
+
+        XCTAssertTrue(preferences.keepTextifyInDock)
+        let migratedJSON = String(decoding: try Data(contentsOf: fileURL), as: UTF8.self)
+        XCTAssertTrue(migratedJSON.contains("\"keepTextifyInDock\""))
+        XCTAssertFalse(migratedJSON.contains("\"showInDock\""))
+    }
+
+    func testNewDockOptOutRoundTripsWithoutLegacyMigration() throws {
+        let store = SettingsStore(storage: .memory)
+        var preferences = AppPreferences.defaults
+        preferences.keepTextifyInDock = false
+
+        store.save(preferences)
+
+        XCTAssertFalse(store.load().keepTextifyInDock)
     }
 
     func testDecodesOldLaunchAtLoginRequestedByOnboardingIntoLaunchAtLoginEnabled() throws {
@@ -65,27 +106,29 @@ final class SettingsStoreTests: XCTestCase {
         let store = SettingsStore(storage: .file(fileURL))
         var preferences = store.load()
         preferences.trigger = .rightOption
-        preferences.showInDock = true
+        preferences.keepTextifyInDock = false
         preferences.activeModelID = "whisper-small-en-balanced"
         store.save(preferences)
 
         let reloaded = SettingsStore(storage: .file(fileURL)).load()
         XCTAssertEqual(reloaded.trigger, .rightOption)
-        XCTAssertTrue(reloaded.showInDock)
+        XCTAssertFalse(reloaded.keepTextifyInDock)
         XCTAssertEqual(reloaded.activeModelID, "whisper-small-en-balanced")
 
         let json = String(decoding: try Data(contentsOf: fileURL), as: UTF8.self)
         XCTAssertTrue(json.contains("\"trigger\""))
         XCTAssertTrue(json.contains("rightOption"))
         XCTAssertTrue(json.contains("\"launchAtLoginEnabled\""))
+        XCTAssertTrue(json.contains("\"keepTextifyInDock\""))
+        XCTAssertFalse(json.contains("\"showInDock\""))
         XCTAssertFalse(json.contains("launchAtLoginRequestedByOnboarding"))
         XCTAssertFalse(json.contains("developerModeEnabled"))
         XCTAssertFalse(json.contains("encrypted"))
     }
 
     func testV1DoesNotExposeArbitraryModelsOrPerAppProfiles() throws {
-        XCTAssertEqual(AppPreferences.supportedTranscriptionLanguages, [.english])
-        XCTAssertFalse(AppPreferences.allowsArbitraryModelImports)
+        XCTAssertEqual(AppPreferences.supportedTranscriptionLanguages, TranscriptionLanguage.allCases)
+        XCTAssertTrue(AppPreferences.allowsArbitraryModelImports)
         XCTAssertFalse(AppPreferences.supportsPerAppProfiles)
     }
 

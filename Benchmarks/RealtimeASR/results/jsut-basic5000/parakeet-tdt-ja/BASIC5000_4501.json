@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.25806451612903225,
+    "characterErrors" : 16,
+    "deletions" : 5,
+    "hypothesisCharacterCount" : 61,
+    "hypothesisText" : "だがaiセンター稼働を快く思わない法医学者警察は内部瓦解をもくろみaiセンターの副センター長に就任してたたきつぶそうとする。",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 62,
+    "referenceText" : "だが、エーアイセンター稼動を快く思わない法医学者、警察は、内部瓦解を目論み、エーアイセンターの副センター長に就任して、叩き潰そうとする。",
+    "referenceWordCount" : 6,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 6
+  },
+  "audio" : {
+    "durationMs" : 10720,
+    "sampleCount" : 171520,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "Core ML CPU preprocessor + CPU/Apple Neural Engine inference",
+  "engine" : "parakeet-tdt-ja",
+  "engineVersion" : "Textify ParakeetRuntime / FluidAudio 0.15.5",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "parakeet-tdt-0.6b Japanese int8",
+  "modelLicense" : "CC-BY-4.0",
+  "resources" : {
+    "peakResidentBytes" : 694222848,
+    "systemCpuMs" : 9,
+    "userCpuMs" : 39
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 70,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 37386,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.0065298507462686565,
+    "releaseToFinalMs" : 70,
+    "warmupMs" : 57
+  }
+}

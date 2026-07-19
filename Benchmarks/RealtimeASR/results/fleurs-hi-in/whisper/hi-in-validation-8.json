@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.08695652173913043,
+    "characterErrors" : 4,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 46,
+    "hypothesisText" : " अभी भी वे यह पता लगाने की कोशिश कर रहे हैं कि क्रयाश कितना बड़ा था और धैती किस तरह से प्रभावित होगी",
+    "hypothesisWordCount" : 35,
+    "insertions" : 1,
+    "referenceCharacterCount" : 46,
+    "referenceText" : "अभी भी वे यह पता लगाने की कोशिश कर रहे हैं कि क्रैश कितना बड़ा था और धरती किस तरह से प्रभावित होगी",
+    "referenceWordCount" : 34,
+    "substitutions" : 2,
+    "wordErrorRate" : 0.08823529411764706,
+    "wordErrors" : 3
+  },
+  "audio" : {
+    "durationMs" : 9120,
+    "sampleCount" : 145920,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-large-v3-turbo-q5_0",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 688013312,
+    "systemCpuMs" : 15,
+    "userCpuMs" : 70
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 494,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 169,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.05416666666666667,
+    "releaseToFinalMs" : 494,
+    "warmupMs" : 1
+  }
+}

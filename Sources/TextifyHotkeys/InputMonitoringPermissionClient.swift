@@ -31,7 +31,13 @@ public struct InputMonitoringPermissionClient: Sendable {
             CGPreflightListenEventAccess() ? .granted : .unknown
         },
         requestAccess: {
-            CGRequestListenEventAccess() ? .granted : .denied
+            InputMonitoringPermissionClient.requestResult(
+                wasGranted: CGRequestListenEventAccess()
+            )
         }
     )
+
+    static func requestResult(wasGranted: Bool) -> InputMonitoringPermissionStatus {
+        wasGranted ? .granted : .unknown
+    }
 }

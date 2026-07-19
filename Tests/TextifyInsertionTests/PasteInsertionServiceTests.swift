@@ -57,6 +57,72 @@ final class PasteInsertionServiceTests: XCTestCase {
         XCTAssertEqual(poster.pasteCount, 0)
     }
 
+    func testChangedTargetBeforeSnapshotTouchesNothing() async {
+        let pasteboard = FakePasteboardClient()
+        let poster = FakeEventPoster()
+        let expectedTarget = InsertionTargetIdentity(
+            processIdentifier: 42,
+            bundleIdentifier: "com.example.Original"
+        )
+        let checker = SequencedTargetChecker(
+            identities: [
+                InsertionTargetIdentity(
+                    processIdentifier: 84,
+                    bundleIdentifier: "com.example.Other"
+                )
+            ]
+        )
+        let service = PasteInsertionService(
+            pasteboard: pasteboard,
+            eventPoster: poster,
+            accessibility: AccessibilityTrustClient(status: { .trusted }),
+            targetChecker: checker,
+            restoreDelayMilliseconds: 0
+        )
+
+        let outcome = await service.insert(
+            InsertionRequest(text: "hello", target: expectedTarget)
+        )
+
+        XCTAssertEqual(outcome, .notInserted(.targetChanged))
+        XCTAssertEqual(pasteboard.snapshotCount, 0)
+        XCTAssertEqual(poster.pasteCount, 0)
+    }
+
+    func testChangedTargetAfterPasteboardWriteRestoresWithoutPostingPaste() async {
+        let pasteboard = FakePasteboardClient(markerStillPresent: true)
+        let poster = FakeEventPoster()
+        let expectedTarget = InsertionTargetIdentity(
+            processIdentifier: 42,
+            bundleIdentifier: "com.example.Original"
+        )
+        let checker = SequencedTargetChecker(
+            identities: [
+                expectedTarget,
+                InsertionTargetIdentity(
+                    processIdentifier: 84,
+                    bundleIdentifier: "com.example.Other"
+                )
+            ]
+        )
+        let service = PasteInsertionService(
+            pasteboard: pasteboard,
+            eventPoster: poster,
+            accessibility: AccessibilityTrustClient(status: { .trusted }),
+            targetChecker: checker,
+            restoreDelayMilliseconds: 0
+        )
+
+        let outcome = await service.insert(
+            InsertionRequest(text: "hello", target: expectedTarget)
+        )
+
+        XCTAssertEqual(outcome, .notInserted(.targetChanged))
+        XCTAssertEqual(pasteboard.writeCount, 1)
+        XCTAssertEqual(pasteboard.restoreCount, 1)
+        XCTAssertEqual(poster.pasteCount, 0)
+    }
+
     func testSnapshotFailureStopsBeforePasteboardWrite() async {
         let pasteboard = FakePasteboardClient(snapshotError: TestInsertionError.operationFailed)
         let poster = FakeEventPoster()
@@ -73,6 +139,66 @@ final class PasteInsertionServiceTests: XCTestCase {
         XCTAssertEqual(outcome, .notInserted(.pasteboardSnapshotFailed))
         XCTAssertEqual(pasteboard.writeCount, 0)
         XCTAssertEqual(poster.pasteCount, 0)
+    }
+
+    func testSnapshotFailureUsesUnicodeFallbackInTwentyScalarChunks() async {
+        let pasteboard = FakePasteboardClient(snapshotError: TestInsertionError.operationFailed)
+        let poster = FakeEventPoster()
+        let target = InsertionTargetIdentity(
+            processIdentifier: 42,
+            bundleIdentifier: "com.example.Target"
+        )
+        let checker = SequencedTargetChecker(
+            identities: [target, target, target, target]
+        )
+        let service = PasteInsertionService(
+            pasteboard: pasteboard,
+            eventPoster: poster,
+            accessibility: AccessibilityTrustClient(status: { .trusted }),
+            targetChecker: checker,
+            restoreDelayMilliseconds: 0
+        )
+
+        let outcome = await service.insert(
+            InsertionRequest(text: String(repeating: "a", count: 25), target: target)
+        )
+
+        XCTAssertEqual(
+            outcome,
+            .typed(
+                TypingFallbackReport(
+                    cause: .pasteboardSnapshotUnavailable,
+                    chunkCount: 2
+                )
+            )
+        )
+        XCTAssertEqual(poster.typedChunks.map(\.unicodeScalars.count), [20, 5])
+        XCTAssertEqual(poster.pasteCount, 0)
+        XCTAssertEqual(pasteboard.writeCount, 0)
+    }
+
+    func testSnapshotFailureDoesNotTypeTextContainingNewline() async {
+        let pasteboard = FakePasteboardClient(snapshotError: TestInsertionError.operationFailed)
+        let poster = FakeEventPoster()
+        let target = InsertionTargetIdentity(
+            processIdentifier: 42,
+            bundleIdentifier: "com.example.Target"
+        )
+        let checker = SequencedTargetChecker(identities: [target])
+        let service = PasteInsertionService(
+            pasteboard: pasteboard,
+            eventPoster: poster,
+            accessibility: AccessibilityTrustClient(status: { .trusted }),
+            targetChecker: checker,
+            restoreDelayMilliseconds: 0
+        )
+
+        let outcome = await service.insert(
+            InsertionRequest(text: "first\nsecond", target: target)
+        )
+
+        XCTAssertEqual(outcome, .notInserted(.pasteboardSnapshotFailed))
+        XCTAssertEqual(poster.typedChunks, [])
     }
 
     func testPasteboardWriteFailureStopsBeforePasteEvent() async {
@@ -341,6 +467,7 @@ private final class FakePasteboardClient: PasteboardClient, @unchecked Sendable 
 
 private final class FakeEventPoster: EventPoster, @unchecked Sendable {
     var pasteCount = 0
+    var typedChunks: [String] = []
 
     private let error: (any Error)?
 
@@ -354,12 +481,39 @@ private final class FakeEventPoster: EventPoster, @unchecked Sendable {
             throw error
         }
     }
+
+    func postUnicodeText(_ text: String) async throws {
+        typedChunks.append(text)
+    }
 }
 
 private struct FakeTargetChecker: InsertionTargetChecking {
     let status: InsertionTargetStatus
 
+    func currentTargetIdentity() async -> InsertionTargetIdentity? {
+        nil
+    }
+
     func currentTargetStatus() async -> InsertionTargetStatus {
         status
+    }
+}
+
+private actor SequencedTargetChecker: InsertionTargetChecking {
+    private var identities: [InsertionTargetIdentity?]
+
+    init(identities: [InsertionTargetIdentity?]) {
+        self.identities = identities
+    }
+
+    func currentTargetIdentity() async -> InsertionTargetIdentity? {
+        guard !identities.isEmpty else {
+            return nil
+        }
+        return identities.removeFirst()
+    }
+
+    func currentTargetStatus() async -> InsertionTargetStatus {
+        .allowed
     }
 }

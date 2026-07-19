@@ -1,0 +1,59 @@
+{
+  "accuracy" : {
+    "deletions" : 0,
+    "hypothesisWordCount" : 8,
+    "insertions" : 0,
+    "referenceWordCount" : 8,
+    "substitutions" : 0,
+    "wordErrorRate" : 0,
+    "wordErrors" : 0
+  },
+  "audio" : {
+    "durationMs" : 4530,
+    "sampleCount" : 72480,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "Apple on-device Speech service; hardware backend managed by macOS",
+  "engine" : "apple-dictation-analyzer",
+  "engineVersion" : "Apple Speech framework on macOS 26",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Apple DictationTranscriber progressive short dictation en-US",
+  "modelLicense" : "Apple system asset; OS license terms",
+  "resources" : {
+    "peakResidentBytes" : 22069248,
+    "systemCpuMs" : 3,
+    "userCpuMs" : 9
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "firstPartialUnder500Ms" : true,
+    "fullyOffline" : true,
+    "partialMedianBetween200And400Ms" : false,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "firstPartialMs" : 26,
+    "inferenceWorkMs" : 93,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 45,
+    "partialUpdateIntervalsMs" : [
+      5,
+      4,
+      5,
+      6,
+      7,
+      10,
+      5,
+      7
+    ],
+    "partialUpdateMedianMs" : 5,
+    "realTimeFactor" : 0.02052980132450331,
+    "releaseToFinalMs" : 93,
+    "warmupMs" : 0
+  }
+}

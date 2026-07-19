@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 1.6458333333333333,
+    "characterErrors" : 79,
+    "deletions" : 17,
+    "hypothesisCharacterCount" : 79,
+    "hypothesisText" : "روبن اتپہ نے کیول گیندوں میں یارہ چونکو اور دو چھکوں کی مدد سے سطرن بناکر پاری کا سروو چیسکور بنایا",
+    "hypothesisWordCount" : 21,
+    "insertions" : 0,
+    "referenceCharacterCount" : 48,
+    "referenceText" : "रॉबिन उथप्पा ने केवल 41 गेंदों में 11 चौकों और 2 छक्कों की मदद से 70 रन बना कर पारी का सर्वोच्च स्कोर बनाया",
+    "referenceWordCount" : 38,
+    "substitutions" : 21,
+    "wordErrorRate" : 1,
+    "wordErrors" : 38
+  },
+  "audio" : {
+    "durationMs" : 9480,
+    "sampleCount" : 151680,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "omnilingual-asr-300m-ctc-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Omnilingual ASR CTC 300M int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 881623040,
+    "systemCpuMs" : 65,
+    "userCpuMs" : 4867
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 621,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 272,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.06550632911392405,
+    "releaseToFinalMs" : 621,
+    "warmupMs" : 35
+  }
+}

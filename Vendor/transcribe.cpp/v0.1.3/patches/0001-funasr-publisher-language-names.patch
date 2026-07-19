@@ -1,0 +1,68 @@
+diff --git a/src/arch/funasr_nano/model.cpp b/src/arch/funasr_nano/model.cpp
+index c1aa74c..5d65cb3 100644
+--- a/src/arch/funasr_nano/model.cpp
++++ b/src/arch/funasr_nano/model.cpp
+@@ -146,6 +146,54 @@ transcribe_status resolve_chat_tokens(const transcribe::Tokenizer & tok, ChatTok
+     return TRANSCRIBE_OK;
+ }
+ 
++// Map public ISO language codes to the exact language names accepted by the
++// publisher's FunASRNano.get_prompt contract.
++const char * publisher_prompt_language(const char * lang) {
++    struct LanguageName {
++        const char * code;
++        const char * name;
++    };
++    static constexpr LanguageName names[] = {
++        { "zh",  "中文"       },
++        { "en",  "英文"       },
++        { "yue", "粤语"       },
++        { "ja",  "日文"       },
++        { "ko",  "韩文"       },
++        { "vi",  "越南语"     },
++        { "id",  "印尼语"     },
++        { "th",  "泰语"       },
++        { "ms",  "马来语"     },
++        { "tl",  "菲律宾语"   },
++        { "ar",  "阿拉伯语"   },
++        { "hi",  "印地语"     },
++        { "bg",  "保加利亚语" },
++        { "hr",  "克罗地亚语" },
++        { "cs",  "捷克语"     },
++        { "da",  "丹麦语"     },
++        { "nl",  "荷兰语"     },
++        { "et",  "爱沙尼亚语" },
++        { "fi",  "芬兰语"     },
++        { "el",  "希腊语"     },
++        { "hu",  "匈牙利语"   },
++        { "ga",  "爱尔兰语"   },
++        { "lv",  "拉脱维亚语" },
++        { "lt",  "立陶宛语"   },
++        { "mt",  "马耳他语"   },
++        { "pl",  "波兰语"     },
++        { "pt",  "葡萄牙语"   },
++        { "ro",  "罗马尼亚语" },
++        { "sk",  "斯洛伐克语" },
++        { "sl",  "斯洛文尼亚语" },
++        { "sv",  "瑞典语"     },
++    };
++    for (const auto & entry : names) {
++        if (std::strcmp(lang, entry.code) == 0) {
++            return entry.name;
++        }
++    }
++    return lang;
++}
++
+ // Build the language/itn prompt text that the reference's
+ // FunASRNano.get_prompt produces. hotwords-empty path only.
+ std::string build_funasr_prompt_text(const char * lang, bool use_itn) {
+@@ -153,7 +201,7 @@ std::string build_funasr_prompt_text(const char * lang, bool use_itn) {
+     if (lang != nullptr && lang[0] != '\0') {
+         // 语音转写成 = "transcribe to" / "transcribe into"
+         out = "\xE8\xAF\xAD\xE9\x9F\xB3\xE8\xBD\xAC\xE5\x86\x99\xE6\x88\x90";
+-        out += lang;
++        out += publisher_prompt_language(lang);
+     } else {
+         out = "\xE8\xAF\xAD\xE9\x9F\xB3\xE8\xBD\xAC\xE5\x86\x99";
+     }

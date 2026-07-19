@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0,
+    "characterErrors" : 0,
+    "deletions" : 2,
+    "hypothesisCharacterCount" : 42,
+    "hypothesisText" : "また、サイコロに姿を変えることもでき転がると強力な魔力が発動し出た目の数だけ死者が出る。",
+    "hypothesisWordCount" : 2,
+    "insertions" : 0,
+    "referenceCharacterCount" : 42,
+    "referenceText" : "また、サイコロに姿を変えることもでき、転がると強力な魔力が発動し、出た目の数だけ死者が出る。",
+    "referenceWordCount" : 4,
+    "substitutions" : 1,
+    "wordErrorRate" : 0.75,
+    "wordErrors" : 3
+  },
+  "audio" : {
+    "durationMs" : 7640,
+    "sampleCount" : 122240,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "Core ML CPU preprocessor + CPU/Apple Neural Engine inference",
+  "engine" : "parakeet-tdt-ja",
+  "engineVersion" : "Textify ParakeetRuntime / FluidAudio 0.15.5",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "parakeet-tdt-0.6b Japanese int8",
+  "modelLicense" : "CC-BY-4.0",
+  "resources" : {
+    "peakResidentBytes" : 96043008,
+    "systemCpuMs" : 11,
+    "userCpuMs" : 49
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 406,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 282,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.053141361256544506,
+    "releaseToFinalMs" : 406,
+    "warmupMs" : 161
+  }
+}

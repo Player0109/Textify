@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0,
+    "characterErrors" : 0,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 30,
+    "hypothesisText" : " A man said to the universe, \"Sir, I exist.\"",
+    "hypothesisWordCount" : 9,
+    "insertions" : 0,
+    "referenceCharacterCount" : 30,
+    "referenceText" : "A MAN SAID TO THE UNIVERSE SIR I EXIST",
+    "referenceWordCount" : 9,
+    "substitutions" : 0,
+    "wordErrorRate" : 0,
+    "wordErrors" : 0
+  },
+  "audio" : {
+    "durationMs" : 4650,
+    "sampleCount" : 74400,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-large-v3-turbo-q5_0",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 691355648,
+    "systemCpuMs" : 6,
+    "userCpuMs" : 19
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 362,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 174,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.0778494623655914,
+    "releaseToFinalMs" : 362,
+    "warmupMs" : 1
+  }
+}

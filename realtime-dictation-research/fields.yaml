@@ -1,0 +1,78 @@
+field_categories:
+  user_perceived_latency:
+    detail_level: detailed
+    fields:
+      - name: time_to_first_partial_ms
+        description: "Time from detected speech onset until the first useful partial transcript."
+      - name: partial_update_interval_ms
+        description: "Typical interval between useful partial transcript revisions."
+      - name: release_to_final_p50_ms
+        description: "Median time from trigger release until final text is ready to insert."
+      - name: release_to_final_p95_ms
+        description: "95th-percentile time from trigger release until final text is ready to insert."
+      - name: insertion_completion_ms
+        description: "Time from final transcript availability until target-app insertion finishes."
+  transcript_behavior:
+    detail_level: detailed
+    fields:
+      - name: native_streaming
+        description: "Whether the model/runtime maintains streaming state instead of repeatedly decoding overlapping full windows."
+      - name: partial_final_semantics
+        description: "How unstable partial text becomes committed final text without duplication or lost words."
+      - name: end_of_utterance_support
+        description: "Whether the engine detects completed utterances and finalizes them incrementally."
+      - name: punctuation_and_capitalization
+        description: "Whether readable punctuation and capitalization are emitted during or after streaming."
+  quality:
+    detail_level: detailed
+    fields:
+      - name: word_error_rate
+        description: "WER on a fixed Textify English dictation corpus, including accents and technical terms."
+      - name: partial_churn_rate
+        description: "How often already displayed words change before finalization."
+      - name: final_word_loss_rate
+        description: "Frequency of clipped trailing words when the trigger is released."
+      - name: hallucination_rate
+        description: "False text emitted for silence, noise, or non-speech audio."
+  hardware_and_efficiency:
+    detail_level: detailed
+    fields:
+      - name: compute_backend
+        description: "Actual CPU, Metal GPU, Core ML GPU, or Apple Neural Engine execution path."
+      - name: realtime_factor
+        description: "Inference time divided by audio duration for fixed utterance lengths."
+      - name: peak_memory_mb
+        description: "Peak resident memory while the model is loaded and transcribing."
+      - name: cpu_gpu_ane_utilization
+        description: "Observed utilization during sustained dictation, not merely a compile-time capability."
+      - name: thermal_and_energy_behavior
+        description: "Sustained impact during a ten-minute dictation workload."
+  product_fit:
+    detail_level: moderate
+    fields:
+      - name: minimum_macos
+        description: "Earliest supported macOS version and device restrictions."
+      - name: offline_guarantee
+        description: "Whether all inference and model operation remain on-device."
+      - name: model_download_size_mb
+        description: "User-visible asset size and model lifecycle ownership."
+      - name: language_coverage
+        description: "Languages supported at the required quality and latency."
+      - name: license_and_distribution
+        description: "SDK and model licenses, attribution, redistribution, and update obligations."
+      - name: integration_risk
+        description: "Expected changes to TextifyAudio, TextifyTranscription, runtime state, UI, and release packaging."
+  competitor_evidence:
+    detail_level: moderate
+    fields:
+      - name: confirmed_architecture
+        description: "Architecture explicitly disclosed in first-party product documentation."
+      - name: inferred_behavior
+        description: "Likely behavior inferred from UX or release notes and clearly labeled as inference."
+      - name: transferable_pattern
+        description: "A product or engineering pattern Textify can reproduce while remaining offline."
+uncertain:
+  - "Proprietary model architecture and decoder implementation inside Wispr Flow"
+  - "Exact local-engine implementation details inside Superwhisper"
+  - "Exact engine-to-mode mapping for every Spokenly build"
+  - "Real-device Textify latency until controlled benchmarks are run"

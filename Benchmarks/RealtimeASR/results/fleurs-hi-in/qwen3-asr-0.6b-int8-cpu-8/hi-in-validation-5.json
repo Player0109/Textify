@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.18333333333333332,
+    "characterErrors" : 11,
+    "deletions" : 1,
+    "hypothesisCharacterCount" : 61,
+    "hypothesisText" : "पूर्व हाउस स्पीकर न्यूट ग्रिनकेज टैक्सास के गवर्नर रिक पैरी और कांग्रेस बॉमेन मिशेल बैचमैन ने क्रमशः चौथा पांचवा और छठा स्थान हासिल किया.",
+    "hypothesisWordCount" : 57,
+    "insertions" : 3,
+    "referenceCharacterCount" : 60,
+    "referenceText" : "पूर्व हाउस स्पीकर न्यूट गिंग्रिच टेक्सास के गर्वनर रिक पैरी और कांग्रेसवुमन मिशेल बैचमैन ने क्रमश चौथा पांचवां और छठा स्थान हासिल किया",
+    "referenceWordCount" : 55,
+    "substitutions" : 5,
+    "wordErrorRate" : 0.16363636363636364,
+    "wordErrors" : 9
+  },
+  "audio" : {
+    "durationMs" : 14220,
+    "sampleCount" : 227520,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "qwen3-asr-0.6b",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Qwen3-ASR 0.6B int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 1880915968,
+    "systemCpuMs" : 125,
+    "userCpuMs" : 19542
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : false
+  },
+  "timing" : {
+    "inferenceWorkMs" : 2513,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 1105,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.17672292545710266,
+    "releaseToFinalMs" : 2513,
+    "warmupMs" : 138
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.03571428571428571,
+    "characterErrors" : 1,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 28,
+    "hypothesisText" : "戦乱 を鎮める ため の 傭兵団 で ある ディーグル傭兵団を 設立する。",
+    "hypothesisWordCount" : 9,
+    "insertions" : 7,
+    "referenceCharacterCount" : 28,
+    "referenceText" : "戦乱を静めるための傭兵団である、ディーグル傭兵団を設立する。",
+    "referenceWordCount" : 2,
+    "substitutions" : 2,
+    "wordErrorRate" : 4.5,
+    "wordErrors" : 9
+  },
+  "audio" : {
+    "durationMs" : 4970,
+    "sampleCount" : 79520,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (4 threads)",
+  "engine" : "sensevoice-small-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "SenseVoiceSmall int8 2024-07-17",
+  "modelLicense" : "FunASR Model License 1.1",
+  "resources" : {
+    "peakResidentBytes" : 592150528,
+    "systemCpuMs" : 2,
+    "userCpuMs" : 606
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 153,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 312,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.030784708249496983,
+    "releaseToFinalMs" : 153,
+    "warmupMs" : 24
+  }
+}

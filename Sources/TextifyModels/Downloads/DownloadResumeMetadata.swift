@@ -59,4 +59,25 @@ public struct DownloadResumeMetadata: Codable, Equatable, Sendable {
 
         return matchedValidator
     }
+
+    public func canResume(
+        modelID: String,
+        url: String,
+        expectedSize: Int64,
+        sha256: String,
+        eTag: String?,
+        lastModified: String?
+    ) -> Bool {
+        guard self.modelID == modelID,
+              self.sha256.lowercased() == sha256.lowercased()
+        else {
+            return false
+        }
+        return canResume(
+            url: url,
+            expectedSize: expectedSize,
+            eTag: eTag,
+            lastModified: lastModified
+        )
+    }
 }

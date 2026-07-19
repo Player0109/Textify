@@ -26,6 +26,7 @@ public actor LiveAudioRecorder {
     }
 
     public func startRecording(
+        maximumDurationSeconds: Double? = nil,
         onSpeechDetected: @escaping @Sendable () -> Void,
         onMaximumDurationReached: @escaping @Sendable () -> Void
     ) async throws {
@@ -62,7 +63,11 @@ public actor LiveAudioRecorder {
             }
             try engineClient.start()
             lifecycle = .recording(sessionID)
-            scheduleMaximumDurationCallback(for: sessionID, onMaximumDurationReached)
+            scheduleMaximumDurationCallback(
+                for: sessionID,
+                maximumDurationSeconds: maximumDurationSeconds,
+                onMaximumDurationReached
+            )
         } catch let error as LiveAudioRecorderError {
             stopEngine()
             await closeIngestionPipeline(for: sessionID, drain: false)
@@ -196,10 +201,12 @@ public actor LiveAudioRecorder {
 
     private func scheduleMaximumDurationCallback(
         for sessionID: RecordingSessionID,
+        maximumDurationSeconds: Double?,
         _ onMaximumDurationReached: @escaping @Sendable () -> Void
     ) {
         cancelMaximumDurationCallback()
-        let duration = max(0, configuration.maximumDurationSeconds)
+        let requestedDuration = maximumDurationSeconds ?? configuration.maximumDurationSeconds
+        let duration = max(0, min(requestedDuration, configuration.maximumDurationSeconds))
         maximumDurationTask = Task { [weak self] in
             let nanoseconds = UInt64(duration * 1_000_000_000)
             do {

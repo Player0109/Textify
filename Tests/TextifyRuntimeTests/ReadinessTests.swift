@@ -32,13 +32,12 @@ final class ReadinessTests: XCTestCase {
             [
                 .microphonePermissionDenied,
                 .accessibilityPermissionDenied,
-                .inputMonitoringPermissionDenied,
                 .activeModelMissing(modelID: "ggml-small.en-q5_1")
             ]
         )
     }
 
-    func testUnknownInputMonitoringBlocksDictation() {
+    func testUnknownInputMonitoringDoesNotBlockDictation() {
         let snapshot = ReadinessSnapshot(
             permissions: RuntimePermissionSnapshot(
                 microphone: .granted,
@@ -48,8 +47,8 @@ final class ReadinessTests: XCTestCase {
             model: .ready(modelID: "ggml-small.en-q5_1")
         )
 
-        XCTAssertFalse(snapshot.canDictate)
-        XCTAssertEqual(snapshot.blockers, [.inputMonitoringPermissionDenied])
+        XCTAssertTrue(snapshot.canDictate)
+        XCTAssertEqual(snapshot.blockers, [])
     }
 
     func testUnknownMicrophoneBlocksDictation() {

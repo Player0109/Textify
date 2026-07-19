@@ -33,11 +33,28 @@ public struct ModelStorageLayout: Equatable, Sendable {
         )
     }
 
+    public func installedArtifactURL(modelID: String, relativePath: String) throws -> URL {
+        let safePath = try Self.validateRelativePath(relativePath)
+        let modelDirectory = try installedModelDirectory(modelID: modelID)
+        return try containedURL(
+            modelDirectory.appendingPathComponent(safePath, isDirectory: false),
+            in: modelDirectory
+        )
+    }
+
     public func temporaryDownloadURL(modelID: String, filename: String) throws -> URL {
         let safeModelID = try Self.validatePathComponent(modelID)
         let safeFilename = try Self.validatePathComponent(filename)
         return try containedURL(
             downloadsDirectory.appendingPathComponent("\(safeModelID)-\(safeFilename).partial", isDirectory: false),
+            in: downloadsDirectory
+        )
+    }
+
+    public func downloadResumeMetadataURL(modelID: String, filename: String) throws -> URL {
+        let temporaryURL = try temporaryDownloadURL(modelID: modelID, filename: filename)
+        return try containedURL(
+            temporaryURL.appendingPathExtension("resume.json"),
             in: downloadsDirectory
         )
     }
@@ -48,6 +65,36 @@ public struct ModelStorageLayout: Equatable, Sendable {
         return try containedURL(
             modelDirectory.appendingPathComponent(".\(safeFilename).installing-\(UUID().uuidString)", isDirectory: false),
             in: modelDirectory
+        )
+    }
+
+    func temporaryInstallationDirectory(modelID: String) throws -> URL {
+        let safeModelID = try Self.validatePathComponent(modelID)
+        return try containedURL(
+            downloadsDirectory.appendingPathComponent(
+                ".\(safeModelID).installing-\(UUID().uuidString)",
+                isDirectory: true
+            ),
+            in: downloadsDirectory
+        )
+    }
+
+    func temporaryRemovalDirectory(modelID: String) throws -> URL {
+        let safeModelID = try Self.validatePathComponent(modelID)
+        return try containedURL(
+            downloadsDirectory.appendingPathComponent(
+                ".\(safeModelID).removing-\(UUID().uuidString)",
+                isDirectory: true
+            ),
+            in: downloadsDirectory
+        )
+    }
+
+    func artifactURL(in directory: URL, relativePath: String) throws -> URL {
+        let safePath = try Self.validateRelativePath(relativePath)
+        return try containedURL(
+            directory.appendingPathComponent(safePath, isDirectory: false),
+            in: directory
         )
     }
 
@@ -62,6 +109,24 @@ public struct ModelStorageLayout: Equatable, Sendable {
               value.range(of: #"^[A-Za-z0-9._-]+$"#, options: .regularExpression) != nil
         else {
             throw ModelStorageLayoutError.unsafePathComponent(value)
+        }
+        return value
+    }
+
+    private static func validateRelativePath(_ value: String) throws -> String {
+        guard !value.isEmpty,
+              !value.hasPrefix("/"),
+              !value.hasSuffix("/"),
+              !value.contains("\\")
+        else {
+            throw ModelStorageLayoutError.unsafePathComponent(value)
+        }
+        let components = value.split(separator: "/", omittingEmptySubsequences: false)
+        guard !components.isEmpty else {
+            throw ModelStorageLayoutError.unsafePathComponent(value)
+        }
+        for component in components {
+            _ = try validatePathComponent(String(component))
         }
         return value
     }

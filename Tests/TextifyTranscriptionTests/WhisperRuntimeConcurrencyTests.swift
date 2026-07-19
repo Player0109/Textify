@@ -73,6 +73,54 @@ final class WhisperRuntimeConcurrencyTests: XCTestCase {
         XCTAssertEqual(backend.freeCallCount, 1)
     }
 
+    func testTranscriptionReturnsNativeConfidenceMetadata() async throws {
+        let modelURL = try makeTemporaryModelFile()
+        defer { try? FileManager.default.removeItem(at: modelURL) }
+        let backend = ImmediateWhisperBackend(
+            text: "hello",
+            noSpeechProbability: 0.12,
+            averageLogProbability: -0.34,
+            compressionRatio: 1.56
+        )
+        let runtime = WhisperRuntime(backend: backend.backend)
+        try await runtime.load(modelID: "test-model", modelPath: modelURL.path, warmup: false)
+
+        let result = try await runtime.transcribe(
+            TranscriptionAudioBuffer(samples: Array(repeating: 0.1, count: 1_600))
+        )
+
+        XCTAssertEqual(result.text, "hello")
+        XCTAssertEqual(result.noSpeechProbability, 0.12)
+        XCTAssertEqual(result.averageLogProbability, -0.34)
+        XCTAssertEqual(result.compressionRatio, 1.56)
+    }
+
+    func testRequestedGPUFailsClosedWhenNativeContextHasNoGPUBackend() async throws {
+        let modelURL = try makeTemporaryModelFile()
+        defer { try? FileManager.default.removeItem(at: modelURL) }
+        let runtime = WhisperRuntime(
+            backend: ImmediateWhisperBackend(usesGPU: false).backend
+        )
+
+        do {
+            try await runtime.load(
+                modelID: "test-model",
+                modelPath: modelURL.path,
+                useGPU: true,
+                warmup: false
+            )
+            XCTFail("Expected a requested GPU backend to fail closed")
+        } catch let error as WhisperRuntimeError {
+            XCTAssertEqual(
+                error,
+                .loadFailed("The requested Metal GPU backend is unavailable.")
+            )
+        }
+
+        let state = await runtime.state
+        XCTAssertEqual(state, .failed(modelID: "test-model", reason: .loadFailed))
+    }
+
     private func makeTemporaryModelFile() throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("textify-test-model-\(UUID().uuidString)")
@@ -83,14 +131,37 @@ final class WhisperRuntimeConcurrencyTests: XCTestCase {
 
 private struct ImmediateWhisperBackend {
     private let context = NativeWhisperContext(rawValue: OpaquePointer(bitPattern: 1)!)
+    let text: String
+    let noSpeechProbability: Double
+    let averageLogProbability: Double
+    let compressionRatio: Double
+    let usesGPU: Bool
+
+    init(
+        text: String = "",
+        noSpeechProbability: Double = 0,
+        averageLogProbability: Double = 0,
+        compressionRatio: Double = 0,
+        usesGPU: Bool = true
+    ) {
+        self.text = text
+        self.noSpeechProbability = noSpeechProbability
+        self.averageLogProbability = averageLogProbability
+        self.compressionRatio = compressionRatio
+        self.usesGPU = usesGPU
+    }
 
     var backend: WhisperRuntimeBackend {
         WhisperRuntimeBackend(
             load: { _, _, _ in context },
             free: { _ in },
+            usesGPU: { _ in usesGPU },
             transcribe: { _, _, _ in 0 },
-            lastText: { _ in "" },
-            lastError: { _ in "" }
+            lastText: { _ in text },
+            lastError: { _ in "" },
+            lastNoSpeechProbability: { _ in noSpeechProbability },
+            lastAverageLogProbability: { _ in averageLogProbability },
+            lastCompressionRatio: { _ in compressionRatio }
         )
     }
 }
@@ -109,9 +180,13 @@ private final class BlockingWhisperBackend: @unchecked Sendable {
         WhisperRuntimeBackend(
             load: { [context] _, _, _ in context },
             free: { [weak self] _ in self?.recordFree() },
+            usesGPU: { _ in true },
             transcribe: { [weak self] _, _, _ in self?.transcribe() ?? -1 },
             lastText: { _ in "transcript" },
-            lastError: { _ in "error" }
+            lastError: { _ in "error" },
+            lastNoSpeechProbability: { _ in 0 },
+            lastAverageLogProbability: { _ in 0 },
+            lastCompressionRatio: { _ in 0 }
         )
     }
 

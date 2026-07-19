@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0,
+    "characterErrors" : 0,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 10,
+    "hypothesisText" : "不得超越界限，盲目扩张。",
+    "hypothesisWordCount" : 2,
+    "insertions" : 1,
+    "referenceCharacterCount" : 10,
+    "referenceText" : "不得超越界限盲目扩张",
+    "referenceWordCount" : 1,
+    "substitutions" : 1,
+    "wordErrorRate" : 2,
+    "wordErrors" : 2
+  },
+  "audio" : {
+    "durationMs" : 3658,
+    "sampleCount" : 58528,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (4 threads)",
+  "engine" : "sensevoice-small-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "SenseVoiceSmall int8 2024-07-17",
+  "modelLicense" : "FunASR Model License 1.1",
+  "resources" : {
+    "peakResidentBytes" : 584663040,
+    "systemCpuMs" : 2,
+    "userCpuMs" : 453
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 114,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 320,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.03116457080371788,
+    "releaseToFinalMs" : 114,
+    "warmupMs" : 24
+  }
+}

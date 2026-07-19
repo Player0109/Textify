@@ -9,21 +9,48 @@ import TextifySettings
 import TextifyTranscription
 
 final class AppCompositionTests: XCTestCase {
-    func testAppDelegateActivationPolicyFollowsShowInDockPreference() {
+    func testAppDelegateActivationPolicyFollowsKeepInDockPreference() {
         var preferences = AppPreferences.defaults
-        preferences.showInDock = false
+        preferences.keepTextifyInDock = false
         XCTAssertEqual(AppDelegate.activationPolicy(preferences: preferences), .accessory)
 
-        preferences.showInDock = true
+        preferences.keepTextifyInDock = true
         XCTAssertEqual(AppDelegate.activationPolicy(preferences: preferences), .regular)
     }
 
-    func testAppDelegateActivationPolicyFallsBackToAccessoryWhenSettingsPathFails() {
+    func testAppDelegateActivationPolicyFallsBackToRegularWhenSettingsPathFails() {
         let policy = AppDelegate.activationPolicy(
             pathFactory: { throw AppPathFixtureError.unavailable }
         )
 
-        XCTAssertEqual(policy, .accessory)
+        XCTAssertEqual(policy, .regular)
+    }
+
+    func testDockReopenPolicyUsesMainWindowVisibilityInsteadOfAnyVisibleOverlay() {
+        XCTAssertEqual(AppReopenPolicy.action(isMainWindowVisible: false), .openMainWindow)
+        XCTAssertEqual(AppReopenPolicy.action(isMainWindowVisible: true), .focusVisibleWindow)
+    }
+
+    func testClosingLastWindowDoesNotTerminateTextify() {
+        XCTAssertFalse(
+            AppDelegate().applicationShouldTerminateAfterLastWindowClosed(NSApplication.shared)
+        )
+    }
+
+    @MainActor
+    func testAppDelegateOpenMainWindowUsesConfiguredPresenter() {
+        let previousOpener = AppDelegate.mainWindowOpener
+        defer {
+            AppDelegate.mainWindowOpener = previousOpener
+        }
+        var openCount = 0
+        AppDelegate.mainWindowOpener = {
+            openCount += 1
+        }
+
+        AppDelegate.openMainWindow()
+
+        XCTAssertEqual(openCount, 1)
     }
 
     @MainActor
@@ -170,21 +197,22 @@ final class AppCompositionTests: XCTestCase {
     @MainActor
     func testStartRuntimeCanRetryAfterSynchronousHotkeyStartFailure() async throws {
         let tap = FakeCGEventTapClient()
-        let permission = MutableInputMonitoringPermission(status: .denied)
+        tap.startError = HotkeyMonitorError.eventTapCreationFailed
         let services = try Self.makeServices(
             hotkeyMonitor: GlobalHotkeyMonitor(
-                permissionClient: permission.client,
                 eventTapClient: tap
             )
         )
 
         services.startRuntime()
-        XCTAssertEqual(tap.startCount, 0)
+        XCTAssertEqual(tap.startCount, 1)
+        XCTAssertEqual(services.runtimeIssue, .hotkeyMonitorUnavailable)
 
-        permission.status = .granted
+        tap.startError = nil
         services.startRuntime()
 
-        XCTAssertEqual(tap.startCount, 1)
+        XCTAssertEqual(tap.startCount, 2)
+        XCTAssertNil(services.runtimeIssue)
     }
 
     @MainActor
@@ -229,13 +257,17 @@ final class AppCompositionTests: XCTestCase {
             )
         )
         var didShowOnboarding = false
-        let coordinator = AppLaunchCoordinator(services: services) {
-            didShowOnboarding = true
-        }
+        var didShowMainWindow = false
+        let coordinator = AppLaunchCoordinator(
+            services: services,
+            showOnboarding: { didShowOnboarding = true },
+            showMainWindow: { didShowMainWindow = true }
+        )
 
         await coordinator.run()
 
         XCTAssertTrue(didShowOnboarding)
+        XCTAssertFalse(didShowMainWindow)
         XCTAssertEqual(runtimeTap.startCount, 0)
         XCTAssertFalse(services.dictation.readiness.canDictate)
     }
@@ -256,14 +288,19 @@ final class AppCompositionTests: XCTestCase {
             )
         )
         var didShowOnboarding = false
-        let coordinator = AppLaunchCoordinator(services: services) {
-            didShowOnboarding = true
-        }
+        var mainWindowOpenCount = 0
+        let coordinator = AppLaunchCoordinator(
+            services: services,
+            showOnboarding: { didShowOnboarding = true },
+            showMainWindow: { mainWindowOpenCount += 1 }
+        )
 
+        await coordinator.run()
         await coordinator.run()
 
         XCTAssertFalse(didShowOnboarding)
         XCTAssertEqual(runtimeTap.startCount, 1)
+        XCTAssertEqual(mainWindowOpenCount, 1)
     }
 
     @MainActor
@@ -291,6 +328,91 @@ final class AppCompositionTests: XCTestCase {
     }
 
     @MainActor
+    func testRecordingStatusPresentsAndThenHidesOverlay() async throws {
+        let overlay = OverlayPresenterSpy()
+        let services = try Self.makeServices(
+            models: ReadyRuntimeModelResolver(),
+            overlayPresenter: overlay
+        )
+
+        await services.dictation.handleTriggerAction(.beginRecording)
+        for _ in 0..<5 {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(services.overlayState, .recording(elapsedSeconds: 0))
+        XCTAssertEqual(overlay.states.last, .recording(elapsedSeconds: 0))
+
+        await services.dictation.cancelActiveSession(reason: .escapeKey)
+        for _ in 0..<5 {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(services.overlayState, .hidden)
+        XCTAssertEqual(overlay.states.last, .hidden)
+    }
+
+    @MainActor
+    func testProcessingIndicatorAppearsOnlyAfterDelayAndHidesWhenProcessingEnds() async throws {
+        let overlay = OverlayPresenterSpy()
+        let delay = OverlayDelayGate()
+        let services = try Self.makeServices(
+            overlayPresenter: overlay,
+            waitBeforeProcessingIndicator: { await delay.wait() }
+        )
+
+        services.updateOverlay(for: .processing)
+        XCTAssertEqual(services.overlayState, .hidden)
+        XCTAssertEqual(overlay.states.last, .hidden)
+
+        for _ in 0..<20 where !(await delay.isWaiting()) {
+            await Task.yield()
+        }
+        await delay.release()
+        for _ in 0..<20 where services.overlayState != .processing {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(services.overlayState, .processing)
+        services.updateOverlay(for: .idle)
+        XCTAssertEqual(services.overlayState, .hidden)
+        XCTAssertEqual(overlay.states.last, .hidden)
+    }
+
+    @MainActor
+    func testLeavingProcessingBeforeDelayPreventsLateIndicator() async throws {
+        let overlay = OverlayPresenterSpy()
+        let delay = OverlayDelayGate()
+        let services = try Self.makeServices(
+            overlayPresenter: overlay,
+            waitBeforeProcessingIndicator: { await delay.wait() }
+        )
+
+        services.updateOverlay(for: .processing)
+        services.updateOverlay(for: .cancelled(.escapeKey))
+        await delay.release()
+        for _ in 0..<10 {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(services.overlayState, .hidden)
+        XCTAssertFalse(overlay.states.contains(.processing))
+    }
+
+    @MainActor
+    func testExcludedAppStatusShowsDisabledOverlayMessage() throws {
+        let overlay = OverlayPresenterSpy()
+        let services = try Self.makeServices(overlayPresenter: overlay)
+
+        services.updateOverlay(for: .blocked(.excludedApp))
+
+        XCTAssertEqual(
+            overlay.states.last,
+            .blocked("Textify disabled for this app.")
+        )
+    }
+
+    @MainActor
     func testTriggerTestControllerSuspendsAndResumesProductionRuntimeWhenOnboarded() throws {
         let runtimeTap = FakeCGEventTapClient()
         var preferences = AppPreferences.defaults
@@ -307,7 +429,7 @@ final class AppCompositionTests: XCTestCase {
         )
         let triggerTestTap = FakeCGEventTapClient()
         let controller = OnboardingTriggerTestController(
-            makeMonitor: {
+            makeMonitor: { _ in
                 GlobalHotkeyMonitor(
                     permissionClient: InputMonitoringPermissionClient(
                         status: { .granted },
@@ -349,7 +471,7 @@ final class AppCompositionTests: XCTestCase {
         let controller = OnboardingTriggerTestController(
             activationDelayMilliseconds: 250,
             sleepMilliseconds: { _ in },
-            makeMonitor: {
+            makeMonitor: { _ in
                 GlobalHotkeyMonitor(
                     permissionClient: InputMonitoringPermissionClient(
                         status: { .granted },
@@ -403,7 +525,7 @@ final class AppCompositionTests: XCTestCase {
         )
         let triggerTestTap = FakeCGEventTapClient()
         let controller = OnboardingTriggerTestController(
-            makeMonitor: {
+            makeMonitor: { _ in
                 GlobalHotkeyMonitor(
                     permissionClient: InputMonitoringPermissionClient(
                         status: { .granted },
@@ -444,7 +566,7 @@ final class AppCompositionTests: XCTestCase {
         )
         let triggerTestTap = FakeCGEventTapClient()
         let controller = OnboardingTriggerTestController(
-            makeMonitor: {
+            makeMonitor: { _ in
                 GlobalHotkeyMonitor(
                     permissionClient: InputMonitoringPermissionClient(
                         status: { .granted },
@@ -516,6 +638,65 @@ final class AppCompositionTests: XCTestCase {
     }
 
     @MainActor
+    func testChangingTriggerUpdatesRuntimeAndPersistsSelection() throws {
+        let services = try Self.makeServices()
+
+        services.setTrigger(.rightOption)
+
+        XCTAssertEqual(services.preferences.trigger, .rightOption)
+        XCTAssertEqual(services.settingsStore.load().trigger, .rightOption)
+        XCTAssertEqual(services.hotkeyMonitor.configuredTrigger, .rightOption)
+        XCTAssertEqual(services.dictation.configuredTrigger, .rightOption)
+    }
+
+    @MainActor
+    func testModelInstallCoordinatorAllowsOnlyOneActiveOperationAndCancels() async {
+        let gate = SuspendedModelInstallGate()
+        let coordinator = ModelInstallCoordinator { _ in
+            await gate.wait()
+            try Task.checkCancellation()
+        }
+
+        coordinator.start()
+        coordinator.start()
+        for _ in 0..<100 where await gate.callCount() == 0 {
+            await Task.yield()
+        }
+
+        let callCount = await gate.callCount()
+        XCTAssertEqual(callCount, 1)
+        XCTAssertTrue(coordinator.isActive)
+        coordinator.cancel()
+        await gate.release()
+        for _ in 0..<100 where coordinator.isActive {
+            await Task.yield()
+        }
+
+        XCTAssertFalse(coordinator.isActive)
+        XCTAssertEqual(coordinator.state?.phase, .cancelled)
+    }
+
+    @MainActor
+    func testProductionCompositionMigratesUnsupportedExplicitMicrophoneToSystemDefault() throws {
+        let paths = try Self.makeTemporaryPaths()
+        var preferences = AppPreferences.defaults
+        preferences.microphoneSelection = .device(
+            deviceUID: "legacy-device",
+            lastSeenDisplayName: "Legacy Microphone"
+        )
+        SettingsStore(storage: .file(paths.settingsFileURL)).save(preferences)
+
+        let services = AppServices.production(
+            pathFactory: { paths },
+            launchAtLogin: FakeLaunchAtLoginManager(status: .disabled),
+            launchAtLoginLocation: FixedLaunchAtLoginLocation(isSupported: true)
+        )
+
+        XCTAssertEqual(services.preferences.microphoneSelection, .systemDefault)
+        XCTAssertEqual(services.settingsStore.load().microphoneSelection, .systemDefault)
+    }
+
+    @MainActor
     func testProductionCompositionReportsPathStartupFailureWithoutCrashing() {
         let services = AppServices.production(
             pathFactory: { throw AppPathFixtureError.unavailable },
@@ -524,6 +705,9 @@ final class AppCompositionTests: XCTestCase {
         )
 
         XCTAssertEqual(services.startupIssue, AppStartupIssue.applicationPathsUnavailable("unavailable"))
+        services.startRuntime()
+        XCTAssertEqual(services.runtimeIssue, .persistentStorageUnavailable)
+        XCTAssertFalse(services.hotkeyMonitor.isRunning)
     }
 
     @MainActor
@@ -531,7 +715,10 @@ final class AppCompositionTests: XCTestCase {
         preferences: AppPreferences = .defaults,
         hotkeyMonitor: GlobalHotkeyMonitor? = nil,
         launchAtLogin: FakeLaunchAtLoginManager? = nil,
-        launchAtLoginLocation: any LaunchAtLoginLocationChecking = FixedLaunchAtLoginLocation(isSupported: true)
+        launchAtLoginLocation: any LaunchAtLoginLocationChecking = FixedLaunchAtLoginLocation(isSupported: true),
+        models: any RuntimeModelResolving = FakeRuntimeModelResolver(),
+        overlayPresenter: (any RecordingOverlayPresenting)? = nil,
+        waitBeforeProcessingIndicator: @escaping @Sendable () async -> Void = {}
     ) throws -> AppServices {
         let paths = try makeTemporaryPaths()
         let settingsStore = SettingsStore(storage: .file(paths.settingsFileURL))
@@ -552,9 +739,10 @@ final class AppCompositionTests: XCTestCase {
             dictation: AppDictationService(dependencies: RuntimeDependencies(
                 settings: RuntimeSettingsStoreAdapter(storage: .file(paths.settingsFileURL)),
                 permissions: FakeRuntimePermissionChecker(),
-                models: FakeRuntimeModelResolver(),
+                models: models,
                 audio: FakeRuntimeAudioRecorder(),
                 transcriber: FakeRuntimeTranscriber(),
+                targetCapturer: FakeInsertionTargetCapturer(),
                 inserter: FakeInsertionService(),
                 diagnostics: RuntimeDiagnosticsLoggerAdapter(logger: diagnosticsLogger),
                 postProcessor: FakeRuntimePostProcessor(),
@@ -562,7 +750,9 @@ final class AppCompositionTests: XCTestCase {
             )),
             hotkeyMonitor: hotkeyMonitor,
             launchAtLogin: launchAtLogin,
-            launchAtLoginLocation: launchAtLoginLocation
+            launchAtLoginLocation: launchAtLoginLocation,
+            overlayPresenter: overlayPresenter,
+            waitBeforeProcessingIndicator: waitBeforeProcessingIndicator
         )
     }
 
@@ -618,42 +808,17 @@ private struct FixedLaunchAtLoginLocation: LaunchAtLoginLocationChecking {
     let isSupported: Bool
 }
 
-private final class MutableInputMonitoringPermission: @unchecked Sendable {
-    private let lock = NSLock()
-    private var protectedStatus: InputMonitoringPermissionStatus
-
-    var status: InputMonitoringPermissionStatus {
-        get {
-            lock.lock()
-            defer { lock.unlock() }
-            return protectedStatus
-        }
-        set {
-            lock.lock()
-            protectedStatus = newValue
-            lock.unlock()
-        }
-    }
-
-    init(status: InputMonitoringPermissionStatus) {
-        self.protectedStatus = status
-    }
-
-    var client: InputMonitoringPermissionClient {
-        InputMonitoringPermissionClient(
-            status: { self.status },
-            requestAccess: { self.status }
-        )
-    }
-}
-
 private final class FakeCGEventTapClient: CGEventTapClient, @unchecked Sendable {
     private var handler: (@Sendable (CGEventTapMessage) -> Void)?
     private(set) var startCount = 0
     private(set) var stopCount = 0
+    var startError: Error?
 
     func start(handler: @escaping @Sendable (CGEventTapMessage) -> Void) throws -> CGEventTapHandle {
         startCount += 1
+        if let startError {
+            throw startError
+        }
         self.handler = handler
         return CGEventTapHandle()
     }
@@ -689,10 +854,67 @@ private struct FakeRuntimeModelResolver: RuntimeModelResolving {
     }
 }
 
+private struct ReadyRuntimeModelResolver: RuntimeModelResolving {
+    private let model = RuntimeActiveModel(
+        id: "ggml-small.en-q5_1",
+        displayName: "Balanced - Whisper small.en",
+        tier: "balanced",
+        localModelPath: "/tmp/ggml-small.en-q5_1.bin",
+        useGPU: true,
+        threadCount: 1
+    )
+
+    func resolveActiveModel(preferences: AppPreferences) async -> RuntimeActiveModel? {
+        model
+    }
+
+    func readiness(for model: RuntimeActiveModel?) async -> RuntimeModelReadiness {
+        .ready(modelID: self.model.id)
+    }
+}
+
+@MainActor
+private final class OverlayPresenterSpy: RecordingOverlayPresenting {
+    private(set) var states: [RecordingOverlayState] = []
+
+    func present(_ state: RecordingOverlayState) {
+        states.append(state)
+    }
+}
+
+private actor OverlayDelayGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var waiting = false
+    private var released = false
+
+    func wait() async {
+        guard !released else {
+            return
+        }
+        waiting = true
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func isWaiting() -> Bool {
+        waiting
+    }
+
+    func release() {
+        released = true
+        waiting = false
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
 private actor FakeRuntimeAudioRecorder: RuntimeAudioRecording {
     func startRecording(
         microphone: MicrophoneSelection,
-        onSpeechDetected: @escaping @Sendable () -> Void
+        maximumDurationSeconds: Double,
+        onSpeechDetected: @escaping @Sendable () -> Void,
+        onMaximumDurationReached: @escaping @Sendable () -> Void
     ) async throws {}
 
     func finishRecording() async throws -> CanonicalAudioBuffer {
@@ -700,6 +922,12 @@ private actor FakeRuntimeAudioRecorder: RuntimeAudioRecording {
     }
 
     func discardRecording() async {}
+}
+
+private struct FakeInsertionTargetCapturer: InsertionTargetCapturing {
+    func currentTargetIdentity() async -> InsertionTargetIdentity? {
+        InsertionTargetIdentity(processIdentifier: 42, bundleIdentifier: "com.example.Target")
+    }
 }
 
 private actor FakeRuntimeTranscriber: RuntimeTranscribing {
@@ -738,5 +966,27 @@ private struct SuspendedRuntimeClock: RuntimeClock {
 
     func sleep(milliseconds: Int) async {
         await withCheckedContinuation { (_: CheckedContinuation<Void, Never>) in }
+    }
+}
+
+private actor SuspendedModelInstallGate {
+    private var calls = 0
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        calls += 1
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func callCount() -> Int {
+        calls
+    }
+
+    func release() {
+        let continuation = continuation
+        self.continuation = nil
+        continuation?.resume()
     }
 }

@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.24561403508771928,
+    "characterErrors" : 14,
+    "deletions" : 5,
+    "hypothesisCharacterCount" : 52,
+    "hypothesisText" : " ज्यानिकों का मानना है कि उसे लोट्स गंद के द्वारा जानवरों का पीछा करते और खाते हैं ये सुमते हुए कि वे जमीन पर कहां रहे हूंगे।",
+    "hypothesisWordCount" : 43,
+    "insertions" : 0,
+    "referenceCharacterCount" : 57,
+    "referenceText" : "वैज्ञानिकों का मानना है कि ओसेलोट्स गंध के द्वारा जानवरों का पीछा करते और खाते शिकार हैं यह सूँघते हुए कि वे ज़मीन पर कहाँ रहे होंगे।",
+    "referenceWordCount" : 48,
+    "substitutions" : 6,
+    "wordErrorRate" : 0.22916666666666666,
+    "wordErrors" : 11
+  },
+  "audio" : {
+    "durationMs" : 10260,
+    "sampleCount" : 164160,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-large-v3-turbo-q5_0",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 688242688,
+    "systemCpuMs" : 14,
+    "userCpuMs" : 64
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 512,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 182,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.04990253411306043,
+    "releaseToFinalMs" : 512,
+    "warmupMs" : 1
+  }
+}

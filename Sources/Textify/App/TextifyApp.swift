@@ -10,9 +10,27 @@ struct TextifyApp: App {
     init() {
         let services = AppServices.production()
         _services = State(initialValue: services)
-        AppDelegate.launchCoordinator = AppLaunchCoordinator(services: services) {
-            TextifyOnboardingWindowPresenter.shared.show(services: services)
+        AppDelegate.mainWindowOpener = {
+            TextifyMainWindowPresenter.shared.show(services: services)
         }
+        AppDelegate.mainWindowVisibilityProvider = {
+            TextifyMainWindowPresenter.shared.isVisible
+        }
+        AppDelegate.modelInstallActivityProvider = {
+            services.modelInstallCoordinator.isActive
+        }
+        AppDelegate.cancelModelInstall = {
+            services.modelInstallCoordinator.cancel()
+        }
+        AppDelegate.launchCoordinator = AppLaunchCoordinator(
+            services: services,
+            showOnboarding: {
+                TextifyOnboardingWindowPresenter.shared.show(services: services)
+            },
+            showMainWindow: {
+                AppDelegate.openMainWindow()
+            }
+        )
     }
 
     var body: some Scene {
@@ -20,10 +38,14 @@ struct TextifyApp: App {
             MenuBarRoot()
                 .environment(services)
         }
-
-        Settings {
-            SettingsRootView()
-                .environment(services)
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                Button(MenuBarPresentation.openTextifyTitle) {
+                    services.settingsRouter.selectedPane = .general
+                    TextifyMainWindowPresenter.shared.show(services: services)
+                }
+                .keyboardShortcut(",", modifiers: [.command])
+            }
         }
     }
 }
@@ -43,14 +65,17 @@ enum AppLaunchPolicy {
 final class AppLaunchCoordinator {
     private let services: AppServices
     private let showOnboarding: @MainActor () -> Void
+    private let showMainWindow: @MainActor () -> Void
     private var didRun = false
 
     init(
         services: AppServices,
-        showOnboarding: @escaping @MainActor () -> Void
+        showOnboarding: @escaping @MainActor () -> Void,
+        showMainWindow: @escaping @MainActor () -> Void
     ) {
         self.services = services
         self.showOnboarding = showOnboarding
+        self.showMainWindow = showMainWindow
     }
 
     func run() async {
@@ -59,12 +84,19 @@ final class AppLaunchCoordinator {
         }
         didRun = true
 
+        if services.startupIssue != nil {
+            services.startRuntime()
+            showMainWindow()
+            return
+        }
+
         switch AppLaunchPolicy.action(for: services.preferences) {
         case .showOnboarding:
             showOnboarding()
             await services.dictation.refreshReadiness()
         case .startRuntime:
             services.startRuntime()
+            showMainWindow()
         }
     }
 }
@@ -95,7 +127,47 @@ final class TextifyOnboardingWindowPresenter {
         window.contentViewController = NSHostingController(
             rootView: OnboardingRootView { [weak window] in
                 window?.close()
+                AppDelegate.openMainWindow()
             }
+                .environment(services)
+        )
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        self.window = window
+    }
+}
+
+@MainActor
+final class TextifyMainWindowPresenter {
+    static let shared = TextifyMainWindowPresenter()
+
+    private var window: NSWindow?
+
+    private init() {}
+
+    var isVisible: Bool {
+        window?.isVisible == true
+    }
+
+    func show(services: AppServices) {
+        if let window {
+            window.makeKeyAndOrderFront(nil)
+            NSApplication.shared.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 680, height: 500),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Textify"
+        window.contentMinSize = NSSize(width: 680, height: 500)
+        window.isReleasedWhenClosed = false
+        window.contentViewController = NSHostingController(
+            rootView: SettingsRootView()
                 .environment(services)
         )
         window.center()

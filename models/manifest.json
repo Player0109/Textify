@@ -1,6 +1,6 @@
 {
   "manifestVersion": 1,
-  "generatedAt": "2026-07-03T18:00:46Z",
+  "generatedAt": "2026-07-19T15:45:16Z",
   "models": [
     {
       "id": "ggml-small.en-q5_1",
@@ -52,7 +52,1346 @@
         "avgLogProbabilityMin": -1.0,
         "compressionRatioMax": 2.4
       },
-      "minAppVersion": "1.1.0"
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "whisper_cpp",
+        "variant": "whisper-small-en-q5_1",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "en"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "Near-instant after release",
+        "accuracyTradeoff": "Reliable English default with the smallest promoted download",
+        "requirements": "Apple Silicon with Metal; about 190 MB disk"
+      }
+    },
+    {
+      "id": "whisper-large-v3-turbo-q5_0",
+      "displayName": "Specialist - Whisper Turbo (English + Hindi)",
+      "tier": "specialist",
+      "description": "Higher-capacity offline Whisper dictation with measured English and Hindi support.",
+      "sizeBytes": 574041195,
+      "files": [
+        {
+          "filename": "ggml-large-v3-turbo-q5_0.bin",
+          "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo-q5_0.bin",
+          "sha256": "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2",
+          "sizeBytes": 574041195
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "OpenAI Whisper large-v3-turbo weights",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/openai/whisper/04f449b8a437f1bbd3dba5c9f826aca972e7709a/LICENSE"
+        },
+        {
+          "scope": "whisper.cpp conversion and runtime tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/ggerganov/whisper.cpp/a8d002cfd879315632a579e73f0148d06959de36/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "ggerganov/whisper.cpp",
+        "sourceUrl": "https://huggingface.co/ggerganov/whisper.cpp",
+        "sourceRevision": "5359861c739e955e79d9a303bcbc70fb988958b1",
+        "sourceFile": "ggml-large-v3-turbo-q5_0.bin",
+        "originalModelName": "OpenAI Whisper large-v3-turbo",
+        "originalModelUrl": "https://huggingface.co/openai/whisper-large-v3-turbo",
+        "mirroredBy": "ggerganov",
+        "mirroredAt": "2026-07-19"
+      },
+      "runtimeParameters": {
+        "language": "en",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0.0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1.0,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "whisper_cpp",
+        "variant": "whisper-large-v3-turbo-q5_0",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "en",
+          "hi"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "English 367 ms median/415 ms p95; Hindi 536.5 ms median/734 ms p95 on fixed M4 Max samples",
+        "accuracyTradeoff": "Higher-capacity English and Hindi specialist; 4.29% English WER and 22.05% Hindi WER on Textify's narrow fixed samples",
+        "requirements": "Apple Silicon with Metal; about 574 MB disk and 700 MB peak memory"
+      }
+    },
+    {
+      "id": "parakeet-tdt-0.6b-v3",
+      "displayName": "Recommended - Parakeet V3",
+      "tier": "recommended",
+      "description": "Fast, accurate offline dictation for English and 24 additional European languages.",
+      "sizeBytes": 483105645,
+      "files": [
+        {
+          "filename": "parakeet-Decoder.mlmodelc-analytics-coremldata.bin",
+          "relativePath": "Decoder.mlmodelc/analytics/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Decoder.mlmodelc/analytics/coremldata.bin",
+          "sha256": "4238c4e81ecd0dc94bd7dfbb60f7e2cc824107c1ffe0387b8607b72833dba350",
+          "sizeBytes": 243
+        },
+        {
+          "filename": "parakeet-Decoder.mlmodelc-coremldata.bin",
+          "relativePath": "Decoder.mlmodelc/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Decoder.mlmodelc/coremldata.bin",
+          "sha256": "18647af085d87bd8f3121c8a9b4d4564c1ede038dab63d295b4e745cf2d7fb99",
+          "sizeBytes": 554
+        },
+        {
+          "filename": "parakeet-Decoder.mlmodelc-metadata.json",
+          "relativePath": "Decoder.mlmodelc/metadata.json",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Decoder.mlmodelc/metadata.json",
+          "sha256": "a39e93cd8371b8ded92635c7804fcd0590f0d1dd9415c6d19a0484be073077d9",
+          "sizeBytes": 3427
+        },
+        {
+          "filename": "parakeet-Decoder.mlmodelc-model.mil",
+          "relativePath": "Decoder.mlmodelc/model.mil",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Decoder.mlmodelc/model.mil",
+          "sha256": "ef2a0a281695398a62fde86ac269c68f73d5b578d7ed3b31f2ba91a2d1ea1f35",
+          "sizeBytes": 13110
+        },
+        {
+          "filename": "parakeet-Decoder.mlmodelc-weights-weight.bin",
+          "relativePath": "Decoder.mlmodelc/weights/weight.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Decoder.mlmodelc/weights/weight.bin",
+          "sha256": "48adf0f0d47c406c8253d4f7fef967436a39da14f5a65e66d5a4b407be355d41",
+          "sizeBytes": 23604992
+        },
+        {
+          "filename": "parakeet-Encoder.mlmodelc-analytics-coremldata.bin",
+          "relativePath": "Encoder.mlmodelc/analytics/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Encoder.mlmodelc/analytics/coremldata.bin",
+          "sha256": "42e638870d73f26b332918a3496ce36793fbb413a81cbd3d16ba01328637a105",
+          "sizeBytes": 243
+        },
+        {
+          "filename": "parakeet-Encoder.mlmodelc-coremldata.bin",
+          "relativePath": "Encoder.mlmodelc/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Encoder.mlmodelc/coremldata.bin",
+          "sha256": "d48034a167a82e88fc3df64f60af963ab3983538271175b8319e7d5720a0fb86",
+          "sizeBytes": 485
+        },
+        {
+          "filename": "parakeet-Encoder.mlmodelc-metadata.json",
+          "relativePath": "Encoder.mlmodelc/metadata.json",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Encoder.mlmodelc/metadata.json",
+          "sha256": "da24da9cca943fb29d7fa8e376d57fca7cb3aa08ca51b956b0b0e56813f087e9",
+          "sizeBytes": 2921
+        },
+        {
+          "filename": "parakeet-Encoder.mlmodelc-model.mil",
+          "relativePath": "Encoder.mlmodelc/model.mil",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Encoder.mlmodelc/model.mil",
+          "sha256": "ed7b19156ca29fa7dfd6891deb9fda4b0e8893f68597c985d135736546a43808",
+          "sizeBytes": 959769
+        },
+        {
+          "filename": "parakeet-Encoder.mlmodelc-weights-weight.bin",
+          "relativePath": "Encoder.mlmodelc/weights/weight.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Encoder.mlmodelc/weights/weight.bin",
+          "sha256": "e2020f323703477a5b21d7c2d282c403e371afb5962e79877e3033e73ba6f421",
+          "sizeBytes": 445187200
+        },
+        {
+          "filename": "parakeet-JointDecisionv3.mlmodelc-analytics-coremldata.bin",
+          "relativePath": "JointDecisionv3.mlmodelc/analytics/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/JointDecisionv3.mlmodelc/analytics/coremldata.bin",
+          "sha256": "26def4bf73dd56d29dee21c8ef97cb8969e62f6120ed1adc91e46828e2737b6c",
+          "sizeBytes": 243
+        },
+        {
+          "filename": "parakeet-JointDecisionv3.mlmodelc-coremldata.bin",
+          "relativePath": "JointDecisionv3.mlmodelc/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/JointDecisionv3.mlmodelc/coremldata.bin",
+          "sha256": "f5fc08b741400f0088492c9e839418b1e18522f19cba28d361dd030c5f398342",
+          "sizeBytes": 521
+        },
+        {
+          "filename": "parakeet-JointDecisionv3.mlmodelc-metadata.json",
+          "relativePath": "JointDecisionv3.mlmodelc/metadata.json",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/JointDecisionv3.mlmodelc/metadata.json",
+          "sha256": "d9307211b9a37e0f0ac260c7660b1571a3de25841035cfdf9b58fd40425f890f",
+          "sizeBytes": 3453
+        },
+        {
+          "filename": "parakeet-JointDecisionv3.mlmodelc-model.mil",
+          "relativePath": "JointDecisionv3.mlmodelc/model.mil",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/JointDecisionv3.mlmodelc/model.mil",
+          "sha256": "be60732943389a047175111a83f8839f3eb39d4803adafa828a0871b2f39818d",
+          "sizeBytes": 11775
+        },
+        {
+          "filename": "parakeet-JointDecisionv3.mlmodelc-weights-weight.bin",
+          "relativePath": "JointDecisionv3.mlmodelc/weights/weight.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/JointDecisionv3.mlmodelc/weights/weight.bin",
+          "sha256": "4e0e63d840032f7f07ddb1d64446051166281e5491bf22da8a945c41f6eedb3e",
+          "sizeBytes": 12642764
+        },
+        {
+          "filename": "parakeet-Preprocessor.mlmodelc-analytics-coremldata.bin",
+          "relativePath": "Preprocessor.mlmodelc/analytics/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Preprocessor.mlmodelc/analytics/coremldata.bin",
+          "sha256": "c9beeb989c8d66f8be11df59bc6df277ec76cee404f6865b46243835ef562f6d",
+          "sizeBytes": 243
+        },
+        {
+          "filename": "parakeet-Preprocessor.mlmodelc-coremldata.bin",
+          "relativePath": "Preprocessor.mlmodelc/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Preprocessor.mlmodelc/coremldata.bin",
+          "sha256": "dbde3f2300842c1fd51ef3ff948a0bcffe65ffd2dca10707f2509f32c1d65b1d",
+          "sizeBytes": 486
+        },
+        {
+          "filename": "parakeet-Preprocessor.mlmodelc-metadata.json",
+          "relativePath": "Preprocessor.mlmodelc/metadata.json",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Preprocessor.mlmodelc/metadata.json",
+          "sha256": "2a98699e22d279dd37fa1d238aeb1c6db1df0d6fad687775324157689d8f3acf",
+          "sizeBytes": 2841
+        },
+        {
+          "filename": "parakeet-Preprocessor.mlmodelc-model.mil",
+          "relativePath": "Preprocessor.mlmodelc/model.mil",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Preprocessor.mlmodelc/model.mil",
+          "sha256": "4b8518a956450fec57f06c2a21bdffc26973f7f1fa6842fb38fe917f896b6b93",
+          "sizeBytes": 28181
+        },
+        {
+          "filename": "parakeet-Preprocessor.mlmodelc-weights-weight.bin",
+          "relativePath": "Preprocessor.mlmodelc/weights/weight.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Preprocessor.mlmodelc/weights/weight.bin",
+          "sha256": "129b76e3aeafa8afa3ea76d995b964b145fe83700d579f6ff42c4c38fa0968ea",
+          "sizeBytes": 491072
+        },
+        {
+          "filename": "parakeet-parakeet_vocab.json",
+          "relativePath": "parakeet_vocab.json",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/parakeet_vocab.json",
+          "sha256": "7ec60e05f1b24480736ec0eed40900f4626bce1fa9a60fd700ec7e2a59198735",
+          "sizeBytes": 151122
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "NVIDIA Parakeet TDT 0.6B V3 weights and derived Core ML weights",
+          "spdxId": "CC-BY-4.0",
+          "name": "Creative Commons Attribution 4.0 International",
+          "licenseTextUrl": "https://creativecommons.org/licenses/by/4.0/legalcode"
+        },
+        {
+          "scope": "FluidAudio runtime and Core ML conversion tooling",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://raw.githubusercontent.com/FluidInference/FluidAudio/19600a485baa4998812e4654b70d2bab8f2c9949/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "FluidInference/parakeet-tdt-0.6b-v3-coreml",
+        "sourceUrl": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml",
+        "sourceRevision": "aed02740059203c4a87495924f685de3722ae9ce",
+        "sourceFile": "21 selected int8 Core ML runtime leaves",
+        "originalModelName": "NVIDIA Parakeet TDT 0.6B V3",
+        "originalModelUrl": "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3",
+        "mirroredBy": "FluidInference",
+        "mirroredAt": "2026-04-30"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0.0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "fluid_audio_parakeet",
+        "variant": "parakeet-tdt-0.6b-v3",
+        "accelerator": "coreml_neural_engine",
+        "artifactLayout": "model_directory"
+      },
+      "capabilities": {
+        "languages": [
+          "en",
+          "bg",
+          "hr",
+          "cs",
+          "da",
+          "nl",
+          "et",
+          "fi",
+          "fr",
+          "de",
+          "el",
+          "hu",
+          "it",
+          "lv",
+          "lt",
+          "mt",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "es",
+          "sv",
+          "uk"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "Typically under 100 ms after release on M4-class Apple Silicon",
+        "accuracyTradeoff": "Best measured English accuracy plus 25-language European coverage",
+        "requirements": "Apple Silicon, macOS 14.4+, about 483 MB disk; first preparation may take several seconds"
+      }
+    },
+    {
+      "sizeBytes": 227466209,
+      "files": [
+        {
+          "filename": "parakeet-110m-Decoder.mlmodelc-analytics-coremldata.bin",
+          "relativePath": "Decoder.mlmodelc/analytics/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-ctc-110m-coreml/resolve/9bc92ead6e8f17eca92a869fd578ae76842b82ba/Decoder.mlmodelc/analytics/coremldata.bin",
+          "sha256": "dc7174d25586869ffb33e6c519cfcc882bf04b2f0e527b8b84a38fe4d469f618",
+          "sizeBytes": 243
+        },
+        {
+          "filename": "parakeet-110m-Decoder.mlmodelc-coremldata.bin",
+          "relativePath": "Decoder.mlmodelc/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-ctc-110m-coreml/resolve/9bc92ead6e8f17eca92a869fd578ae76842b82ba/Decoder.mlmodelc/coremldata.bin",
+          "sha256": "407846e00c895ee447ee5795eb61c0437b4d5ed8ae33e603173fb3f79d871151",
+          "sizeBytes": 562
+        },
+        {
+          "filename": "parakeet-110m-Decoder.mlmodelc-metadata.json",
+          "relativePath": "Decoder.mlmodelc/metadata.json",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-ctc-110m-coreml/resolve/9bc92ead6e8f17eca92a869fd578ae76842b82ba/Decoder.mlmodelc/metadata.json",
+          "sha256": "31e061914a0e0106020800ac6b19a66e1d11e9194597dc238babfdfad9bd1163",
+          "sizeBytes": 3418
+        },
+        {
+          "filename": "parakeet-110m-Decoder.mlmodelc-model.mil",
+          "relativePath": "Decoder.mlmodelc/model.mil",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-ctc-110m-coreml/resolve/9bc92ead6e8f17eca92a869fd578ae76842b82ba/Decoder.mlmodelc/model.mil",
+          "sha256": "5d8fe2126ead2e4467931f563f0ca4d7747a1feee27c75672b66204f0e95feba",
+          "sizeBytes": 8765
+        },
+        {
+          "filename": "parakeet-110m-Decoder.mlmodelc-weights-weight.bin",
+          "relativePath": "Decoder.mlmodelc/weights/weight.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-ctc-110m-coreml/resolve/9bc92ead6e8f17eca92a869fd578ae76842b82ba/Decoder.mlmodelc/weights/weight.bin",
+          "sha256": "dd90b58597ee2c172c672dffe13b1110898ba07394c1a15efc96cc8c6b18411b",
+          "sizeBytes": 7871040
+        },
+        {
+          "filename": "parakeet-110m-JointDecision.mlmodelc-analytics-coremldata.bin",
+          "relativePath": "JointDecision.mlmodelc/analytics/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-ctc-110m-coreml/resolve/9bc92ead6e8f17eca92a869fd578ae76842b82ba/JointDecision.mlmodelc/analytics/coremldata.bin",
+          "sha256": "42f7757cc6603cf025dd490169edef879c355b62a178243e1ca4d538e762af2f",
+          "sizeBytes": 243
+        },
+        {
+          "filename": "parakeet-110m-JointDecision.mlmodelc-coremldata.bin",
+          "relativePath": "JointDecision.mlmodelc/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-ctc-110m-coreml/resolve/9bc92ead6e8f17eca92a869fd578ae76842b82ba/JointDecision.mlmodelc/coremldata.bin",
+          "sha256": "9ef957d12add316f594b2e8766202ce2b06341e3e5ebaea35b9ff2c3d7a0f4f7",
+          "sizeBytes": 583
+        },
+        {
+          "filename": "parakeet-110m-JointDecision.mlmodelc-metadata.json",
+          "relativePath": "JointDecision.mlmodelc/metadata.json",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-ctc-110m-coreml/resolve/9bc92ead6e8f17eca92a869fd578ae76842b82ba/JointDecision.mlmodelc/metadata.json",
+          "sha256": "d41758303b3430b38132b3d76b39bc88c16889be0dc0e8a88803226b891fa9b2",
+          "sizeBytes": 3565
+        },
+        {
+          "filename": "parakeet-110m-JointDecision.mlmodelc-model.mil",
+          "relativePath": "JointDecision.mlmodelc/model.mil",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-ctc-110m-coreml/resolve/9bc92ead6e8f17eca92a869fd578ae76842b82ba/JointDecision.mlmodelc/model.mil",
+          "sha256": "b8beac2b60a8b2b33854352784b2d37b3783b10eb262cf761095c8df5bf97d14",
+          "sizeBytes": 11768
+        },
+        {
+          "filename": "parakeet-110m-JointDecision.mlmodelc-weights-weight.bin",
+          "relativePath": "JointDecision.mlmodelc/weights/weight.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-ctc-110m-coreml/resolve/9bc92ead6e8f17eca92a869fd578ae76842b82ba/JointDecision.mlmodelc/weights/weight.bin",
+          "sha256": "b3f771cb65b190f1873e39629676ed79b65a8361522f451b37bdba8b1106e6ff",
+          "sizeBytes": 2798028
+        },
+        {
+          "filename": "parakeet-110m-Preprocessor.mlmodelc-analytics-coremldata.bin",
+          "relativePath": "Preprocessor.mlmodelc/analytics/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-ctc-110m-coreml/resolve/9bc92ead6e8f17eca92a869fd578ae76842b82ba/Preprocessor.mlmodelc/analytics/coremldata.bin",
+          "sha256": "d813d089b82b1edfdc558d902d91421c527c2db4ba85e36c4a611ea99eba8248",
+          "sizeBytes": 243
+        },
+        {
+          "filename": "parakeet-110m-Preprocessor.mlmodelc-coremldata.bin",
+          "relativePath": "Preprocessor.mlmodelc/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-ctc-110m-coreml/resolve/9bc92ead6e8f17eca92a869fd578ae76842b82ba/Preprocessor.mlmodelc/coremldata.bin",
+          "sha256": "69e29c6cf43349318661a4aaade4bc0cc124a5780582d283614056cc76eb2907",
+          "sizeBytes": 499
+        },
+        {
+          "filename": "parakeet-110m-Preprocessor.mlmodelc-metadata.json",
+          "relativePath": "Preprocessor.mlmodelc/metadata.json",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-ctc-110m-coreml/resolve/9bc92ead6e8f17eca92a869fd578ae76842b82ba/Preprocessor.mlmodelc/metadata.json",
+          "sha256": "c126b295f723abb241ee9b0e855670fb2b4c68a041caaf5149fcf991b3daf307",
+          "sizeBytes": 3133
+        },
+        {
+          "filename": "parakeet-110m-Preprocessor.mlmodelc-model.mil",
+          "relativePath": "Preprocessor.mlmodelc/model.mil",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-ctc-110m-coreml/resolve/9bc92ead6e8f17eca92a869fd578ae76842b82ba/Preprocessor.mlmodelc/model.mil",
+          "sha256": "2dbf6796267859d0677ffe1bc1c41e72320ef5aa23b256cd96a73c21ecf1cc44",
+          "sizeBytes": 794623
+        },
+        {
+          "filename": "parakeet-110m-Preprocessor.mlmodelc-weights-weight.bin",
+          "relativePath": "Preprocessor.mlmodelc/weights/weight.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-ctc-110m-coreml/resolve/9bc92ead6e8f17eca92a869fd578ae76842b82ba/Preprocessor.mlmodelc/weights/weight.bin",
+          "sha256": "a1c90b88b52667ee4f349b39994003cc2a9fb1b12c310752399d90c880286a7b",
+          "sizeBytes": 215951360
+        },
+        {
+          "filename": "parakeet-110m-parakeet_vocab.json",
+          "relativePath": "parakeet_vocab.json",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-ctc-110m-coreml/resolve/9bc92ead6e8f17eca92a869fd578ae76842b82ba/parakeet_vocab.json",
+          "sha256": "1d6e786d0c1842f45fd3a89044b099d4e3abf889ec986101166619d56bdb821e",
+          "sizeBytes": 18136
+        }
+      ],
+      "id": "parakeet-tdt-ctc-110m",
+      "displayName": "Fast - Parakeet 110M",
+      "tier": "fast",
+      "description": "Compact, very fast offline English dictation with a small memory footprint.",
+      "licenses": [
+        {
+          "scope": "NVIDIA Parakeet TDT-CTC 110M weights and derived Core ML weights",
+          "spdxId": "CC-BY-4.0",
+          "name": "Creative Commons Attribution 4.0 International",
+          "licenseTextUrl": "https://creativecommons.org/licenses/by/4.0/legalcode"
+        },
+        {
+          "scope": "FluidAudio runtime and Core ML conversion tooling",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://raw.githubusercontent.com/FluidInference/FluidAudio/19600a485baa4998812e4654b70d2bab8f2c9949/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "FluidInference/parakeet-tdt-ctc-110m-coreml",
+        "sourceUrl": "https://huggingface.co/FluidInference/parakeet-tdt-ctc-110m-coreml",
+        "sourceRevision": "9bc92ead6e8f17eca92a869fd578ae76842b82ba",
+        "sourceFile": "16 selected Core ML runtime leaves",
+        "originalModelName": "NVIDIA Parakeet TDT-CTC 110M",
+        "originalModelUrl": "https://huggingface.co/nvidia/parakeet-tdt_ctc-110m",
+        "mirroredBy": "FluidInference",
+        "mirroredAt": "2026-03-16"
+      },
+      "runtimeParameters": {
+        "language": "en",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0.0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "fluid_audio_parakeet",
+        "variant": "parakeet-tdt-ctc-110m",
+        "accelerator": "coreml_neural_engine",
+        "artifactLayout": "model_directory"
+      },
+      "capabilities": {
+        "languages": [
+          "en"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "Typically under 100 ms after release on M4-class Apple Silicon",
+        "accuracyTradeoff": "Smallest Parakeet memory footprint; lower published accuracy than the 0.6B variants",
+        "requirements": "Apple Silicon, macOS 14.4+, about 228 MB disk; first preparation may take tens of seconds"
+      }
+    },
+    {
+      "sizeBytes": 464413247,
+      "files": [
+        {
+          "filename": "parakeet-v2-Decoder.mlmodelc-analytics-coremldata.bin",
+          "relativePath": "Decoder.mlmodelc/analytics/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml/resolve/ee09c569f73759e6d44c9bd16766f477b2b36d39/Decoder.mlmodelc/analytics/coremldata.bin",
+          "sha256": "46de1a6fe2e49d19a2125bc91acf020df7f2aea84ba821532aade8427a440b05",
+          "sizeBytes": 243
+        },
+        {
+          "filename": "parakeet-v2-Decoder.mlmodelc-coremldata.bin",
+          "relativePath": "Decoder.mlmodelc/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml/resolve/ee09c569f73759e6d44c9bd16766f477b2b36d39/Decoder.mlmodelc/coremldata.bin",
+          "sha256": "d200ca07694a347f6d02a3886a062ae839831e094e443222f2e48a14945966a8",
+          "sizeBytes": 554
+        },
+        {
+          "filename": "parakeet-v2-Decoder.mlmodelc-metadata.json",
+          "relativePath": "Decoder.mlmodelc/metadata.json",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml/resolve/ee09c569f73759e6d44c9bd16766f477b2b36d39/Decoder.mlmodelc/metadata.json",
+          "sha256": "90a279b822496316458febc0ce761ab05954fadd9d66aa97bea077a35fc8f2b2",
+          "sizeBytes": 3427
+        },
+        {
+          "filename": "parakeet-v2-Decoder.mlmodelc-model.mil",
+          "relativePath": "Decoder.mlmodelc/model.mil",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml/resolve/ee09c569f73759e6d44c9bd16766f477b2b36d39/Decoder.mlmodelc/model.mil",
+          "sha256": "7b95a5a6b672c652000348a67b6d4d92bb8e176b978c6666fe73c28a4d7ec579",
+          "sizeBytes": 13106
+        },
+        {
+          "filename": "parakeet-v2-Decoder.mlmodelc-weights-weight.bin",
+          "relativePath": "Decoder.mlmodelc/weights/weight.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml/resolve/ee09c569f73759e6d44c9bd16766f477b2b36d39/Decoder.mlmodelc/weights/weight.bin",
+          "sha256": "27d26890221d82322c1092fd99d7b40578e435d5cf4b83c887c42603caf97aba",
+          "sizeBytes": 14429952
+        },
+        {
+          "filename": "parakeet-v2-Encoder.mlmodelc-analytics-coremldata.bin",
+          "relativePath": "Encoder.mlmodelc/analytics/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml/resolve/ee09c569f73759e6d44c9bd16766f477b2b36d39/Encoder.mlmodelc/analytics/coremldata.bin",
+          "sha256": "42e638870d73f26b332918a3496ce36793fbb413a81cbd3d16ba01328637a105",
+          "sizeBytes": 243
+        },
+        {
+          "filename": "parakeet-v2-Encoder.mlmodelc-coremldata.bin",
+          "relativePath": "Encoder.mlmodelc/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml/resolve/ee09c569f73759e6d44c9bd16766f477b2b36d39/Encoder.mlmodelc/coremldata.bin",
+          "sha256": "4def7aa848599ad0e17a8b9a982edcdbf33cf92e1f4b798de32e2ca0bc74b030",
+          "sizeBytes": 485
+        },
+        {
+          "filename": "parakeet-v2-Encoder.mlmodelc-metadata.json",
+          "relativePath": "Encoder.mlmodelc/metadata.json",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml/resolve/ee09c569f73759e6d44c9bd16766f477b2b36d39/Encoder.mlmodelc/metadata.json",
+          "sha256": "58222fbc48c13c49d9715567803cd50cb9c23e4360462e0f8ffcea59a2c73c63",
+          "sizeBytes": 2926
+        },
+        {
+          "filename": "parakeet-v2-Encoder.mlmodelc-model.mil",
+          "relativePath": "Encoder.mlmodelc/model.mil",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml/resolve/ee09c569f73759e6d44c9bd16766f477b2b36d39/Encoder.mlmodelc/model.mil",
+          "sha256": "ed7b19156ca29fa7dfd6891deb9fda4b0e8893f68597c985d135736546a43808",
+          "sizeBytes": 959769
+        },
+        {
+          "filename": "parakeet-v2-Encoder.mlmodelc-weights-weight.bin",
+          "relativePath": "Encoder.mlmodelc/weights/weight.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml/resolve/ee09c569f73759e6d44c9bd16766f477b2b36d39/Encoder.mlmodelc/weights/weight.bin",
+          "sha256": "4adc7ad44f9d05e1bffeb2b06d3bb02861a5c7602dff63a6b494aed3bf8a6c3e",
+          "sizeBytes": 445187200
+        },
+        {
+          "filename": "parakeet-v2-JointDecision.mlmodelc-analytics-coremldata.bin",
+          "relativePath": "JointDecision.mlmodelc/analytics/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml/resolve/ee09c569f73759e6d44c9bd16766f477b2b36d39/JointDecision.mlmodelc/analytics/coremldata.bin",
+          "sha256": "f1183ba213bb94a918c8d2cad19ab045320618f97f6ca662245b3936d7b090f7",
+          "sizeBytes": 243
+        },
+        {
+          "filename": "parakeet-v2-JointDecision.mlmodelc-coremldata.bin",
+          "relativePath": "JointDecision.mlmodelc/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml/resolve/ee09c569f73759e6d44c9bd16766f477b2b36d39/JointDecision.mlmodelc/coremldata.bin",
+          "sha256": "e2c6752f1c8cf2d3f6f26ec93195c9bfa759ad59edf9f806696a138154f96f11",
+          "sizeBytes": 534
+        },
+        {
+          "filename": "parakeet-v2-JointDecision.mlmodelc-metadata.json",
+          "relativePath": "JointDecision.mlmodelc/metadata.json",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml/resolve/ee09c569f73759e6d44c9bd16766f477b2b36d39/JointDecision.mlmodelc/metadata.json",
+          "sha256": "ba8d309417b9acd4a175fdb15687de6a941db2f5b06666a60e7cf3cc8e2d3c3c",
+          "sizeBytes": 2936
+        },
+        {
+          "filename": "parakeet-v2-JointDecision.mlmodelc-model.mil",
+          "relativePath": "JointDecision.mlmodelc/model.mil",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml/resolve/ee09c569f73759e6d44c9bd16766f477b2b36d39/JointDecision.mlmodelc/model.mil",
+          "sha256": "93bf82042235127cb81ab537dcae47a1c2e7e242ce4ffdaf772981b45eedc4f0",
+          "sizeBytes": 9722
+        },
+        {
+          "filename": "parakeet-v2-JointDecision.mlmodelc-weights-weight.bin",
+          "relativePath": "JointDecision.mlmodelc/weights/weight.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml/resolve/ee09c569f73759e6d44c9bd16766f477b2b36d39/JointDecision.mlmodelc/weights/weight.bin",
+          "sha256": "ca22a65903a05e64137677da608077578a8606090a598abf4875fa6199aaa19d",
+          "sizeBytes": 3453388
+        },
+        {
+          "filename": "parakeet-v2-Preprocessor.mlmodelc-analytics-coremldata.bin",
+          "relativePath": "Preprocessor.mlmodelc/analytics/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml/resolve/ee09c569f73759e6d44c9bd16766f477b2b36d39/Preprocessor.mlmodelc/analytics/coremldata.bin",
+          "sha256": "03ab3c1327a054c54c07a40325db967ec574f2c91dcc8192bfa44aa561bcf2d8",
+          "sizeBytes": 243
+        },
+        {
+          "filename": "parakeet-v2-Preprocessor.mlmodelc-coremldata.bin",
+          "relativePath": "Preprocessor.mlmodelc/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml/resolve/ee09c569f73759e6d44c9bd16766f477b2b36d39/Preprocessor.mlmodelc/coremldata.bin",
+          "sha256": "d88ea1fc349459c9e100d6a96688c5b29a1f0d865f544be103001724b986b6d6",
+          "sizeBytes": 494
+        },
+        {
+          "filename": "parakeet-v2-Preprocessor.mlmodelc-metadata.json",
+          "relativePath": "Preprocessor.mlmodelc/metadata.json",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml/resolve/ee09c569f73759e6d44c9bd16766f477b2b36d39/Preprocessor.mlmodelc/metadata.json",
+          "sha256": "fb16c581ff5e1b962e7cb2181ed892cd32f9f84c12b6e80ff3e089f28e35bcbb",
+          "sizeBytes": 2974
+        },
+        {
+          "filename": "parakeet-v2-Preprocessor.mlmodelc-model.mil",
+          "relativePath": "Preprocessor.mlmodelc/model.mil",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml/resolve/ee09c569f73759e6d44c9bd16766f477b2b36d39/Preprocessor.mlmodelc/model.mil",
+          "sha256": "3e06d16fd061294c8a75be68c43a3b1ed1f593d4a9c35249e9cdbccadc59721e",
+          "sizeBytes": 27166
+        },
+        {
+          "filename": "parakeet-v2-Preprocessor.mlmodelc-weights-weight.bin",
+          "relativePath": "Preprocessor.mlmodelc/weights/weight.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml/resolve/ee09c569f73759e6d44c9bd16766f477b2b36d39/Preprocessor.mlmodelc/weights/weight.bin",
+          "sha256": "a5f7df6c7f47147ae9486fe18cc7792f9a44d093ec3c6a11e91ef2dc363c48dc",
+          "sizeBytes": 298880
+        },
+        {
+          "filename": "parakeet-v2-parakeet_vocab.json",
+          "relativePath": "parakeet_vocab.json",
+          "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml/resolve/ee09c569f73759e6d44c9bd16766f477b2b36d39/parakeet_vocab.json",
+          "sha256": "57019fe3c745772ca83a1b048a4bb951cd51329504ea33d4d83316b96e279a97",
+          "sizeBytes": 18762
+        }
+      ],
+      "id": "parakeet-tdt-0.6b-v2",
+      "displayName": "Accurate - Parakeet V2",
+      "tier": "accurate",
+      "description": "High-recall offline English dictation on the Apple Neural Engine.",
+      "licenses": [
+        {
+          "scope": "NVIDIA Parakeet TDT 0.6B V2 weights and derived Core ML weights",
+          "spdxId": "CC-BY-4.0",
+          "name": "Creative Commons Attribution 4.0 International",
+          "licenseTextUrl": "https://creativecommons.org/licenses/by/4.0/legalcode"
+        },
+        {
+          "scope": "FluidAudio runtime and Core ML conversion tooling",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://raw.githubusercontent.com/FluidInference/FluidAudio/19600a485baa4998812e4654b70d2bab8f2c9949/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "FluidInference/parakeet-tdt-0.6b-v2-coreml",
+        "sourceUrl": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml",
+        "sourceRevision": "ee09c569f73759e6d44c9bd16766f477b2b36d39",
+        "sourceFile": "21 selected int8 Core ML runtime leaves",
+        "originalModelName": "NVIDIA Parakeet TDT 0.6B V2",
+        "originalModelUrl": "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2",
+        "mirroredBy": "FluidInference",
+        "mirroredAt": "2025-09-25"
+      },
+      "runtimeParameters": {
+        "language": "en",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0.0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "fluid_audio_parakeet",
+        "variant": "parakeet-tdt-0.6b-v2",
+        "accelerator": "coreml_neural_engine",
+        "artifactLayout": "model_directory"
+      },
+      "capabilities": {
+        "languages": [
+          "en"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "Typically under 100 ms after release on M4-class Apple Silicon",
+        "accuracyTradeoff": "English-only high-recall model with a larger memory footprint than 110M",
+        "requirements": "Apple Silicon, macOS 14.4+, about 465 MB disk; first preparation may take about a minute"
+      }
+    },
+    {
+      "sizeBytes": 619065246,
+      "files": [
+        {
+          "filename": "parakeet-ja-Decoderv2.mlmodelc-analytics-coremldata.bin",
+          "relativePath": "Decoderv2.mlmodelc/analytics/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml/resolve/2952296ff1da4a6d6a7aec545e226367db80c612/Decoderv2.mlmodelc/analytics/coremldata.bin",
+          "sha256": "86795f3f612cf5bceb5d3ccb62353e7b249ec0d947de2d92f3a493b41c61cfc3",
+          "sizeBytes": 243
+        },
+        {
+          "filename": "parakeet-ja-Decoderv2.mlmodelc-coremldata.bin",
+          "relativePath": "Decoderv2.mlmodelc/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml/resolve/2952296ff1da4a6d6a7aec545e226367db80c612/Decoderv2.mlmodelc/coremldata.bin",
+          "sha256": "aba05a4a882fb8149c0229b0eb36e24269fb9f008e65f302eef37b1f6c982ed3",
+          "sizeBytes": 493
+        },
+        {
+          "filename": "parakeet-ja-Decoderv2.mlmodelc-metadata.json",
+          "relativePath": "Decoderv2.mlmodelc/metadata.json",
+          "url": "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml/resolve/2952296ff1da4a6d6a7aec545e226367db80c612/Decoderv2.mlmodelc/metadata.json",
+          "sha256": "345b75575b055563b6adc5a6adb39d3bdd8b5bf06b171fcc8a07229113dfc8c5",
+          "sizeBytes": 3316
+        },
+        {
+          "filename": "parakeet-ja-Decoderv2.mlmodelc-model.mil",
+          "relativePath": "Decoderv2.mlmodelc/model.mil",
+          "url": "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml/resolve/2952296ff1da4a6d6a7aec545e226367db80c612/Decoderv2.mlmodelc/model.mil",
+          "sha256": "dd9367a6dac8128d6cbb22a2bf8c7da48fa15494f04b6a4ef7be091f55bedf73",
+          "sizeBytes": 13106
+        },
+        {
+          "filename": "parakeet-ja-Decoderv2.mlmodelc-weights-weight.bin",
+          "relativePath": "Decoderv2.mlmodelc/weights/weight.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml/resolve/2952296ff1da4a6d6a7aec545e226367db80c612/Decoderv2.mlmodelc/weights/weight.bin",
+          "sha256": "a56d792edf3b88e30466c0b992bb7e316fa743c90f8809c2be9d2ecb8ffbd48e",
+          "sizeBytes": 17051392
+        },
+        {
+          "filename": "parakeet-ja-Encoder.mlmodelc-analytics-coremldata.bin",
+          "relativePath": "Encoder.mlmodelc/analytics/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml/resolve/2952296ff1da4a6d6a7aec545e226367db80c612/Encoder.mlmodelc/analytics/coremldata.bin",
+          "sha256": "64d086974fa873a29bac8face69e71df44f678e8591dc848650fdfbd4110730d",
+          "sizeBytes": 243
+        },
+        {
+          "filename": "parakeet-ja-Encoder.mlmodelc-coremldata.bin",
+          "relativePath": "Encoder.mlmodelc/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml/resolve/2952296ff1da4a6d6a7aec545e226367db80c612/Encoder.mlmodelc/coremldata.bin",
+          "sha256": "6e24d36005b89f97ab672596f94215883b19008f556ac1874500385994bd885f",
+          "sizeBytes": 507
+        },
+        {
+          "filename": "parakeet-ja-Encoder.mlmodelc-metadata.json",
+          "relativePath": "Encoder.mlmodelc/metadata.json",
+          "url": "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml/resolve/2952296ff1da4a6d6a7aec545e226367db80c612/Encoder.mlmodelc/metadata.json",
+          "sha256": "d06e8b6e3e305b9d15fad119e9b31d05229c00b532655d120c317e990d633511",
+          "sizeBytes": 2930
+        },
+        {
+          "filename": "parakeet-ja-Encoder.mlmodelc-model.mil",
+          "relativePath": "Encoder.mlmodelc/model.mil",
+          "url": "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml/resolve/2952296ff1da4a6d6a7aec545e226367db80c612/Encoder.mlmodelc/model.mil",
+          "sha256": "151eca4da087e17fa187834f2e15ae84e91a866299f2eecd5f184ff3ee738a3a",
+          "sizeBytes": 1086104
+        },
+        {
+          "filename": "parakeet-ja-Encoder.mlmodelc-weights-weight.bin",
+          "relativePath": "Encoder.mlmodelc/weights/weight.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml/resolve/2952296ff1da4a6d6a7aec545e226367db80c612/Encoder.mlmodelc/weights/weight.bin",
+          "sha256": "257685d3fdb578c5d6d7f0a5460c778f6104bcf2f264e4ae704b885c69ad6dda",
+          "sizeBytes": 593943616
+        },
+        {
+          "filename": "parakeet-ja-Jointerv2.mlmodelc-analytics-coremldata.bin",
+          "relativePath": "Jointerv2.mlmodelc/analytics/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml/resolve/2952296ff1da4a6d6a7aec545e226367db80c612/Jointerv2.mlmodelc/analytics/coremldata.bin",
+          "sha256": "7dcee73505a75e1264f5d2c40f3767fe528768c00ed73b3937b354d10b41e779",
+          "sizeBytes": 243
+        },
+        {
+          "filename": "parakeet-ja-Jointerv2.mlmodelc-coremldata.bin",
+          "relativePath": "Jointerv2.mlmodelc/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml/resolve/2952296ff1da4a6d6a7aec545e226367db80c612/Jointerv2.mlmodelc/coremldata.bin",
+          "sha256": "98c853843c56998e061a2749365c0b1e0bfd5b03f2f54465e843f3de83e8c148",
+          "sizeBytes": 521
+        },
+        {
+          "filename": "parakeet-ja-Jointerv2.mlmodelc-metadata.json",
+          "relativePath": "Jointerv2.mlmodelc/metadata.json",
+          "url": "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml/resolve/2952296ff1da4a6d6a7aec545e226367db80c612/Jointerv2.mlmodelc/metadata.json",
+          "sha256": "192a4656ca8744e9e27317a9008ebde4b664dbaf46011aec85ae27b9715b9697",
+          "sizeBytes": 3464
+        },
+        {
+          "filename": "parakeet-ja-Jointerv2.mlmodelc-model.mil",
+          "relativePath": "Jointerv2.mlmodelc/model.mil",
+          "url": "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml/resolve/2952296ff1da4a6d6a7aec545e226367db80c612/Jointerv2.mlmodelc/model.mil",
+          "sha256": "0e4fb7f1307d2e8fc15542118856cd34ed589134cbb84f0bcd60387aba6ef17d",
+          "sizeBytes": 11774
+        },
+        {
+          "filename": "parakeet-ja-Jointerv2.mlmodelc-weights-weight.bin",
+          "relativePath": "Jointerv2.mlmodelc/weights/weight.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml/resolve/2952296ff1da4a6d6a7aec545e226367db80c612/Jointerv2.mlmodelc/weights/weight.bin",
+          "sha256": "d6f24519c7c6959e8ec6fb078e8c05d912d292fcb57720c63fdc9291b1db122d",
+          "sizeBytes": 6078924
+        },
+        {
+          "filename": "parakeet-ja-Preprocessor.mlmodelc-analytics-coremldata.bin",
+          "relativePath": "Preprocessor.mlmodelc/analytics/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml/resolve/2952296ff1da4a6d6a7aec545e226367db80c612/Preprocessor.mlmodelc/analytics/coremldata.bin",
+          "sha256": "315309121ac09c8fb7ed9f8dab20a30e440530b527401af5abcf6d0cf959e495",
+          "sizeBytes": 243
+        },
+        {
+          "filename": "parakeet-ja-Preprocessor.mlmodelc-coremldata.bin",
+          "relativePath": "Preprocessor.mlmodelc/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml/resolve/2952296ff1da4a6d6a7aec545e226367db80c612/Preprocessor.mlmodelc/coremldata.bin",
+          "sha256": "de3624dd8335b3b0391be95da73b59577916f3ac7d1c6d30a66fd16369af7cb8",
+          "sizeBytes": 512
+        },
+        {
+          "filename": "parakeet-ja-Preprocessor.mlmodelc-metadata.json",
+          "relativePath": "Preprocessor.mlmodelc/metadata.json",
+          "url": "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml/resolve/2952296ff1da4a6d6a7aec545e226367db80c612/Preprocessor.mlmodelc/metadata.json",
+          "sha256": "6c12ff477a63450f41ca2b52451d767a9bfc91d70311788c04265786bab43d3e",
+          "sizeBytes": 2837
+        },
+        {
+          "filename": "parakeet-ja-Preprocessor.mlmodelc-model.mil",
+          "relativePath": "Preprocessor.mlmodelc/model.mil",
+          "url": "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml/resolve/2952296ff1da4a6d6a7aec545e226367db80c612/Preprocessor.mlmodelc/model.mil",
+          "sha256": "cd35cb142ca4db597e99b0cb8d3d68f087e7a9d3e330ce46c8c20d55ab0b1c59",
+          "sizeBytes": 27152
+        },
+        {
+          "filename": "parakeet-ja-Preprocessor.mlmodelc-weights-weight.bin",
+          "relativePath": "Preprocessor.mlmodelc/weights/weight.bin",
+          "url": "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml/resolve/2952296ff1da4a6d6a7aec545e226367db80c612/Preprocessor.mlmodelc/weights/weight.bin",
+          "sha256": "6512ba5d1acc3ffe6f322089c0ece5466f93c7ac77c267dd851a1fb517c637f9",
+          "sizeBytes": 807968
+        },
+        {
+          "filename": "parakeet-ja-vocab.json",
+          "relativePath": "vocab.json",
+          "url": "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml/resolve/2952296ff1da4a6d6a7aec545e226367db80c612/vocab.json",
+          "sha256": "9db0aa7ab1f5d2714c20a7880cb452d753da91cb10de88cb289cda4fd473d50a",
+          "sizeBytes": 29658
+        }
+      ],
+      "id": "parakeet-ja",
+      "displayName": "Specialist - Parakeet Japanese",
+      "tier": "specialist",
+      "description": "Fast offline Japanese dictation on the Apple Neural Engine.",
+      "licenses": [
+        {
+          "scope": "NVIDIA Parakeet TDT-CTC 0.6B Japanese weights and derived Core ML weights",
+          "spdxId": "CC-BY-4.0",
+          "name": "Creative Commons Attribution 4.0 International",
+          "licenseTextUrl": "https://creativecommons.org/licenses/by/4.0/legalcode"
+        },
+        {
+          "scope": "FluidAudio runtime and Core ML conversion tooling",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://raw.githubusercontent.com/FluidInference/FluidAudio/19600a485baa4998812e4654b70d2bab8f2c9949/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "FluidInference/parakeet-0.6b-ja-coreml",
+        "sourceUrl": "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml",
+        "sourceRevision": "2952296ff1da4a6d6a7aec545e226367db80c612",
+        "sourceFile": "21 selected int8 Core ML runtime leaves",
+        "originalModelName": "NVIDIA Parakeet TDT-CTC 0.6B Japanese",
+        "originalModelUrl": "https://huggingface.co/nvidia/parakeet-tdt_ctc-0.6b-ja",
+        "mirroredBy": "FluidInference",
+        "mirroredAt": "2026-04-29"
+      },
+      "runtimeParameters": {
+        "language": "ja",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0.0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "fluid_audio_parakeet",
+        "variant": "parakeet-tdt-0.6b-ja",
+        "accelerator": "coreml_neural_engine",
+        "artifactLayout": "model_directory"
+      },
+      "capabilities": {
+        "languages": [
+          "ja"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "About 61 ms median and 406 ms p95 on the fixed JSUT sample on M4 Max",
+        "accuracyTradeoff": "Japanese-only specialist; 13.11% corpus CER on Textify's fixed JSUT sample",
+        "requirements": "Apple Silicon, macOS 14.4+, about 619 MB disk; first preparation took about 37 seconds on M4 Max"
+      }
+    },
+    {
+      "id": "paraformer-large-zh-int8",
+      "displayName": "Specialist - Paraformer Chinese",
+      "tier": "specialist",
+      "description": "Fast offline Mandarin Chinese dictation using the compact int8 Core ML conversion.",
+      "sizeBytes": 222136057,
+      "files": [
+        {
+          "filename": "paraformer-ParaformerCifAlphas.mlmodelc-analytics-coremldata.bin",
+          "relativePath": "ParaformerCifAlphas.mlmodelc/analytics/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/paraformer-large-zh-coreml/resolve/5dd557bd06342a3cd07ceccb909d8a45e48b053a/ParaformerCifAlphas.mlmodelc/analytics/coremldata.bin",
+          "sha256": "eab07ffe1555c52bf453304c7440181d05cb813c507f7d2b9dc690f893daee7f",
+          "sizeBytes": 243
+        },
+        {
+          "filename": "paraformer-ParaformerCifAlphas.mlmodelc-coremldata.bin",
+          "relativePath": "ParaformerCifAlphas.mlmodelc/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/paraformer-large-zh-coreml/resolve/5dd557bd06342a3cd07ceccb909d8a45e48b053a/ParaformerCifAlphas.mlmodelc/coremldata.bin",
+          "sha256": "1fdc3a31784fdd4ce76d8f6662cc1d5266a4bcb9f8ebff1f7364e4af9b9bfb1b",
+          "sizeBytes": 358
+        },
+        {
+          "filename": "paraformer-ParaformerCifAlphas.mlmodelc-model.mil",
+          "relativePath": "ParaformerCifAlphas.mlmodelc/model.mil",
+          "url": "https://huggingface.co/FluidInference/paraformer-large-zh-coreml/resolve/5dd557bd06342a3cd07ceccb909d8a45e48b053a/ParaformerCifAlphas.mlmodelc/model.mil",
+          "sha256": "7d1b26300097a8e9d227528395ecceb789478f89fee98be5679c7c5f8714c673",
+          "sizeBytes": 5291
+        },
+        {
+          "filename": "paraformer-ParaformerCifAlphas.mlmodelc-weights-weight.bin",
+          "relativePath": "ParaformerCifAlphas.mlmodelc/weights/weight.bin",
+          "url": "https://huggingface.co/FluidInference/paraformer-large-zh-coreml/resolve/5dd557bd06342a3cd07ceccb909d8a45e48b053a/ParaformerCifAlphas.mlmodelc/weights/weight.bin",
+          "sha256": "ca67890e3fd418ca1f3a227001ba4f1300d5523b8a49470bf3791eaba836bbee",
+          "sizeBytes": 1575168
+        },
+        {
+          "filename": "paraformer-ParaformerDecoder_int8.mlmodelc-analytics-coremldata.bin",
+          "relativePath": "ParaformerDecoder_int8.mlmodelc/analytics/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/paraformer-large-zh-coreml/resolve/5dd557bd06342a3cd07ceccb909d8a45e48b053a/ParaformerDecoder_int8.mlmodelc/analytics/coremldata.bin",
+          "sha256": "544bf35b7e52b54f0a84b9ece9ad6b0416a07a4cc707f5dd67e1f6027b3e1697",
+          "sizeBytes": 243
+        },
+        {
+          "filename": "paraformer-ParaformerDecoder_int8.mlmodelc-coremldata.bin",
+          "relativePath": "ParaformerDecoder_int8.mlmodelc/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/paraformer-large-zh-coreml/resolve/5dd557bd06342a3cd07ceccb909d8a45e48b053a/ParaformerDecoder_int8.mlmodelc/coremldata.bin",
+          "sha256": "744496100b6309842b94410d0ddd1dce65b3da773e308f86da010f86967161d8",
+          "sizeBytes": 370
+        },
+        {
+          "filename": "paraformer-ParaformerDecoder_int8.mlmodelc-model.mil",
+          "relativePath": "ParaformerDecoder_int8.mlmodelc/model.mil",
+          "url": "https://huggingface.co/FluidInference/paraformer-large-zh-coreml/resolve/5dd557bd06342a3cd07ceccb909d8a45e48b053a/ParaformerDecoder_int8.mlmodelc/model.mil",
+          "sha256": "2c2dea30cc84c5669d4baf547eafa2f40274a22fdc1e6732a3cdb2b192389bab",
+          "sizeBytes": 309868
+        },
+        {
+          "filename": "paraformer-ParaformerDecoder_int8.mlmodelc-weights-weight.bin",
+          "relativePath": "ParaformerDecoder_int8.mlmodelc/weights/weight.bin",
+          "url": "https://huggingface.co/FluidInference/paraformer-large-zh-coreml/resolve/5dd557bd06342a3cd07ceccb909d8a45e48b053a/ParaformerDecoder_int8.mlmodelc/weights/weight.bin",
+          "sha256": "1794d31522563f29357c6fdb5eb61bdb0cfe1cb9c1734265ae0cc5b154f702f6",
+          "sizeBytes": 57440104
+        },
+        {
+          "filename": "paraformer-ParaformerEncoder_int8.mlmodelc-analytics-coremldata.bin",
+          "relativePath": "ParaformerEncoder_int8.mlmodelc/analytics/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/paraformer-large-zh-coreml/resolve/5dd557bd06342a3cd07ceccb909d8a45e48b053a/ParaformerEncoder_int8.mlmodelc/analytics/coremldata.bin",
+          "sha256": "2ccb1ebd14f683926c047f44c52097b17ab7264f0d3be7f624a8e321e3770f5d",
+          "sizeBytes": 243
+        },
+        {
+          "filename": "paraformer-ParaformerEncoder_int8.mlmodelc-coremldata.bin",
+          "relativePath": "ParaformerEncoder_int8.mlmodelc/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/paraformer-large-zh-coreml/resolve/5dd557bd06342a3cd07ceccb909d8a45e48b053a/ParaformerEncoder_int8.mlmodelc/coremldata.bin",
+          "sha256": "09cc778f64866a7c25d454816c7da566d96fb7d0a9ea13d070276c9828150e0b",
+          "sizeBytes": 387
+        },
+        {
+          "filename": "paraformer-ParaformerEncoder_int8.mlmodelc-model.mil",
+          "relativePath": "ParaformerEncoder_int8.mlmodelc/model.mil",
+          "url": "https://huggingface.co/FluidInference/paraformer-large-zh-coreml/resolve/5dd557bd06342a3cd07ceccb909d8a45e48b053a/ParaformerEncoder_int8.mlmodelc/model.mil",
+          "sha256": "219bc0334ca64d84b232f7320c900794149b612152b1594739a2e9e9cbccd9a3",
+          "sizeBytes": 806287
+        },
+        {
+          "filename": "paraformer-ParaformerEncoder_int8.mlmodelc-weights-weight.bin",
+          "relativePath": "ParaformerEncoder_int8.mlmodelc/weights/weight.bin",
+          "url": "https://huggingface.co/FluidInference/paraformer-large-zh-coreml/resolve/5dd557bd06342a3cd07ceccb909d8a45e48b053a/ParaformerEncoder_int8.mlmodelc/weights/weight.bin",
+          "sha256": "e5a808ac41b0beade91c443ad13ee7aa8be85f94318bddc0d515f2334e147bef",
+          "sizeBytes": 158884352
+        },
+        {
+          "filename": "paraformer-ParaformerPreprocessor.mlmodelc-analytics-coremldata.bin",
+          "relativePath": "ParaformerPreprocessor.mlmodelc/analytics/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/paraformer-large-zh-coreml/resolve/5dd557bd06342a3cd07ceccb909d8a45e48b053a/ParaformerPreprocessor.mlmodelc/analytics/coremldata.bin",
+          "sha256": "5ab78c2dbf08223650a6ebbd3d501e34700b86ddf6e099a4c7a9fe947c1d3412",
+          "sizeBytes": 243
+        },
+        {
+          "filename": "paraformer-ParaformerPreprocessor.mlmodelc-coremldata.bin",
+          "relativePath": "ParaformerPreprocessor.mlmodelc/coremldata.bin",
+          "url": "https://huggingface.co/FluidInference/paraformer-large-zh-coreml/resolve/5dd557bd06342a3cd07ceccb909d8a45e48b053a/ParaformerPreprocessor.mlmodelc/coremldata.bin",
+          "sha256": "998336618c499cb44a66c39dcee7b37eff07a67e351de07beaf5563c11c7122d",
+          "sizeBytes": 330
+        },
+        {
+          "filename": "paraformer-ParaformerPreprocessor.mlmodelc-model.mil",
+          "relativePath": "ParaformerPreprocessor.mlmodelc/model.mil",
+          "url": "https://huggingface.co/FluidInference/paraformer-large-zh-coreml/resolve/5dd557bd06342a3cd07ceccb909d8a45e48b053a/ParaformerPreprocessor.mlmodelc/model.mil",
+          "sha256": "1b9b18be0a35b11165269b1ca071a30af736deb314d8bd82d9540c769137a70e",
+          "sizeBytes": 15008
+        },
+        {
+          "filename": "paraformer-ParaformerPreprocessor.mlmodelc-weights-weight.bin",
+          "relativePath": "ParaformerPreprocessor.mlmodelc/weights/weight.bin",
+          "url": "https://huggingface.co/FluidInference/paraformer-large-zh-coreml/resolve/5dd557bd06342a3cd07ceccb909d8a45e48b053a/ParaformerPreprocessor.mlmodelc/weights/weight.bin",
+          "sha256": "69c630a115da5e4db36ec41662f0b776c0ef33ec6776d86f8cdaaba022518396",
+          "sizeBytes": 3037504
+        },
+        {
+          "filename": "paraformer-vocab.json",
+          "relativePath": "vocab.json",
+          "url": "https://huggingface.co/FluidInference/paraformer-large-zh-coreml/resolve/5dd557bd06342a3cd07ceccb909d8a45e48b053a/vocab.json",
+          "sha256": "14fcd6164b074459896831d6845b1c45d8832dc50c754c8cf4375481125f8ea2",
+          "sizeBytes": 60058
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "Paraformer-large model weights and derived Core ML weights",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "scope": "FluidAudio runtime and Core ML conversion tooling",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://raw.githubusercontent.com/FluidInference/FluidAudio/19600a485baa4998812e4654b70d2bab8f2c9949/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "FluidInference/paraformer-large-zh-coreml",
+        "sourceUrl": "https://huggingface.co/FluidInference/paraformer-large-zh-coreml",
+        "sourceRevision": "5dd557bd06342a3cd07ceccb909d8a45e48b053a",
+        "sourceFile": "17 selected int8 Core ML runtime leaves",
+        "originalModelName": "Paraformer-large Chinese",
+        "originalModelUrl": "https://modelscope.cn/models/iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
+        "mirroredBy": "FluidInference",
+        "mirroredAt": "2026-06-01"
+      },
+      "runtimeParameters": {
+        "language": "zh",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0.0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 29
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "fluid_audio_paraformer",
+        "variant": "paraformer-large-zh-int8",
+        "accelerator": "coreml_neural_engine",
+        "artifactLayout": "model_directory"
+      },
+      "capabilities": {
+        "languages": [
+          "zh"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "Typically under 100 ms after release on M4-class Apple Silicon",
+        "accuracyTradeoff": "Mandarin specialist; not intended as a general multilingual model",
+        "requirements": "Apple Silicon, macOS 14.4+, about 222 MB disk, 29-second recording limit; first preparation can take several minutes"
+      }
+    },
+    {
+      "id": "reazonspeech-k2-v2-int8",
+      "displayName": "Fast - ReazonSpeech Japanese",
+      "tier": "fast",
+      "description": "Compact offline Japanese dictation with near-instant CPU finalization on Apple Silicon.",
+      "sizeBytes": 160372200,
+      "files": [
+        {
+          "filename": "decoder-epoch-99-avg-1.int8.onnx",
+          "relativePath": "decoder-epoch-99-avg-1.int8.onnx",
+          "url": "https://huggingface.co/reazon-research/reazonspeech-k2-v2/resolve/291488c8151be24d7da4bf7af26e533fad96e407/decoder-epoch-99-avg-1.int8.onnx",
+          "sha256": "8f0bff94d38797b03b762634ed03211a8e303d06cc4603cdd0cf4199d6eb1485",
+          "sizeBytes": 2959337
+        },
+        {
+          "filename": "encoder-epoch-99-avg-1.int8.onnx",
+          "relativePath": "encoder-epoch-99-avg-1.int8.onnx",
+          "url": "https://huggingface.co/reazon-research/reazonspeech-k2-v2/resolve/291488c8151be24d7da4bf7af26e533fad96e407/encoder-epoch-99-avg-1.int8.onnx",
+          "sha256": "2c7bd08a8a99f9ddd0d9e458456577b1f6279214e51426f114f9eced44c54e1d",
+          "sizeBytes": 154670139
+        },
+        {
+          "filename": "joiner-epoch-99-avg-1.int8.onnx",
+          "relativePath": "joiner-epoch-99-avg-1.int8.onnx",
+          "url": "https://huggingface.co/reazon-research/reazonspeech-k2-v2/resolve/291488c8151be24d7da4bf7af26e533fad96e407/joiner-epoch-99-avg-1.int8.onnx",
+          "sha256": "49cc7ea1d3d35a40a27442db5e89996da64bf0e683a903dce76e99e57a12e4de",
+          "sizeBytes": 2696970
+        },
+        {
+          "filename": "tokens.txt",
+          "relativePath": "tokens.txt",
+          "url": "https://huggingface.co/reazon-research/reazonspeech-k2-v2/resolve/291488c8151be24d7da4bf7af26e533fad96e407/tokens.txt",
+          "sha256": "2c3ac659818a48a0c04010e0593bbc4d7c8a24a054340b01131499c05fd52def",
+          "sizeBytes": 45754
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "ReazonSpeech K2 V2 model weights",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "scope": "sherpa-onnx runtime",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/13d0ae6c539d2809d32f5eaa3ef1db0c459d0b24/LICENSE"
+        },
+        {
+          "scope": "ONNX Runtime",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/microsoft/onnxruntime/v1.24.4/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "reazon-research/reazonspeech-k2-v2",
+        "sourceUrl": "https://huggingface.co/reazon-research/reazonspeech-k2-v2",
+        "sourceRevision": "291488c8151be24d7da4bf7af26e533fad96e407",
+        "sourceFile": "Official four-file int8 ONNX transducer export",
+        "originalModelName": "ReazonSpeech K2 V2",
+        "originalModelUrl": "https://huggingface.co/reazon-research/reazonspeech-k2-v2",
+        "mirroredBy": "reazon-research",
+        "mirroredAt": "2024-08-01"
+      },
+      "runtimeParameters": {
+        "language": "ja",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0.0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 29
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1.0,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "sherpa_onnx",
+        "variant": "reazonspeech-k2-v2",
+        "accelerator": "cpu",
+        "artifactLayout": "model_directory"
+      },
+      "capabilities": {
+        "languages": [
+          "ja"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "About 86 ms median and 413 ms p95 on the fixed JSUT sample on M4 Max",
+        "accuracyTradeoff": "Japanese-only fast tier; 14.61% corpus CER versus 13.11% for the larger Parakeet Japanese model",
+        "requirements": "Apple Silicon, about 160 MB disk, 29-second recording limit; first preparation took about 1.3 seconds and a 29-second stress clip finalized in about 954 ms on M4 Max"
+      }
+    },
+    {
+      "id": "sensevoice-small-int8-2024-07-17",
+      "displayName": "Accurate - SenseVoice Multilingual",
+      "tier": "accurate",
+      "description": "Fast offline English, Mandarin, Cantonese, Japanese, and Korean dictation with automatic language selection.",
+      "sizeBytes": 239549735,
+      "files": [
+        {
+          "filename": "model.int8.onnx",
+          "relativePath": "model.int8.onnx",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/2365baeacb507f821a0c8120fcee3d484dba7a07/model.int8.onnx",
+          "sha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+          "sizeBytes": 239233841
+        },
+        {
+          "filename": "tokens.txt",
+          "relativePath": "tokens.txt",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/2365baeacb507f821a0c8120fcee3d484dba7a07/tokens.txt",
+          "sha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+          "sizeBytes": 315894
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "SenseVoiceSmall model weights",
+          "spdxId": "LicenseRef-FunASR-Model-1.1",
+          "name": "FunASR Model Open Source License Agreement 1.1",
+          "licenseTextUrl": "https://raw.githubusercontent.com/modelscope/FunASR/38e421b0c49963a6f46ae2ebbaa24bc5168cc707/MODEL_LICENSE"
+        },
+        {
+          "scope": "sherpa-onnx runtime and ONNX conversion",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/13d0ae6c539d2809d32f5eaa3ef1db0c459d0b24/LICENSE"
+        },
+        {
+          "scope": "ONNX Runtime",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/microsoft/onnxruntime/v1.24.4/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17",
+        "sourceUrl": "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17",
+        "sourceRevision": "2365baeacb507f821a0c8120fcee3d484dba7a07",
+        "sourceFile": "Official int8 ONNX model and token table",
+        "originalModelName": "SenseVoiceSmall",
+        "originalModelUrl": "https://huggingface.co/FunAudioLLM/SenseVoiceSmall",
+        "mirroredBy": "csukuangfj",
+        "mirroredAt": "2024-07-18"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0.0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 29
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1.0,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "sherpa_onnx",
+        "variant": "sensevoice-small-int8-2024-07-17",
+        "accelerator": "cpu",
+        "artifactLayout": "model_directory"
+      },
+      "capabilities": {
+        "languages": [
+          "en",
+          "zh",
+          "yue",
+          "ja",
+          "ko"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "About 139 ms Japanese median, 223 ms English median, and 128 ms Mandarin median on fixed M4 Max samples",
+        "accuracyTradeoff": "Best measured Japanese option at 10.86% CER; also measured at 3.81% English WER and 6.15% Mandarin CER",
+        "requirements": "Apple Silicon, about 240 MB disk, automatic selection across five languages, 29-second recording limit; a 29-second stress clip finalized in about 882 ms on M4 Max"
+      }
     }
   ]
 }

@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.10344827586206896,
+    "characterErrors" : 3,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 27,
+    "hypothesisText" : "夏の暑 さを割り切るに は、クーラーよりも扇風機が体にはいい。",
+    "hypothesisWordCount" : 4,
+    "insertions" : 2,
+    "referenceCharacterCount" : 29,
+    "referenceText" : "夏の暑さをの割り切るには、クーラーよりも扇風機が身体には良い。",
+    "referenceWordCount" : 2,
+    "substitutions" : 2,
+    "wordErrorRate" : 2,
+    "wordErrors" : 4
+  },
+  "audio" : {
+    "durationMs" : 5360,
+    "sampleCount" : 85760,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (4 threads)",
+  "engine" : "sensevoice-small-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "SenseVoiceSmall int8 2024-07-17",
+  "modelLicense" : "FunASR Model License 1.1",
+  "resources" : {
+    "peakResidentBytes" : 593526784,
+    "systemCpuMs" : 5,
+    "userCpuMs" : 658
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 168,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 315,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.03134328358208955,
+    "releaseToFinalMs" : 168,
+    "warmupMs" : 24
+  }
+}

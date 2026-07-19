@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.009433962264150943,
+    "characterErrors" : 1,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 105,
+    "hypothesisText" : "They SAT about the house most of the day, as if it were Sunday, greasing their boots, mending their suspenders, plating whip lashes.",
+    "hypothesisWordCount" : 23,
+    "insertions" : 1,
+    "referenceCharacterCount" : 106,
+    "referenceText" : "THEY SAT ABOUT THE HOUSE MOST OF THE DAY AS IF IT WERE SUNDAY GREASING THEIR BOOTS MENDING THEIR SUSPENDERS PLAITING WHIPLASHES",
+    "referenceWordCount" : 22,
+    "substitutions" : 2,
+    "wordErrorRate" : 0.13636363636363635,
+    "wordErrors" : 3
+  },
+  "audio" : {
+    "durationMs" : 8420,
+    "sampleCount" : 134720,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (4 threads)",
+  "engine" : "sensevoice-small-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "SenseVoiceSmall int8 2024-07-17",
+  "modelLicense" : "FunASR Model License 1.1",
+  "resources" : {
+    "peakResidentBytes" : 603144192,
+    "systemCpuMs" : 5,
+    "userCpuMs" : 1004
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 253,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 313,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.03004750593824228,
+    "releaseToFinalMs" : 253,
+    "warmupMs" : 24
+  }
+}

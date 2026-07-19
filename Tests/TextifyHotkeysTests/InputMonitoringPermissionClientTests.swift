@@ -1,4 +1,4 @@
-import TextifyHotkeys
+@testable import TextifyHotkeys
 import XCTest
 
 final class InputMonitoringPermissionClientTests: XCTestCase {
@@ -20,5 +20,19 @@ final class InputMonitoringPermissionClientTests: XCTestCase {
         let status = await client.requestAccess()
 
         XCTAssertEqual(status, .granted)
+    }
+
+    func testRequestResultMapsGrantedToGranted() {
+        XCTAssertEqual(
+            InputMonitoringPermissionClient.requestResult(wasGranted: true),
+            .granted
+        )
+    }
+
+    func testFalseRequestResultStaysUnknownInsteadOfDenied() {
+        XCTAssertEqual(
+            InputMonitoringPermissionClient.requestResult(wasGranted: false),
+            .unknown
+        )
     }
 }

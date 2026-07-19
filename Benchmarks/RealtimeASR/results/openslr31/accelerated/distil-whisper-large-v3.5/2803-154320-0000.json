@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.06862745098039216,
+    "characterErrors" : 7,
+    "deletions" : 2,
+    "hypothesisCharacterCount" : 102,
+    "hypothesisText" : "fortunately will hally was not a man in a hurry and did not use oppressive canvas or his mass would inevitably have come down",
+    "hypothesisWordCount" : 24,
+    "insertions" : 0,
+    "referenceCharacterCount" : 102,
+    "referenceText" : "FORTUNATELY WILL HALLEY WAS NOT A MAN IN A HURRY AND DID NOT USE A PRESS OF CANVAS OR HIS MASTS WOULD INEVITABLY HAVE COME DOWN",
+    "referenceWordCount" : 26,
+    "substitutions" : 3,
+    "wordErrorRate" : 0.19230769230769232,
+    "wordErrors" : 5
+  },
+  "audio" : {
+    "durationMs" : 11480,
+    "sampleCount" : 183680,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-model",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 1615331328,
+    "systemCpuMs" : 9,
+    "userCpuMs" : 45
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 359,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 347,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.03127177700348432,
+    "releaseToFinalMs" : 359,
+    "warmupMs" : 1
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "accuracy" : {
+    "deletions" : 0,
+    "hypothesisWordCount" : 9,
+    "insertions" : 0,
+    "referenceWordCount" : 9,
+    "substitutions" : 0,
+    "wordErrorRate" : 0,
+    "wordErrors" : 0
+  },
+  "audio" : {
+    "durationMs" : 4650,
+    "sampleCount" : 74400,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "Core ML CPU + Apple Neural Engine",
+  "engine" : "parakeet-unified-320",
+  "engineVersion" : "FluidAudio 0.15.5",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Parakeet Unified int8 [70,2,2]",
+  "modelLicense" : "CC-BY-4.0",
+  "resources" : {
+    "peakResidentBytes" : 64765952,
+    "systemCpuMs" : 32,
+    "userCpuMs" : 78
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "firstPartialUnder500Ms" : true,
+    "fullyOffline" : true,
+    "partialMedianBetween200And400Ms" : false,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "firstPartialMs" : 100,
+    "inferenceWorkMs" : 438,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 90,
+    "partialUpdateIntervalsMs" : [
+      15,
+      15,
+      15,
+      15,
+      15,
+      117,
+      16,
+      33,
+      18,
+      18
+    ],
+    "partialUpdateMedianMs" : 15,
+    "realTimeFactor" : 0.09419354838709677,
+    "releaseToFinalMs" : 15,
+    "warmupMs" : 42
+  }
+}

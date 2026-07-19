@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0,
+    "characterErrors" : 0,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 13,
+    "hypothesisText" : "一二线城市虽然也处于调整中",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 13,
+    "referenceText" : "一二线城市虽然也处于调整中",
+    "referenceWordCount" : 1,
+    "substitutions" : 0,
+    "wordErrorRate" : 0,
+    "wordErrors" : 0
+  },
+  "audio" : {
+    "durationMs" : 4115,
+    "sampleCount" : 65840,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "Core ML CPU preprocessor + CPU/Apple Neural Engine inference",
+  "engine" : "paraformer-large-zh-int8",
+  "engineVersion" : "Textify ParaformerRuntime / FluidAudio 0.15.5",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "paraformer-large-zh int8",
+  "modelLicense" : "Apache-2.0 upstream model; conversion inherits upstream terms",
+  "resources" : {
+    "peakResidentBytes" : 66404352,
+    "systemCpuMs" : 1,
+    "userCpuMs" : 51
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 62,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 352,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.015066828675577158,
+    "releaseToFinalMs" : 62,
+    "warmupMs" : 40
+  }
+}

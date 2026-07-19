@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.24561403508771928,
+    "characterErrors" : 14,
+    "deletions" : 6,
+    "hypothesisCharacterCount" : 54,
+    "hypothesisText" : "यूनियनिको का मानना है कि ओसे लोड्स गंड के द्वारा जानवरों का पीछा करते और खाते हैं, यह सुनते हुए कि वे ज़मीन पर कहां रहेंगे.",
+    "hypothesisWordCount" : 43,
+    "insertions" : 1,
+    "referenceCharacterCount" : 57,
+    "referenceText" : "वैज्ञानिकों का मानना है कि ओसेलोट्स गंध के द्वारा जानवरों का पीछा करते और खाते शिकार हैं यह सूँघते हुए कि वे ज़मीन पर कहाँ रहे होंगे।",
+    "referenceWordCount" : 48,
+    "substitutions" : 4,
+    "wordErrorRate" : 0.22916666666666666,
+    "wordErrors" : 11
+  },
+  "audio" : {
+    "durationMs" : 10260,
+    "sampleCount" : 164160,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "qwen3-asr-0.6b",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Qwen3-ASR 0.6B int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 1738080256,
+    "systemCpuMs" : 90,
+    "userCpuMs" : 15620
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : false
+  },
+  "timing" : {
+    "inferenceWorkMs" : 2014,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 1094,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.1962962962962963,
+    "releaseToFinalMs" : 2014,
+    "warmupMs" : 136
+  }
+}

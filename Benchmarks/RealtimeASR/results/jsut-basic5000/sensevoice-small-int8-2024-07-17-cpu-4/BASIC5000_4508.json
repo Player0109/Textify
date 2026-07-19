@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.5,
+    "characterErrors" : 3,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 8,
+    "hypothesisText" : "わらべ歌 は 楽しい。",
+    "hypothesisWordCount" : 3,
+    "insertions" : 2,
+    "referenceCharacterCount" : 6,
+    "referenceText" : "童歌は楽しい",
+    "referenceWordCount" : 1,
+    "substitutions" : 1,
+    "wordErrorRate" : 3,
+    "wordErrors" : 3
+  },
+  "audio" : {
+    "durationMs" : 1850,
+    "sampleCount" : 29600,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (4 threads)",
+  "engine" : "sensevoice-small-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "SenseVoiceSmall int8 2024-07-17",
+  "modelLicense" : "FunASR Model License 1.1",
+  "resources" : {
+    "peakResidentBytes" : 587350016,
+    "systemCpuMs" : 1,
+    "userCpuMs" : 258
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 66,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 314,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.03567567567567568,
+    "releaseToFinalMs" : 66,
+    "warmupMs" : 24
+  }
+}

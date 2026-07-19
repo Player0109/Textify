@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.125,
+    "characterErrors" : 6,
+    "deletions" : 2,
+    "hypothesisCharacterCount" : 49,
+    "hypothesisText" : "रोबिन उथपा ने केवल 14 गेंदों में 11 चौकों और 2 छकों की मदद से 70 रन बनाकर पारी का सर्वोच्च इस्कोर बनाया.",
+    "hypothesisWordCount" : 36,
+    "insertions" : 0,
+    "referenceCharacterCount" : 48,
+    "referenceText" : "रॉबिन उथप्पा ने केवल 41 गेंदों में 11 चौकों और 2 छक्कों की मदद से 70 रन बना कर पारी का सर्वोच्च स्कोर बनाया",
+    "referenceWordCount" : 38,
+    "substitutions" : 2,
+    "wordErrorRate" : 0.10526315789473684,
+    "wordErrors" : 4
+  },
+  "audio" : {
+    "durationMs" : 9480,
+    "sampleCount" : 151680,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "qwen3-asr-0.6b",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Qwen3-ASR 0.6B int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 1760493568,
+    "systemCpuMs" : 67,
+    "userCpuMs" : 13261
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : false
+  },
+  "timing" : {
+    "inferenceWorkMs" : 1711,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 1108,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.18048523206751055,
+    "releaseToFinalMs" : 1711,
+    "warmupMs" : 158
+  }
+}

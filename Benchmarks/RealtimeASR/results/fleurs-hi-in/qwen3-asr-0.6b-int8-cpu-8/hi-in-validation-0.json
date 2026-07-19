@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.07352941176470588,
+    "characterErrors" : 5,
+    "deletions" : 1,
+    "hypothesisCharacterCount" : 67,
+    "hypothesisText" : "मेजर किन खाना भूमध्यसागर में समान क्षेत्रों की तरह रोटी सब्जियों और मांस, विशेष रूप से सूर्य का मांस पर आधारित है और जेतून की तेल का उपयोग करता है.",
+    "hypothesisWordCount" : 56,
+    "insertions" : 2,
+    "referenceCharacterCount" : 68,
+    "referenceText" : "मेजरकेन खाना भूमध्य सागर में समान क्षेत्रों की तरह रोटी सब्जियों और मांस विशेष रूप से सूअर का मांस पर आधारित है और जैतून के तेल का उपयोग करता है।",
+    "referenceWordCount" : 55,
+    "substitutions" : 3,
+    "wordErrorRate" : 0.10909090909090909,
+    "wordErrors" : 6
+  },
+  "audio" : {
+    "durationMs" : 12240,
+    "sampleCount" : 195840,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "qwen3-asr-0.6b",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Qwen3-ASR 0.6B int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 1841086464,
+    "systemCpuMs" : 107,
+    "userCpuMs" : 18853
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : false
+  },
+  "timing" : {
+    "inferenceWorkMs" : 2424,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 1049,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.1980392156862745,
+    "releaseToFinalMs" : 2424,
+    "warmupMs" : 135
+  }
+}

@@ -18,9 +18,13 @@ struct NativeWhisperContext: @unchecked Sendable {
 struct WhisperRuntimeBackend: Sendable {
     let load: @Sendable (_ modelPath: String, _ useGPU: Bool, _ threadCount: Int32) -> NativeWhisperContext?
     let free: @Sendable (_ context: NativeWhisperContext) -> Void
+    let usesGPU: @Sendable (_ context: NativeWhisperContext) -> Bool
     let transcribe: @Sendable (_ context: NativeWhisperContext, _ samples: [Float], _ options: WhisperTranscriptionOptions) -> Int32
     let lastText: @Sendable (_ context: NativeWhisperContext) -> String
     let lastError: @Sendable (_ context: NativeWhisperContext?) -> String
+    let lastNoSpeechProbability: @Sendable (_ context: NativeWhisperContext) -> Double
+    let lastAverageLogProbability: @Sendable (_ context: NativeWhisperContext) -> Double
+    let lastCompressionRatio: @Sendable (_ context: NativeWhisperContext) -> Double
 
     static let native = WhisperRuntimeBackend(
         load: { modelPath, useGPU, threadCount in
@@ -32,6 +36,9 @@ struct WhisperRuntimeBackend: Sendable {
         },
         free: { context in
             textify_whisper_free(context.rawValue)
+        },
+        usesGPU: { context in
+            textify_whisper_uses_gpu(context.rawValue) != 0
         },
         transcribe: { context, samples, options in
             samples.withUnsafeBufferPointer { buffer in
@@ -69,6 +76,15 @@ struct WhisperRuntimeBackend: Sendable {
         },
         lastError: { context in
             whisperString(from: textify_whisper_last_error(context?.rawValue))
+        },
+        lastNoSpeechProbability: { context in
+            Double(textify_whisper_last_no_speech_probability(context.rawValue))
+        },
+        lastAverageLogProbability: { context in
+            Double(textify_whisper_last_average_log_probability(context.rawValue))
+        },
+        lastCompressionRatio: { context in
+            Double(textify_whisper_last_compression_ratio(context.rawValue))
         }
     )
 }
@@ -129,6 +145,11 @@ public actor WhisperRuntime: TranscriptionProvider {
             let message = backend.lastError(nil)
             state = .failed(modelID: modelID, reason: .loadFailed)
             throw WhisperRuntimeError.loadFailed(message)
+        }
+        guard !useGPU || backend.usesGPU(loadedContext) else {
+            backend.free(loadedContext)
+            state = .failed(modelID: modelID, reason: .loadFailed)
+            throw WhisperRuntimeError.loadFailed("The requested Metal GPU backend is unavailable.")
         }
         updateMetrics(lastLoadDurationMs: Self.elapsedMilliseconds(since: loadStart))
 
@@ -308,9 +329,9 @@ public actor WhisperRuntime: TranscriptionProvider {
                 continuation.resume(
                     returning: TranscriptionResult(
                         text: text,
-                        noSpeechProbability: 0,
-                        averageLogProbability: 0,
-                        compressionRatio: 0,
+                        noSpeechProbability: backend.lastNoSpeechProbability(nativeContext),
+                        averageLogProbability: backend.lastAverageLogProbability(nativeContext),
+                        compressionRatio: backend.lastCompressionRatio(nativeContext),
                         timing: TranscriptionTiming(
                             audioDurationMs: audioDurationMs,
                             inferenceDurationMs: inferenceDurationMs

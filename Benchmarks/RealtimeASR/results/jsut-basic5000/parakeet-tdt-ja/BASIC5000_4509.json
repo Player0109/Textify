@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.13636363636363635,
+    "characterErrors" : 3,
+    "deletions" : 1,
+    "hypothesisCharacterCount" : 21,
+    "hypothesisText" : "お酒に酔っ払って転んで顔を打って鼻血が出た。",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 22,
+    "referenceText" : "お酒に酔っぱらって転んで、顔をうって鼻血が出た。",
+    "referenceWordCount" : 2,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 2
+  },
+  "audio" : {
+    "durationMs" : 3570,
+    "sampleCount" : 57120,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "Core ML CPU preprocessor + CPU/Apple Neural Engine inference",
+  "engine" : "parakeet-tdt-ja",
+  "engineVersion" : "Textify ParakeetRuntime / FluidAudio 0.15.5",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "parakeet-tdt-0.6b Japanese int8",
+  "modelLicense" : "CC-BY-4.0",
+  "resources" : {
+    "peakResidentBytes" : 97206272,
+    "systemCpuMs" : 4,
+    "userCpuMs" : 27
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 59,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 713,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.016526610644257703,
+    "releaseToFinalMs" : 59,
+    "warmupMs" : 63
+  }
+}

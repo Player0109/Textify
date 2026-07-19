@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.13432835820895522,
+    "characterErrors" : 9,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 66,
+    "hypothesisText" : " जब घायलों को लडाई बंध होने के बाद अस्पताल ले जाया गया तो लगबक 40 अन्य बचे हुए कैदी यार्ड में रुके और अपनी कोटरियों में लोटने से इंकान कर दिया।",
+    "hypothesisWordCount" : 51,
+    "insertions" : 1,
+    "referenceCharacterCount" : 67,
+    "referenceText" : "जब घायलों को लड़ाई बंद होने के बाद अस्पताल ले जाया गया तो लगभग 40 अन्य बचे हुए कैदी यार्ड में रुके और अपनी कोठरियों में लौटने से इनकार कर दिया",
+    "referenceWordCount" : 50,
+    "substitutions" : 5,
+    "wordErrorRate" : 0.12,
+    "wordErrors" : 6
+  },
+  "audio" : {
+    "durationMs" : 13620,
+    "sampleCount" : 217920,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "whisper.cpp Metal requested; CPU operations remain possible",
+  "engine" : "whisper",
+  "engineVersion" : "Textify vendored whisper.cpp",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "ggml-large-v3-turbo-q5_0",
+  "modelLicense" : "MIT",
+  "resources" : {
+    "peakResidentBytes" : 690503680,
+    "systemCpuMs" : 19,
+    "userCpuMs" : 108
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 579,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 183,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.04251101321585903,
+    "releaseToFinalMs" : 579,
+    "warmupMs" : 1
+  }
+}

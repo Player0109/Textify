@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.12857142857142856,
+    "characterErrors" : 9,
+    "deletions" : 1,
+    "hypothesisCharacterCount" : 68,
+    "hypothesisText" : "आर्म्ड वार्षस ने कहा, मैंने अपनी बहन और उनकी दोस्त को खो दिया। और रास्ते में हुल्चियर में दो दिब्यांग लोग थे और लोग उनपर उछल रहे थे और उन्हें धक्का दे रहे थे।",
+    "hypothesisWordCount" : 54,
+    "insertions" : 1,
+    "referenceCharacterCount" : 70,
+    "referenceText" : "आर्मंड वर्सास ने कहा मैंने अपनी बहन और उसकी दोस्त को खो दिया और रास्ते में व्हीलचेयर में दो दिव्यांग लोग थे और लोग उनपर उछल रहे थे और उन्हें धक्का दे रहे थे",
+    "referenceWordCount" : 54,
+    "substitutions" : 6,
+    "wordErrorRate" : 0.14814814814814814,
+    "wordErrors" : 8
+  },
+  "audio" : {
+    "durationMs" : 21360,
+    "sampleCount" : 341760,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "qwen3-asr-0.6b",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Qwen3-ASR 0.6B int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 2153988096,
+    "systemCpuMs" : 185,
+    "userCpuMs" : 26500
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : false
+  },
+  "timing" : {
+    "inferenceWorkMs" : 3420,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 1105,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.1601123595505618,
+    "releaseToFinalMs" : 3420,
+    "warmupMs" : 136
+  }
+}

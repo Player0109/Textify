@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.08333333333333333,
+    "characterErrors" : 2,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 23,
+    "hypothesisText" : "कुतुहल गांव में आधे घंटे टलना समय की हानि नहीं है.",
+    "hypothesisWordCount" : 16,
+    "insertions" : 0,
+    "referenceCharacterCount" : 24,
+    "referenceText" : "कुतूहल गांव में आधे घंटे टहलना समय की हानि नहीं है",
+    "referenceWordCount" : 16,
+    "substitutions" : 1,
+    "wordErrorRate" : 0.0625,
+    "wordErrors" : 1
+  },
+  "audio" : {
+    "durationMs" : 6420,
+    "sampleCount" : 102720,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "qwen3-asr-0.6b",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Qwen3-ASR 0.6B int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 1614020608,
+    "systemCpuMs" : 52,
+    "userCpuMs" : 6927
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : false
+  },
+  "timing" : {
+    "inferenceWorkMs" : 890,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 1109,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.13862928348909656,
+    "releaseToFinalMs" : 890,
+    "warmupMs" : 135
+  }
+}

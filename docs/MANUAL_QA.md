@@ -7,24 +7,52 @@ release-blocking.
 
 - [ ] 1. Fresh install from stapled DMG on macOS 14+ Apple Silicon.
 - [ ] 2. Gatekeeper opens app without override.
-- [ ] 3. No Dock icon by default.
-- [ ] 4. Menu bar icon appears.
+- [ ] 3. Dock icon appears by default; closing the main window leaves Textify
+  running, and clicking the Dock icon reopens the same window.
+- [ ] 4. Menu bar icon appears and Open Textify reopens the same main window.
 - [ ] 5. Onboarding installs and verifies `ggml-small.en-q5_1`.
 - [ ] 6. Microphone permission flow works.
 - [ ] 7. Accessibility permission flow works.
-- [ ] 8. Input Monitoring permission flow works.
-- [ ] 9. Right Command trigger test passes.
-- [ ] 10. Dictation into TextEdit works.
-- [ ] 11. Dictation into Notes or browser text field works.
-- [ ] 12. Secure password field blocks insertion.
-- [ ] 13. Cancelling during processing does not insert late text.
-- [ ] 14. Clipboard is restored after paste when marker remains.
-- [ ] 15. Clipboard is not overwritten if changed during paste.
-- [ ] 16. Diagnostics export contains no transcript or clipboard content.
-- [ ] 17. Launch at Login works if enabled.
-- [ ] 18. Sparkle UI/framework is absent.
-- [ ] 19. App binary is arm64 only.
-- [ ] 20. DMG notarization/stapling validation passes.
+- [ ] 8. Right Command trigger test passes with Accessibility granted.
+- [ ] 9. Dictation into TextEdit works.
+- [ ] 10. Dictation into Notes or browser text field works.
+- [ ] 11. Secure password field blocks insertion.
+- [ ] 12. Cancelling during processing does not insert late text.
+- [ ] 13. Clipboard is restored after paste when marker remains.
+- [ ] 14. Clipboard is not overwritten if changed during paste.
+- [ ] 15. Diagnostics export contains no transcript or clipboard content.
+- [ ] 16. Launch at Login works if enabled.
+- [ ] 17. Sparkle UI/framework is absent.
+- [ ] 18. App binary is arm64 only.
+- [ ] 19. DMG notarization/stapling validation passes.
+- [ ] 20. An app added under Privacy -> Excluded Apps shows the disabled
+  overlay while the trigger is held and starts no microphone capture.
+- [ ] 21. Switching to another app during processing silently prevents
+  insertion into the new frontmost app.
+- [ ] 22. Holding dictation to the 60-second cap automatically stops capture
+  and proceeds without waiting for trigger release.
+- [ ] 23. Each curated fallback trigger can be selected, updates the trigger
+  instructions immediately, and passes the trigger test after relaunch.
+- [ ] 24. Interrupting a model install preserves only a validated resumable
+  partial; Retry sends a byte-range request, resumes without corrupting the
+  artifact, and reaches Ready only after model warm-up.
+- [ ] 25. The model picker clearly shows tier, languages, download size,
+  accelerator, expected finalization, accuracy tradeoff, requirements, and
+  license for every signed catalog entry.
+- [ ] 26. Install and activate a signed multi-file Parakeet V3 entry on a clean
+  machine; diagnostics report `fluid_audio_parakeet` and
+  `coreml_neural_engine`, and a real dictation completes with no network access.
+- [ ] 27. If Paraformer is published, its first preparation warning is visible;
+  after preparation, Mandarin dictation succeeds and diagnostics report
+  `fluid_audio_paraformer` and `coreml_neural_engine`.
+- [ ] 28. Switching among Whisper, Parakeet, and any published Specialist model
+  unloads the previous backend, warms the new one, and never inserts a result
+  from an old in-flight session.
+- [ ] 29. A failed model switch restores the previously active working model;
+  deleting an inactive model removes it, while deleting the active model is
+  refused until another model is selected.
+- [ ] 30. Accelerator verification fails closed when Metal or Neural Engine
+  execution is unavailable; Textify never silently accepts a CPU fallback.
 
 ## Supporting Commands
 
@@ -48,11 +76,248 @@ Automated checks run on `master`:
 
 Manual checks not run in this integration gate:
 
-- Release-blocking checklist items 1-2 and 20 require a Developer ID signed,
+- Release-blocking checklist items 1-2 and 19 require a Developer ID signed,
   notarized, stapled DMG from a maintainer machine.
 - Release-blocking checklist item 5 requires the published model asset,
   license/provenance sidecars, signed manifest, and manifest signature. The
   GitHub Pages manifest endpoints returned 404 during integration.
-- Release-blocking checklist items 6-17 require interactive macOS permissions,
+- Release-blocking checklist items 6-16 require interactive macOS permissions,
   target apps, real dictation, secure-field checks, cancellation checks,
   clipboard checks, diagnostics export, and Launch at Login verification.
+
+## Pre-Production Readiness - 2026-07-18
+
+Automated checks against the current working tree:
+
+- PASS: `bash script/release/validate_release.sh` completed 259 tests with 0
+  failures, built the arm64 Release executable, linted the release plist, and
+  passed the release string and architecture policies.
+- PASS: `./script/build_and_run.sh --verify` launched the staged app; the
+  launched `Textify` process was stopped after verification.
+- PASS: clean native Xcode Debug build, native app launch, and ad-hoc Release archive. The archived
+  app passes strict code-signature verification, reports version `1.1.0` build
+  `1`, is an `LSUIElement`, and contains only arm64 code.
+- PASS: the archived binary links neither Sparkle nor Core ML.
+- PASS: the live manifest and detached signature match the tracked files, the
+  signature validates with the embedded production public key, and a complete
+  download of `ggml-small.en-q5_1.bin` matches the manifest SHA-256.
+- PASS: release, model, build, and Xcode-project generation shell scripts pass
+  syntax validation.
+
+The build is ready to enter pre-production testing. These checks intentionally
+remain unchecked until performed by a tester or release maintainer:
+
+- Items 3-16 require interactive macOS UI, permission, real-model onboarding,
+  dictation, secure-field, cancellation, clipboard, diagnostics, and Launch at
+  Login testing.
+- Items 17-18 have automated evidence above but remain part of the manual
+  release checklist.
+- Items 1-2 and 19 require a Developer ID signed, notarized, stapled DMG. This
+  machine has no Developer ID signing identity, so those checks must run on the
+  credentialed maintainer machine before publishing.
+
+## Computer Use Session - 2026-07-18
+
+Interactive checks used the final native Xcode Debug app at
+`dist/FinalDerivedData/Build/Products/Debug/Textify.app`. The checklist remains
+unchecked because the session used an ad-hoc Debug build rather than the final
+signed and stapled release artifact.
+
+- BLOCKED (items 1, 2, and 19): no Developer ID signed, notarized, stapled DMG
+  was available on this machine.
+- SUPERSEDED (former item 3), PASS (items 17 and 18): the tested build used the
+  former menu-bar-only default, is an `LSUIElement`, contains no Sparkle
+  framework or linked Sparkle library, and is arm64 only.
+- HISTORICAL (item 4): the app ran as a menu-bar utility, but inspection of the
+  opened status-item menu required a physical click and the handoff was ended
+  before it was completed. The tester subsequently reported that the menu is
+  dismissed when clicking away, motivating a persistent main-window follow-up.
+- PASS (item 5): fresh onboarding displayed the curated
+  `ggml-small.en-q5_1` model, verified the installed asset as Ready, and showed
+  a complete 190.1 MB installation state.
+- PASS (item 6): onboarding requested Microphone permission and refreshed to
+  Granted after the tester approved the macOS prompt.
+- BLOCKED (item 7): System Settings showed Textify enabled for Accessibility,
+  but the ad-hoc Debug process continued to report Denied. Multiple local
+  ad-hoc Textify builds had different code requirements and macOS collapsed
+  them into one TCC entry, so this needs a stably signed installed build.
+- PARTIAL (item 8): the onboarding and Settings trigger tests both detected a
+  tester-operated Right Command press and release, including recording start.
+  The complete criterion remains blocked by the Accessibility grant mismatch.
+- BLOCKED (items 9-14): real cross-app insertion, secure-field behavior,
+  processing cancellation, and clipboard restoration/non-overwrite could not
+  be exercised safely while the tested process lacked Accessibility trust.
+- PASS (item 15): exporting from Advanced Settings created
+  `/private/tmp/Textify-Diagnostics-CUA.json`; it contained an empty `files`
+  array and no transcript or clipboard content. Cancelling the save panel also
+  produced the expected cancellation state.
+- PARTIAL (item 16): the Launch at Login control correctly explained that the
+  Debug app must be moved to Applications. Actual login-item behavior remains
+  blocked until testing an installed release build.
+
+Additional UI evidence:
+
+- PASS: Welcome, Model, Microphone, Accessibility, Trigger Test, and Completion
+  onboarding screens rendered coherently and navigated successfully.
+- PASS: General, Dictation, Models, Privacy, and Advanced Settings rendered and
+  reported consistent model, microphone, and Accessibility states.
+- PASS: About Textify reported version `1.1.0 (1)` and the Apache-2.0 notice.
+- PASS: original Textify preferences were restored byte-for-byte after the
+  session, and the tested Textify process was stopped.
+
+## Hybrid Main Window Computer Use Session - 2026-07-18
+
+Interactive checks used the native Xcode Debug app at
+`dist/HybridDerivedData/Build/Products/Debug/Textify.app` after the hybrid Dock
+and main-window change.
+
+- PASS: final `bash script/release/validate_release.sh` completed 266 tests with
+  0 failures, built the arm64 Release executable, and passed plist, release
+  string, and architecture validation. The native Xcode Debug build succeeded.
+- PASS (item 3): launching with a legacy `showInDock: false` preference showed
+  one main window titled Textify and presented Keep Textify in the Dock as on.
+- PASS (item 3): closing the main window left the exact Textify process running
+  with no visible window. Opening the already-running bundle through Finder and
+  LaunchServices invoked the same app-reopen delegate used by a Dock click and
+  restored the retained main window. Computer Use could not address the global
+  Dock process directly, so the literal icon click is additionally covered by
+  the delegate-policy test.
+- PASS with source and automated support (item 4): Open Textify… was present in
+  the standard Textify app menu and focused the existing main window. The
+  menu-bar-extra action uses the same title and presenter; the global status
+  item itself was not addressable through Computer Use.
+- PASS: the Dock opt-out switched off and persisted only
+  `keepTextifyInDock: false`; switching it back on worked. Automated tests also
+  prove a legacy file is atomically rewritten once and a new opt-out survives
+  later loads.
+- PASS: General, Dictation, Models, Privacy, and Advanced panes remained
+  navigable in the retained main window.
+- PASS: explicit Quit Textify terminated the process, while closing the window
+  did not.
+- PASS: the original Textify preferences were restored byte-for-byte and the
+  tested process was stopped after the session.
+
+## Production Hardening Verification - 2026-07-19
+
+- PASS: `bash script/release/validate_release.sh` completed 302 tests with zero
+  failures, regenerated a stable Xcode project, built the arm64 Release binary,
+  and passed plist, icon, category, entitlement, architecture, release-string,
+  and shell-syntax policies.
+- PASS: the tracked production manifest and detached signature verify with the
+  production public key and the exact pinned legacy-manifest migration policy.
+- PASS: the live GitHub Pages manifest and signature are byte-for-byte
+  identical to the tracked files and verify with the production key. The live
+  190,098,681-byte model asset streams to the signed SHA-256
+  `bfdff4894dcb76bbf647d56263ea2a96645423f1669176f4844a1bf8e478ad30`;
+  its published MIT license and provenance sidecars are present, and the
+  provenance size, hash, source revision, source filename, and mirror metadata
+  match the signed manifest.
+- PASS: a fresh native Xcode Release archive succeeded. Its ad-hoc signature
+  passes strict verification, uses hardened runtime, and contains the
+  `com.apple.security.device.audio-input` entitlement without App Sandbox. The
+  app is version `1.1.0` build `1`, targets macOS 14+, contains only arm64 code,
+  and links neither Sparkle nor Core ML.
+- PASS: `./script/build_and_run.sh --verify` launched the fresh staged app. A
+  Computer Use inspection of that exact `dist/Textify.app` confirmed the four
+  curated trigger choices, model-install controls, and complete Excluded Apps
+  surface. The app was stopped afterward; no permission prompt was accepted
+  and no model download was started.
+- BLOCKED: this machine reports zero valid code-signing identities, and
+  `TEXTIFY_DEVELOPMENT_TEAM`, `TEXTIFY_SIGNING_IDENTITY`, and
+  `TEXTIFY_NOTARY_PROFILE` are all absent. Therefore no Developer ID export,
+  notarized/stapled DMG, or Gatekeeper result can be certified here.
+
+All current release-blocking checkboxes remain unchecked. They must be completed
+against the final Developer ID signed and stapled artifact; this local evidence
+does not substitute for the release-maintainer QA pass.
+
+## Multi-Model Release Verification - 2026-07-19
+
+- PASS: the final `bash script/release/validate_release.sh` run completed 362
+  tests with zero failures (six opt-in hardware/network integration tests
+  skipped by the default suite), built the arm64 production package, and passed
+  the release plist, catalog-signature, and architecture checks.
+- PASS: separate opt-in integrations transcribed fixture audio through all four
+  offline runtime families: two Whisper variants on Metal, four Parakeet
+  variants on Core ML/ANE, Paraformer on Core ML/ANE, and ReazonSpeech and
+  SenseVoiceSmall through the declared sherpa-onnx CPU route. The signed-catalog
+  test downloaded and verified all 103 Hugging Face catalog files into isolated
+  storage. Runtime/provider validation fails closed instead of silently
+  accepting a different route.
+- PASS: the reproducible fixed English corpus measured 141.5 ms median final
+  latency for Whisper small.en, 367 ms for Whisper Turbo, 66 ms for Parakeet
+  V3, 64 ms for V2, and 38.5 ms for 110M. Corresponding WER was 3.33%, 4.29%,
+  2.38%, 0.95%, and 2.38%. Turbo's fixed Hindi sample measured 536.5 ms median
+  and 20.47% CER. Paraformer's fixed Mandarin sample remained at 66 ms median
+  and 5.38% CER on this Apple M4 Max.
+- PASS: ReazonSpeech's fixed Japanese sample measured 86 ms median, 413 ms
+  p95/max, and 14.61% CER. Its 29-second stress fixture finalized in 954 ms,
+  and its silence fixture was rejected by the signed confidence threshold.
+- PASS: SenseVoiceSmall measured 10.86% Japanese CER at 138.5 ms median,
+  3.81% English WER at 222.5 ms median, and 6.15% Mandarin CER at 128 ms
+  median. Automatic Japanese, Mandarin, English, Korean, and Cantonese fixtures
+  finalized in 91–159 ms, and the measured digital-silence hallucination is
+  marked as no speech by the production runtime.
+- PASS: a fresh `script/build_and_run.sh --stage-full-release` produced the
+  exact app at `dist/Textify.app`. It contains a valid root
+  `Contents/Resources/default.metallib`, contains only arm64 code, and passes
+  strict ad-hoc code-signature verification.
+- PASS: a SenseVoice smoke loaded the signed dylibs directly from the staged
+  app's `Contents/Frameworks`, automatically selected Japanese, produced the
+  zero-CER reference sentence, and finalized in 91 ms after a 26 ms warmup.
+- PASS: the staged 48 MB arm64 app contains the exact tracked nine-model
+  manifest/signature pair and passes strict ad-hoc signature verification. Its
+  picker catalog contains Whisper small.en, Specialist Whisper Turbo for
+  English/Hindi, Recommended Parakeet V3, Fast Parakeet 110M, Accurate Parakeet
+  V2, Specialist Parakeet Japanese, Specialist Paraformer Chinese, and Fast
+  ReazonSpeech Japanese, and Accurate SenseVoiceSmall Multilingual. Its two
+  arm64 native runtime libraries are separately signed under
+  `Contents/Frameworks`, and strict deep verification passes.
+- BLOCKED: final `verify_release_artifact.sh`, Developer ID signing,
+  notarization/stapling, Gatekeeper verification, and clean-machine manual QA
+  require the maintainer's team/signing/notary credentials. The ad-hoc staged
+  app is for local testing only.
+
+## Immutable Hugging Face Catalog Verification - 2026-07-19
+
+This verification includes the current nine-model catalog.
+
+- PASS: `bash script/release/validate_release.sh` completed 362 tests with zero
+  failures and six explicit opt-in hardware/network skips, then built the
+  arm64 Release executable and passed catalog, plist, entitlement,
+  architecture, release-string, and shell-syntax policies.
+- PASS: the tracked signed catalog contains Whisper small.en, Whisper Turbo,
+  Parakeet V3, Fast Parakeet 110M, Accurate Parakeet V2, Parakeet Japanese,
+  the Paraformer Chinese Specialist, Fast ReazonSpeech Japanese, and Accurate
+  SenseVoiceSmall Multilingual. Its
+  detached signature verifies with key ID
+  `textify-model-manifest-2026-huggingface`, and every one of the 103 selected
+  Hugging Face leaves uses an exact lowercase 40-character commit, byte size,
+  and SHA-256.
+- PASS: an isolated clean-install integration downloaded the Whisper Turbo
+  artifact, all 79 Parakeet leaves, all 17 Paraformer leaves, and all four
+  ReazonSpeech leaves and both SenseVoiceSmall leaves from their final public
+  Hugging Face URLs. It installed every model atomically, loaded it from
+  Textify-managed storage, proved the
+  intended Metal, ANE, or declared CPU route, and transcribed public English,
+  Hindi, Japanese, and Mandarin fixtures. The test completed in 1,300.342
+  seconds with zero failures; SenseVoice automatic selection also transcribed
+  pinned English, Mandarin, Japanese, Korean, and Cantonese fixtures. Fresh
+  downloads and cold Core ML preparation dominated the duration.
+- PASS: a fresh Xcode Release build staged the exact app at `dist/Textify.app`.
+  The 48 MB arm64 app contains no model weights, contains a valid Whisper
+  `default.metallib`, contains the two pinned arm64 sherpa/ONNX Runtime
+  libraries, and contains a byte-identical signed catalog pair under
+  `Contents/Resources/ModelCatalog/`. Strict deep ad-hoc signature verification
+  passes. The copied FunASR model license and SenseVoice attribution are also
+  present in `Contents/Resources`.
+- PASS: catalog selection tests prove that the bundled baseline survives remote
+  failure and cannot be replaced by an older valid remote catalog. Sources are
+  selected wholesale; entries are never merged.
+- REMAINS MANUAL: checklist items 26-30 must still be performed interactively
+  against the final Developer ID signed, notarized, stapled artifact. The local
+  clean-install/runtime proof does not certify Gatekeeper, user permissions,
+  model switching UI, or cross-app insertion on that final artifact.
+- BLOCKED: Developer ID signing, notarization, stapling, Gatekeeper assessment,
+  and final manual dictation through every promoted catalog entry still require
+  the credentialed release-maintainer machine.

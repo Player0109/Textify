@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.12962962962962962,
+    "characterErrors" : 7,
+    "deletions" : 0,
+    "hypothesisCharacterCount" : 51,
+    "hypothesisText" : "समय के साथ जैसे जैसे नीं आबादी ने माहोल में ढलती जाती है वह भी दूसरी आबादी की तरह अंदेखी करना शुरू कर देती है",
+    "hypothesisWordCount" : 38,
+    "insertions" : 1,
+    "referenceCharacterCount" : 54,
+    "referenceText" : "समय के साथ जैसे-जैसे नई आबादी नए माहौल में ढलती जाती है वह भी दूसरी आबादी की तरह अनदेखी करना शुरू कर देती है",
+    "referenceWordCount" : 37,
+    "substitutions" : 3,
+    "wordErrorRate" : 0.10810810810810811,
+    "wordErrors" : 4
+  },
+  "audio" : {
+    "durationMs" : 9720,
+    "sampleCount" : 155520,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "ONNX Runtime cpu (8 threads)",
+  "engine" : "omnilingual-asr-300m-ctc-int8",
+  "engineVersion" : "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "Omnilingual ASR CTC 300M int8",
+  "modelLicense" : "Apache-2.0",
+  "resources" : {
+    "peakResidentBytes" : 857112576,
+    "systemCpuMs" : 64,
+    "userCpuMs" : 4989
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 636,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 287,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.0654320987654321,
+    "releaseToFinalMs" : 636,
+    "warmupMs" : 35
+  }
+}

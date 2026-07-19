@@ -1,9 +1,11 @@
+import AppKit
 import CoreGraphics
 
 public struct KeyboardEventSnapshot: Equatable, Sendable {
     public enum EventType: Equatable, Sendable {
         case flagsChanged
         case keyDown
+        case keyUp
     }
 
     public let type: EventType
@@ -28,6 +30,27 @@ public struct KeyboardEventSnapshot: Equatable, Sendable {
 }
 
 public extension KeyboardEventSnapshot {
+    init?(event: NSEvent) {
+        let mappedType: EventType
+        switch event.type {
+        case .flagsChanged:
+            mappedType = .flagsChanged
+        case .keyDown:
+            mappedType = .keyDown
+        case .keyUp:
+            mappedType = .keyUp
+        default:
+            return nil
+        }
+        self.init(
+            type: mappedType,
+            keyCode: event.keyCode,
+            flags: UInt64(event.modifierFlags.rawValue),
+            timestampMs: Int(event.timestamp * 1_000),
+            isAutoRepeat: event.type == .keyDown ? event.isARepeat : false
+        )
+    }
+
     init?(event: CGEvent, type: CGEventType) {
         let mappedType: EventType
         switch type {
@@ -35,6 +58,8 @@ public extension KeyboardEventSnapshot {
             mappedType = .flagsChanged
         case .keyDown:
             mappedType = .keyDown
+        case .keyUp:
+            mappedType = .keyUp
         default:
             return nil
         }

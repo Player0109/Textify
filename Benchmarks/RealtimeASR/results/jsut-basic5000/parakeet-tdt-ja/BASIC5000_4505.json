@@ -1,0 +1,54 @@
+{
+  "accuracy" : {
+    "characterErrorRate" : 0.06666666666666667,
+    "characterErrors" : 1,
+    "deletions" : 1,
+    "hypothesisCharacterCount" : 15,
+    "hypothesisText" : "桜湖と双璧をなす商店街の人気者。",
+    "hypothesisWordCount" : 1,
+    "insertions" : 0,
+    "referenceCharacterCount" : 15,
+    "referenceText" : "桜子と双璧をなす、商店街の人気者。",
+    "referenceWordCount" : 2,
+    "substitutions" : 1,
+    "wordErrorRate" : 1,
+    "wordErrors" : 2
+  },
+  "audio" : {
+    "durationMs" : 3530,
+    "sampleCount" : 56480,
+    "sampleRate" : 16000
+  },
+  "computeBackend" : "Core ML CPU preprocessor + CPU/Apple Neural Engine inference",
+  "engine" : "parakeet-tdt-ja",
+  "engineVersion" : "Textify ParakeetRuntime / FluidAudio 0.15.5",
+  "feedMode" : "accelerated",
+  "host" : {
+    "architecture" : "arm64",
+    "chip" : "Apple M4 Max",
+    "operatingSystem" : "Version 26.5.1 (Build 25F80)"
+  },
+  "model" : "parakeet-tdt-0.6b Japanese int8",
+  "modelLicense" : "CC-BY-4.0",
+  "resources" : {
+    "peakResidentBytes" : 99352576,
+    "systemCpuMs" : 6,
+    "userCpuMs" : 36
+  },
+  "schemaVersion" : 1,
+  "targets" : {
+    "fullyOffline" : true,
+    "releaseToFinalUnder700Ms" : true
+  },
+  "timing" : {
+    "inferenceWorkMs" : 378,
+    "maximumFeedLagMs" : 0,
+    "modelLoadMs" : 281,
+    "partialUpdateIntervalsMs" : [
+
+    ],
+    "realTimeFactor" : 0.10708215297450425,
+    "releaseToFinalMs" : 378,
+    "warmupMs" : 188
+  }
+}
