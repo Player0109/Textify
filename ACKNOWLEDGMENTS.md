@@ -9,6 +9,14 @@ Textify also uses sherpa-onnx, ONNX Runtime, and transcribe.cpp for eligible
 offline speech-model formats. The FunAudioLLM team released Fun-ASR MLT-Nano;
 Textify evaluates and exposes only the language routes that meet its own local
 quality and performance gates.
+Textify uses MLX and the pinned MLX Audio Swift runtime for eligible Apple
+Silicon speech models, including the separately downloaded NVIDIA Parakeet RNNT
+1.1B, Parakeet TDT V2/V3, Nemotron 3.5 ASR, Cohere Transcribe 03-2026, and MLX
+Community Whisper Large V3 Turbo and Qwen3-ASR conversions. Parakeet TDT,
+Nemotron, and Qwen3-ASR GGUF conversions are provided by handy-computer and run
+through the pinned transcribe.cpp Metal runtime. Runtime model loading is
+restricted to Textify-managed local
+directories; network-backed package loading APIs are not used.
 
 Whisper was developed and released by OpenAI. The English, multilingual, and
 Japanese Parakeet models were released by NVIDIA. Paraformer-large Chinese and

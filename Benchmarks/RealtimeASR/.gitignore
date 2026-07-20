@@ -1,4 +1,8 @@
 .build/
 .swiftpm/
 .benchmark-data/
+.benchmark-cache/
+.benchmark-results/
+__pycache__/
 results/*.json
+results/**/*.json

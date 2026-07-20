@@ -119,7 +119,9 @@ public enum ProductionModelPolicy {
                  (.fluidAudioParakeet, .coreMLNeuralEngine, .modelDirectory),
                  (.fluidAudioParaformer, .coreMLNeuralEngine, .modelDirectory),
                  (.sherpaOnnx, .cpu, .modelDirectory),
-                 (.transcribeCpp, .metalGPU, .singleFile):
+                 (.transcribeCpp, .metalGPU, .singleFile),
+                 (.mlxAudio, .metalGPU, .modelDirectory),
+                 (.liteRTLM, .metalGPU, .singleFile):
                 break
             default:
                 throw ProductionModelPolicyError.incompatibleRuntime(modelID: model.id)

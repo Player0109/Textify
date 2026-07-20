@@ -1,12 +1,17 @@
 # Textify Curated Models
 
-The signed catalog shipped with the current app contains nine curated
-production choices: Whisper small.en; Whisper Large V3 Turbo q5_0; Parakeet
-TDT 0.6B V3, V2, and TDT-CTC 110M; Parakeet Japanese; and the Paraformer
-Chinese specialist; ReazonSpeech K2 V2 Japanese; and SenseVoiceSmall for
-English, Mandarin, Cantonese, Japanese, and Korean. The catalog and signature
-are bundled; model weights remain external and are downloaded only after the
-user chooses a model.
+The signed catalog shipped with the current app contains 35 curated
+choices: Whisper small.en; Experimental Whisper Large V2 and V3 q5_0; Whisper
+Large V3 Turbo q5_0 and a separate MLX Turbo entry; Accurate Canary-Qwen 2.5B;
+Parakeet TDT 0.6B V3, V2, and TDT-CTC 110M; Parakeet RNNT 1.1B; Cohere
+Transcribe; Parakeet Japanese; the Paraformer Chinese specialist; ReazonSpeech
+K2 V2 Japanese; and SenseVoiceSmall for English, Mandarin, Cantonese,
+Japanese, and Korean; plus Experimental Qwen3-ASR 0.6B and 1.7B entries in MLX
+8-bit and GGUF BF16, Q8_0, and Q5_K_M formats; plus Experimental Parakeet TDT
+V2, Parakeet TDT V3, and Nemotron 3.5 ASR entries in MLX and GGUF F16, Q8_0,
+and Q5_K_M formats. The catalog and signature are
+bundled; model weights
+remain external and are downloaded only after the user chooses a model.
 
 The GitHub Pages catalog may temporarily lag an app release. Textify verifies
 the bundled and remote catalogs independently and selects the whole catalog
@@ -52,6 +57,21 @@ header, hashes and copies it into managed storage, and requires the native
 Whisper runtime to load and warm it before activation. Textify labels the
 license as user-provided and does not claim that an imported file is safe or
 properly licensed.
+
+Whisper Large V2 q5_0 and Whisper Large V3 q5_0 are published as Experimental
+English routes under catalog IDs `whisper-large-v2-q5_0` and
+`whisper-large-v3-q5_0`. Their exact 1,080,732,091-byte and 1,081,140,203-byte
+artifacts come from `ggerganov/whisper.cpp` commit
+`c521a4b02f422512d734391fdf08bb08c0862f68`; SHA-256 values are
+`3a214837221e4530dbc1fe8d734f302af393eb30bd0ed046042ebf4baf70f6f2` and
+`d75795ecff3f83b5faa89d1900604ad8c780abd5739fae406de19f23ecd98ad1`.
+Textify exposes English only for these entries until additional languages pass
+the same fixed-corpus quality, latency, and memory gate. The OpenAI model and
+whisper.cpp conversion/runtime layers are MIT. On the fixed 210-word OpenSLR
+subset on M4 Max, V2 measured 3.33% WER, 551 ms median/746 ms p95
+release-to-final, and 1.49 GB peak resident memory; V3 measured 3.81% WER,
+542.5 ms median/728 ms p95, and 1.50 GB peak resident memory. See the
+[exact benchmark record](benchmark-report-2026-07-20-whisper-large.md).
 
 Whisper Large V3 Turbo q5_0 is published as the English/Hindi Specialist under
 catalog id `whisper-large-v3-turbo-q5_0`. Its single 574,041,195-byte artifact
@@ -130,6 +150,129 @@ RSS was about 694 MB. The first executable-specific Core ML preparation took
 37.4 seconds; warm process loads were 281–739 ms. Its signed picker guidance
 discloses the Japanese-only coverage, 619 MB download, accuracy result, and
 first-preparation cost.
+
+### MLX Audio / Metal GPU
+
+Parakeet RNNT 1.1B is published as the English-only Experimental entry
+`parakeet-rnnt-1.1b`. Its five-file MLX directory totals 4,282,559,760 bytes and
+comes from `mlx-community/parakeet-rnnt-1.1b` at immutable commit
+`7f399a0d3442123deae9194e71f5c984b2879efa`. The original NVIDIA weights and
+conversion remain CC-BY-4.0; the pinned MLX Audio Swift and MLX Swift runtime
+layers are MIT.
+
+Textify keeps the loaded MLX session resident, forces the Metal GPU, accepts
+16 kHz mono English audio only, and caps recordings at 60 seconds. Command-line
+SwiftPM cannot build MLX's shaders, so the app ships a distinct, verified
+`mlx.metallib` beside its executable. Whisper's `default.metallib` is a
+different library and cannot satisfy this route.
+
+On the fixed 210-word OpenSLR subset on M4 Max, the exact model measured 1.90%
+WER, 128.5 ms median and 241 ms p95 release-to-final latency, 0.0182 median
+real-time factor, and 4,456,595,456 bytes peak resident memory. A fresh
+install-shaped directory with all five catalog hashes reproduced the exact
+first transcript on MLX Metal. Its 4.28 GB download and memory footprint keep
+it Experimental and require at least 16 GB unified memory. See the
+[exact benchmark record](benchmark-report-2026-07-20-parakeet-rnnt.md).
+
+Cohere Transcribe is published as the English-only Experimental entry
+`cohere-transcribe-03-2026-mlx-8bit`. Its four-file MLX directory totals
+2,418,577,135 bytes and is pinned to
+`beshkenadze/cohere-transcribe-03-2026-mlx-8bit` commit
+`d1f843476f84846e6fe7aa58a6033f17882f0ec9`. The official model and conversion
+are Apache-2.0; the MLX runtime layers are MIT. Textify uses explicit English,
+greedy decoding, the verified Metal GPU, and rejects recordings beyond the
+model's 30-second window.
+
+On the same fixed M4 Max corpus, the exact 8-bit model measured 2.86% WER,
+121.5 ms median and 304 ms p95 release-to-final latency, 0.0179 median
+real-time factor, and 2,522,726,400 bytes peak resident memory. All four
+downloaded files matched the signed byte sizes and hashes, and the native
+runtime reproduced the first reference at 0 WER through MLX Metal. The 2.42 GB
+download, English-only scope, new conversion, and 30-second cap keep it
+Experimental. See the
+[exact benchmark record](benchmark-report-2026-07-20-cohere-transcribe.md).
+
+Whisper Large V3 Turbo MLX is published as the English-only Experimental entry
+`whisper-large-v3-turbo-mlx`. Its 1,618,594,759-byte managed directory combines
+`config.json` and `weights.safetensors` from
+`mlx-community/whisper-large-v3-turbo` commit
+`a4aaeec0636e6fef84abdcbe3544cb2bf7e9f6fb` with eight tokenizer and generation
+files from the original OpenAI Turbo repository at immutable commit
+`41f01f3fe87f28c78e2fbf8b568835947dd65ed9`. This prevents the upstream Swift
+loader from attempting its mutable online tokenizer fallback after install.
+
+On the same fixed M4 Max corpus, the exact MLX model measured 3.33% WER, 321.5
+ms median and 416 ms p95 release-to-final latency, 0.0458 median real-time
+factor, and 1,748,041,728 bytes peak resident memory. The existing 5-bit
+whisper.cpp Turbo route remains available because it is about one third the
+download size and uses substantially less memory; the MLX route offers slightly
+better measured English accuracy and latency in exchange for that footprint.
+Textify currently exposes explicit English only because the pinned Swift
+Whisper decoder does not provide the automatic-language and confidence metrics
+needed for a trustworthy multilingual production route. See the
+[exact benchmark record](benchmark-report-2026-07-20-mlx-whisper-turbo.md).
+
+### Qwen3-ASR / MLX and transcribe.cpp Metal GPU
+
+Qwen3-ASR 0.6B and 1.7B are published as Experimental automatic-language
+choices. Each architecture has one native MLX Audio Swift 8-bit directory and
+three GGUF choices through transcribe.cpp: BF16, Q8_0, and Q5_K_M. The MLX
+directories are pinned to `mlx-community/Qwen3-ASR-0.6B-8bit` commit
+`89e96d92ba34aca20b3e29fb10cc284097d1219f` and
+`mlx-community/Qwen3-ASR-1.7B-8bit` commit
+`a8379a2e2f9e313c9292cdf1af4055ab56d50d55`. Their nine required inference
+files total 1,010,771,234 and 2,467,856,503 bytes respectively.
+
+The six GGUF entries select exact files from
+`handy-computer/Qwen3-ASR-0.6B-gguf` commit
+`e4e16599b900eb0cb36e524514756bb92eb092b7` and
+`handy-computer/Qwen3-ASR-1.7B-gguf` commit
+`92282af1610a2db19d66f2bef1e260f5deca782d`. Their sizes range from
+645,356,192 bytes for 0.6B Q5_K_M to 4,083,087,904 bytes for 1.7B BF16. Every
+entry records its own exact filename, size, SHA-256, revision, and Apache-2.0
+model license; the native MLX and transcribe.cpp runtime layers are MIT.
+
+Both runtimes keep model inference local, require a verified Metal backend,
+cap recordings at 60 seconds, and use the architecture's automatic language
+detection. Textify does not send an explicit language hint because the Qwen3-ASR
+GGUF implementation does not support one. The entries advertise the 30
+languages declared by the upstream checkpoint and remain Experimental while
+Textify expands its per-language corpus evidence.
+
+On the fixed English sample, MLX 0.6B and 1.7B measured 3.20% and 1.83% WER
+with 191.5 ms and 211.5 ms median finalization. The GGUF routes measured
+3.33–3.65% WER with 156.5–317.5 ms medians. Q5_K_M used the least memory for
+each GGUF size. On the fixed Hindi sample, the 0.6B and 1.7B Q5_K_M routes
+measured 11.36%/10.05% and 10.00%/7.00% WER/CER through automatic language
+detection. See the
+[exact artifact and benchmark record](benchmark-report-2026-07-20-qwen3-asr.md).
+
+### Parakeet TDT and Nemotron / MLX and transcribe.cpp Metal GPU
+
+Parakeet TDT 0.6B V2, Parakeet TDT 0.6B V3, and Nemotron 3.5 ASR 0.6B each
+have one exact MLX Community directory plus F16, Q8_0, and Q5_K_M GGUF choices
+from handy-computer. The GGUF sources do not publish BF16, so Textify uses and
+labels their exact F16 files. All twelve choices remain Experimental.
+
+V2 is explicit English. V3 uses automatic detection across its 25 declared
+European languages. Nemotron uses automatic detection with a conservative
+catalog of 28 base language codes. Textify sends completed recordings to all
+three architectures and does not expose Nemotron's upstream streaming mode or
+claim live partials.
+
+The exact MLX revisions are
+`8ae155301e23d820d82aa60d24817c900e69e487` (V2),
+`ed2b7e8c15f9aaa0b5772e2efb986255eaef7e15` (V3), and
+`e550040c0478027ed679b2b6b0d055502c103663` (Nemotron). The exact GGUF
+revisions are `07cee0616125a08ef619729bb47f40ef747e4bc4`,
+`85ac09ea12fc4b1112fa76810059364bc6adc9de`, and
+`6d44e540bc31b0de1dbe174a3cea87f53a7f22fb` respectively.
+
+On the fixed 210-word M4 Max English corpus, Parakeet V2 measured 0.48% WER,
+Parakeet V3 measured 2.38%, and Nemotron measured 2.86–3.33%. Median
+release-to-final latency ranged from 67 to 137 ms and every route verified its
+required Metal backend. See the
+[exact artifact and benchmark record](benchmark-report-2026-07-20-parakeet-tdt-nemotron.md).
 
 ### FluidAudio Paraformer / Core ML Neural Engine
 
@@ -222,14 +365,37 @@ member separately confirmed commercial paid-desktop use. Textify retains the
 SenseVoiceSmall name in the picker, includes FunASR/SenseVoice attribution, and
 ships a copy of the model license text.
 
+### Canary-Qwen / transcribe.cpp Metal GPU
+
+The catalog publishes `canary-qwen-2.5b-q4-k-m` as the Accurate English choice.
+Its single 1,737,575,808-byte Q4_K_M GGUF is pinned to
+`handy-computer/canary-qwen-2.5b-gguf` commit
+`3370d4e2f28cc70eea79dfc9f2f43fb91eef3163`; SHA-256 is
+`db5162229d6fa22597d06a613bd9b543eddb3ee02e6afc5e759120fde02bebf7`.
+The original NVIDIA model and conversion are CC-BY-4.0, the Qwen component is
+Apache-2.0, and the pinned transcribe.cpp runtime is MIT.
+
+Textify loads the exact `canary_qwen` architecture through its isolated
+transcribe.cpp 0.1.3 dynamic runtime, verifies the reported Metal device, keeps
+the session resident, accepts explicit English only, and rejects audio longer
+than 40 seconds before inference. Digital and near-digital silence is returned
+as no speech without invoking the autoregressive model.
+
+On the fixed 210-word OpenSLR subset on M4 Max, Canary-Qwen measured 0.95% WER,
+255.5 ms median and 373 ms p95 release-to-final latency, 0.0312 median
+real-time factor, and 3,163,389,952 bytes peak resident memory. The opt-in
+native regression loaded the exact artifact on Metal and reproduced the
+punctuated first reference under the 700 ms budget. See the
+[exact benchmark record](benchmark-report-2026-07-20-canary-qwen.md).
+
 ## Evaluated but deferred families
 
 The reusable additional engine boundary is sherpa-onnx v1.13.2 at commit
 `13d0ae6c539d2809d32f5eaa3ef1db0c459d0b24`, not one custom runtime per model.
 Textify now ships production paths for ReazonSpeech and SenseVoiceSmall. Its
-broader released C/Swift evaluation surface covers Qwen3-ASR, Dolphin, and
-Omnilingual ASR, while sherpa-onnx also exposes Moonshine V2, Cohere Transcribe,
-Fun-ASR Nano, and FireRedASR. Each new architecture
+broader released C/Swift evaluation surface covers Dolphin and Omnilingual ASR,
+while sherpa-onnx also exposes the separately deferred Qwen3-ASR ONNX route,
+Moonshine V2, Cohere Transcribe, Fun-ASR Nano, and FireRedASR. Each new architecture
 still requires a small explicit shim extension plus exact-artifact quality,
 latency, memory, license, and accelerator evaluation. A provider option alone
 is not accelerator proof.
@@ -238,8 +404,8 @@ is not accelerator proof.
 | --- | --- |
 | Distil-Whisper Large V3.5 | Deferred on product fit. Its official 1,519,521,155-byte GGML artifact produced the same 4.29% WER as Turbo on the fixed English sample and was only 15 ms faster at the median, while peaking near 1.62 GB RSS and supporting English only. |
 | Kotoba-Whisper V2.0 q5_0 | Deferred with no measured advantage. The official 537,819,875-byte Apache-2.0 GGML artifact reached 18.73% CER, 507.5 ms median, 700 ms p95/max, about 633 MB RSS, and a 24.7-second first load on the same JSUT slice. Promoted Parakeet Japanese measured 13.11% CER and 60.5 ms median, so another Japanese-only download would add choice without adding value. |
-| Qwen3-ASR 0.6B int8 ONNX | Deferred on interactive cost. The exact 987,015,347-byte Apache-2.0 artifact reached 12.95% Hindi WER and 13.11% CER, better than Whisper Turbo's Hindi result, but took about 2.22 seconds median and 3.42 seconds p95/max with about 2.15 GB RSS. Core ML regressed to 15.45 seconds and 8.20 GB on one clip; a 29-second Japanese stress clip still ended incomplete at the raised 512-token output limit. |
-| Cohere Transcribe 2B | Runtime-capable but license-deferred. Sherpa-onnx v1.13.2 has a released adapter, but the approximately 2.1 GB conversion remains slow for this product and its model page contradicts itself by declaring Apache-2.0 metadata and CC-BY-NC-4.0 in the license section. |
+| Qwen3-ASR 0.6B int8 ONNX | This separate sherpa-onnx export remains deferred on interactive cost; the native MLX and GGUF variants are published above. The exact 987,015,347-byte Apache-2.0 ONNX artifact reached 12.95% Hindi WER and 13.11% CER, better than Whisper Turbo's Hindi result, but took about 2.22 seconds median and 3.42 seconds p95/max with about 2.15 GB RSS. Core ML regressed to 15.45 seconds and 8.20 GB on one clip; a 29-second Japanese stress clip still ended incomplete at the raised 512-token output limit. |
+| Legacy Cohere Transcribe 2B sherpa conversion | Deferred. This older, differently licensed conversion is not the requested Apache-2.0 Cohere Transcribe 03-2026 model now supported through MLX Metal. |
 | Omnilingual ASR CTC 300M int8 | Deferred on measured quality. The exact 365,438,543-byte Apache-2.0 artifact covers more than 1,600 languages and finalized the fixed Hindi sample in about 754 ms median/1.50 seconds p95, but reached 23.18% WER and 31.24% CER with about 1.02 GB RSS—worse quality than promoted Whisper Turbo on this slice. Core ML took 2.92 seconds and roughly 12.28 GB on one clip. |
 | Dolphin Small CTC multilingual int8 | Deferred on quality despite speed. The exact 250,163,616-byte Apache-2.0 artifact finalized at about 228 ms Hindi median and roughly 93 ms Japanese median, but measured 33.86% Hindi WER/35.37% CER and 18.35% Japanese CER. It adds no quality advantage over the promoted Hindi or Japanese choices. |
 | Moonshine V2 Tiny English | Deferred pending safe chunking. The exact 44 MB quantized sherpa artifact transcribed ≤9.02-second OpenSLR clips in 29–110 ms on CPU, but returned empty results for every 11.48–13.31-second clip because the exported window is about 10 seconds. Core ML was much worse on a 4.65-second clip: 1.947 seconds versus 58 ms on CPU, with higher memory. Do not cap ordinary dictation or silently lose long audio; add boundary-aware chunking before promotion. |

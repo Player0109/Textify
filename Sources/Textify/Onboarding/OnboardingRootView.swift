@@ -1,3 +1,4 @@
+import AppKit
 import Observation
 import SwiftUI
 import TextifyHotkeys
@@ -24,64 +25,63 @@ struct OnboardingRootView: View {
     var body: some View {
         @Bindable var services = services
 
-        VStack(alignment: .leading, spacing: 22) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Textify Setup")
-                    .font(.largeTitle.bold())
-                Text(services.onboardingStep.progressTitle)
-                    .foregroundStyle(.secondary)
-            }
+        HStack(spacing: 0) {
+            onboardingSidebar
 
-            ProgressView(
-                value: Double(currentStepIndex + 1),
-                total: Double(OnboardingStep.productionFlow.count)
-            )
+            Divider()
 
-            HStack(alignment: .top, spacing: 22) {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(OnboardingStep.productionFlow) { step in
-                        StepRow(
-                            title: step.title,
-                            isSelected: step == services.onboardingStep,
-                            isComplete: isComplete(step)
-                        )
-                    }
+            VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(services.onboardingStep.progressTitle.uppercased())
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .tracking(1.1)
+                        .foregroundStyle(TextifyVisualIdentity.voiceViolet)
+                    Text(currentStepTitle)
+                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                        .tracking(-0.5)
                 }
-                .frame(width: 170, alignment: .leading)
+                .padding(.horizontal, 34)
+                .padding(.top, 32)
+                .padding(.bottom, 18)
 
-                VStack(alignment: .leading, spacing: 16) {
-                    Text(services.onboardingStep.productionTitle)
-                        .font(.title2.bold())
-
-                    onboardingContent
+                ScrollView {
+                    TextifyCard(padding: 22) {
+                        onboardingContent
+                    }
+                    .padding(.horizontal, 34)
+                    .padding(.bottom, 20)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            }
 
-            Spacer(minLength: 0)
+                Divider()
 
-            HStack {
-                Button("Back") {
-                    moveBack()
+                HStack(spacing: 12) {
+                    Button("Back") {
+                        moveBack()
+                    }
+                    .disabled(currentStepIndex == 0)
+
+                    Spacer()
+
+                    if services.onboardingStep == .completion {
+                        Toggle("Launch at Login", isOn: $launchAtLogin)
+                            .toggleStyle(.checkbox)
+                    }
+
+                    Button(primaryButtonTitle) {
+                        primaryAction()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(primaryButtonDisabled)
                 }
-                .disabled(currentStepIndex == 0)
-
-                Spacer()
-
-                if services.onboardingStep == .completion {
-                    Toggle("Launch at Login", isOn: $launchAtLogin)
-                        .toggleStyle(.checkbox)
-                }
-
-                Button(primaryButtonTitle) {
-                    primaryAction()
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(primaryButtonDisabled)
+                .padding(.horizontal, 34)
+                .frame(height: 68)
             }
         }
-        .padding(28)
-        .frame(width: 680, height: 470)
+        .tint(TextifyVisualIdentity.voiceViolet)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .frame(width: TextifyWindowMetrics.onboardingWidth, height: TextifyWindowMetrics.onboardingHeight)
         .disabled(services.startupIssue != nil)
         .overlay {
             if services.startupIssue != nil {
@@ -114,15 +114,76 @@ struct OnboardingRootView: View {
         }
     }
 
+    private var onboardingSidebar: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 11) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(TextifyVisualIdentity.voiceViolet.opacity(0.14))
+                    TextifyVoiceMark(state: .processing, height: 22)
+                }
+                .frame(width: 38, height: 38)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Textify")
+                        .font(.system(.title3, design: .rounded, weight: .bold))
+                    Text("First-time setup")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 26)
+            .padding(.bottom, 28)
+
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(Array(OnboardingStep.productionFlow.enumerated()), id: \.element) { index, step in
+                    StepRow(
+                        number: index + 1,
+                        title: step.title,
+                        isSelected: step == services.onboardingStep,
+                        isComplete: isComplete(step),
+                        isPast: index < currentStepIndex
+                    )
+                }
+            }
+            .padding(.horizontal, 12)
+
+            Spacer(minLength: 20)
+
+            Label("On-device by design", systemImage: "lock.shield")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(20)
+        }
+        .frame(width: 224)
+        .background(Color(nsColor: .underPageBackgroundColor).opacity(0.72))
+    }
+
     @ViewBuilder
     private var onboardingContent: some View {
         switch services.onboardingStep {
         case .welcome:
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Textify turns a held Right Command key into short local dictation.")
-                Text("Setup checks the model, macOS permissions, and the trigger before the menu bar utility is ready.")
+            VStack(alignment: .leading, spacing: 18) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(TextifyVisualIdentity.voiceViolet.opacity(0.12))
+                    TextifyVoiceMark(state: .processing, height: 54)
+                }
+                .frame(height: 128)
+
+                VStack(alignment: .leading, spacing: 7) {
+                    Text("Speak here. Type anywhere.")
+                        .font(.system(.title2, design: .rounded, weight: .bold))
+                    Text("Hold your trigger, speak naturally, then release. Textify turns short speech into text without sending dictation off your Mac.")
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Label("Setup takes about two minutes", systemImage: "timer")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
-            .foregroundStyle(.secondary)
 
         case .model:
             VStack(alignment: .leading, spacing: 12) {
@@ -136,7 +197,7 @@ struct OnboardingRootView: View {
                         }
                     }
 
-                    Button("Install Model") {
+                    Button(services.isModelInstalled(ProductionModelPresentation.v1_1.id) ? "Reinstall Model" : "Install Model") {
                         services.modelInstallCoordinator.start()
                     }
                     .disabled(services.modelInstallCoordinator.isActive || ProductionModelInstallConfiguration.current == nil)
@@ -213,8 +274,11 @@ struct OnboardingRootView: View {
                     }
                 }
 
-                Text("Hold \(services.preferences.trigger.displayName) until the check appears, then release.")
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 14) {
+                    TextifyKeycap(title: services.preferences.trigger.displayName)
+                    Text("Hold until the check appears, then release.")
+                        .foregroundStyle(.secondary)
+                }
 
                 HStack(spacing: 12) {
                     Button(triggerTest.isRunning ? "Restart Test" : "Start Test") {
@@ -229,14 +293,30 @@ struct OnboardingRootView: View {
 
                 TriggerTestResultView(result: triggerTest.result)
 
-                Text(triggerTest.statusText)
+                Text(triggerTest.displayStatusText(triggerName: services.preferences.trigger.displayName))
                     .foregroundStyle(triggerTest.result.passed ? .green : .secondary)
             }
 
         case .completion:
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Textify will stay in the menu bar and listen for \(services.preferences.trigger.displayName).")
-                Text("Dictation starts only after setup is complete and readiness has no blockers.")
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 14) {
+                    ZStack {
+                        Circle()
+                            .fill(TextifyVisualIdentity.readyMint.opacity(0.14))
+                        TextifyVoiceMark(state: .ready, height: 32)
+                    }
+                    .frame(width: 58, height: 58)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Setup is complete")
+                            .font(.system(.title2, design: .rounded, weight: .bold))
+                        Text("Textify will stay nearby in the menu bar.")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Text("Hold \(services.preferences.trigger.displayName), speak, then release to type. If a requirement still needs attention, Textify will show it in the main window.")
+                    .foregroundStyle(.secondary)
 
                 if let message = OnboardingLaunchAtLoginNotice.message(for: launchAtLoginCompletionStatus) {
                     Text(message)
@@ -255,6 +335,13 @@ struct OnboardingRootView: View {
 
     private var primaryButtonTitle: String {
         services.onboardingStep == .completion ? "Done" : "Continue"
+    }
+
+    private var currentStepTitle: String {
+        if services.onboardingStep == .triggerTest {
+            return "Test \(services.preferences.trigger.displayName)"
+        }
+        return services.onboardingStep.productionTitle
     }
 
     private var primaryButtonDisabled: Bool {
@@ -307,10 +394,20 @@ struct OnboardingRootView: View {
     }
 
     private func isComplete(_ step: OnboardingStep) -> Bool {
-        guard let index = OnboardingStep.productionFlow.firstIndex(of: step) else {
-            return false
+        switch step {
+        case .welcome:
+            return currentStepIndex > 0
+        case .model:
+            return services.dictation.readiness.model.isReady
+        case .microphone:
+            return services.dictation.readiness.permissions.microphone == .granted
+        case .accessibility:
+            return services.dictation.readiness.permissions.accessibility == .granted
+        case .triggerTest:
+            return triggerTest.result.passed
+        case .completion:
+            return didCompleteOnboarding
         }
-        return index < currentStepIndex
     }
 
     private func completeOnboarding() async {
@@ -485,6 +582,16 @@ final class OnboardingTriggerTestController: @unchecked Sendable {
         finish()
     }
 
+    func displayStatusText(triggerName: String) -> String {
+        if !isRunning,
+           !result.sawDown,
+           !result.sawBeginRecording,
+           !result.sawUp {
+            return "Start the test, then hold and release \(triggerName)."
+        }
+        return statusText
+    }
+
     private func finish() {
         activationTask?.cancel()
         activationTask = nil
@@ -541,18 +648,60 @@ final class OnboardingTriggerTestController: @unchecked Sendable {
 }
 
 private struct StepRow: View {
+    let number: Int
     let title: String
     let isSelected: Bool
     let isComplete: Bool
+    let isPast: Bool
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: isComplete ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(isSelected || isComplete ? Color.accentColor : Color.secondary)
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(stepColor.opacity(isSelected || isComplete ? 0.16 : 0.07))
+                if isComplete {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 9, weight: .bold))
+                } else if isPast {
+                    Image(systemName: "exclamationmark")
+                        .font(.system(size: 9, weight: .bold))
+                } else {
+                    Text(String(number))
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                }
+            }
+            .foregroundStyle(stepColor)
+            .frame(width: 24, height: 24)
+
             Text(title)
-                .font(.callout)
+                .font(.system(.callout, design: .rounded, weight: isSelected ? .semibold : .regular))
                 .foregroundStyle(isSelected ? .primary : .secondary)
+
+            Spacer(minLength: 0)
         }
+        .padding(.horizontal, 9)
+        .frame(height: 38)
+        .background(
+            isSelected ? TextifyVisualIdentity.voiceViolet.opacity(0.10) : Color.clear,
+            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(
+            isComplete ? "Complete" : isPast ? "Needs attention" : isSelected ? "Current step" : "Not started"
+        )
+    }
+
+    private var stepColor: Color {
+        if isComplete {
+            return TextifyVisualIdentity.readyMint
+        }
+        if isSelected {
+            return TextifyVisualIdentity.voiceViolet
+        }
+        if isPast {
+            return TextifyVisualIdentity.warmWarning
+        }
+        return TextifyVisualIdentity.slate
     }
 }
 
@@ -560,11 +709,32 @@ private struct ModelSummaryView: View {
     let readiness: RuntimeModelReadiness
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            LabeledContent("Model", value: ProductionModelPresentation.v1_1.displayName)
-            LabeledContent("Identifier", value: ProductionModelPresentation.v1_1.id)
-            LabeledContent("Status", value: readiness.settingsModelStatus)
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(TextifyVisualIdentity.voiceViolet.opacity(0.13))
+                Image(systemName: "externaldrive.fill")
+                    .font(.title2)
+                    .foregroundStyle(TextifyVisualIdentity.voiceViolet)
+            }
+            .frame(width: 50, height: 50)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(ProductionModelPresentation.v1_1.displayName)
+                    .font(.system(.headline, design: .rounded, weight: .semibold))
+                Text(ProductionModelPresentation.v1_1.id)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 12)
+
+            TextifyStatusBadge(
+                title: readiness.settingsModelStatus.uppercased(),
+                tone: readiness.isReady ? .success : .warning
+            )
         }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -576,11 +746,35 @@ private struct PermissionStepView: View {
     let action: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            LabeledContent(name, value: status)
-            Text(details)
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 13) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(status == "Granted" ? TextifyVisualIdentity.readyMint.opacity(0.13) : TextifyVisualIdentity.voiceViolet.opacity(0.13))
+                    Image(systemName: name == "Microphone" ? "mic.fill" : "cursorarrow.rays")
+                        .font(.title2)
+                        .foregroundStyle(status == "Granted" ? TextifyVisualIdentity.readyMint : TextifyVisualIdentity.voiceViolet)
+                }
+                .frame(width: 50, height: 50)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(name)
+                        .font(.system(.headline, design: .rounded, weight: .semibold))
+                    Text(details)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 12)
+
+                TextifyStatusBadge(
+                    title: status.uppercased(),
+                    tone: status == "Granted" ? .success : .warning
+                )
+            }
+
             Button(actionTitle, action: action)
+                .buttonStyle(.borderedProminent)
         }
     }
 }

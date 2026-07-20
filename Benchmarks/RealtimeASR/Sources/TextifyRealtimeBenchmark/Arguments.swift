@@ -16,6 +16,21 @@ enum BenchmarkEngine: String, Codable {
     case omnilingualASR300M = "omnilingual-asr-300m-ctc-int8"
     case dolphinSmall = "dolphin-small-ctc-multi-lang-int8"
     case senseVoiceSmall = "sensevoice-small-int8"
+    case mlxParakeetRNNT1_1B = "mlx-parakeet-rnnt-1.1b"
+    case mlxCohereTranscribe03_2026 = "mlx-cohere-transcribe-03-2026"
+    case mlxWhisperLargeV3Turbo = "mlx-whisper-large-v3-turbo"
+    case mlxQwen3ASR0_6B8Bit = "mlx-qwen3-asr-0.6b-8bit"
+    case mlxQwen3ASR1_7B8Bit = "mlx-qwen3-asr-1.7b-8bit"
+    case mlxParakeetTDT0_6BV2 = "mlx-parakeet-tdt-0.6b-v2"
+    case mlxParakeetTDT0_6BV3 = "mlx-parakeet-tdt-0.6b-v3"
+    case mlxNemotron3_5ASRStreaming0_6B = "mlx-nemotron-3.5-asr-streaming-0.6b"
+    case canaryQwen2_5B = "canary-qwen-2.5b"
+    case transcribeQwen3ASR0_6B = "transcribe-qwen3-asr-0.6b"
+    case transcribeQwen3ASR1_7B = "transcribe-qwen3-asr-1.7b"
+    case transcribeParakeetTDT0_6BV2 = "transcribe-parakeet-tdt-0.6b-v2"
+    case transcribeParakeetTDT0_6BV3 = "transcribe-parakeet-tdt-0.6b-v3"
+    case transcribeNemotron3_5ASRStreaming0_6B = "transcribe-nemotron-3.5-asr-streaming-0.6b"
+    case liteRTGemma4_12B = "litert-gemma-4-12b"
 }
 
 enum FeedMode: String, Codable {
@@ -28,6 +43,11 @@ struct BenchmarkOptions {
     let audioURL: URL
     let reference: String?
     let whisperModelURL: URL?
+    let mlxModelURL: URL?
+    let transcribeRuntimeURL: URL?
+    let transcribeModelURL: URL?
+    let liteRTModelURL: URL?
+    let liteRTCacheURL: URL
     let languageCode: String
     let fluidCacheURL: URL
     let sherpaRuntimeURL: URL?
@@ -53,7 +73,7 @@ struct BenchmarkOptions {
               let engine = BenchmarkEngine(rawValue: engineValue)
         else {
             throw BenchmarkCLIError.invalidArguments(
-                "--engine must be apple-dictation-analyzer, apple-speech-analyzer, whisper, parakeet-eou-160, parakeet-unified-320, parakeet-tdt-v2, parakeet-tdt-v3, parakeet-tdt-ctc-110m, parakeet-tdt-ja, paraformer-large-zh-int8, reazonspeech-k2-v2, qwen3-asr-0.6b, omnilingual-asr-300m-ctc-int8, dolphin-small-ctc-multi-lang-int8, or sensevoice-small-int8"
+                "--engine must name a supported benchmark engine, including whisper or mlx-parakeet-rnnt-1.1b"
             )
         }
         guard let audioPath = values["--audio"] else {
@@ -79,6 +99,49 @@ struct BenchmarkOptions {
                 "--whisper-model is required for the whisper engine"
             )
         }
+        let mlxModelURL = values["--mlx-model"].map {
+            URL(fileURLWithPath: $0).standardizedFileURL
+        }
+        if engine == .mlxParakeetRNNT1_1B
+            || engine == .mlxCohereTranscribe03_2026
+            || engine == .mlxWhisperLargeV3Turbo
+            || engine == .mlxQwen3ASR0_6B8Bit
+            || engine == .mlxQwen3ASR1_7B8Bit
+            || engine == .mlxParakeetTDT0_6BV2
+            || engine == .mlxParakeetTDT0_6BV3
+            || engine == .mlxNemotron3_5ASRStreaming0_6B,
+            mlxModelURL == nil
+        {
+            throw BenchmarkCLIError.invalidArguments(
+                "--mlx-model is required for MLX Audio engines"
+            )
+        }
+        let transcribeRuntimeURL = values["--transcribe-runtime"].map {
+            URL(fileURLWithPath: $0).standardizedFileURL
+        }
+        let transcribeModelURL = values["--transcribe-model"].map {
+            URL(fileURLWithPath: $0).standardizedFileURL
+        }
+        if engine == .canaryQwen2_5B
+            || engine == .transcribeQwen3ASR0_6B
+            || engine == .transcribeQwen3ASR1_7B
+            || engine == .transcribeParakeetTDT0_6BV2
+            || engine == .transcribeParakeetTDT0_6BV3
+            || engine == .transcribeNemotron3_5ASRStreaming0_6B,
+            transcribeRuntimeURL == nil || transcribeModelURL == nil
+        {
+            throw BenchmarkCLIError.invalidArguments(
+                "--transcribe-runtime and --transcribe-model are required for transcribe.cpp engines"
+            )
+        }
+        let liteRTModelURL = values["--litert-model"].map {
+            URL(fileURLWithPath: $0).standardizedFileURL
+        }
+        if engine == .liteRTGemma4_12B, liteRTModelURL == nil {
+            throw BenchmarkCLIError.invalidArguments(
+                "--litert-model is required for the Gemma 4 LiteRT-LM engine"
+            )
+        }
         let sherpaRuntimeURL = values["--sherpa-runtime"].map {
             URL(fileURLWithPath: $0).standardizedFileURL
         }
@@ -88,7 +151,8 @@ struct BenchmarkOptions {
         if engine == .reazonSpeechK2V2 || engine == .qwen3ASR0_6B
             || engine == .omnilingualASR300M || engine == .dolphinSmall
             || engine == .senseVoiceSmall,
-           sherpaRuntimeURL == nil || sherpaModelURL == nil {
+            sherpaRuntimeURL == nil || sherpaModelURL == nil
+        {
             throw BenchmarkCLIError.invalidArguments(
                 "--sherpa-runtime and --sherpa-model are required for sherpa-onnx engines"
             )
@@ -100,7 +164,7 @@ struct BenchmarkOptions {
             )
         }
         let sherpaThreadCount = values["--sherpa-threads"].flatMap(Int.init) ?? 4
-        guard (1...16).contains(sherpaThreadCount) else {
+        guard (1 ... 16).contains(sherpaThreadCount) else {
             throw BenchmarkCLIError.invalidArguments(
                 "--sherpa-threads must be between 1 and 16"
             )
@@ -111,6 +175,13 @@ struct BenchmarkOptions {
             audioURL: URL(fileURLWithPath: audioPath).standardizedFileURL,
             reference: values["--reference"],
             whisperModelURL: whisperModelURL,
+            mlxModelURL: mlxModelURL,
+            transcribeRuntimeURL: transcribeRuntimeURL,
+            transcribeModelURL: transcribeModelURL,
+            liteRTModelURL: liteRTModelURL,
+            liteRTCacheURL: values["--litert-cache"].map {
+                URL(fileURLWithPath: $0, isDirectory: true).standardizedFileURL
+            } ?? defaultCache.appendingPathComponent("LiteRTLM", isDirectory: true),
             languageCode: values["--language"] ?? "en",
             fluidCacheURL: values["--fluid-cache"].map {
                 URL(fileURLWithPath: $0).standardizedFileURL
@@ -134,9 +205,9 @@ enum BenchmarkCLIError: Error, CustomStringConvertible {
 
     var description: String {
         switch self {
-        case .invalidArguments(let message),
-             .invalidAudio(let message),
-             .benchmarkFailed(let message):
+        case let .invalidArguments(message),
+             let .invalidAudio(message),
+             let .benchmarkFailed(message):
             return message
         }
     }

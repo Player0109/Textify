@@ -13,18 +13,20 @@ struct MenuBarRoot: View {
 
         Divider()
 
-        Text(statusTitle)
-            .foregroundStyle(.secondary)
-
-        if let blockerTitle {
-            Text(blockerTitle)
+        if shouldShowStatus {
+            Label(statusTitle, systemImage: statusSystemImage)
                 .foregroundStyle(.secondary)
+
+            if let blockerTitle {
+                Text(blockerTitle)
+                    .foregroundStyle(.secondary)
+            }
+
+            Divider()
         }
 
-        Divider()
-
         if shouldShowFinishSetup {
-            Button("Finish Setup...") {
+            Button("Finish Setup…") {
                 TextifyOnboardingWindowPresenter.shared.show(services: services)
             }
         }
@@ -65,6 +67,26 @@ struct MenuBarRoot: View {
 
     private var shouldShowFinishSetup: Bool {
         !services.preferences.onboardingCompleted || !services.dictation.readiness.canDictate
+    }
+
+    private var shouldShowStatus: Bool {
+        services.runtimeIssue != nil
+            || !services.dictation.readiness.canDictate
+            || services.dictation.status != .idle
+    }
+
+    private var statusSystemImage: String {
+        if services.runtimeIssue != nil || !services.dictation.readiness.canDictate {
+            return "exclamationmark.circle"
+        }
+        switch services.dictation.status {
+        case .recording:
+            return "waveform"
+        case .processing, .inserting:
+            return "ellipsis.circle"
+        default:
+            return "circle.fill"
+        }
     }
 
     private func openSettingsPane(_ pane: SettingsPane) {

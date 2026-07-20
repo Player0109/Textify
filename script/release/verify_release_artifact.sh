@@ -38,15 +38,26 @@ plist_value() {
 [[ -s "$APP_PATH/Contents/Resources/FunASR_Model_License_1.1.txt" ]]
 [[ -s "$APP_PATH/Contents/Resources/transcribe.cpp.txt" ]]
 [[ -s "$APP_PATH/Contents/Resources/default.metallib" ]]
+[[ -s "$APP_PATH/Contents/Resources/MLXAudioSwift.txt" ]]
+[[ -s "$APP_PATH/Contents/Resources/MLXSwift.txt" ]]
 SHERPA_LIBRARY="$APP_PATH/Contents/Frameworks/libsherpa-onnx-c-api.dylib"
 ONNX_RUNTIME_LIBRARY="$APP_PATH/Contents/Frameworks/libonnxruntime.1.24.4.dylib"
 TRANSCRIBE_CPP_LIBRARY="$APP_PATH/Contents/Frameworks/libtextify-transcribe.0.1.3.dylib"
+MLX_METAL_LIBRARY="$APP_PATH/Contents/MacOS/mlx.metallib"
 [[ -s "$SHERPA_LIBRARY" ]]
 [[ -s "$ONNX_RUNTIME_LIBRARY" ]]
 [[ -s "$TRANSCRIBE_CPP_LIBRARY" ]]
+[[ -s "$MLX_METAL_LIBRARY" ]]
 [[ -s "$MODEL_CATALOG_DIRECTORY/manifest.json" ]]
 [[ -s "$MODEL_CATALOG_DIRECTORY/manifest.json.sig" ]]
 file "$APP_PATH/Contents/Resources/default.metallib" | grep -Fq "MetalLib executable"
+file "$MLX_METAL_LIBRARY" | grep -Fq "MetalLib executable"
+codesign --verify --strict --verbose=2 "$MLX_METAL_LIBRARY"
+printf '%s  %s\n' \
+  'cffe8fbfa9cfb794f1d920ff187016f823a555f7814cede99026699a936b92c7' \
+  "$MLX_METAL_LIBRARY" \
+  | shasum -a 256 -c -
+grep -aFq 'layer_normfloat32' "$MLX_METAL_LIBRARY"
 TEXTIFY_MODEL_MANIFEST_PUBLIC_KEY_BASE64="$MODEL_CATALOG_PUBLIC_KEY_BASE64" \
   TEXTIFY_MODEL_MANIFEST_KEY_ID="$MODEL_CATALOG_KEY_ID" \
   "$SCRIPT_DIRECTORY/../models/verify_model_manifest.sh" \
@@ -62,6 +73,8 @@ grep -Fq "SenseVoiceSmall" "$APP_PATH/Contents/Resources/THIRD_PARTY_NOTICES.md"
 grep -Fq "transcribe.cpp" "$APP_PATH/Contents/Resources/THIRD_PARTY_NOTICES.md"
 grep -Fq "Fun-ASR MLT-Nano" "$APP_PATH/Contents/Resources/THIRD_PARTY_NOTICES.md"
 grep -Fq "MIT License" "$APP_PATH/Contents/Resources/transcribe.cpp.txt"
+grep -Fq "MIT License" "$APP_PATH/Contents/Resources/MLXAudioSwift.txt"
+grep -Fq "MIT License" "$APP_PATH/Contents/Resources/MLXSwift.txt"
 [[ "$(lipo -archs "$SHERPA_LIBRARY")" == "arm64" ]]
 [[ "$(lipo -archs "$ONNX_RUNTIME_LIBRARY")" == "arm64" ]]
 [[ "$(lipo -archs "$TRANSCRIBE_CPP_LIBRARY")" == "arm64" ]]
@@ -83,7 +96,7 @@ grep -Fqx "TeamIdentifier=$TEXTIFY_DEVELOPMENT_TEAM" <<<"$SIGNING_DETAILS"
 grep -Fqx "Authority=$TEXTIFY_SIGNING_IDENTITY" <<<"$SIGNING_DETAILS"
 grep -Eq '^CodeDirectory .* flags=.*\(runtime\)' <<<"$SIGNING_DETAILS"
 
-for nested_library in "$ONNX_RUNTIME_LIBRARY" "$SHERPA_LIBRARY" "$TRANSCRIBE_CPP_LIBRARY"; do
+for nested_library in "$ONNX_RUNTIME_LIBRARY" "$SHERPA_LIBRARY" "$TRANSCRIBE_CPP_LIBRARY" "$MLX_METAL_LIBRARY"; do
   codesign --verify --strict --verbose=2 "$nested_library"
   NESTED_SIGNING_DETAILS="$(codesign --display --verbose=4 "$nested_library" 2>&1)"
   grep -Fqx "TeamIdentifier=$TEXTIFY_DEVELOPMENT_TEAM" <<<"$NESTED_SIGNING_DETAILS"

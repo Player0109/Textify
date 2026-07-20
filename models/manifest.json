@@ -1,6 +1,6 @@
 {
   "manifestVersion": 1,
-  "generatedAt": "2026-07-19T15:45:16Z",
+  "generatedAt": "2026-07-20T06:37:46Z",
   "models": [
     {
       "id": "ggml-small.en-q5_1",
@@ -70,6 +70,158 @@
         "expectedFinalization": "Near-instant after release",
         "accuracyTradeoff": "Reliable English default with the smallest promoted download",
         "requirements": "Apple Silicon with Metal; about 190 MB disk"
+      }
+    },
+    {
+      "id": "whisper-large-v2-q5_0",
+      "displayName": "Experimental - Whisper Large V2",
+      "tier": "experimental",
+      "description": "Exact Whisper Large V2 q5_0 weights for higher-capacity offline English dictation.",
+      "sizeBytes": 1080732091,
+      "files": [
+        {
+          "filename": "ggml-large-v2-q5_0.bin",
+          "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/c521a4b02f422512d734391fdf08bb08c0862f68/ggml-large-v2-q5_0.bin",
+          "sha256": "3a214837221e4530dbc1fe8d734f302af393eb30bd0ed046042ebf4baf70f6f2",
+          "sizeBytes": 1080732091
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "OpenAI Whisper large-v2 weights",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/openai/whisper/04f449b8a437f1bbd3dba5c9f826aca972e7709a/LICENSE"
+        },
+        {
+          "scope": "whisper.cpp conversion and runtime tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/ggerganov/whisper.cpp/a8d002cfd879315632a579e73f0148d06959de36/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "ggerganov/whisper.cpp",
+        "sourceUrl": "https://huggingface.co/ggerganov/whisper.cpp",
+        "sourceRevision": "c521a4b02f422512d734391fdf08bb08c0862f68",
+        "sourceFile": "ggml-large-v2-q5_0.bin",
+        "originalModelName": "OpenAI Whisper large-v2",
+        "originalModelUrl": "https://huggingface.co/openai/whisper-large-v2",
+        "mirroredBy": "ggerganov",
+        "mirroredAt": "2026-07-20"
+      },
+      "runtimeParameters": {
+        "language": "en",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0.0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1.0,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "whisper_cpp",
+        "variant": "whisper-large-v2-q5_0",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "en"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "551 ms median and 746 ms p95 release-to-final on the fixed M4 Max English sample",
+        "accuracyTradeoff": "3.33% English WER on Textify's fixed 210-word sample; substantially larger than the default",
+        "requirements": "Apple Silicon with Metal; about 1.08 GB disk and 1.49 GB peak memory"
+      }
+    },
+    {
+      "id": "whisper-large-v3-q5_0",
+      "displayName": "Experimental - Whisper Large V3",
+      "tier": "experimental",
+      "description": "Exact Whisper Large V3 q5_0 weights for higher-capacity offline English dictation.",
+      "sizeBytes": 1081140203,
+      "files": [
+        {
+          "filename": "ggml-large-v3-q5_0.bin",
+          "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/c521a4b02f422512d734391fdf08bb08c0862f68/ggml-large-v3-q5_0.bin",
+          "sha256": "d75795ecff3f83b5faa89d1900604ad8c780abd5739fae406de19f23ecd98ad1",
+          "sizeBytes": 1081140203
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "OpenAI Whisper large-v3 weights",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/openai/whisper/04f449b8a437f1bbd3dba5c9f826aca972e7709a/LICENSE"
+        },
+        {
+          "scope": "whisper.cpp conversion and runtime tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/ggerganov/whisper.cpp/a8d002cfd879315632a579e73f0148d06959de36/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "ggerganov/whisper.cpp",
+        "sourceUrl": "https://huggingface.co/ggerganov/whisper.cpp",
+        "sourceRevision": "c521a4b02f422512d734391fdf08bb08c0862f68",
+        "sourceFile": "ggml-large-v3-q5_0.bin",
+        "originalModelName": "OpenAI Whisper large-v3",
+        "originalModelUrl": "https://huggingface.co/openai/whisper-large-v3",
+        "mirroredBy": "ggerganov",
+        "mirroredAt": "2026-07-20"
+      },
+      "runtimeParameters": {
+        "language": "en",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0.0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1.0,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "whisper_cpp",
+        "variant": "whisper-large-v3-q5_0",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "en"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "542.5 ms median and 728 ms p95 release-to-final on the fixed M4 Max English sample",
+        "accuracyTradeoff": "3.81% English WER on Textify's fixed 210-word sample; substantially larger than the default",
+        "requirements": "Apple Silicon with Metal; about 1.08 GB disk and 1.50 GB peak memory"
       }
     },
     {
@@ -147,6 +299,88 @@
         "expectedFinalization": "English 367 ms median/415 ms p95; Hindi 536.5 ms median/734 ms p95 on fixed M4 Max samples",
         "accuracyTradeoff": "Higher-capacity English and Hindi specialist; 4.29% English WER and 22.05% Hindi WER on Textify's narrow fixed samples",
         "requirements": "Apple Silicon with Metal; about 574 MB disk and 700 MB peak memory"
+      }
+    },
+    {
+      "id": "canary-qwen-2.5b-q4-k-m",
+      "displayName": "Accurate - Canary-Qwen 2.5B",
+      "tier": "accurate",
+      "description": "High-accuracy offline English dictation with punctuation through the exact Canary-Qwen 2.5B Metal route.",
+      "sizeBytes": 1737575808,
+      "files": [
+        {
+          "filename": "canary-qwen-2.5b-Q4_K_M.gguf",
+          "url": "https://huggingface.co/handy-computer/canary-qwen-2.5b-gguf/resolve/3370d4e2f28cc70eea79dfc9f2f43fb91eef3163/canary-qwen-2.5b-Q4_K_M.gguf",
+          "sha256": "db5162229d6fa22597d06a613bd9b543eddb3ee02e6afc5e759120fde02bebf7",
+          "sizeBytes": 1737575808
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "NVIDIA Canary-Qwen 2.5B model weights and GGUF conversion",
+          "spdxId": "CC-BY-4.0",
+          "name": "Creative Commons Attribution 4.0 International",
+          "licenseTextUrl": "https://creativecommons.org/licenses/by/4.0/legalcode"
+        },
+        {
+          "scope": "Qwen 2.5 language-model component",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "scope": "transcribe.cpp runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/antirez/transcribe.cpp/5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "handy-computer/canary-qwen-2.5b-gguf",
+        "sourceUrl": "https://huggingface.co/handy-computer/canary-qwen-2.5b-gguf",
+        "sourceRevision": "3370d4e2f28cc70eea79dfc9f2f43fb91eef3163",
+        "sourceFile": "canary-qwen-2.5b-Q4_K_M.gguf",
+        "originalModelName": "NVIDIA Canary-Qwen 2.5B",
+        "originalModelUrl": "https://huggingface.co/nvidia/canary-qwen-2.5b",
+        "mirroredBy": "handy-computer",
+        "mirroredAt": "2026-07-20"
+      },
+      "runtimeParameters": {
+        "language": "en",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0.0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 40
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1.0,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "transcribe_cpp",
+        "variant": "canary-qwen-2.5b",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "en"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "255.5 ms median and 373 ms p95 release-to-final on the fixed M4 Max English sample",
+        "accuracyTradeoff": "0.95% English WER with punctuation on Textify's fixed 210-word sample; larger than the existing English defaults",
+        "requirements": "Apple Silicon with Metal; about 1.74 GB disk, 3.16 GB peak process memory, and a 40-second recording limit"
       }
     },
     {
@@ -790,6 +1024,367 @@
       }
     },
     {
+      "id": "parakeet-rnnt-1.1b",
+      "displayName": "Experimental - Parakeet RNNT 1.1B",
+      "tier": "experimental",
+      "description": "Exact Parakeet RNNT 1.1B weights for high-accuracy offline English dictation through MLX Metal.",
+      "sizeBytes": 4282559760,
+      "files": [
+        {
+          "filename": "config.json",
+          "relativePath": "config.json",
+          "url": "https://huggingface.co/mlx-community/parakeet-rnnt-1.1b/resolve/7f399a0d3442123deae9194e71f5c984b2879efa/config.json",
+          "sha256": "1d84911a9139a9f56a43cfc8d46400e125bcade8a39508d604492fe291c8f40b",
+          "sizeBytes": 37318
+        },
+        {
+          "filename": "model.safetensors",
+          "relativePath": "model.safetensors",
+          "url": "https://huggingface.co/mlx-community/parakeet-rnnt-1.1b/resolve/7f399a0d3442123deae9194e71f5c984b2879efa/model.safetensors",
+          "sha256": "d2c370b3728c4c3b318d814574e87da144a9484ce6b3c4457a6ed5889bb007e1",
+          "sizeBytes": 4282246596
+        },
+        {
+          "filename": "tokenizer.model",
+          "relativePath": "tokenizer.model",
+          "url": "https://huggingface.co/mlx-community/parakeet-rnnt-1.1b/resolve/7f399a0d3442123deae9194e71f5c984b2879efa/tokenizer.model",
+          "sha256": "8f279c3951a1c280a99a108d07b429bd98c03c94ecd0270748bd7affca9c0817",
+          "sizeBytes": 259162
+        },
+        {
+          "filename": "tokenizer.vocab",
+          "relativePath": "tokenizer.vocab",
+          "url": "https://huggingface.co/mlx-community/parakeet-rnnt-1.1b/resolve/7f399a0d3442123deae9194e71f5c984b2879efa/tokenizer.vocab",
+          "sha256": "dc8f48909c2d3a0374f45b7478226d26a7de16bbc5334448a8e989f4538384d1",
+          "sizeBytes": 11383
+        },
+        {
+          "filename": "vocab.txt",
+          "relativePath": "vocab.txt",
+          "url": "https://huggingface.co/mlx-community/parakeet-rnnt-1.1b/resolve/7f399a0d3442123deae9194e71f5c984b2879efa/vocab.txt",
+          "sha256": "27277f2a7176399c7acc178e394cec5e6a575657db9aae9e9e609cb004e9f350",
+          "sizeBytes": 5301
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "NVIDIA Parakeet RNNT 1.1B weights and MLX conversion",
+          "spdxId": "CC-BY-4.0",
+          "name": "Creative Commons Attribution 4.0 International",
+          "licenseTextUrl": "https://creativecommons.org/licenses/by/4.0/legalcode"
+        },
+        {
+          "scope": "MLX Audio Swift runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/Blaizzy/mlx-audio-swift/d302a5c6080d2bb97bae38c7418f82abb76013b6/LICENSE"
+        },
+        {
+          "scope": "MLX Swift runtime",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/ml-explore/mlx-swift/61b9e011e09a62b489f6bd647958f1555bdf2896/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "mlx-community/parakeet-rnnt-1.1b",
+        "sourceUrl": "https://huggingface.co/mlx-community/parakeet-rnnt-1.1b",
+        "sourceRevision": "7f399a0d3442123deae9194e71f5c984b2879efa",
+        "sourceFile": "Five-file MLX safetensors model directory",
+        "originalModelName": "NVIDIA Parakeet RNNT 1.1B",
+        "originalModelUrl": "https://huggingface.co/nvidia/parakeet-rnnt-1.1b",
+        "mirroredBy": "mlx-community",
+        "mirroredAt": "2026-07-20"
+      },
+      "runtimeParameters": {
+        "language": "en",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0.0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1.0,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "mlx_audio",
+        "variant": "parakeet-rnnt-1.1b",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "model_directory"
+      },
+      "capabilities": {
+        "languages": [
+          "en"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "128.5 ms median and 241 ms p95 release-to-final on the fixed M4 Max English sample",
+        "accuracyTradeoff": "1.90% English WER on Textify's fixed 210-word sample; highest measured accuracy with a very large download",
+        "requirements": "Apple Silicon with Metal and at least 16 GB memory; about 4.28 GB disk and 4.46 GB peak process memory"
+      }
+    },
+    {
+      "id": "cohere-transcribe-03-2026-mlx-8bit",
+      "displayName": "Experimental - Cohere Transcribe",
+      "tier": "experimental",
+      "description": "Exact 8-bit Cohere Transcribe 03-2026 weights for fast offline English dictation through MLX Metal.",
+      "sizeBytes": 2418577135,
+      "files": [
+        {
+          "filename": "config.json",
+          "relativePath": "config.json",
+          "url": "https://huggingface.co/beshkenadze/cohere-transcribe-03-2026-mlx-8bit/resolve/d1f843476f84846e6fe7aa58a6033f17882f0ec9/config.json",
+          "sha256": "206113921b2b75ad43461e9d2d4cd361405be9acaf29aa3ec1ed751c16347bb6",
+          "sizeBytes": 4336
+        },
+        {
+          "filename": "model.safetensors",
+          "relativePath": "model.safetensors",
+          "url": "https://huggingface.co/beshkenadze/cohere-transcribe-03-2026-mlx-8bit/resolve/d1f843476f84846e6fe7aa58a6033f17882f0ec9/model.safetensors",
+          "sha256": "bd1edbe982f47d22e64ba5723a4204b43ca93ea703b18946160d44ec26c83ab9",
+          "sizeBytes": 2418031831
+        },
+        {
+          "filename": "tokenizer.model",
+          "relativePath": "tokenizer.model",
+          "url": "https://huggingface.co/beshkenadze/cohere-transcribe-03-2026-mlx-8bit/resolve/d1f843476f84846e6fe7aa58a6033f17882f0ec9/tokenizer.model",
+          "sha256": "6d21e6a83b2d0d3e1241a7817e4bef8eb63bcb7cfe4a2675af9a35ff3bbf0e14",
+          "sizeBytes": 492827
+        },
+        {
+          "filename": "tokenizer_config.json",
+          "relativePath": "tokenizer_config.json",
+          "url": "https://huggingface.co/beshkenadze/cohere-transcribe-03-2026-mlx-8bit/resolve/d1f843476f84846e6fe7aa58a6033f17882f0ec9/tokenizer_config.json",
+          "sha256": "0dfeb3eeba07bccaa1b4bf78f3135ad3059acf8d18f681675832b285ac0035b0",
+          "sizeBytes": 48141
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "Cohere Transcribe 03-2026 weights and 8-bit MLX conversion",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "scope": "MLX Audio Swift runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/Blaizzy/mlx-audio-swift/d302a5c6080d2bb97bae38c7418f82abb76013b6/LICENSE"
+        },
+        {
+          "scope": "MLX Swift runtime",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/ml-explore/mlx-swift/61b9e011e09a62b489f6bd647958f1555bdf2896/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "beshkenadze/cohere-transcribe-03-2026-mlx-8bit",
+        "sourceUrl": "https://huggingface.co/beshkenadze/cohere-transcribe-03-2026-mlx-8bit",
+        "sourceRevision": "d1f843476f84846e6fe7aa58a6033f17882f0ec9",
+        "sourceFile": "Four-file MLX safetensors model directory",
+        "originalModelName": "Cohere Transcribe 03-2026",
+        "originalModelUrl": "https://huggingface.co/CohereLabs/cohere-transcribe-03-2026",
+        "mirroredBy": "beshkenadze",
+        "mirroredAt": "2026-07-20"
+      },
+      "runtimeParameters": {
+        "language": "en",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0.0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 30
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1.0,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "mlx_audio",
+        "variant": "cohere-transcribe-03-2026",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "model_directory"
+      },
+      "capabilities": {
+        "languages": [
+          "en"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "121.5 ms median and 304 ms p95 release-to-final on the fixed M4 Max English sample",
+        "accuracyTradeoff": "2.86% English WER with punctuation on Textify's fixed 210-word sample; English-only and capped at 30 seconds",
+        "requirements": "Apple Silicon with Metal; about 2.42 GB disk, 2.53 GB peak process memory, and a 30-second recording limit"
+      }
+    },
+    {
+      "id": "whisper-large-v3-turbo-mlx",
+      "displayName": "Experimental - Whisper Turbo MLX",
+      "tier": "experimental",
+      "description": "Exact MLX Community Whisper Large V3 Turbo weights for fast offline English dictation through MLX Metal.",
+      "sizeBytes": 1618594759,
+      "files": [
+        {
+          "filename": "config.json",
+          "relativePath": "config.json",
+          "url": "https://huggingface.co/mlx-community/whisper-large-v3-turbo/resolve/a4aaeec0636e6fef84abdcbe3544cb2bf7e9f6fb/config.json",
+          "sha256": "b34fc29e4e11e0a25e812775dd67f4dd16fc2c8eb43d28ae25ff7d660ecb6379",
+          "sizeBytes": 268
+        },
+        {
+          "filename": "weights.safetensors",
+          "relativePath": "weights.safetensors",
+          "url": "https://huggingface.co/mlx-community/whisper-large-v3-turbo/resolve/a4aaeec0636e6fef84abdcbe3544cb2bf7e9f6fb/weights.safetensors",
+          "sha256": "951ed3fc1203e6a62467abb2144a96ce7eafca8fa77e3704fdb8635ff3e7f8a6",
+          "sizeBytes": 1613977612
+        },
+        {
+          "filename": "tokenizer.json",
+          "relativePath": "tokenizer.json",
+          "url": "https://huggingface.co/openai/whisper-large-v3-turbo/resolve/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/tokenizer.json",
+          "sha256": "297b13372ac43916285644fb9687add3cc62ee2a1adb60da3dc25cc94c1871fd",
+          "sizeBytes": 2710337
+        },
+        {
+          "filename": "tokenizer_config.json",
+          "relativePath": "tokenizer_config.json",
+          "url": "https://huggingface.co/openai/whisper-large-v3-turbo/resolve/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/tokenizer_config.json",
+          "sha256": "844b642c73a91359722f47b35705f7174686df33d252695d8572cf9ac03a6389",
+          "sizeBytes": 282843
+        },
+        {
+          "filename": "special_tokens_map.json",
+          "relativePath": "special_tokens_map.json",
+          "url": "https://huggingface.co/openai/whisper-large-v3-turbo/resolve/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/special_tokens_map.json",
+          "sha256": "baea4ea09372eb4fca86b4e4346139fd73cb807d5087e9de0948e971739c3e74",
+          "sizeBytes": 2186
+        },
+        {
+          "filename": "added_tokens.json",
+          "relativePath": "added_tokens.json",
+          "url": "https://huggingface.co/openai/whisper-large-v3-turbo/resolve/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/added_tokens.json",
+          "sha256": "3c51f66c4c21f9e126970078f11ae77a78c74aee8df606ee9daba86e467108e0",
+          "sizeBytes": 34648
+        },
+        {
+          "filename": "vocab.json",
+          "relativePath": "vocab.json",
+          "url": "https://huggingface.co/openai/whisper-large-v3-turbo/resolve/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/vocab.json",
+          "sha256": "e2aa043ef015641d363d8288e7c241c85e36a5c761fb303598e0710233344387",
+          "sizeBytes": 1036558
+        },
+        {
+          "filename": "merges.txt",
+          "relativePath": "merges.txt",
+          "url": "https://huggingface.co/openai/whisper-large-v3-turbo/resolve/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/merges.txt",
+          "sha256": "2df2990a395e35e8dfbc7511e08c12d56018d8d04691e0133e5d63b21e154dc6",
+          "sizeBytes": 493869
+        },
+        {
+          "filename": "normalizer.json",
+          "relativePath": "normalizer.json",
+          "url": "https://huggingface.co/openai/whisper-large-v3-turbo/resolve/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/normalizer.json",
+          "sha256": "bf1c507dc8724ca9cf9903640dacfb69dae2f00edee4f21ceba106a7392f26dd",
+          "sizeBytes": 52666
+        },
+        {
+          "filename": "generation_config.json",
+          "relativePath": "generation_config.json",
+          "url": "https://huggingface.co/openai/whisper-large-v3-turbo/resolve/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/generation_config.json",
+          "sha256": "cce11bfe3aaa6ae9e072ea2637caaec8795e68d9b67e655a5af16ee509681a4c",
+          "sizeBytes": 3772
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "OpenAI Whisper large-v3-turbo weights and MLX converted checkpoint",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/openai/whisper/04f449b8a437f1bbd3dba5c9f826aca972e7709a/LICENSE"
+        },
+        {
+          "scope": "MLX Audio Swift runtime",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/Blaizzy/mlx-audio-swift/d302a5c6080d2bb97bae38c7418f82abb76013b6/LICENSE"
+        },
+        {
+          "scope": "MLX Swift runtime",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/ml-explore/mlx-swift/61b9e011e09a62b489f6bd647958f1555bdf2896/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "mlx-community/whisper-large-v3-turbo",
+        "sourceUrl": "https://huggingface.co/mlx-community/whisper-large-v3-turbo",
+        "sourceRevision": "a4aaeec0636e6fef84abdcbe3544cb2bf7e9f6fb",
+        "sourceFile": "MLX config and safetensors checkpoint with eight tokenizer assets from the original model",
+        "originalModelName": "OpenAI Whisper large-v3-turbo",
+        "originalModelUrl": "https://huggingface.co/openai/whisper-large-v3-turbo",
+        "mirroredBy": "mlx-community",
+        "mirroredAt": "2026-07-20"
+      },
+      "runtimeParameters": {
+        "language": "en",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0.0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1.0,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "mlx_audio",
+        "variant": "whisper-large-v3-turbo",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "model_directory"
+      },
+      "capabilities": {
+        "languages": [
+          "en"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "321.5 ms median and 416 ms p95 release-to-final on the fixed M4 Max English sample",
+        "accuracyTradeoff": "3.33% English WER on Textify's fixed 210-word sample; larger download and memory use than the 5-bit whisper.cpp Turbo route",
+        "requirements": "Apple Silicon with Metal and at least 8 GB memory; about 1.62 GB disk and 1.75 GB peak process memory"
+      }
+    },
+    {
       "sizeBytes": 619065246,
       "files": [
         {
@@ -1391,6 +1986,2186 @@
         "expectedFinalization": "About 139 ms Japanese median, 223 ms English median, and 128 ms Mandarin median on fixed M4 Max samples",
         "accuracyTradeoff": "Best measured Japanese option at 10.86% CER; also measured at 3.81% English WER and 6.15% Mandarin CER",
         "requirements": "Apple Silicon, about 240 MB disk, automatic selection across five languages, 29-second recording limit; a 29-second stress clip finalized in about 882 ms on M4 Max"
+      }
+    },
+    {
+      "id": "qwen3-asr-0.6b-mlx-8bit",
+      "displayName": "Experimental - Qwen3-ASR 0.6B MLX 8-bit",
+      "tier": "experimental",
+      "description": "Exact 8-bit MLX Community Qwen3-ASR 0.6B weights for offline multilingual dictation with automatic language detection on MLX Metal.",
+      "sizeBytes": 1010771234,
+      "files": [
+        {
+          "filename": "config.json",
+          "relativePath": "config.json",
+          "url": "https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/89e96d92ba34aca20b3e29fb10cc284097d1219f/config.json",
+          "sha256": "5d104a945fed08728ab010f12bf3ce5ab4d0794bba276d81bff5bd83ae9d2be0",
+          "sizeBytes": 7187
+        },
+        {
+          "filename": "model.safetensors",
+          "relativePath": "model.safetensors",
+          "url": "https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/89e96d92ba34aca20b3e29fb10cc284097d1219f/model.safetensors",
+          "sha256": "b5bfe4abc1b4c6e58b633096682ec2b6297298add1527119936107d211adf0e8",
+          "sizeBytes": 1006229426
+        },
+        {
+          "filename": "model.safetensors.index.json",
+          "relativePath": "model.safetensors.index.json",
+          "url": "https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/89e96d92ba34aca20b3e29fb10cc284097d1219f/model.safetensors.index.json",
+          "sha256": "caa32ece76c395ba241533eb4aceb0efbc72488ef3d8d2fd3c677ce068dad57d",
+          "sizeBytes": 71815
+        },
+        {
+          "filename": "chat_template.json",
+          "relativePath": "chat_template.json",
+          "url": "https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/89e96d92ba34aca20b3e29fb10cc284097d1219f/chat_template.json",
+          "sha256": "75a8cfca24f00de72d796fbfed6858fc9614ef3dabd8696684cc3bc03a9c58ff",
+          "sizeBytes": 1161
+        },
+        {
+          "filename": "generation_config.json",
+          "relativePath": "generation_config.json",
+          "url": "https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/89e96d92ba34aca20b3e29fb10cc284097d1219f/generation_config.json",
+          "sha256": "1da527824d81e07118facff437e03f2e24a23311e3bdeb2368973fe77e5f275c",
+          "sizeBytes": 142
+        },
+        {
+          "filename": "merges.txt",
+          "relativePath": "merges.txt",
+          "url": "https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/89e96d92ba34aca20b3e29fb10cc284097d1219f/merges.txt",
+          "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+          "sizeBytes": 1671853
+        },
+        {
+          "filename": "preprocessor_config.json",
+          "relativePath": "preprocessor_config.json",
+          "url": "https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/89e96d92ba34aca20b3e29fb10cc284097d1219f/preprocessor_config.json",
+          "sha256": "45e120a4eda2c20c5d7f2ea9354e63536bf35e27aa573fb7cdf78017b378770d",
+          "sizeBytes": 330
+        },
+        {
+          "filename": "tokenizer_config.json",
+          "relativePath": "tokenizer_config.json",
+          "url": "https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/89e96d92ba34aca20b3e29fb10cc284097d1219f/tokenizer_config.json",
+          "sha256": "4942d005604266809309cabc9f4e9cb89ce855d59b14681fdc0e1cc62ea26c4c",
+          "sizeBytes": 12487
+        },
+        {
+          "filename": "vocab.json",
+          "relativePath": "vocab.json",
+          "url": "https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/89e96d92ba34aca20b3e29fb10cc284097d1219f/vocab.json",
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+          "sizeBytes": 2776833
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "Qwen3-ASR model weights and MLX converted checkpoint",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "scope": "MLX Audio Swift runtime",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/Blaizzy/mlx-audio-swift/d302a5c6080d2bb97bae38c7418f82abb76013b6/LICENSE"
+        },
+        {
+          "scope": "MLX Swift runtime",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/ml-explore/mlx-swift/61b9e011e09a62b489f6bd647958f1555bdf2896/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "mlx-community/Qwen3-ASR-0.6B-8bit",
+        "sourceUrl": "https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit",
+        "sourceRevision": "89e96d92ba34aca20b3e29fb10cc284097d1219f",
+        "sourceFile": "Complete nine-file MLX inference directory",
+        "originalModelName": "Qwen3-ASR 0.6B",
+        "originalModelUrl": "https://huggingface.co/Qwen/Qwen3-ASR-0.6B",
+        "mirroredBy": "mlx-community",
+        "mirroredAt": "2026-01-29"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "mlx_audio",
+        "variant": "qwen3-asr-0.6b-8bit",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "model_directory"
+      },
+      "capabilities": {
+        "languages": [
+          "zh",
+          "en",
+          "yue",
+          "ar",
+          "de",
+          "fr",
+          "es",
+          "pt",
+          "id",
+          "it",
+          "ko",
+          "ru",
+          "th",
+          "vi",
+          "ja",
+          "tr",
+          "hi",
+          "ms",
+          "nl",
+          "sv",
+          "da",
+          "fi",
+          "pl",
+          "cs",
+          "fil",
+          "fa",
+          "el",
+          "ro",
+          "hu",
+          "mk"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+      "expectedFinalization": "191.5 ms median and 277 ms p95 finalization on Textify's fixed English corpus on M4 Max",
+      "accuracyTradeoff": "3.20% English WER; automatic Hindi measured 15.00% WER and 12.39% CER on the fixed sample",
+      "requirements": "Apple Silicon with Metal; about 1.01 GB disk, 1.16 GB measured peak process memory, and a 60-second recording limit"
+      }
+    },
+    {
+      "id": "qwen3-asr-1.7b-mlx-8bit",
+      "displayName": "Experimental - Qwen3-ASR 1.7B MLX 8-bit",
+      "tier": "experimental",
+      "description": "Exact 8-bit MLX Community Qwen3-ASR 1.7B weights for offline multilingual dictation with automatic language detection on MLX Metal.",
+      "sizeBytes": 2467856503,
+      "files": [
+        {
+          "filename": "config.json",
+          "relativePath": "config.json",
+          "url": "https://huggingface.co/mlx-community/Qwen3-ASR-1.7B-8bit/resolve/a8379a2e2f9e313c9292cdf1af4055ab56d50d55/config.json",
+          "sha256": "1b76b3b6c655fc54595da025f7a96474ad9fa86363303fbdd61a7d8483ccfaf7",
+          "sizeBytes": 7188
+        },
+        {
+          "filename": "model.safetensors",
+          "relativePath": "model.safetensors",
+          "url": "https://huggingface.co/mlx-community/Qwen3-ASR-1.7B-8bit/resolve/a8379a2e2f9e313c9292cdf1af4055ab56d50d55/model.safetensors",
+          "sha256": "bf304b009cc7eca79283056f787b44c952d24ac22cec787b39732bba3c23c13c",
+          "sizeBytes": 2463307541
+        },
+        {
+          "filename": "model.safetensors.index.json",
+          "relativePath": "model.safetensors.index.json",
+          "url": "https://huggingface.co/mlx-community/Qwen3-ASR-1.7B-8bit/resolve/a8379a2e2f9e313c9292cdf1af4055ab56d50d55/model.safetensors.index.json",
+          "sha256": "0a5d0ec11188602242ff81a9969883d0fdeb98cd5d85cd1413089d897c201af5",
+          "sizeBytes": 78968
+        },
+        {
+          "filename": "chat_template.json",
+          "relativePath": "chat_template.json",
+          "url": "https://huggingface.co/mlx-community/Qwen3-ASR-1.7B-8bit/resolve/a8379a2e2f9e313c9292cdf1af4055ab56d50d55/chat_template.json",
+          "sha256": "75a8cfca24f00de72d796fbfed6858fc9614ef3dabd8696684cc3bc03a9c58ff",
+          "sizeBytes": 1161
+        },
+        {
+          "filename": "generation_config.json",
+          "relativePath": "generation_config.json",
+          "url": "https://huggingface.co/mlx-community/Qwen3-ASR-1.7B-8bit/resolve/a8379a2e2f9e313c9292cdf1af4055ab56d50d55/generation_config.json",
+          "sha256": "1da527824d81e07118facff437e03f2e24a23311e3bdeb2368973fe77e5f275c",
+          "sizeBytes": 142
+        },
+        {
+          "filename": "merges.txt",
+          "relativePath": "merges.txt",
+          "url": "https://huggingface.co/mlx-community/Qwen3-ASR-1.7B-8bit/resolve/a8379a2e2f9e313c9292cdf1af4055ab56d50d55/merges.txt",
+          "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+          "sizeBytes": 1671853
+        },
+        {
+          "filename": "preprocessor_config.json",
+          "relativePath": "preprocessor_config.json",
+          "url": "https://huggingface.co/mlx-community/Qwen3-ASR-1.7B-8bit/resolve/a8379a2e2f9e313c9292cdf1af4055ab56d50d55/preprocessor_config.json",
+          "sha256": "45e120a4eda2c20c5d7f2ea9354e63536bf35e27aa573fb7cdf78017b378770d",
+          "sizeBytes": 330
+        },
+        {
+          "filename": "tokenizer_config.json",
+          "relativePath": "tokenizer_config.json",
+          "url": "https://huggingface.co/mlx-community/Qwen3-ASR-1.7B-8bit/resolve/a8379a2e2f9e313c9292cdf1af4055ab56d50d55/tokenizer_config.json",
+          "sha256": "4942d005604266809309cabc9f4e9cb89ce855d59b14681fdc0e1cc62ea26c4c",
+          "sizeBytes": 12487
+        },
+        {
+          "filename": "vocab.json",
+          "relativePath": "vocab.json",
+          "url": "https://huggingface.co/mlx-community/Qwen3-ASR-1.7B-8bit/resolve/a8379a2e2f9e313c9292cdf1af4055ab56d50d55/vocab.json",
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+          "sizeBytes": 2776833
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "Qwen3-ASR model weights and MLX converted checkpoint",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "scope": "MLX Audio Swift runtime",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/Blaizzy/mlx-audio-swift/d302a5c6080d2bb97bae38c7418f82abb76013b6/LICENSE"
+        },
+        {
+          "scope": "MLX Swift runtime",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/ml-explore/mlx-swift/61b9e011e09a62b489f6bd647958f1555bdf2896/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "mlx-community/Qwen3-ASR-1.7B-8bit",
+        "sourceUrl": "https://huggingface.co/mlx-community/Qwen3-ASR-1.7B-8bit",
+        "sourceRevision": "a8379a2e2f9e313c9292cdf1af4055ab56d50d55",
+        "sourceFile": "Complete nine-file MLX inference directory",
+        "originalModelName": "Qwen3-ASR 1.7B",
+        "originalModelUrl": "https://huggingface.co/Qwen/Qwen3-ASR-1.7B",
+        "mirroredBy": "mlx-community",
+        "mirroredAt": "2026-01-29"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "mlx_audio",
+        "variant": "qwen3-asr-1.7b-8bit",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "model_directory"
+      },
+      "capabilities": {
+        "languages": [
+          "zh",
+          "en",
+          "yue",
+          "ar",
+          "de",
+          "fr",
+          "es",
+          "pt",
+          "id",
+          "it",
+          "ko",
+          "ru",
+          "th",
+          "vi",
+          "ja",
+          "tr",
+          "hi",
+          "ms",
+          "nl",
+          "sv",
+          "da",
+          "fi",
+          "pl",
+          "cs",
+          "fil",
+          "fa",
+          "el",
+          "ro",
+          "hu",
+          "mk"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+      "expectedFinalization": "211.5 ms median and 421 ms p95 finalization on Textify's fixed English corpus on M4 Max",
+      "accuracyTradeoff": "1.83% English WER; automatic Hindi measured 14.77% WER and 11.67% CER but 894 ms median finalization",
+      "requirements": "Apple Silicon with Metal; about 2.47 GB disk, 2.62 GB measured peak process memory, and a 60-second recording limit"
+      }
+    },
+    {
+      "id": "qwen3-asr-0.6b-bf16",
+      "displayName": "Experimental - Qwen3-ASR 0.6B BF16",
+      "tier": "experimental",
+      "description": "Exact BF16 Qwen3-ASR 0.6B GGUF for offline multilingual dictation with automatic language detection through transcribe.cpp Metal.",
+      "sizeBytes": 1571490016,
+      "files": [
+        {
+          "filename": "Qwen3-ASR-0.6B-BF16.gguf",
+          "url": "https://huggingface.co/handy-computer/Qwen3-ASR-0.6B-gguf/resolve/e4e16599b900eb0cb36e524514756bb92eb092b7/Qwen3-ASR-0.6B-BF16.gguf",
+          "sha256": "dadb8196937aa6b998a94124a043fce694e0ab6c3c6eb0ae1669fa49d04aab84",
+          "sizeBytes": 1571490016
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "Qwen3-ASR model weights and GGUF conversion",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "scope": "transcribe.cpp runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "handy-computer/Qwen3-ASR-0.6B-gguf",
+        "sourceUrl": "https://huggingface.co/handy-computer/Qwen3-ASR-0.6B-gguf",
+        "sourceRevision": "e4e16599b900eb0cb36e524514756bb92eb092b7",
+        "sourceFile": "Qwen3-ASR-0.6B-BF16.gguf",
+        "originalModelName": "Qwen3-ASR 0.6B",
+        "originalModelUrl": "https://huggingface.co/Qwen/Qwen3-ASR-0.6B",
+        "mirroredBy": "handy-computer",
+        "mirroredAt": "2026-06-28"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "transcribe_cpp",
+        "variant": "qwen3-asr-0.6b",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "zh",
+          "en",
+          "yue",
+          "ar",
+          "de",
+          "fr",
+          "es",
+          "pt",
+          "id",
+          "it",
+          "ko",
+          "ru",
+          "th",
+          "vi",
+          "ja",
+          "tr",
+          "hi",
+          "ms",
+          "nl",
+          "sv",
+          "da",
+          "fi",
+          "pl",
+          "cs",
+          "fil",
+          "fa",
+          "el",
+          "ro",
+          "hu",
+          "mk"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+      "expectedFinalization": "178.5 ms median and 305 ms p95 finalization on Textify's fixed English corpus on M4 Max",
+      "accuracyTradeoff": "3.65% English WER; highest-precision 0.6B GGUF choice at more than twice the measured memory of Q5_K_M",
+      "requirements": "Apple Silicon with Metal; about 1.57 GB disk, 2.61 GB measured peak process memory, and a 60-second recording limit"
+      }
+    },
+    {
+      "id": "qwen3-asr-0.6b-q8-0",
+      "displayName": "Experimental - Qwen3-ASR 0.6B Q8_0",
+      "tier": "experimental",
+      "description": "Exact Q8_0 Qwen3-ASR 0.6B GGUF for offline multilingual dictation with automatic language detection through transcribe.cpp Metal.",
+      "sizeBytes": 850423456,
+      "files": [
+        {
+          "filename": "Qwen3-ASR-0.6B-Q8_0.gguf",
+          "url": "https://huggingface.co/handy-computer/Qwen3-ASR-0.6B-gguf/resolve/e4e16599b900eb0cb36e524514756bb92eb092b7/Qwen3-ASR-0.6B-Q8_0.gguf",
+          "sha256": "f081b2d5e23bd669d92cc331d722a8a0681943b8e6f34b48996fd5c319b5acd8",
+          "sizeBytes": 850423456
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "Qwen3-ASR model weights and GGUF conversion",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "scope": "transcribe.cpp runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "handy-computer/Qwen3-ASR-0.6B-gguf",
+        "sourceUrl": "https://huggingface.co/handy-computer/Qwen3-ASR-0.6B-gguf",
+        "sourceRevision": "e4e16599b900eb0cb36e524514756bb92eb092b7",
+        "sourceFile": "Qwen3-ASR-0.6B-Q8_0.gguf",
+        "originalModelName": "Qwen3-ASR 0.6B",
+        "originalModelUrl": "https://huggingface.co/Qwen/Qwen3-ASR-0.6B",
+        "mirroredBy": "handy-computer",
+        "mirroredAt": "2026-06-28"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "transcribe_cpp",
+        "variant": "qwen3-asr-0.6b",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "zh",
+          "en",
+          "yue",
+          "ar",
+          "de",
+          "fr",
+          "es",
+          "pt",
+          "id",
+          "it",
+          "ko",
+          "ru",
+          "th",
+          "vi",
+          "ja",
+          "tr",
+          "hi",
+          "ms",
+          "nl",
+          "sv",
+          "da",
+          "fi",
+          "pl",
+          "cs",
+          "fil",
+          "fa",
+          "el",
+          "ro",
+          "hu",
+          "mk"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+      "expectedFinalization": "156.5 ms median and 260 ms p95 finalization on Textify's fixed English corpus on M4 Max",
+      "accuracyTradeoff": "3.65% English WER; middle 0.6B GGUF disk and memory choice with no measured English gain over Q5_K_M",
+      "requirements": "Apple Silicon with Metal; about 0.85 GB disk, 1.57 GB measured peak process memory, and a 60-second recording limit"
+      }
+    },
+    {
+      "id": "qwen3-asr-0.6b-q5-k-m",
+      "displayName": "Experimental - Qwen3-ASR 0.6B Q5_K_M",
+      "tier": "experimental",
+      "description": "Exact Q5_K_M Qwen3-ASR 0.6B GGUF for offline multilingual dictation with automatic language detection through transcribe.cpp Metal.",
+      "sizeBytes": 645356192,
+      "files": [
+        {
+          "filename": "Qwen3-ASR-0.6B-Q5_K_M.gguf",
+          "url": "https://huggingface.co/handy-computer/Qwen3-ASR-0.6B-gguf/resolve/e4e16599b900eb0cb36e524514756bb92eb092b7/Qwen3-ASR-0.6B-Q5_K_M.gguf",
+          "sha256": "062a7bcb18675c2fe5ffd0e8b354eac6a1ceada9b2af9ef7168746ae16b54358",
+          "sizeBytes": 645356192
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "Qwen3-ASR model weights and GGUF conversion",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "scope": "transcribe.cpp runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "handy-computer/Qwen3-ASR-0.6B-gguf",
+        "sourceUrl": "https://huggingface.co/handy-computer/Qwen3-ASR-0.6B-gguf",
+        "sourceRevision": "e4e16599b900eb0cb36e524514756bb92eb092b7",
+        "sourceFile": "Qwen3-ASR-0.6B-Q5_K_M.gguf",
+        "originalModelName": "Qwen3-ASR 0.6B",
+        "originalModelUrl": "https://huggingface.co/Qwen/Qwen3-ASR-0.6B",
+        "mirroredBy": "handy-computer",
+        "mirroredAt": "2026-06-28"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "transcribe_cpp",
+        "variant": "qwen3-asr-0.6b",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "zh",
+          "en",
+          "yue",
+          "ar",
+          "de",
+          "fr",
+          "es",
+          "pt",
+          "id",
+          "it",
+          "ko",
+          "ru",
+          "th",
+          "vi",
+          "ja",
+          "tr",
+          "hi",
+          "ms",
+          "nl",
+          "sv",
+          "da",
+          "fi",
+          "pl",
+          "cs",
+          "fil",
+          "fa",
+          "el",
+          "ro",
+          "hu",
+          "mk"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+      "expectedFinalization": "174.5 ms median and 283 ms p95 finalization on Textify's fixed English corpus on M4 Max",
+      "accuracyTradeoff": "3.65% English WER; automatic Hindi measured 11.36% WER and 10.05% CER with the smallest 0.6B footprint",
+      "requirements": "Apple Silicon with Metal; about 0.65 GB disk, 1.26 GB measured peak process memory, and a 60-second recording limit"
+      }
+    },
+    {
+      "id": "qwen3-asr-1.7b-bf16",
+      "displayName": "Experimental - Qwen3-ASR 1.7B BF16",
+      "tier": "experimental",
+      "description": "Exact BF16 Qwen3-ASR 1.7B GGUF for offline multilingual dictation with automatic language detection through transcribe.cpp Metal.",
+      "sizeBytes": 4083087904,
+      "files": [
+        {
+          "filename": "Qwen3-ASR-1.7B-BF16.gguf",
+          "url": "https://huggingface.co/handy-computer/Qwen3-ASR-1.7B-gguf/resolve/92282af1610a2db19d66f2bef1e260f5deca782d/Qwen3-ASR-1.7B-BF16.gguf",
+          "sha256": "57db745f8ec3ad2ea391b0205661e7d74f76158877a33f151e4d4624ed2b7cc9",
+          "sizeBytes": 4083087904
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "Qwen3-ASR model weights and GGUF conversion",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "scope": "transcribe.cpp runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "handy-computer/Qwen3-ASR-1.7B-gguf",
+        "sourceUrl": "https://huggingface.co/handy-computer/Qwen3-ASR-1.7B-gguf",
+        "sourceRevision": "92282af1610a2db19d66f2bef1e260f5deca782d",
+        "sourceFile": "Qwen3-ASR-1.7B-BF16.gguf",
+        "originalModelName": "Qwen3-ASR 1.7B",
+        "originalModelUrl": "https://huggingface.co/Qwen/Qwen3-ASR-1.7B",
+        "mirroredBy": "handy-computer",
+        "mirroredAt": "2026-06-28"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "transcribe_cpp",
+        "variant": "qwen3-asr-1.7b",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "zh",
+          "en",
+          "yue",
+          "ar",
+          "de",
+          "fr",
+          "es",
+          "pt",
+          "id",
+          "it",
+          "ko",
+          "ru",
+          "th",
+          "vi",
+          "ja",
+          "tr",
+          "hi",
+          "ms",
+          "nl",
+          "sv",
+          "da",
+          "fi",
+          "pl",
+          "cs",
+          "fil",
+          "fa",
+          "el",
+          "ro",
+          "hu",
+          "mk"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+      "expectedFinalization": "317.5 ms median and 545 ms p95 finalization on Textify's fixed English corpus on M4 Max",
+      "accuracyTradeoff": "3.33% English WER; highest-precision 1.7B GGUF choice with the largest measured memory footprint",
+      "requirements": "Apple Silicon with Metal; about 4.08 GB disk, 6.52 GB measured peak process memory, at least 16 GB unified memory, and a 60-second recording limit"
+      }
+    },
+    {
+      "id": "qwen3-asr-1.7b-q8-0",
+      "displayName": "Experimental - Qwen3-ASR 1.7B Q8_0",
+      "tier": "experimental",
+      "description": "Exact Q8_0 Qwen3-ASR 1.7B GGUF for offline multilingual dictation with automatic language detection through transcribe.cpp Metal.",
+      "sizeBytes": 2185030624,
+      "files": [
+        {
+          "filename": "Qwen3-ASR-1.7B-Q8_0.gguf",
+          "url": "https://huggingface.co/handy-computer/Qwen3-ASR-1.7B-gguf/resolve/92282af1610a2db19d66f2bef1e260f5deca782d/Qwen3-ASR-1.7B-Q8_0.gguf",
+          "sha256": "9a0d81792dfea2d5f278b8a63deb3ea6e02139ce42c2301f32ea19c4f77526b7",
+          "sizeBytes": 2185030624
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "Qwen3-ASR model weights and GGUF conversion",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "scope": "transcribe.cpp runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "handy-computer/Qwen3-ASR-1.7B-gguf",
+        "sourceUrl": "https://huggingface.co/handy-computer/Qwen3-ASR-1.7B-gguf",
+        "sourceRevision": "92282af1610a2db19d66f2bef1e260f5deca782d",
+        "sourceFile": "Qwen3-ASR-1.7B-Q8_0.gguf",
+        "originalModelName": "Qwen3-ASR 1.7B",
+        "originalModelUrl": "https://huggingface.co/Qwen/Qwen3-ASR-1.7B",
+        "mirroredBy": "handy-computer",
+        "mirroredAt": "2026-06-28"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "transcribe_cpp",
+        "variant": "qwen3-asr-1.7b",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "zh",
+          "en",
+          "yue",
+          "ar",
+          "de",
+          "fr",
+          "es",
+          "pt",
+          "id",
+          "it",
+          "ko",
+          "ru",
+          "th",
+          "vi",
+          "ja",
+          "tr",
+          "hi",
+          "ms",
+          "nl",
+          "sv",
+          "da",
+          "fi",
+          "pl",
+          "cs",
+          "fil",
+          "fa",
+          "el",
+          "ro",
+          "hu",
+          "mk"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+      "expectedFinalization": "231 ms median and 393 ms p95 finalization on Textify's fixed English corpus on M4 Max",
+      "accuracyTradeoff": "3.33% English WER; middle 1.7B GGUF disk and memory choice with no measured English gain over Q5_K_M",
+      "requirements": "Apple Silicon with Metal; about 2.19 GB disk, 3.64 GB measured peak process memory, and a 60-second recording limit"
+      }
+    },
+    {
+      "id": "qwen3-asr-1.7b-q5-k-m",
+      "displayName": "Experimental - Qwen3-ASR 1.7B Q5_K_M",
+      "tier": "experimental",
+      "description": "Exact Q5_K_M Qwen3-ASR 1.7B GGUF for offline multilingual dictation with automatic language detection through transcribe.cpp Metal.",
+      "sizeBytes": 1517290464,
+      "files": [
+        {
+          "filename": "Qwen3-ASR-1.7B-Q5_K_M.gguf",
+          "url": "https://huggingface.co/handy-computer/Qwen3-ASR-1.7B-gguf/resolve/92282af1610a2db19d66f2bef1e260f5deca782d/Qwen3-ASR-1.7B-Q5_K_M.gguf",
+          "sha256": "034c557fe92ff8fcd9a9c041cbdaad347be0a86a58d3a348f63cf3f0180879d0",
+          "sizeBytes": 1517290464
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "Qwen3-ASR model weights and GGUF conversion",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "scope": "transcribe.cpp runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "handy-computer/Qwen3-ASR-1.7B-gguf",
+        "sourceUrl": "https://huggingface.co/handy-computer/Qwen3-ASR-1.7B-gguf",
+        "sourceRevision": "92282af1610a2db19d66f2bef1e260f5deca782d",
+        "sourceFile": "Qwen3-ASR-1.7B-Q5_K_M.gguf",
+        "originalModelName": "Qwen3-ASR 1.7B",
+        "originalModelUrl": "https://huggingface.co/Qwen/Qwen3-ASR-1.7B",
+        "mirroredBy": "handy-computer",
+        "mirroredAt": "2026-06-28"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "transcribe_cpp",
+        "variant": "qwen3-asr-1.7b",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "zh",
+          "en",
+          "yue",
+          "ar",
+          "de",
+          "fr",
+          "es",
+          "pt",
+          "id",
+          "it",
+          "ko",
+          "ru",
+          "th",
+          "vi",
+          "ja",
+          "tr",
+          "hi",
+          "ms",
+          "nl",
+          "sv",
+          "da",
+          "fi",
+          "pl",
+          "cs",
+          "fil",
+          "fa",
+          "el",
+          "ro",
+          "hu",
+          "mk"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+      "expectedFinalization": "210 ms median and 346 ms p95 finalization on Textify's fixed English corpus on M4 Max",
+      "accuracyTradeoff": "3.33% English WER; automatic Hindi measured 10.00% WER and 7.00% CER with the smallest 1.7B GGUF footprint",
+      "requirements": "Apple Silicon with Metal; about 1.52 GB disk, 2.63 GB measured peak process memory, and a 60-second recording limit"
+      }
+    },
+    {
+      "id": "parakeet-tdt-0.6b-v2-mlx",
+      "displayName": "Experimental - Parakeet TDT V2 MLX F32",
+      "tier": "experimental",
+      "description": "Exact MLX Community F32 Parakeet TDT 0.6B V2 directory for offline English batch dictation on MLX Metal.",
+      "sizeBytes": 2471862935,
+      "files": [
+        {
+          "filename": "config.json",
+          "relativePath": "config.json",
+          "url": "https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v2/resolve/8ae155301e23d820d82aa60d24817c900e69e487/config.json",
+          "sha256": "9bd323e60afe2615c983a5d9fc3a2c0470df2a03edf90c0f861bd59509d07264",
+          "sizeBytes": 36176
+        },
+        {
+          "filename": "model.safetensors",
+          "relativePath": "model.safetensors",
+          "url": "https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v2/resolve/8ae155301e23d820d82aa60d24817c900e69e487/model.safetensors",
+          "sha256": "b958c37a6baa6874a279108755c8f2818e27bf647d72d54800a234a421341dfe",
+          "sizeBytes": 2471559904
+        },
+        {
+          "filename": "tokenizer.model",
+          "relativePath": "tokenizer.model",
+          "url": "https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v2/resolve/8ae155301e23d820d82aa60d24817c900e69e487/tokenizer.model",
+          "sha256": "5a3a82c48998709f9bc9f5db2924d99a899d20bf82550ca52272da7c7557b0a0",
+          "sizeBytes": 251396
+        },
+        {
+          "filename": "tokenizer.vocab",
+          "relativePath": "tokenizer.vocab",
+          "url": "https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v2/resolve/8ae155301e23d820d82aa60d24817c900e69e487/tokenizer.vocab",
+          "sha256": "dbe7ec6bd066c4526080940e1614e6582b9161515e856c2c39a1d49267c88cbc",
+          "sizeBytes": 10393
+        },
+        {
+          "filename": "vocab.txt",
+          "relativePath": "vocab.txt",
+          "url": "https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v2/resolve/8ae155301e23d820d82aa60d24817c900e69e487/vocab.txt",
+          "sha256": "70b25deed256d79365a3c290d6191c31cc2315d952faf18d5c3a334f46e4866e",
+          "sizeBytes": 5066
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "NVIDIA Parakeet TDT 0.6B V2 weights and MLX conversion",
+          "spdxId": "CC-BY-4.0",
+          "name": "Creative Commons Attribution 4.0 International",
+          "licenseTextUrl": "https://creativecommons.org/licenses/by/4.0/legalcode"
+        },
+        {
+          "scope": "MLX Audio Swift runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/Blaizzy/mlx-audio-swift/d302a5c6080d2bb97bae38c7418f82abb76013b6/LICENSE"
+        },
+        {
+          "scope": "MLX Swift runtime",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/ml-explore/mlx-swift/61b9e011e09a62b489f6bd647958f1555bdf2896/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "mlx-community/parakeet-tdt-0.6b-v2",
+        "sourceUrl": "https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v2",
+        "sourceRevision": "8ae155301e23d820d82aa60d24817c900e69e487",
+        "sourceFile": "Complete 5-file MLX inference directory",
+        "originalModelName": "NVIDIA Parakeet TDT 0.6B V2",
+        "originalModelUrl": "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2",
+        "mirroredBy": "mlx-community",
+        "mirroredAt": "2026-07-20"
+      },
+      "runtimeParameters": {
+        "language": "en",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "mlx_audio",
+        "variant": "parakeet-tdt-0.6b-v2",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "model_directory"
+      },
+      "capabilities": {
+        "languages": [
+          "en"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "80 ms median and 192 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
+        "accuracyTradeoff": "0.48% English WER; exact F32 MLX directory with a larger disk and memory footprint than the GGUF choices",
+        "requirements": "Apple Silicon with Metal; about 2.47 GB disk, 2.64 GB measured peak process memory, and a 60-second recording limit"
+      }
+    },
+    {
+      "id": "parakeet-tdt-0.6b-v3-mlx",
+      "displayName": "Experimental - Parakeet TDT V3 MLX F32",
+      "tier": "experimental",
+      "description": "Exact MLX Community F32 Parakeet TDT 0.6B V3 directory for offline multilingual batch dictation with automatic language detection on MLX Metal.",
+      "sizeBytes": 2509041541,
+      "files": [
+        {
+          "filename": "config.json",
+          "relativePath": "config.json",
+          "url": "https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v3/resolve/ed2b7e8c15f9aaa0b5772e2efb986255eaef7e15/config.json",
+          "sha256": "f320f1292511f34ec47f513755fe20fd01dbfc09a925d42730e66059a6e1ef4c",
+          "sizeBytes": 244093
+        },
+        {
+          "filename": "model.safetensors",
+          "relativePath": "model.safetensors",
+          "url": "https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v3/resolve/ed2b7e8c15f9aaa0b5772e2efb986255eaef7e15/model.safetensors",
+          "sha256": "05e01c7f396c298cf7d23f61da7b504adeab698f0aaeafd9c82d198625464592",
+          "sizeBytes": 2508288736
+        },
+        {
+          "filename": "tokenizer.model",
+          "relativePath": "tokenizer.model",
+          "url": "https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v3/resolve/ed2b7e8c15f9aaa0b5772e2efb986255eaef7e15/tokenizer.model",
+          "sha256": "eacec2b0a77f336d4a2ca4a25a7047575d3c2b74de47e997f4c205126ed3135e",
+          "sizeBytes": 360916
+        },
+        {
+          "filename": "tokenizer.vocab",
+          "relativePath": "tokenizer.vocab",
+          "url": "https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v3/resolve/ed2b7e8c15f9aaa0b5772e2efb986255eaef7e15/tokenizer.vocab",
+          "sha256": "41130ff456706304a1adec782ccc9e003c4d417e8e324353d281be958cac4e17",
+          "sizeBytes": 101024
+        },
+        {
+          "filename": "vocab.txt",
+          "relativePath": "vocab.txt",
+          "url": "https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v3/resolve/ed2b7e8c15f9aaa0b5772e2efb986255eaef7e15/vocab.txt",
+          "sha256": "3cde1409fd78783a79b29ed4d32da57c746993856f7c8263bcb905d2e5839db7",
+          "sizeBytes": 46772
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "NVIDIA Parakeet TDT 0.6B V3 weights and MLX conversion",
+          "spdxId": "CC-BY-4.0",
+          "name": "Creative Commons Attribution 4.0 International",
+          "licenseTextUrl": "https://creativecommons.org/licenses/by/4.0/legalcode"
+        },
+        {
+          "scope": "MLX Audio Swift runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/Blaizzy/mlx-audio-swift/d302a5c6080d2bb97bae38c7418f82abb76013b6/LICENSE"
+        },
+        {
+          "scope": "MLX Swift runtime",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/ml-explore/mlx-swift/61b9e011e09a62b489f6bd647958f1555bdf2896/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "mlx-community/parakeet-tdt-0.6b-v3",
+        "sourceUrl": "https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v3",
+        "sourceRevision": "ed2b7e8c15f9aaa0b5772e2efb986255eaef7e15",
+        "sourceFile": "Complete 5-file MLX inference directory",
+        "originalModelName": "NVIDIA Parakeet TDT 0.6B V3",
+        "originalModelUrl": "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3",
+        "mirroredBy": "mlx-community",
+        "mirroredAt": "2026-07-20"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "mlx_audio",
+        "variant": "parakeet-tdt-0.6b-v3",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "model_directory"
+      },
+      "capabilities": {
+        "languages": [
+          "bg",
+          "hr",
+          "cs",
+          "da",
+          "nl",
+          "en",
+          "et",
+          "fi",
+          "fr",
+          "de",
+          "el",
+          "hu",
+          "it",
+          "lv",
+          "lt",
+          "mt",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "es",
+          "sv",
+          "uk"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "67 ms median and 291 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
+        "accuracyTradeoff": "2.38% English WER; automatic selection across 25 declared European languages, with Textify corpus evidence currently limited to English",
+        "requirements": "Apple Silicon with Metal; about 2.51 GB disk, 2.68 GB measured peak process memory, and a 60-second recording limit"
+      }
+    },
+    {
+      "id": "nemotron-3.5-asr-streaming-0.6b-mlx",
+      "displayName": "Experimental - Nemotron 3.5 ASR MLX BF16",
+      "tier": "experimental",
+      "description": "Exact MLX Community BF16 Nemotron 3.5 ASR directory for fully local multilingual batch dictation with automatic language detection on MLX Metal.",
+      "sizeBytes": 1276703116,
+      "files": [
+        {
+          "filename": "config.json",
+          "relativePath": "config.json",
+          "url": "https://huggingface.co/mlx-community/nemotron-3.5-asr-streaming-0.6b/resolve/e550040c0478027ed679b2b6b0d055502c103663/config.json",
+          "sha256": "97fe51f0970514e6cac928bcaebac4dbb1dba554f980642542ffac451a0dca56",
+          "sizeBytes": 159432
+        },
+        {
+          "filename": "model.safetensors",
+          "relativePath": "model.safetensors",
+          "url": "https://huggingface.co/mlx-community/nemotron-3.5-asr-streaming-0.6b/resolve/e550040c0478027ed679b2b6b0d055502c103663/model.safetensors",
+          "sha256": "1b78e4551371b1438daba0e8c9e1673bb18606994c1bcc493d85c5454d428ee5",
+          "sizeBytes": 1276058836
+        },
+        {
+          "filename": "tokenizer.model",
+          "relativePath": "tokenizer.model",
+          "url": "https://huggingface.co/mlx-community/nemotron-3.5-asr-streaming-0.6b/resolve/e550040c0478027ed679b2b6b0d055502c103663/tokenizer.model",
+          "sha256": "ce3895e40806f02a26c3a225161b96ef682d6c0054bae32a245dec4258d7d291",
+          "sizeBytes": 406554
+        },
+        {
+          "filename": "vocab.txt",
+          "relativePath": "vocab.txt",
+          "url": "https://huggingface.co/mlx-community/nemotron-3.5-asr-streaming-0.6b/resolve/e550040c0478027ed679b2b6b0d055502c103663/vocab.txt",
+          "sha256": "d74b60edd1cad792cfce25dcb7e1048d78d717cf4f29acaae2854262d5189f4f",
+          "sizeBytes": 78294
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "NVIDIA Nemotron 3.5 ASR weights and MLX conversion",
+          "spdxId": "LicenseRef-NVIDIA-Open-Model-License",
+          "name": "NVIDIA Open Model License",
+          "licenseTextUrl": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/"
+        },
+        {
+          "scope": "MLX Audio Swift runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/Blaizzy/mlx-audio-swift/d302a5c6080d2bb97bae38c7418f82abb76013b6/LICENSE"
+        },
+        {
+          "scope": "MLX Swift runtime",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/ml-explore/mlx-swift/61b9e011e09a62b489f6bd647958f1555bdf2896/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "mlx-community/nemotron-3.5-asr-streaming-0.6b",
+        "sourceUrl": "https://huggingface.co/mlx-community/nemotron-3.5-asr-streaming-0.6b",
+        "sourceRevision": "e550040c0478027ed679b2b6b0d055502c103663",
+        "sourceFile": "Complete 4-file MLX inference directory",
+        "originalModelName": "NVIDIA Nemotron 3.5 ASR Streaming 0.6B",
+        "originalModelUrl": "https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b",
+        "mirroredBy": "mlx-community",
+        "mirroredAt": "2026-07-20"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "mlx_audio",
+        "variant": "nemotron-3.5-asr-streaming-0.6b",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "model_directory"
+      },
+      "capabilities": {
+        "languages": [
+          "en",
+          "es",
+          "fr",
+          "it",
+          "pt",
+          "nl",
+          "de",
+          "tr",
+          "ru",
+          "ar",
+          "hi",
+          "ja",
+          "ko",
+          "vi",
+          "uk",
+          "pl",
+          "sv",
+          "cs",
+          "nb",
+          "da",
+          "bg",
+          "fi",
+          "hr",
+          "sk",
+          "zh",
+          "hu",
+          "ro",
+          "et"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "137 ms median and 413 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
+        "accuracyTradeoff": "3.33% English WER; Textify exposes whole-recording batch dictation, not upstream streaming partials",
+        "requirements": "Apple Silicon with Metal; about 1.28 GB disk, 1.44 GB measured peak process memory, and a 60-second recording limit"
+      }
+    },
+    {
+      "id": "parakeet-tdt-0.6b-v2-f16",
+      "displayName": "Experimental - Parakeet TDT V2 F16",
+      "tier": "experimental",
+      "description": "Exact F16 Parakeet TDT 0.6B V2 GGUF for offline English batch dictation through transcribe.cpp Metal; the source repository does not publish BF16.",
+      "sizeBytes": 1237334592,
+      "files": [
+        {
+          "filename": "parakeet-tdt-0.6b-v2-F16.gguf",
+          "url": "https://huggingface.co/handy-computer/parakeet-tdt-0.6b-v2-gguf/resolve/07cee0616125a08ef619729bb47f40ef747e4bc4/parakeet-tdt-0.6b-v2-F16.gguf",
+          "sha256": "8440125213cb92625e3993ec751c3919dd329da9ae9149951cd6f95dd8bafe81",
+          "sizeBytes": 1237334592
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "NVIDIA Parakeet TDT 0.6B V2 weights and GGUF conversion",
+          "spdxId": "CC-BY-4.0",
+          "name": "Creative Commons Attribution 4.0 International",
+          "licenseTextUrl": "https://creativecommons.org/licenses/by/4.0/legalcode"
+        },
+        {
+          "scope": "transcribe.cpp runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "handy-computer/parakeet-tdt-0.6b-v2-gguf",
+        "sourceUrl": "https://huggingface.co/handy-computer/parakeet-tdt-0.6b-v2-gguf",
+        "sourceRevision": "07cee0616125a08ef619729bb47f40ef747e4bc4",
+        "sourceFile": "parakeet-tdt-0.6b-v2-F16.gguf",
+        "originalModelName": "NVIDIA Parakeet TDT 0.6B V2",
+        "originalModelUrl": "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2",
+        "mirroredBy": "handy-computer",
+        "mirroredAt": "2026-07-20"
+      },
+      "runtimeParameters": {
+        "language": "en",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "transcribe_cpp",
+        "variant": "parakeet-tdt-0.6b-v2",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "en"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "74 ms median and 159 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
+        "accuracyTradeoff": "0.48% English WER; F16 GGUF choice at the largest V2 disk and memory footprint",
+        "requirements": "Apple Silicon with Metal; about 1.24 GB disk, 1.51 GB measured peak process memory, and a 60-second recording limit"
+      }
+    },
+    {
+      "id": "parakeet-tdt-0.6b-v2-q8-0",
+      "displayName": "Experimental - Parakeet TDT V2 Q8_0",
+      "tier": "experimental",
+      "description": "Exact Q8_0 Parakeet TDT 0.6B V2 GGUF for offline English batch dictation through transcribe.cpp Metal.",
+      "sizeBytes": 729574912,
+      "files": [
+        {
+          "filename": "parakeet-tdt-0.6b-v2-Q8_0.gguf",
+          "url": "https://huggingface.co/handy-computer/parakeet-tdt-0.6b-v2-gguf/resolve/07cee0616125a08ef619729bb47f40ef747e4bc4/parakeet-tdt-0.6b-v2-Q8_0.gguf",
+          "sha256": "f0d0e99cebb6d3b83f1f7069b82b5d3c2e39a54545b0da039cb4bafd9c4e5caa",
+          "sizeBytes": 729574912
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "NVIDIA Parakeet TDT 0.6B V2 weights and GGUF conversion",
+          "spdxId": "CC-BY-4.0",
+          "name": "Creative Commons Attribution 4.0 International",
+          "licenseTextUrl": "https://creativecommons.org/licenses/by/4.0/legalcode"
+        },
+        {
+          "scope": "transcribe.cpp runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "handy-computer/parakeet-tdt-0.6b-v2-gguf",
+        "sourceUrl": "https://huggingface.co/handy-computer/parakeet-tdt-0.6b-v2-gguf",
+        "sourceRevision": "07cee0616125a08ef619729bb47f40ef747e4bc4",
+        "sourceFile": "parakeet-tdt-0.6b-v2-Q8_0.gguf",
+        "originalModelName": "NVIDIA Parakeet TDT 0.6B V2",
+        "originalModelUrl": "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2",
+        "mirroredBy": "handy-computer",
+        "mirroredAt": "2026-07-20"
+      },
+      "runtimeParameters": {
+        "language": "en",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "transcribe_cpp",
+        "variant": "parakeet-tdt-0.6b-v2",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "en"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "107 ms median and 208 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
+        "accuracyTradeoff": "0.48% English WER; Q8_0 GGUF choice at a middle V2 disk and memory footprint",
+        "requirements": "Apple Silicon with Metal; about 0.73 GB disk, 1.00 GB measured peak process memory, and a 60-second recording limit"
+      }
+    },
+    {
+      "id": "parakeet-tdt-0.6b-v2-q5-k-m",
+      "displayName": "Experimental - Parakeet TDT V2 Q5_K_M",
+      "tier": "experimental",
+      "description": "Exact Q5_K_M Parakeet TDT 0.6B V2 GGUF for offline English batch dictation through transcribe.cpp Metal.",
+      "sizeBytes": 539012608,
+      "files": [
+        {
+          "filename": "parakeet-tdt-0.6b-v2-Q5_K_M.gguf",
+          "url": "https://huggingface.co/handy-computer/parakeet-tdt-0.6b-v2-gguf/resolve/07cee0616125a08ef619729bb47f40ef747e4bc4/parakeet-tdt-0.6b-v2-Q5_K_M.gguf",
+          "sha256": "dfa904520b95451599683613fea47766c378c5fdf5d8cddf48151226b6eaec85",
+          "sizeBytes": 539012608
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "NVIDIA Parakeet TDT 0.6B V2 weights and GGUF conversion",
+          "spdxId": "CC-BY-4.0",
+          "name": "Creative Commons Attribution 4.0 International",
+          "licenseTextUrl": "https://creativecommons.org/licenses/by/4.0/legalcode"
+        },
+        {
+          "scope": "transcribe.cpp runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "handy-computer/parakeet-tdt-0.6b-v2-gguf",
+        "sourceUrl": "https://huggingface.co/handy-computer/parakeet-tdt-0.6b-v2-gguf",
+        "sourceRevision": "07cee0616125a08ef619729bb47f40ef747e4bc4",
+        "sourceFile": "parakeet-tdt-0.6b-v2-Q5_K_M.gguf",
+        "originalModelName": "NVIDIA Parakeet TDT 0.6B V2",
+        "originalModelUrl": "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2",
+        "mirroredBy": "handy-computer",
+        "mirroredAt": "2026-07-20"
+      },
+      "runtimeParameters": {
+        "language": "en",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "transcribe_cpp",
+        "variant": "parakeet-tdt-0.6b-v2",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "en"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "107 ms median and 216 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
+        "accuracyTradeoff": "0.48% English WER; Q5_K_M GGUF choice at the smallest V2 disk and memory footprint",
+        "requirements": "Apple Silicon with Metal; about 0.54 GB disk, 0.81 GB measured peak process memory, and a 60-second recording limit"
+      }
+    },
+    {
+      "id": "parakeet-tdt-0.6b-v3-f16",
+      "displayName": "Experimental - Parakeet TDT V3 F16",
+      "tier": "experimental",
+      "description": "Exact F16 Parakeet TDT 0.6B V3 GGUF for offline multilingual batch dictation with automatic language detection through transcribe.cpp Metal; the source repository does not publish BF16.",
+      "sizeBytes": 1255869856,
+      "files": [
+        {
+          "filename": "parakeet-tdt-0.6b-v3-F16.gguf",
+          "url": "https://huggingface.co/handy-computer/parakeet-tdt-0.6b-v3-gguf/resolve/85ac09ea12fc4b1112fa76810059364bc6adc9de/parakeet-tdt-0.6b-v3-F16.gguf",
+          "sha256": "d9ec7e2c39da7b4fec3e01e71e82c7f7bbe97741e08c0c054091bf3d520a41d3",
+          "sizeBytes": 1255869856
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "NVIDIA Parakeet TDT 0.6B V3 weights and GGUF conversion",
+          "spdxId": "CC-BY-4.0",
+          "name": "Creative Commons Attribution 4.0 International",
+          "licenseTextUrl": "https://creativecommons.org/licenses/by/4.0/legalcode"
+        },
+        {
+          "scope": "transcribe.cpp runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "handy-computer/parakeet-tdt-0.6b-v3-gguf",
+        "sourceUrl": "https://huggingface.co/handy-computer/parakeet-tdt-0.6b-v3-gguf",
+        "sourceRevision": "85ac09ea12fc4b1112fa76810059364bc6adc9de",
+        "sourceFile": "parakeet-tdt-0.6b-v3-F16.gguf",
+        "originalModelName": "NVIDIA Parakeet TDT 0.6B V3",
+        "originalModelUrl": "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3",
+        "mirroredBy": "handy-computer",
+        "mirroredAt": "2026-07-20"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "transcribe_cpp",
+        "variant": "parakeet-tdt-0.6b-v3",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "bg",
+          "hr",
+          "cs",
+          "da",
+          "nl",
+          "en",
+          "et",
+          "fi",
+          "fr",
+          "de",
+          "el",
+          "hu",
+          "it",
+          "lv",
+          "lt",
+          "mt",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "es",
+          "sv",
+          "uk"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "99 ms median and 143 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
+        "accuracyTradeoff": "2.38% English WER; automatic selection across 25 declared European languages, with Textify corpus evidence currently limited to English",
+        "requirements": "Apple Silicon with Metal; about 1.26 GB disk, 1.60 GB measured peak process memory, and a 60-second recording limit"
+      }
+    },
+    {
+      "id": "parakeet-tdt-0.6b-v3-q8-0",
+      "displayName": "Experimental - Parakeet TDT V3 Q8_0",
+      "tier": "experimental",
+      "description": "Exact Q8_0 Parakeet TDT 0.6B V3 GGUF for offline multilingual batch dictation with automatic language detection through transcribe.cpp Metal.",
+      "sizeBytes": 739508576,
+      "files": [
+        {
+          "filename": "parakeet-tdt-0.6b-v3-Q8_0.gguf",
+          "url": "https://huggingface.co/handy-computer/parakeet-tdt-0.6b-v3-gguf/resolve/85ac09ea12fc4b1112fa76810059364bc6adc9de/parakeet-tdt-0.6b-v3-Q8_0.gguf",
+          "sha256": "5859f77944efcd8eafa23a6350731960b2b55b2203df51f319665c807d802cc7",
+          "sizeBytes": 739508576
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "NVIDIA Parakeet TDT 0.6B V3 weights and GGUF conversion",
+          "spdxId": "CC-BY-4.0",
+          "name": "Creative Commons Attribution 4.0 International",
+          "licenseTextUrl": "https://creativecommons.org/licenses/by/4.0/legalcode"
+        },
+        {
+          "scope": "transcribe.cpp runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "handy-computer/parakeet-tdt-0.6b-v3-gguf",
+        "sourceUrl": "https://huggingface.co/handy-computer/parakeet-tdt-0.6b-v3-gguf",
+        "sourceRevision": "85ac09ea12fc4b1112fa76810059364bc6adc9de",
+        "sourceFile": "parakeet-tdt-0.6b-v3-Q8_0.gguf",
+        "originalModelName": "NVIDIA Parakeet TDT 0.6B V3",
+        "originalModelUrl": "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3",
+        "mirroredBy": "handy-computer",
+        "mirroredAt": "2026-07-20"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "transcribe_cpp",
+        "variant": "parakeet-tdt-0.6b-v3",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "bg",
+          "hr",
+          "cs",
+          "da",
+          "nl",
+          "en",
+          "et",
+          "fi",
+          "fr",
+          "de",
+          "el",
+          "hu",
+          "it",
+          "lv",
+          "lt",
+          "mt",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "es",
+          "sv",
+          "uk"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "75 ms median and 98 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
+        "accuracyTradeoff": "2.38% English WER; automatic selection across 25 declared European languages, with Textify corpus evidence currently limited to English",
+        "requirements": "Apple Silicon with Metal; about 0.74 GB disk, 1.07 GB measured peak process memory, and a 60-second recording limit"
+      }
+    },
+    {
+      "id": "parakeet-tdt-0.6b-v3-q5-k-m",
+      "displayName": "Experimental - Parakeet TDT V3 Q5_K_M",
+      "tier": "experimental",
+      "description": "Exact Q5_K_M Parakeet TDT 0.6B V3 GGUF for offline multilingual batch dictation with automatic language detection through transcribe.cpp Metal.",
+      "sizeBytes": 548946272,
+      "files": [
+        {
+          "filename": "parakeet-tdt-0.6b-v3-Q5_K_M.gguf",
+          "url": "https://huggingface.co/handy-computer/parakeet-tdt-0.6b-v3-gguf/resolve/85ac09ea12fc4b1112fa76810059364bc6adc9de/parakeet-tdt-0.6b-v3-Q5_K_M.gguf",
+          "sha256": "cc722e76adc1a629fc0b2535de879d99b8160d07ad4c0215e2ca7d7ea0ae4b8f",
+          "sizeBytes": 548946272
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "NVIDIA Parakeet TDT 0.6B V3 weights and GGUF conversion",
+          "spdxId": "CC-BY-4.0",
+          "name": "Creative Commons Attribution 4.0 International",
+          "licenseTextUrl": "https://creativecommons.org/licenses/by/4.0/legalcode"
+        },
+        {
+          "scope": "transcribe.cpp runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "handy-computer/parakeet-tdt-0.6b-v3-gguf",
+        "sourceUrl": "https://huggingface.co/handy-computer/parakeet-tdt-0.6b-v3-gguf",
+        "sourceRevision": "85ac09ea12fc4b1112fa76810059364bc6adc9de",
+        "sourceFile": "parakeet-tdt-0.6b-v3-Q5_K_M.gguf",
+        "originalModelName": "NVIDIA Parakeet TDT 0.6B V3",
+        "originalModelUrl": "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3",
+        "mirroredBy": "handy-computer",
+        "mirroredAt": "2026-07-20"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "transcribe_cpp",
+        "variant": "parakeet-tdt-0.6b-v3",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "bg",
+          "hr",
+          "cs",
+          "da",
+          "nl",
+          "en",
+          "et",
+          "fi",
+          "fr",
+          "de",
+          "el",
+          "hu",
+          "it",
+          "lv",
+          "lt",
+          "mt",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "es",
+          "sv",
+          "uk"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "98 ms median and 134 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
+        "accuracyTradeoff": "2.38% English WER; automatic selection across 25 declared European languages, with Textify corpus evidence currently limited to English",
+        "requirements": "Apple Silicon with Metal; about 0.55 GB disk, 0.88 GB measured peak process memory, and a 60-second recording limit"
+      }
+    },
+    {
+      "id": "nemotron-3.5-asr-streaming-0.6b-f16",
+      "displayName": "Experimental - Nemotron 3.5 ASR F16",
+      "tier": "experimental",
+      "description": "Exact F16 Nemotron 3.5 ASR GGUF for fully local multilingual batch dictation with automatic language detection through transcribe.cpp Metal; the source repository does not publish BF16.",
+      "sizeBytes": 1277750240,
+      "files": [
+        {
+          "filename": "nemotron-3.5-asr-streaming-0.6b-F16.gguf",
+          "url": "https://huggingface.co/handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/6d44e540bc31b0de1dbe174a3cea87f53a7f22fb/nemotron-3.5-asr-streaming-0.6b-F16.gguf",
+          "sha256": "f21a0cea64d232981def7f8f2b7ab322459703a2e89359962c042c57159755b1",
+          "sizeBytes": 1277750240
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "NVIDIA Nemotron 3.5 ASR weights and GGUF conversion",
+          "spdxId": "LicenseRef-OpenMDW-1.1",
+          "name": "Open Model & Data License 1.1",
+          "licenseTextUrl": "https://openmdw.ai/license/1-1/"
+        },
+        {
+          "scope": "transcribe.cpp runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf",
+        "sourceUrl": "https://huggingface.co/handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf",
+        "sourceRevision": "6d44e540bc31b0de1dbe174a3cea87f53a7f22fb",
+        "sourceFile": "nemotron-3.5-asr-streaming-0.6b-F16.gguf",
+        "originalModelName": "NVIDIA Nemotron 3.5 ASR Streaming 0.6B",
+        "originalModelUrl": "https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b",
+        "mirroredBy": "handy-computer",
+        "mirroredAt": "2026-07-20"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "transcribe_cpp",
+        "variant": "nemotron-3.5-asr-streaming-0.6b",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "en",
+          "es",
+          "fr",
+          "it",
+          "pt",
+          "nl",
+          "de",
+          "tr",
+          "ru",
+          "ar",
+          "hi",
+          "ja",
+          "ko",
+          "vi",
+          "uk",
+          "pl",
+          "sv",
+          "cs",
+          "nb",
+          "da",
+          "bg",
+          "fi",
+          "hr",
+          "sk",
+          "zh",
+          "hu",
+          "ro",
+          "et"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "129 ms median and 220 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
+        "accuracyTradeoff": "3.33% English WER; Textify exposes whole-recording batch dictation, not upstream streaming partials",
+        "requirements": "Apple Silicon with Metal; about 1.28 GB disk, 1.65 GB measured peak process memory, and a 60-second recording limit"
+      }
+    },
+    {
+      "id": "nemotron-3.5-asr-streaming-0.6b-q8-0",
+      "displayName": "Experimental - Nemotron 3.5 ASR Q8_0",
+      "tier": "experimental",
+      "description": "Exact Q8_0 Nemotron 3.5 ASR GGUF for fully local multilingual batch dictation with automatic language detection through transcribe.cpp Metal.",
+      "sizeBytes": 751094240,
+      "files": [
+        {
+          "filename": "nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf",
+          "url": "https://huggingface.co/handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/6d44e540bc31b0de1dbe174a3cea87f53a7f22fb/nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf",
+          "sha256": "b94545b313b3223fda7b2857a52681da813935c2127643d1e9ff0c23d988089c",
+          "sizeBytes": 751094240
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "NVIDIA Nemotron 3.5 ASR weights and GGUF conversion",
+          "spdxId": "LicenseRef-OpenMDW-1.1",
+          "name": "Open Model & Data License 1.1",
+          "licenseTextUrl": "https://openmdw.ai/license/1-1/"
+        },
+        {
+          "scope": "transcribe.cpp runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf",
+        "sourceUrl": "https://huggingface.co/handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf",
+        "sourceRevision": "6d44e540bc31b0de1dbe174a3cea87f53a7f22fb",
+        "sourceFile": "nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf",
+        "originalModelName": "NVIDIA Nemotron 3.5 ASR Streaming 0.6B",
+        "originalModelUrl": "https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b",
+        "mirroredBy": "handy-computer",
+        "mirroredAt": "2026-07-20"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "transcribe_cpp",
+        "variant": "nemotron-3.5-asr-streaming-0.6b",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "en",
+          "es",
+          "fr",
+          "it",
+          "pt",
+          "nl",
+          "de",
+          "tr",
+          "ru",
+          "ar",
+          "hi",
+          "ja",
+          "ko",
+          "vi",
+          "uk",
+          "pl",
+          "sv",
+          "cs",
+          "nb",
+          "da",
+          "bg",
+          "fi",
+          "hr",
+          "sk",
+          "zh",
+          "hu",
+          "ro",
+          "et"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "123 ms median and 230 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
+        "accuracyTradeoff": "3.33% English WER; Textify exposes whole-recording batch dictation, not upstream streaming partials",
+        "requirements": "Apple Silicon with Metal; about 0.75 GB disk, 1.11 GB measured peak process memory, and a 60-second recording limit"
+      }
+    },
+    {
+      "id": "nemotron-3.5-asr-streaming-0.6b-q5-k-m",
+      "displayName": "Experimental - Nemotron 3.5 ASR Q5_K_M",
+      "tier": "experimental",
+      "description": "Exact Q5_K_M Nemotron 3.5 ASR GGUF for fully local multilingual batch dictation with automatic language detection through transcribe.cpp Metal.",
+      "sizeBytes": 559647200,
+      "files": [
+        {
+          "filename": "nemotron-3.5-asr-streaming-0.6b-Q5_K_M.gguf",
+          "url": "https://huggingface.co/handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/6d44e540bc31b0de1dbe174a3cea87f53a7f22fb/nemotron-3.5-asr-streaming-0.6b-Q5_K_M.gguf",
+          "sha256": "86429e8c4f7fdcf9b3312269ad1ca6669478ba7805331c4aea7a2e33e9910d65",
+          "sizeBytes": 559647200
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "NVIDIA Nemotron 3.5 ASR weights and GGUF conversion",
+          "spdxId": "LicenseRef-OpenMDW-1.1",
+          "name": "Open Model & Data License 1.1",
+          "licenseTextUrl": "https://openmdw.ai/license/1-1/"
+        },
+        {
+          "scope": "transcribe.cpp runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf",
+        "sourceUrl": "https://huggingface.co/handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf",
+        "sourceRevision": "6d44e540bc31b0de1dbe174a3cea87f53a7f22fb",
+        "sourceFile": "nemotron-3.5-asr-streaming-0.6b-Q5_K_M.gguf",
+        "originalModelName": "NVIDIA Nemotron 3.5 ASR Streaming 0.6B",
+        "originalModelUrl": "https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b",
+        "mirroredBy": "handy-computer",
+        "mirroredAt": "2026-07-20"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "transcribe_cpp",
+        "variant": "nemotron-3.5-asr-streaming-0.6b",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "en",
+          "es",
+          "fr",
+          "it",
+          "pt",
+          "nl",
+          "de",
+          "tr",
+          "ru",
+          "ar",
+          "hi",
+          "ja",
+          "ko",
+          "vi",
+          "uk",
+          "pl",
+          "sv",
+          "cs",
+          "nb",
+          "da",
+          "bg",
+          "fi",
+          "hr",
+          "sk",
+          "zh",
+          "hu",
+          "ro",
+          "et"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "130 ms median and 306 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
+        "accuracyTradeoff": "2.86% English WER; Textify exposes whole-recording batch dictation, not upstream streaming partials",
+        "requirements": "Apple Silicon with Metal; about 0.56 GB disk, 0.92 GB measured peak process memory, and a 60-second recording limit"
       }
     }
   ]

@@ -45,6 +45,46 @@ final class TranscribeCppRuntimeTests: XCTestCase {
         await runtime.unload()
     }
 
+    func testNativeRuntimeLoadsPinnedCanaryQwenOnMetalWhenEnabled() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["TEXTIFY_RUN_CANARY_QWEN_NATIVE_TESTS"] == "1" else {
+            throw XCTSkip(
+                "Set TEXTIFY_RUN_CANARY_QWEN_NATIVE_TESTS=1 for the pinned Canary-Qwen Metal smoke test."
+            )
+        }
+        guard let modelPath = environment["TEXTIFY_CANARY_Q4_MODEL_PATH"],
+              !modelPath.isEmpty
+        else {
+            XCTFail("TEXTIFY_CANARY_Q4_MODEL_PATH must point to the pinned Q4_K_M GGUF.")
+            return
+        }
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let runtimeDirectory = repositoryRoot
+            .appendingPathComponent("Vendor/transcribe.cpp/v0.1.3/lib", isDirectory: true)
+        let runtime = TranscribeCppRuntime(runtimeDirectory: runtimeDirectory.path)
+
+        try await runtime.load(
+            modelID: "canary-qwen-2.5b-q4-k-m",
+            modelPath: modelPath,
+            variant: .canaryQwen2_5B,
+            languageCode: "en",
+            warmup: false
+        )
+
+        let state = await runtime.state
+        XCTAssertEqual(state, .ready(modelID: "canary-qwen-2.5b-q4-k-m"))
+        let audioURL = repositoryRoot.appendingPathComponent(
+            "Benchmarks/RealtimeASR/.benchmark-data/openslr31/LibriSpeech/dev-clean-2/1272/141231/1272-141231-0000.flac"
+        )
+        let result = try await runtime.transcribe(Self.loadPCMMono16K(from: audioURL))
+        XCTAssertEqual(result.text, "A man said to the universe, Sir, I exist")
+        XCTAssertLessThan(result.timing?.inferenceDurationMs ?? .max, 700)
+        await runtime.unload()
+    }
+
     func testLoadWarmsResidentMetalSessionAndTranscribes() async throws {
         let runtimeDirectory = try Self.makeTemporaryDirectory()
         let modelURL = try Self.makeTemporaryModelFile()
@@ -87,21 +127,21 @@ final class TranscribeCppRuntimeTests: XCTestCase {
         XCTAssertEqual(load?.variant, .funASRMLTNanoQ8)
         XCTAssertEqual(load?.threadCount, 4)
         let warmupCalls = await session.callsSnapshot()
-        XCTAssertEqual(warmupCalls.map(\.sampleCount), [6_400])
-        XCTAssertEqual(warmupCalls.map(\.sampleRate), [16_000])
+        XCTAssertEqual(warmupCalls.map(\.sampleCount), [6400])
+        XCTAssertEqual(warmupCalls.map(\.sampleRate), [16000])
         XCTAssertEqual(warmupCalls.map(\.languageCode), ["en"])
 
         let result = try await runtime.transcribe(
-            TranscriptionAudioBuffer(samples: Array(repeating: 0.1, count: 16_000))
+            TranscriptionAudioBuffer(samples: Array(repeating: 0.1, count: 16000))
         )
 
         XCTAssertEqual(result.text, "Fast local transcription")
         XCTAssertEqual(result.noSpeechProbability, 0)
         XCTAssertEqual(result.averageLogProbability, 0)
-        XCTAssertEqual(result.timing?.audioDurationMs, 1_000)
+        XCTAssertEqual(result.timing?.audioDurationMs, 1000)
         XCTAssertNotNil(result.timing?.inferenceDurationMs)
         let calls = await session.callsSnapshot()
-        XCTAssertEqual(calls.map(\.sampleCount), [6_400, 16_000])
+        XCTAssertEqual(calls.map(\.sampleCount), [6400, 16000])
         XCTAssertEqual(calls.map(\.languageCode), ["en", "en"])
     }
 
@@ -143,7 +183,7 @@ final class TranscribeCppRuntimeTests: XCTestCase {
         )
     }
 
-    func testLoadRejectsAutomaticAndUnpromotedLanguages() async throws {
+    func testLoadRejectsAutomaticAndUnpromotedLanguages() throws {
         XCTAssertThrowsError(try TranscribeCppRuntime.requireSupportedLanguage("auto")) { error in
             XCTAssertEqual(
                 error as? TranscribeCppRuntimeError,
@@ -157,6 +197,94 @@ final class TranscribeCppRuntimeTests: XCTestCase {
             try TranscribeCppRuntime.requireSupportedLanguage("YUE-Hant-HK"),
             "yue"
         )
+        XCTAssertEqual(
+            try TranscribeCppRuntime.requireSupportedLanguage(
+                "EN-US",
+                variant: .canaryQwen2_5B
+            ),
+            "en"
+        )
+        XCTAssertThrowsError(
+            try TranscribeCppRuntime.requireSupportedLanguage(
+                "vi",
+                variant: .canaryQwen2_5B
+            )
+        ) { error in
+            XCTAssertEqual(error as? TranscribeCppRuntimeError, .unsupportedLanguage("vi"))
+        }
+        XCTAssertEqual(
+            try TranscribeCppRuntime.requireSupportedLanguage(
+                "auto",
+                variant: .qwen3ASR0_6B
+            ),
+            "auto"
+        )
+        XCTAssertEqual(
+            try TranscribeCppRuntime.requireSupportedLanguage(
+                "auto",
+                variant: .qwen3ASR1_7B
+            ),
+            "auto"
+        )
+        XCTAssertThrowsError(
+            try TranscribeCppRuntime.requireSupportedLanguage(
+                "en",
+                variant: .qwen3ASR0_6B
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? TranscribeCppRuntimeError,
+                .automaticLanguageDetectionRequired
+            )
+        }
+        XCTAssertEqual(
+            try TranscribeCppRuntime.requireSupportedLanguage(
+                "EN-US",
+                variant: .parakeetTDT0_6BV2
+            ),
+            "en"
+        )
+        for variant in [
+            TranscribeCppModelVariant.parakeetTDT0_6BV3,
+            .nemotron3_5ASRStreaming0_6B,
+        ] {
+            XCTAssertEqual(
+                try TranscribeCppRuntime.requireSupportedLanguage("auto", variant: variant),
+                "auto"
+            )
+        }
+    }
+
+    func testQwen3ASRUsesAutomaticLanguageForWarmupAndInference() async throws {
+        let runtimeDirectory = try Self.makeTemporaryDirectory()
+        let modelURL = try Self.makeTemporaryModelFile()
+        defer {
+            try? FileManager.default.removeItem(at: runtimeDirectory)
+            try? FileManager.default.removeItem(at: modelURL.deletingLastPathComponent())
+        }
+
+        for variant in [
+            TranscribeCppModelVariant.qwen3ASR0_6B,
+            TranscribeCppModelVariant.qwen3ASR1_7B,
+        ] {
+            let session = FakeTranscribeCppSession()
+            let runtime = TranscribeCppRuntime(
+                runtimeDirectory: runtimeDirectory.path,
+                backend: TranscribeCppRuntimeBackend { _, _, _, _ in session }
+            )
+            try await runtime.load(
+                modelID: variant.rawValue,
+                modelPath: modelURL.path,
+                variant: variant,
+                languageCode: "auto"
+            )
+            _ = try await runtime.transcribe(
+                TranscriptionAudioBuffer(samples: Array(repeating: 0.1, count: 16000))
+            )
+
+            let calls = await session.callsSnapshot()
+            XCTAssertEqual(calls.map(\.languageCode), ["auto", "auto"])
+        }
     }
 
     func testSilenceBackstopMarksHallucinatedTextAsNoSpeech() async throws {
@@ -180,7 +308,7 @@ final class TranscribeCppRuntimeTests: XCTestCase {
         )
 
         let result = try await runtime.transcribe(
-            TranscriptionAudioBuffer(samples: Array(repeating: 0, count: 16_000))
+            TranscriptionAudioBuffer(samples: Array(repeating: 0, count: 16000))
         )
 
         XCTAssertEqual(result.text, "")
@@ -227,6 +355,40 @@ final class TranscribeCppRuntimeTests: XCTestCase {
         }
     }
 
+    func testCanaryRejectsAudioLongerThanFortySeconds() async throws {
+        let runtimeDirectory = try Self.makeTemporaryDirectory()
+        let modelURL = try Self.makeTemporaryModelFile()
+        defer {
+            try? FileManager.default.removeItem(at: runtimeDirectory)
+            try? FileManager.default.removeItem(at: modelURL.deletingLastPathComponent())
+        }
+        let runtime = TranscribeCppRuntime(
+            runtimeDirectory: runtimeDirectory.path,
+            backend: TranscribeCppRuntimeBackend { _, _, _, _ in FakeTranscribeCppSession() }
+        )
+        try await runtime.load(
+            modelID: "canary-qwen-2.5b-q4-k-m",
+            modelPath: modelURL.path,
+            variant: .canaryQwen2_5B,
+            languageCode: "en",
+            warmup: false
+        )
+        let maximumSamples = 40 * 16000
+        let actualSamples = maximumSamples + 1
+
+        do {
+            _ = try await runtime.transcribe(
+                TranscriptionAudioBuffer(samples: Array(repeating: 0.1, count: actualSamples))
+            )
+            XCTFail("Expected overlong Canary audio to fail")
+        } catch let error as TranscribeCppRuntimeError {
+            XCTAssertEqual(
+                error,
+                .audioTooLong(maximumSamples: maximumSamples, actualSamples: actualSamples)
+            )
+        }
+    }
+
     private static func makeTemporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("TextifyTranscribeCppTests-\(UUID().uuidString)", isDirectory: true)
@@ -247,7 +409,7 @@ final class TranscribeCppRuntimeTests: XCTestCase {
     private static func loadPCMMono16K(from sourceURL: URL) throws -> TranscriptionAudioBuffer {
         let file = try AVAudioFile(forReading: sourceURL)
         let format = file.processingFormat
-        guard format.sampleRate == 16_000, format.channelCount == 1,
+        guard format.sampleRate == 16000, format.channelCount == 1,
               let buffer = AVAudioPCMBuffer(
                   pcmFormat: format,
                   frameCapacity: AVAudioFrameCount(file.length)
@@ -270,7 +432,7 @@ private enum TranscribeCppIntegrationAudioError: Error {
 }
 
 private actor FakeTranscribeCppSession: TranscribeCppRuntimeSession {
-    struct Call: Equatable, Sendable {
+    struct Call: Equatable {
         let sampleCount: Int
         let sampleRate: Int
         let languageCode: String
@@ -318,7 +480,7 @@ private actor FakeTranscribeCppSession: TranscribeCppRuntimeSession {
 }
 
 private actor TranscribeCppLoadRecorder {
-    struct Load: Sendable {
+    struct Load {
         let runtimeDirectory: URL
         let modelURL: URL
         let variant: TranscribeCppModelVariant

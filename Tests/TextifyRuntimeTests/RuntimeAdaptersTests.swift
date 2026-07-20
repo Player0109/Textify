@@ -179,7 +179,9 @@ final class RuntimeAdaptersTests: XCTestCase {
             parakeet: parakeet,
             paraformer: FakeEngineTranscriber(resultText: "paraformer"),
             sherpaOnnx: FakeEngineTranscriber(resultText: "sherpa-onnx"),
-            transcribeCpp: FakeEngineTranscriber(resultText: "transcribe.cpp")
+            transcribeCpp: FakeEngineTranscriber(resultText: "transcribe.cpp"),
+            mlxAudio: FakeEngineTranscriber(resultText: "mlx-audio"),
+            liteRTLM: FakeEngineTranscriber(resultText: "litert-lm")
         )
 
         try await adapter.prepare(model: Self.activeModel())
@@ -206,7 +208,9 @@ final class RuntimeAdaptersTests: XCTestCase {
             parakeet: parakeet,
             paraformer: paraformer,
             sherpaOnnx: FakeEngineTranscriber(resultText: "sherpa-onnx"),
-            transcribeCpp: FakeEngineTranscriber(resultText: "transcribe.cpp")
+            transcribeCpp: FakeEngineTranscriber(resultText: "transcribe.cpp"),
+            mlxAudio: FakeEngineTranscriber(resultText: "mlx-audio"),
+            liteRTLM: FakeEngineTranscriber(resultText: "litert-lm")
         )
 
         try await adapter.prepare(model: Self.activeModel())
@@ -228,7 +232,9 @@ final class RuntimeAdaptersTests: XCTestCase {
             parakeet: FakeEngineTranscriber(resultText: "parakeet"),
             paraformer: FakeEngineTranscriber(resultText: "paraformer"),
             sherpaOnnx: sherpaOnnx,
-            transcribeCpp: FakeEngineTranscriber(resultText: "transcribe.cpp")
+            transcribeCpp: FakeEngineTranscriber(resultText: "transcribe.cpp"),
+            mlxAudio: FakeEngineTranscriber(resultText: "mlx-audio"),
+            liteRTLM: FakeEngineTranscriber(resultText: "litert-lm")
         )
 
         try await adapter.prepare(model: Self.activeModel())
@@ -250,7 +256,9 @@ final class RuntimeAdaptersTests: XCTestCase {
             parakeet: FakeEngineTranscriber(resultText: "parakeet"),
             paraformer: FakeEngineTranscriber(resultText: "paraformer"),
             sherpaOnnx: FakeEngineTranscriber(resultText: "sherpa-onnx"),
-            transcribeCpp: transcribeCpp
+            transcribeCpp: transcribeCpp,
+            mlxAudio: FakeEngineTranscriber(resultText: "mlx-audio"),
+            liteRTLM: FakeEngineTranscriber(resultText: "litert-lm")
         )
 
         try await adapter.prepare(model: Self.activeModel())
@@ -262,6 +270,54 @@ final class RuntimeAdaptersTests: XCTestCase {
         XCTAssertEqual(result.text, "nhận dạng nhanh")
         XCTAssertEqual(whisperUnloadCount, 1)
         XCTAssertEqual(transcribeCppPrepareCount, 1)
+    }
+
+    func testMultiEngineAdapterRoutesToMLXAudio() async throws {
+        let whisper = FakeEngineTranscriber(resultText: "whisper")
+        let mlxAudio = FakeEngineTranscriber(resultText: "local RNNT")
+        let adapter = MultiEngineRuntimeTranscribingAdapter(
+            whisper: whisper,
+            parakeet: FakeEngineTranscriber(resultText: "parakeet"),
+            paraformer: FakeEngineTranscriber(resultText: "paraformer"),
+            sherpaOnnx: FakeEngineTranscriber(resultText: "sherpa-onnx"),
+            transcribeCpp: FakeEngineTranscriber(resultText: "transcribe.cpp"),
+            mlxAudio: mlxAudio,
+            liteRTLM: FakeEngineTranscriber(resultText: "litert-lm")
+        )
+
+        try await adapter.prepare(model: Self.activeModel())
+        try await adapter.prepare(model: Self.mlxAudioActiveModel())
+        let result = try await adapter.transcribe(.emptyForTests)
+
+        let whisperUnloadCount = await whisper.unloadCallCount()
+        let mlxPrepareCount = await mlxAudio.prepareCallCount()
+        XCTAssertEqual(result.text, "local RNNT")
+        XCTAssertEqual(whisperUnloadCount, 1)
+        XCTAssertEqual(mlxPrepareCount, 1)
+    }
+
+    func testMultiEngineAdapterRoutesToLiteRTLM() async throws {
+        let whisper = FakeEngineTranscriber(resultText: "whisper")
+        let liteRTLM = FakeEngineTranscriber(resultText: "local Gemma")
+        let adapter = MultiEngineRuntimeTranscribingAdapter(
+            whisper: whisper,
+            parakeet: FakeEngineTranscriber(resultText: "parakeet"),
+            paraformer: FakeEngineTranscriber(resultText: "paraformer"),
+            sherpaOnnx: FakeEngineTranscriber(resultText: "sherpa-onnx"),
+            transcribeCpp: FakeEngineTranscriber(resultText: "transcribe.cpp"),
+            mlxAudio: FakeEngineTranscriber(resultText: "mlx-audio"),
+            liteRTLM: liteRTLM
+        )
+
+        try await adapter.prepare(model: Self.activeModel())
+        try await adapter.prepare(model: Self.liteRTLMActiveModel())
+        let result = try await adapter.transcribe(.emptyForTests)
+
+        let whisperUnloadCount = await whisper.unloadCallCount()
+        let liteRTPrepareCount = await liteRTLM.prepareCallCount()
+        XCTAssertEqual(result.text, "local Gemma")
+        XCTAssertEqual(whisperUnloadCount, 1)
+        XCTAssertEqual(liteRTPrepareCount, 1)
     }
 
     func testParaformerAdapterRejectsNonChineseCatalogEntry() async {
@@ -370,7 +426,9 @@ final class RuntimeAdaptersTests: XCTestCase {
             parakeet: FakeEngineTranscriber(resultText: "parakeet"),
             paraformer: FakeEngineTranscriber(resultText: "paraformer"),
             sherpaOnnx: FakeEngineTranscriber(resultText: "sherpa-onnx"),
-            transcribeCpp: FakeEngineTranscriber(resultText: "transcribe.cpp")
+            transcribeCpp: FakeEngineTranscriber(resultText: "transcribe.cpp"),
+            mlxAudio: FakeEngineTranscriber(resultText: "mlx-audio"),
+            liteRTLM: FakeEngineTranscriber(resultText: "litert-lm")
         )
 
         do {
@@ -860,6 +918,62 @@ final class RuntimeAdaptersTests: XCTestCase {
                 noContext: true,
                 tokenTimestamps: false,
                 maxAudioSeconds: 60
+            )
+        )
+    }
+
+    private static func mlxAudioActiveModel() -> RuntimeActiveModel {
+        RuntimeActiveModel(
+            id: "parakeet-rnnt-1.1b",
+            displayName: "Experimental - Parakeet RNNT 1.1B",
+            tier: "experimental",
+            localModelPath: "/tmp/parakeet-rnnt-1.1b",
+            useGPU: true,
+            threadCount: nil,
+            engine: .mlxAudio,
+            variant: MLXAudioModelVariant.parakeetRNNT1_1B.rawValue,
+            accelerator: .metalGPU,
+            artifactLayout: .modelDirectory,
+            runtimeParameters: RuntimeParameters(
+                language: "en",
+                detectLanguage: false,
+                translate: false,
+                strategy: "greedy",
+                beamSize: 1,
+                bestOf: 1,
+                temperature: 0,
+                temperatureFallback: [],
+                noContext: true,
+                tokenTimestamps: false,
+                maxAudioSeconds: 60
+            )
+        )
+    }
+
+    private static func liteRTLMActiveModel() -> RuntimeActiveModel {
+        RuntimeActiveModel(
+            id: "gemma-4-12b-litertlm",
+            displayName: "Experimental - Gemma 4 12B",
+            tier: "experimental",
+            localModelPath: "/tmp/gemma-4-12B-it.litertlm",
+            useGPU: true,
+            threadCount: nil,
+            engine: .liteRTLM,
+            variant: LiteRTLMModelVariant.gemma4_12B.rawValue,
+            accelerator: .metalGPU,
+            artifactLayout: .singleFile,
+            runtimeParameters: RuntimeParameters(
+                language: "en",
+                detectLanguage: false,
+                translate: false,
+                strategy: "greedy",
+                beamSize: 1,
+                bestOf: 1,
+                temperature: 0,
+                temperatureFallback: [],
+                noContext: true,
+                tokenTimestamps: false,
+                maxAudioSeconds: 30
             )
         )
     }

@@ -258,6 +258,51 @@ Task 1 must merge before parallel Wave 1 work begins.
   has already been posted, so it is not on the visible text-arrival path and
   should not be shortened as a transcription optimization.
 
+## UI/UX Redesign Handoff - 2026-07-20
+
+- The user-directed UI/UX goal owns the Task 11 application surfaces under
+  `Sources/Textify/{UI,SettingsUI,Onboarding,Overlay}/` plus the narrow window
+  sizing in `Sources/Textify/App/TextifyApp.swift` and UI-focused coverage in
+  `Tests/TextifyAppTests/ProductionUITests.swift`.
+- The redesign may add a shared visual-system source under `Sources/Textify/UI/`.
+  Task 14's generated `Textify.xcodeproj/project.pbxproj` may be regenerated only
+  so the new UI source is included in the native app target; `project.yml`, bundle
+  metadata, signing, release packaging, runtime behavior, models, hotkeys,
+  insertion, and permissions remain unchanged.
+- The UI verification gate owns one compatibility-only edit in
+  `script/build_and_run.sh`: give the debug SwiftPM invocation an explicit
+  non-empty argument array so macOS Bash 3.2 with `set -u` can run the required
+  `--verify` path. Release staging behavior remains unchanged.
+- Visual verification must use the staged/native app in both light and dark
+  appearances where practical. Existing user preferences and installed models
+  must be preserved.
+- Final verification passed 375 tests with 7 opt-in native-model tests skipped,
+  `script/release/validate_release.sh`, a native Xcode Release build, arm64 and
+  strict code-signature checks, `script/build_and_run.sh --verify`, and staged
+  Release launch. Computer Use reviewed
+  General, Dictation, Models, Privacy, Advanced, and onboarding across dark and
+  forced-light appearances, including keyboard focus and accessibility labels.
+  Temporary preview controls and appearance overrides were removed, the test
+  preference override was deleted, and the original `/Applications/Textify.app`
+  process was restored after review.
+
+## Benchmark Model Expansion Handoff - 2026-07-20
+
+- The active user-directed model goal owns the catalog/runtime/test/documentation
+  changes needed for the exact speech models shown in the supplied Artificial
+  Analysis benchmark, while preserving Textify's local-only privacy contract.
+- The already-completed UI/UX redesign remains authoritative for application
+  layout and styling. This model workstream owns only the narrow catalog-ID
+  expectation update in `Tests/TextifyAppTests/ProductionUITests.swift`; it must
+  preserve every UI-focused change already present in that file.
+- Cloud-only services and models whose published minimum hardware cannot fit an
+  Apple Silicon Mac must not be represented as locally runnable. Similarly named
+  open models are not substitutes for the exact requested model names.
+- The MLX Audio runtime addition requires one exhaustive-switch label in the
+  redesign-owned `Sources/Textify/SettingsUI/SettingsRootView.swift`. The model
+  workstream owns only the new `mlx_audio` to `MLX Audio` label case and must
+  preserve all surrounding layout, styling, and copy.
+
 ## Multi-Model Transcription Expansion Handoff - 2026-07-19
 
 - The user-directed multi-model goal is a post-V1.1 product expansion. It
@@ -390,3 +435,138 @@ Task 1 must merge before parallel Wave 1 work begins.
   source commit, binary hash, deployment target, and benchmark evidence must
   remain reproducible and visible in notices rather than being treated as an
   unmodified upstream binary.
+
+## Canary-Qwen transcribe.cpp Extension Handoff - 2026-07-20
+
+- The benchmark-model expansion may extend the existing isolated
+  transcribe.cpp boundary only for the exact Canary-Qwen 2.5B architecture
+  already implemented by pinned runtime `0.1.3`. It owns the narrow model
+  variant, English/40-second limits, generic shim diagnostics, benchmark,
+  catalog metadata, notices, and associated tests.
+- Preserve `RTLD_LOCAL`, the current ABI/version/device verification, the
+  Fun-ASR language-name compatibility patch, and every existing Fun-ASR route.
+  Do not replace the dynamic runtime or link another ggml copy into Textify.
+- Promotion requires the exact commit-pinned Q4_K_M GGUF, independent Textify
+  accuracy/latency/memory evidence, and a clean installed-model smoke on Metal.
+
+## MLX Audio Metal Packaging Handoff - 2026-07-20
+
+- The benchmark-model expansion owns the narrow MLX shader packaging path for
+  Parakeet RNNT and Cohere Transcribe. This includes the reproducible
+  `mlx.metallib` build/embed scripts, the app and benchmark staging hooks,
+  Xcode project generation, release artifact checks, and their documentation.
+- Preserve Whisper's separate `default.metallib`. MLX must ship as a colocated
+  `mlx.metallib` because the pinned MLX runtime searches that path first; never
+  rename or substitute Whisper's library for it.
+- The committed MLX library must be built only from the nine generated Metal
+  entry points at pinned `mlx-swift` revision
+  `61b9e011e09a62b489f6bd647958f1555bdf2896`, target macOS 14.0, and expose
+  the expected `layer_normfloat32` kernel before it can be embedded.
+- This handoff permits surgical additions to the generated Xcode project,
+  `project.yml`, `script/build_and_run.sh`, and release verification. Preserve
+  the concurrent visual-system changes already present in those files.
+
+## Gemma 4 LiteRT-LM Runtime Handoff - 2026-07-20
+
+- The benchmark-model expansion owns the narrow exact Gemma 4 12B speech route
+  through the pinned official LiteRT-LM 0.14 Swift package. It may extend the
+  model engine enum/policy, transcription/runtime adapters, app composition,
+  benchmark CLI, signed catalog, release notices, and their focused tests.
+- Preserve all existing Whisper, FluidAudio, sherpa-onnx, transcribe.cpp, and
+  MLX Audio routes. The Gemma adapter must use only Textify-managed local model
+  bytes, a writable cache directory, GPU text and audio backends, explicit
+  transcript-only prompting, and a 30-second audio cap.
+- The app may generate a short-lived 16 kHz mono PCM WAV inside its own caches
+  for LiteRT-LM's file-audio API, but it must remove that file after inference
+  and must not retain transcript or audio history.
+- Promotion requires the exact commit-pinned `.litertlm` artifact, native
+  Apple Silicon GPU evidence, fixed-corpus latency/accuracy/memory results, a
+  clean install-shaped smoke, and signed release packaging. Preserve the
+  concurrent visual-system changes in `AppServices`, settings, onboarding,
+  overlay, menu-bar, and generated project files.
+
+## MLX Whisper Large V3 Turbo Handoff - 2026-07-20
+
+- The user-directed MLX Whisper addition owns the narrow extension of the
+  existing MLX Audio engine, benchmark CLI, signed catalog, release notices,
+  model documentation, and focused transcription/runtime/app tests for exact
+  repository `mlx-community/whisper-large-v3-turbo`.
+- Reuse the already pinned native `mlx-audio-swift` and MLX Swift dependencies.
+  Do not add the Python-only `mlx-lm`, `mlx-vlm`, or `mlx-audio` packages, and
+  do not replace the existing whisper.cpp models or fallback route.
+- The managed model directory must contain exact commit-pinned tokenizer and
+  generation assets in addition to the MLX checkpoint. Runtime preparation
+  must remain fully offline and must never trigger the upstream loader's
+  mutable `openai/whisper-large-v3@main` tokenizer fallback.
+- Promotion requires exact byte sizes and SHA-256 hashes, MLX Metal backend
+  verification, fixed-corpus accuracy/latency/memory evidence, an
+  install-shaped offline smoke, a valid signed catalog, and release packaging
+  checks. Preserve every existing runtime route and the concurrent visual and
+  Gemma work in shared files.
+
+## MLX Whisper Release-Staging Handoff - 2026-07-20
+
+- Final MLX Whisper release verification may make the minimum packaging-only
+  correction needed when the existing LiteRT-LM binary target and its explicit
+  embed phase both claim the same app-bundle output. Preserve the Gemma runtime
+  and pinned artifact; the phase may only thin and sign Xcode's automatically
+  embedded dylib before the staged app is verified.
+
+## Qwen3-ASR MLX And GGUF Expansion Handoff - 2026-07-20
+
+- The user-directed Qwen3-ASR expansion owns the narrow additions required for
+  the exact `mlx-community/Qwen3-ASR-{0.6B,1.7B}-8bit` model directories and
+  the BF16, Q8_0, and Q5_K_M artifacts from the exact
+  `handy-computer/Qwen3-ASR-{0.6B,1.7B}-gguf` repositories.
+- Reuse the pinned native `mlx-audio-swift` Qwen3-ASR implementation for MLX
+  and the existing isolated transcribe.cpp 0.1.3 Metal runtime for GGUF. Do not
+  add Python `mlx-lm`, `mlx-vlm`, or `mlx-audio`, and do not add the examples
+  repository as an application dependency.
+- This workstream may extend the MLX Audio and transcribe.cpp variants,
+  auto-language routing, benchmark CLI, signed catalog, release/model notices,
+  and focused tests. Preserve every existing Whisper, FluidAudio, sherpa,
+  Canary, Fun-ASR, Cohere, Parakeet, Gemma, visual-system, and packaging change
+  in the currently dirty shared files.
+- Qwen3-ASR is an automatic multilingual route. The transcribe.cpp shim may
+  translate Textify's internal `auto` sentinel to a null language hint only for
+  variants whose catalog contract declares language detection; existing
+  explicit-language families must keep their fail-closed behavior.
+- Promotion requires exact commit-pinned bytes and hashes, native MLX/Metal or
+  transcribe.cpp/Metal evidence, fixed-corpus measurements for each architecture
+  and format, install-shaped offline smokes, a valid signed catalog, and staged
+  release verification.
+- Completed verification: all eight exact artifacts passed native Metal
+  transcription, the English fixed corpus covered every format, the Hindi
+  sample covered both MLX sizes and both Q5_K_M sizes, and the final 23-model
+  signature verifies. Full tests, release validation, and the ad-hoc staged app
+  also pass; Developer ID/notarization and clean-machine interactive QA remain
+  with the release maintainer.
+
+## Parakeet TDT And Nemotron MLX/GGUF Expansion Handoff - 2026-07-20
+
+- The user-directed expansion owns the narrow additions required for the exact
+  `mlx-community/parakeet-tdt-0.6b-{v2,v3}` and
+  `mlx-community/nemotron-3.5-asr-streaming-0.6b` model directories, plus F16,
+  Q8_0, and Q5_K_M artifacts from the corresponding `handy-computer` GGUF
+  repositories. Those exact repositories do not publish BF16; F16 is the
+  user-visible substitute and must not be mislabeled.
+- Reuse the pinned native `mlx-audio-swift` implementation for MLX and the
+  existing isolated transcribe.cpp Metal runtime for GGUF. Do not add the
+  Python `mlx-lm`, `mlx-vlm`, or `mlx-audio` packages, and do not add the
+  examples repository as an application dependency.
+- This workstream may extend the MLX Audio and transcribe.cpp variants,
+  language routing, benchmark CLI, signed catalog, release/model notices, and
+  focused transcription/runtime/app tests. Preserve every existing runtime,
+  visual-system, packaging, and concurrently uncommitted change in shared
+  files.
+- Promotion requires exact commit-pinned bytes and hashes, native MLX/Metal or
+  transcribe.cpp/Metal evidence, install-shaped offline smokes, a valid signed
+  catalog, and staged release verification. Language and streaming claims must
+  remain no broader than the behavior actually exposed and measured by
+  Textify's post-release batch-dictation path.
+- Completed native verification: all twelve exact artifact choices matched
+  their immutable source sizes and SHA-256 values, required MLX or
+  transcribe.cpp Metal on an M4 Max, and completed the fixed 210-word English
+  corpus at 0.48–3.33% WER with 67–137 ms median finalization. The final signed
+  catalog contains 35 models. Full release validation and staged-app checks
+  remain required before handoff.

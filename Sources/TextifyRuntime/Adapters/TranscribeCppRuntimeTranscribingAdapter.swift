@@ -61,11 +61,16 @@ public actor TranscribeCppRuntimeTranscribingAdapter: RuntimeEngineTranscribing 
         guard let variant = TranscribeCppModelVariant(rawValue: model.variant) else {
             throw TranscribeCppRuntimeError.unsupportedVariant(model.variant)
         }
-        guard !model.runtimeParameters.detectLanguage else {
+        if variant.supportsAutomaticLanguageDetection {
+            guard model.runtimeParameters.detectLanguage else {
+                throw TranscribeCppRuntimeError.automaticLanguageDetectionRequired
+            }
+        } else if model.runtimeParameters.detectLanguage {
             throw TranscribeCppRuntimeError.automaticLanguageDetectionUnsupported
         }
         let languageCode = try TranscribeCppRuntime.requireSupportedLanguage(
-            model.runtimeParameters.language
+            model.runtimeParameters.language,
+            variant: variant
         )
         let threadCount = min(max(model.threadCount ?? 4, 1), 4)
         let key = PreparationKey(

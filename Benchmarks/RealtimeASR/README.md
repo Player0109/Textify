@@ -37,6 +37,27 @@ The current candidates are:
 - `qwen3-asr-0.6b`, `omnilingual-asr-300m-ctc-int8`, and
   `dolphin-small-ctc-multi-lang-int8`: exact-artifact evaluation-only paths;
   their measured support decisions are recorded in the benchmark report.
+- `mlx-parakeet-rnnt-1.1b`, `mlx-cohere-transcribe-03-2026`, and
+  `mlx-whisper-large-v3-turbo`: exact local MLX Audio model-directory routes
+  that require Textify's pinned MLX Metal library beside the benchmark
+  executable.
+- `mlx-qwen3-asr-0.6b-8bit` and `mlx-qwen3-asr-1.7b-8bit`: exact
+  MLX Community Qwen3-ASR directories through native MLX Audio Swift with
+  automatic language detection.
+- `canary-qwen-2.5b`: the exact English Canary-Qwen route through Textify's
+  isolated transcribe.cpp Metal runtime.
+- `transcribe-qwen3-asr-0.6b` and `transcribe-qwen3-asr-1.7b`: Qwen3-ASR GGUF
+  routes through the same isolated transcribe.cpp Metal runtime; the selected
+  BF16, Q8_0, or Q5_K_M file is supplied with `--transcribe-model`.
+- `mlx-parakeet-tdt-0.6b-v2`, `mlx-parakeet-tdt-0.6b-v3`, and
+  `mlx-nemotron-3.5-asr-streaming-0.6b`: exact MLX Community directories
+  through MLX Audio Swift Metal.
+- `transcribe-parakeet-tdt-0.6b-v2`,
+  `transcribe-parakeet-tdt-0.6b-v3`, and
+  `transcribe-nemotron-3.5-asr-streaming-0.6b`: exact F16, Q8_0, or Q5_K_M
+  Handy GGUF files through transcribe.cpp Metal.
+- `litert-gemma-4-12b`: the exact Gemma 4 12B `.litertlm` artifact through the
+  official pinned LiteRT-LM Swift package with GPU text and audio backends.
 
 Model downloads are cached outside the repository under
 `~/Library/Caches/io.github.Player0109.Textify/RealtimeBenchmark/Models`.
@@ -51,6 +72,7 @@ cd Benchmarks/RealtimeASR
 ./prepare_aishell1_sample.sh
 ./prepare_jsut_sample.sh
 ./prepare_whisper_metal.sh
+./prepare_mlx_metal.sh
 
 swift run -c release TextifyRealtimeBenchmark \
   --engine apple-dictation-analyzer \
@@ -97,6 +119,48 @@ swift run -c release TextifyRealtimeBenchmark \
   --fluid-cache "$HOME/Library/Application Support/FluidAudio/Models" \
   --feed-mode accelerated \
   --output results/paraformer-aishell1-0.json
+
+swift run -c release TextifyRealtimeBenchmark \
+  --engine mlx-parakeet-rnnt-1.1b \
+  --audio .benchmark-data/openslr31/LibriSpeech/dev-clean-2/1272/141231/1272-141231-0000.flac \
+  --reference "A MAN SAID TO THE UNIVERSE SIR I EXIST" \
+  --mlx-model .benchmark-data/parakeet-rnnt-1.1b \
+  --feed-mode accelerated \
+  --output results/parakeet-rnnt-1.1b-openslr31-0000.json
+
+swift run -c release TextifyRealtimeBenchmark \
+  --engine mlx-whisper-large-v3-turbo \
+  --audio .benchmark-data/openslr31/LibriSpeech/dev-clean-2/1272/141231/1272-141231-0000.flac \
+  --reference "A MAN SAID TO THE UNIVERSE SIR I EXIST" \
+  --mlx-model .benchmark-data/mlx-whisper-large-v3-turbo \
+  --feed-mode accelerated \
+  --output results/mlx-whisper-large-v3-turbo-openslr31-0000.json
+
+swift run -c release TextifyRealtimeBenchmark \
+  --engine mlx-qwen3-asr-0.6b-8bit \
+  --audio .benchmark-data/openslr31/LibriSpeech/dev-clean-2/1272/141231/1272-141231-0000.flac \
+  --reference "A MAN SAID TO THE UNIVERSE SIR I EXIST" \
+  --mlx-model /path/to/Qwen3-ASR-0.6B-8bit \
+  --feed-mode accelerated \
+  --output results/mlx-qwen3-asr-0.6b-8bit-openslr31-0000.json
+
+swift run -c release TextifyRealtimeBenchmark \
+  --engine transcribe-qwen3-asr-0.6b \
+  --audio .benchmark-data/openslr31/LibriSpeech/dev-clean-2/1272/141231/1272-141231-0000.flac \
+  --reference "A MAN SAID TO THE UNIVERSE SIR I EXIST" \
+  --transcribe-runtime ../../Vendor/transcribe.cpp/v0.1.3/lib \
+  --transcribe-model /path/to/Qwen3-ASR-0.6B-Q5_K_M.gguf \
+  --feed-mode accelerated \
+  --output results/transcribe-qwen3-asr-0.6b-q5-k-m-openslr31-0000.json
+
+swift run -c release TextifyRealtimeBenchmark \
+  --engine litert-gemma-4-12b \
+  --audio .benchmark-data/openslr31/LibriSpeech/dev-clean-2/1272/141231/1272-141231-0000.flac \
+  --reference "A MAN SAID TO THE UNIVERSE SIR I EXIST" \
+  --litert-model .benchmark-data/gemma-4-12b-litert-lm/gemma-4-12B-it.litertlm \
+  --litert-cache .benchmark-data/gemma-4-12b-litert-cache \
+  --feed-mode accelerated \
+  --output results/gemma-4-12b-openslr31-0000.json
 ```
 
 Use `--feed-mode accelerated` for a throughput-only run. The default
@@ -162,6 +226,11 @@ Run the fixed Hindi FLEURS sample with:
 The Whisper preparation step compiles the same vendored ggml Metal shader into
 the benchmark executable directory. Without that artifact, whisper.cpp can
 silently fall back to CPU in a command-line SwiftPM build.
+
+The MLX preparation step embeds Textify's hash-verified `mlx.metallib` beside
+the release benchmark executable. MLX Swift documents that command-line
+SwiftPM cannot compile these shaders; without the distinct library, MLX Audio
+fails closed instead of falling back to a different compute path.
 
 Synthetic speech is a reproducible smoke corpus, not the accuracy gate. Engine
 selection also uses the ten-speaker fixed subset in `Corpus/openslr31.json` and

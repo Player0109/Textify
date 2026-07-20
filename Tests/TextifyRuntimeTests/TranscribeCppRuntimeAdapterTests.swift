@@ -21,7 +21,7 @@ final class TranscribeCppRuntimeAdapterTests: XCTestCase {
         XCTAssertEqual(readiness, .ready(modelID: "funasr-mlt-nano-2512-q8"))
     }
 
-    func testAdapterRejectsAutomaticLanguageDetection() async {
+    func testAdapterRejectsAutomaticLanguageDetectionForExplicitLanguageVariant() async {
         let runtime = FakeTranscribeCppRuntime()
         let adapter = TranscribeCppRuntimeTranscribingAdapter(runtime: runtime)
         let model = Self.activeModel(detectLanguage: true)
@@ -37,6 +37,86 @@ final class TranscribeCppRuntimeAdapterTests: XCTestCase {
 
         let load = await runtime.loadSnapshot()
         XCTAssertNil(load)
+    }
+
+    func testAdapterPreparesQwen3ASRVariantsWithAutomaticLanguageDetection() async throws {
+        for (id, filename, variant) in [
+            (
+                "qwen3-asr-0.6b-q8-0",
+                "Qwen3-ASR-0.6B-Q8_0.gguf",
+                TranscribeCppModelVariant.qwen3ASR0_6B
+            ),
+            (
+                "qwen3-asr-1.7b-q8-0",
+                "Qwen3-ASR-1.7B-Q8_0.gguf",
+                TranscribeCppModelVariant.qwen3ASR1_7B
+            ),
+        ] {
+            let runtime = FakeTranscribeCppRuntime()
+            let adapter = TranscribeCppRuntimeTranscribingAdapter(runtime: runtime)
+
+            try await adapter.prepare(
+                model: Self.activeModel(
+                    id: id,
+                    modelPath: "/tmp/\(filename)",
+                    variant: variant,
+                    language: "auto",
+                    detectLanguage: true
+                )
+            )
+
+            let load = await runtime.loadSnapshot()
+            XCTAssertEqual(load?.modelID, id)
+            XCTAssertEqual(load?.modelPath, "/tmp/\(filename)")
+            XCTAssertEqual(load?.variant, variant)
+            XCTAssertEqual(load?.languageCode, "auto")
+        }
+    }
+
+    func testAdapterPreparesParakeetTDTAndNemotronVariants() async throws {
+        let candidates: [(String, TranscribeCppModelVariant, String, Bool)] = [
+            ("parakeet-tdt-0.6b-v2-q8-0", .parakeetTDT0_6BV2, "en", false),
+            ("parakeet-tdt-0.6b-v3-q8-0", .parakeetTDT0_6BV3, "auto", true),
+            ("nemotron-3.5-asr-streaming-0.6b-q8-0", .nemotron3_5ASRStreaming0_6B, "auto", true),
+        ]
+        for (id, variant, language, detectLanguage) in candidates {
+            let runtime = FakeTranscribeCppRuntime()
+            let adapter = TranscribeCppRuntimeTranscribingAdapter(runtime: runtime)
+            try await adapter.prepare(
+                model: Self.activeModel(
+                    id: id,
+                    modelPath: "/tmp/\(id).gguf",
+                    variant: variant,
+                    language: language,
+                    detectLanguage: detectLanguage
+                )
+            )
+
+            let load = await runtime.loadSnapshot()
+            XCTAssertEqual(load?.modelID, id)
+            XCTAssertEqual(load?.variant, variant)
+            XCTAssertEqual(load?.languageCode, language)
+        }
+    }
+
+    func testAdapterPreparesExactCanaryEnglishVariant() async throws {
+        let runtime = FakeTranscribeCppRuntime()
+        let adapter = TranscribeCppRuntimeTranscribingAdapter(runtime: runtime)
+
+        try await adapter.prepare(
+            model: Self.activeModel(
+                id: "canary-qwen-2.5b-q4-k-m",
+                modelPath: "/tmp/canary-qwen-2.5b-Q4_K_M.gguf",
+                variant: .canaryQwen2_5B,
+                maxAudioSeconds: 40
+            )
+        )
+
+        let load = await runtime.loadSnapshot()
+        XCTAssertEqual(load?.modelID, "canary-qwen-2.5b-q4-k-m")
+        XCTAssertEqual(load?.modelPath, "/tmp/canary-qwen-2.5b-Q4_K_M.gguf")
+        XCTAssertEqual(load?.variant, .canaryQwen2_5B)
+        XCTAssertEqual(load?.languageCode, "en")
     }
 
     func testAdapterRejectsUnpromotedLanguage() async {
@@ -72,20 +152,24 @@ final class TranscribeCppRuntimeAdapterTests: XCTestCase {
     }
 
     private static func activeModel(
+        id: String = "funasr-mlt-nano-2512-q8",
+        modelPath: String = "/tmp/Fun-ASR-MLT-Nano-2512-Q8_0.gguf",
+        variant: TranscribeCppModelVariant = .funASRMLTNanoQ8,
         language: String = "en",
         detectLanguage: Bool = false,
         threadCount: Int? = 4,
-        accelerator: ModelAccelerator = .metalGPU
+        accelerator: ModelAccelerator = .metalGPU,
+        maxAudioSeconds: Int = 60
     ) -> RuntimeActiveModel {
         RuntimeActiveModel(
-            id: "funasr-mlt-nano-2512-q8",
+            id: id,
             displayName: "Specialist - Fun-ASR Multilingual",
             tier: "specialist",
-            localModelPath: "/tmp/Fun-ASR-MLT-Nano-2512-Q8_0.gguf",
+            localModelPath: modelPath,
             useGPU: true,
             threadCount: threadCount,
             engine: .transcribeCpp,
-            variant: TranscribeCppModelVariant.funASRMLTNanoQ8.rawValue,
+            variant: variant.rawValue,
             accelerator: accelerator,
             artifactLayout: .singleFile,
             runtimeParameters: RuntimeParameters(
@@ -99,14 +183,14 @@ final class TranscribeCppRuntimeAdapterTests: XCTestCase {
                 temperatureFallback: [],
                 noContext: true,
                 tokenTimestamps: false,
-                maxAudioSeconds: 60
+                maxAudioSeconds: maxAudioSeconds
             )
         )
     }
 }
 
 private actor FakeTranscribeCppRuntime: TranscribeCppRuntimeLoading {
-    struct Load: Sendable {
+    struct Load {
         let modelID: String
         let modelPath: String
         let variant: TranscribeCppModelVariant
@@ -141,7 +225,7 @@ private actor FakeTranscribeCppRuntime: TranscribeCppRuntimeLoading {
         mutableState = .ready(modelID: modelID)
     }
 
-    func transcribe(_ audio: TranscriptionAudioBuffer) -> TranscriptionResult {
+    func transcribe(_: TranscriptionAudioBuffer) -> TranscriptionResult {
         TranscriptionResult(
             text: "Fast local transcription",
             noSpeechProbability: 0,

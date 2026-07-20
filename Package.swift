@@ -85,9 +85,22 @@ let package = Package(
         .package(
             url: "https://github.com/FluidInference/FluidAudio.git",
             exact: "0.15.5"
+        ),
+        .package(
+            url: "https://github.com/ml-explore/mlx-swift.git",
+            exact: "0.31.3"
+        ),
+        .package(
+            url: "https://github.com/Blaizzy/mlx-audio-swift.git",
+            revision: "d302a5c6080d2bb97bae38c7418f82abb76013b6"
         )
     ],
     targets: [
+        .binaryTarget(
+            name: "CLiteRTLM_mac",
+            url: "https://github.com/google-ai-edge/LiteRT-LM/releases/download/v0.14.0/CLiteRTLM_mac.xcframework.zip",
+            checksum: "450615483509aaa6d34b321fdc6862e41a224b674468ab10aff64ebe113d21b7"
+        ),
         .target(
             name: "WhisperCppVendor",
             path: "Vendor/whisper.cpp",
@@ -152,7 +165,10 @@ let package = Package(
                 "TextifyWhisperShim",
                 "TextifySherpaShim",
                 "TextifyTranscribeCppShim",
-                .product(name: "FluidAudio", package: "FluidAudio")
+                .product(name: "FluidAudio", package: "FluidAudio"),
+                .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
+                .target(name: "CLiteRTLM_mac", condition: .when(platforms: [.macOS]))
             ]
         ),
         .target(name: "TextifyModels", dependencies: ["TextifyDiagnostics"]),

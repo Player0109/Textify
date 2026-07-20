@@ -8,7 +8,8 @@ Release DMG.
 
 ## Prerequisites
 
-- Xcode with macOS 14 SDK support.
+- Xcode with Swift 6.2 or later and macOS 14 SDK support. The pinned MLX Audio
+  package declares Swift tools 6.2 while Textify continues to deploy to macOS 14.
 - XcodeGen installed locally: `brew install xcodegen`.
 - A clean worktree except for intentional release files.
 - The production model-manifest public key and `keyId` are embedded in the app.
@@ -32,11 +33,14 @@ bash script/release/validate_release.sh
 This regenerates the Xcode project, runs the Swift test suite, builds the arm64
 release executable, checks the release plist and hardened-runtime audio-input
 entitlement, confirms Sparkle/mock release strings are absent, validates every
-release shell script, verifies the tracked signed nine-model catalog, and
+release shell script, verifies the tracked signed 35-model catalog, and
 verifies the SwiftPM release binary is arm64 only. A
 staged or archived app must also contain a valid compiled
 `Contents/Resources/default.metallib`; the artifact verifier rejects a bundle
-that would silently lose Whisper's Metal path. It also requires the exact
+that would silently lose Whisper's Metal path. MLX Audio models separately
+require the pinned `Contents/MacOS/mlx.metallib`; the verifier checks its exact
+hash and required `layer_normfloat32` kernel so Whisper's library cannot be
+mistaken for it. It also requires the exact
 verified catalog/signature pair under `Contents/Resources/ModelCatalog/`. If
 the catalog includes sherpa-onnx, the app must contain the pinned arm64
 `libsherpa-onnx-c-api.dylib` and `libonnxruntime.1.24.4.dylib` under
@@ -103,6 +107,16 @@ Textify GitHub Release assets or exact commit-pinned Hugging Face URLs.
    transcribe.cpp Metal runtime. Do not translate the upstream 31-language
    capability into a Textify support claim without measured per-language
    evidence.
+   Qwen3-ASR MLX and GGUF variants remain Experimental until their exact
+   artifacts pass Textify's install-shaped Metal smokes and fixed-corpus
+   measurements. They require automatic language detection; do not send an
+   explicit language prompt through either runtime.
+   Parakeet TDT V2/V3 and Nemotron MLX/GGUF variants likewise remain
+   Experimental until their declared multilingual routes gain representative
+   per-language evidence. The Handy repositories publish F16 rather than BF16
+   for these three GGUF families; never relabel F16 artifacts as BF16.
+   Nemotron must remain a whole-buffer dictation route unless Textify separately
+   implements and verifies a live-partial product path.
 
 2. Choose an immutable approved source for every exact artifact. Whisper may
    use a Textify GitHub Release asset. Public Hugging Face files must use

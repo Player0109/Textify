@@ -27,6 +27,9 @@
   latency, memory, or accuracy rather than exposing unqualified model choices.
 - Added Whisper Large V3 Turbo q5_0 as an English/Hindi Specialist after fixed
   English and Hindi corpus benchmarks and Metal GPU validation.
+- Added exact MLX and GGUF Metal choices for Parakeet TDT V2, Parakeet TDT V3,
+  and Nemotron 3.5 ASR, with immutable hashes, measured picker guidance, and
+  explicit F16 substitution where the GGUF sources do not publish BF16.
 - Kept the interaction as full recording followed by one near-instant final
   result; live partial transcription and cloud ASR remain excluded.
 

@@ -40,6 +40,9 @@ typedef void (*TextifyTranscribeCppBackendDeviceInitFunction)(
 typedef transcribe_status (*TextifyTranscribeCppModelGetDeviceFunction)(
     const struct transcribe_model *model,
     struct transcribe_backend_device *device);
+typedef bool (*TextifyTranscribeCppModelSupportsFunction)(
+    const struct transcribe_model *model,
+    transcribe_feature feature);
 typedef const char *(*TextifyTranscribeCppStatusStringFunction)(int status);
 
 struct TextifyTranscribeCppContext {
@@ -52,6 +55,7 @@ struct TextifyTranscribeCppContext {
   TextifyTranscribeCppGetModelFunction get_model;
   TextifyTranscribeCppBackendDeviceInitFunction backend_device_init;
   TextifyTranscribeCppModelGetDeviceFunction model_get_device;
+  TextifyTranscribeCppModelSupportsFunction model_supports;
   TextifyTranscribeCppStatusStringFunction status_string;
 };
 
@@ -262,6 +266,13 @@ TextifyTranscribeCppContext *TextifyTranscribeCppCreate(
       error_message_capacity);
   TEXTIFY_LOAD_FUNCTION(
       context,
+      model_supports,
+      TextifyTranscribeCppModelSupportsFunction,
+      "transcribe_model_supports",
+      error_message,
+      error_message_capacity);
+  TEXTIFY_LOAD_FUNCTION(
+      context,
       status_string,
       TextifyTranscribeCppStatusStringFunction,
       "transcribe_status_string",
@@ -299,7 +310,7 @@ TextifyTranscribeCppContext *TextifyTranscribeCppCreate(
     TextifyTranscribeCppSetError(
         error_message,
         error_message_capacity,
-        "Fun-ASR did not load on the required Metal backend.");
+        "The speech model did not load on the required Metal backend.");
     TextifyTranscribeCppReleasePartialContext(context);
     return NULL;
   }
@@ -325,7 +336,7 @@ TextifyTranscribeCppStatus TextifyTranscribeCppTranscribe(
     TextifyTranscribeCppSetError(
         error_message,
         error_message_capacity,
-        "Fun-ASR requires non-empty 16 kHz mono audio and an explicit language.");
+        "The speech model requires non-empty 16 kHz mono audio and a language policy.");
     return TextifyTranscribeCppStatusInvalidArgument;
   }
 
@@ -333,8 +344,11 @@ TextifyTranscribeCppStatus TextifyTranscribeCppTranscribe(
   context->run_params_init(&run_params);
   run_params.task = TRANSCRIBE_TASK_TRANSCRIBE;
   run_params.timestamps = TRANSCRIBE_TIMESTAMPS_NONE;
-  run_params.itn = TRANSCRIBE_ITN_MODE_ON;
-  run_params.language = language;
+  const struct transcribe_model *model = context->get_model(context->session);
+  run_params.itn = context->model_supports(model, TRANSCRIBE_FEATURE_ITN)
+      ? TRANSCRIBE_ITN_MODE_ON
+      : TRANSCRIBE_ITN_MODE_DEFAULT;
+  run_params.language = strcmp(language, "auto") == 0 ? NULL : language;
 
   transcribe_status status = context->run(
       context->session,

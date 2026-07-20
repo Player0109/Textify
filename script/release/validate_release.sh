@@ -49,7 +49,15 @@ printf '%s  %s\n' \
   'Vendor/transcribe.cpp/v0.1.3/EXPORTED_SYMBOLS' \
   '86a53633b56f6b029d3cb42158bcc7aac0cdff898aceb13e83b93e368bbc4ac6' \
   'THIRD_PARTY_LICENSES/transcribe.cpp.txt' \
+  'fd330bb5d9adf9e65bfe4d8f6f90c808a4196ef5c98aad018a3344256fcb2374' \
+  'THIRD_PARTY_LICENSES/MLXAudioSwift.txt' \
+  '44326a4ea062241ae6fc26ee2ec90bdc81af7eb7b9d3966181b733fa69d42057' \
+  'THIRD_PARTY_LICENSES/MLXSwift.txt' \
+  'cffe8fbfa9cfb794f1d920ff187016f823a555f7814cede99026699a936b92c7' \
+  'Vendor/mlx-swift/0.31.3/mlx.metallib' \
   | shasum -a 256 -c -
+file Vendor/mlx-swift/0.31.3/mlx.metallib | grep -Fq 'MetalLib executable'
+grep -aFq 'layer_normfloat32' Vendor/mlx-swift/0.31.3/mlx.metallib
 [[ "$(lipo -archs Vendor/transcribe.cpp/v0.1.3/lib/libtextify-transcribe.0.1.3.dylib)" == "arm64" ]]
 [[ "$(otool -D Vendor/transcribe.cpp/v0.1.3/lib/libtextify-transcribe.0.1.3.dylib | tail -1)" == '@rpath/libtextify-transcribe.0.1.3.dylib' ]]
 nm -gjU Vendor/transcribe.cpp/v0.1.3/lib/libtextify-transcribe.0.1.3.dylib \
@@ -62,6 +70,7 @@ shell_scripts=(
   script/models/*.sh
   script/runtime/*.sh
   script/build_and_run.sh
+  script/build_mlx_metallib.sh
   script/build_whisper_metallib.sh
   script/generate_xcode_project.sh
 )

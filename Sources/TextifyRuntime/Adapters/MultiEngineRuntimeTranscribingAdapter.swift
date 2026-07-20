@@ -23,6 +23,8 @@ public actor MultiEngineRuntimeTranscribingAdapter: RuntimeTranscribing {
     private let paraformer: any RuntimeEngineTranscribing
     private let sherpaOnnx: any RuntimeEngineTranscribing
     private let transcribeCpp: any RuntimeEngineTranscribing
+    private let mlxAudio: any RuntimeEngineTranscribing
+    private let liteRTLM: any RuntimeEngineTranscribing
     private var activeEngine: TranscriptionEngine?
 
     public init(
@@ -30,13 +32,17 @@ public actor MultiEngineRuntimeTranscribingAdapter: RuntimeTranscribing {
         parakeet: ParakeetRuntimeTranscribingAdapter,
         paraformer: ParaformerRuntimeTranscribingAdapter,
         sherpaOnnx: SherpaOnnxRuntimeTranscribingAdapter,
-        transcribeCpp: TranscribeCppRuntimeTranscribingAdapter
+        transcribeCpp: TranscribeCppRuntimeTranscribingAdapter,
+        mlxAudio: MLXAudioRuntimeTranscribingAdapter,
+        liteRTLM: LiteRTLMRuntimeTranscribingAdapter
     ) {
         self.whisper = whisper
         self.parakeet = parakeet
         self.paraformer = paraformer
         self.sherpaOnnx = sherpaOnnx
         self.transcribeCpp = transcribeCpp
+        self.mlxAudio = mlxAudio
+        self.liteRTLM = liteRTLM
     }
 
     init(
@@ -44,13 +50,17 @@ public actor MultiEngineRuntimeTranscribingAdapter: RuntimeTranscribing {
         parakeet: any RuntimeEngineTranscribing,
         paraformer: any RuntimeEngineTranscribing,
         sherpaOnnx: any RuntimeEngineTranscribing,
-        transcribeCpp: any RuntimeEngineTranscribing
+        transcribeCpp: any RuntimeEngineTranscribing,
+        mlxAudio: any RuntimeEngineTranscribing,
+        liteRTLM: any RuntimeEngineTranscribing
     ) {
         self.whisper = whisper
         self.parakeet = parakeet
         self.paraformer = paraformer
         self.sherpaOnnx = sherpaOnnx
         self.transcribeCpp = transcribeCpp
+        self.mlxAudio = mlxAudio
+        self.liteRTLM = liteRTLM
     }
 
     public var readiness: RuntimeModelReadiness {
@@ -93,6 +103,8 @@ public actor MultiEngineRuntimeTranscribingAdapter: RuntimeTranscribing {
         await paraformer.unload()
         await sherpaOnnx.unload()
         await transcribeCpp.unload()
+        await mlxAudio.unload()
+        await liteRTLM.unload()
         activeEngine = nil
     }
 
@@ -108,6 +120,10 @@ public actor MultiEngineRuntimeTranscribingAdapter: RuntimeTranscribing {
             return sherpaOnnx
         case .transcribeCpp:
             return transcribeCpp
+        case .mlxAudio:
+            return mlxAudio
+        case .liteRTLM:
+            return liteRTLM
         }
     }
 }

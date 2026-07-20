@@ -336,7 +336,9 @@ do {
         guard runtimeTuple == "whisper_cpp|metal_gpu|single_file"
             || runtimeTuple == "fluid_audio_parakeet|coreml_neural_engine|model_directory"
             || runtimeTuple == "fluid_audio_paraformer|coreml_neural_engine|model_directory"
-            || runtimeTuple == "sherpa_onnx|cpu|model_directory" else {
+            || runtimeTuple == "sherpa_onnx|cpu|model_directory"
+            || runtimeTuple == "transcribe_cpp|metal_gpu|single_file"
+            || runtimeTuple == "mlx_audio|metal_gpu|model_directory" else {
             fail("model \(model.id) has an incompatible engine, accelerator, or artifact layout")
         }
         if let capabilities = model.capabilities,

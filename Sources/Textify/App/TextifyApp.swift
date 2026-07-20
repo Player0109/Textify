@@ -117,12 +117,17 @@ final class TextifyOnboardingWindowPresenter {
         }
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 680, height: 470),
+            contentRect: NSRect(
+                x: 0,
+                y: 0,
+                width: TextifyWindowMetrics.onboardingWidth,
+                height: TextifyWindowMetrics.onboardingHeight
+            ),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
-        window.title = "Textify Onboarding"
+        window.title = "Welcome to Textify"
         window.isReleasedWhenClosed = false
         window.contentViewController = NSHostingController(
             rootView: OnboardingRootView { [weak window] in
@@ -158,13 +163,21 @@ final class TextifyMainWindowPresenter {
         }
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 680, height: 500),
+            contentRect: NSRect(
+                x: 0,
+                y: 0,
+                width: TextifyWindowMetrics.mainWidth,
+                height: TextifyWindowMetrics.mainHeight
+            ),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Textify"
-        window.contentMinSize = NSSize(width: 680, height: 500)
+        window.contentMinSize = NSSize(
+            width: TextifyWindowMetrics.mainMinimumWidth,
+            height: TextifyWindowMetrics.mainMinimumHeight
+        )
         window.isReleasedWhenClosed = false
         window.contentViewController = NSHostingController(
             rootView: SettingsRootView()

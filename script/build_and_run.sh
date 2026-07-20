@@ -17,6 +17,8 @@ INFO_PLIST="$APP_CONTENTS/Info.plist"
 RESOURCE_INFO_PLIST="$ROOT_DIR/Resources/Info.plist"
 WHISPER_RESOURCE_BUNDLE_NAME="Textify_WhisperCppVendor.bundle"
 METAL_LIBRARY="$APP_RESOURCES/default.metallib"
+MLX_METAL_LIBRARY="$APP_MACOS/mlx.metallib"
+LITERT_LM_LIBRARY="$APP_FRAMEWORKS/libCLiteRTLM_mac.dylib"
 MODEL_CATALOG_DIRECTORY="$APP_RESOURCES/ModelCatalog"
 MODEL_CATALOG_MANIFEST="$MODEL_CATALOG_DIRECTORY/manifest.json"
 MODEL_CATALOG_SIGNATURE="$MODEL_CATALOG_DIRECTORY/manifest.json.sig"
@@ -32,7 +34,7 @@ stop_app() {
 
 stage_fast_app() {
   BUILD_CONFIGURATION="${1:-debug}"
-  BUILD_ARGUMENTS=()
+  BUILD_ARGUMENTS=(-c debug)
   if [[ "$BUILD_CONFIGURATION" == "release" ]]; then
     BUILD_ARGUMENTS=(-c release --arch arm64)
   fi
@@ -59,12 +61,18 @@ stage_fast_app() {
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/ONNX_Runtime.txt" "$APP_RESOURCES/ONNX_Runtime.txt"
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/FunASR_Model_License_1.1.txt" "$APP_RESOURCES/FunASR_Model_License_1.1.txt"
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/transcribe.cpp.txt" "$APP_RESOURCES/transcribe.cpp.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/MLXAudioSwift.txt" "$APP_RESOURCES/MLXAudioSwift.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/MLXSwift.txt" "$APP_RESOURCES/MLXSwift.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/LiteRT-LM.txt" "$APP_RESOURCES/LiteRT-LM.txt"
   cp "$ROOT_DIR/models/manifest.json" "$MODEL_CATALOG_MANIFEST"
   cp "$ROOT_DIR/models/manifest.json.sig" "$MODEL_CATALOG_SIGNATURE"
   /usr/bin/ditto "$BUILD_RESOURCE_BUNDLE" "$APP_RESOURCES/$WHISPER_RESOURCE_BUNDLE_NAME"
   "$ROOT_DIR/script/build_whisper_metallib.sh" "$METAL_LIBRARY"
+  "$ROOT_DIR/script/runtime/embed_mlx_metallib.sh" "$MLX_METAL_LIBRARY" -
   "$ROOT_DIR/script/runtime/embed_sherpa_runtime.sh" "$APP_FRAMEWORKS" -
   "$ROOT_DIR/script/runtime/embed_transcribe_cpp_runtime.sh" "$APP_FRAMEWORKS" -
+  "$ROOT_DIR/script/runtime/embed_litert_lm_runtime.sh" \
+    "$BUILD_BIN_DIR/libCLiteRTLM_mac.dylib" "$APP_FRAMEWORKS" -
   chmod +x "$APP_BINARY"
 
   codesign --force --sign - "$APP_BUNDLE" >/dev/null
@@ -76,6 +84,11 @@ verify_staged_app() {
     echo "staged app is missing a valid Metal library: $METAL_LIBRARY" >&2
     exit 1
   fi
+  if [[ ! -s "$MLX_METAL_LIBRARY" ]] || ! /usr/bin/file "$MLX_METAL_LIBRARY" | /usr/bin/grep -q "MetalLib executable"; then
+    echo "staged app is missing a valid MLX Metal library: $MLX_METAL_LIBRARY" >&2
+    exit 1
+  fi
+  codesign --verify --strict "$MLX_METAL_LIBRARY"
 
   codesign --verify --deep --strict "$APP_BUNDLE"
   [[ -s "$APP_RESOURCES/ACKNOWLEDGMENTS.md" ]]
@@ -86,12 +99,17 @@ verify_staged_app() {
   [[ -s "$APP_RESOURCES/ONNX_Runtime.txt" ]]
   [[ -s "$APP_RESOURCES/FunASR_Model_License_1.1.txt" ]]
   [[ -s "$APP_RESOURCES/transcribe.cpp.txt" ]]
+  [[ -s "$APP_RESOURCES/MLXAudioSwift.txt" ]]
+  [[ -s "$APP_RESOURCES/MLXSwift.txt" ]]
+  [[ -s "$APP_RESOURCES/LiteRT-LM.txt" ]]
   [[ "$(lipo -archs "$APP_FRAMEWORKS/libsherpa-onnx-c-api.dylib")" == "arm64" ]]
   [[ "$(lipo -archs "$APP_FRAMEWORKS/libonnxruntime.1.24.4.dylib")" == "arm64" ]]
   [[ "$(lipo -archs "$APP_FRAMEWORKS/libtextify-transcribe.0.1.3.dylib")" == "arm64" ]]
+  [[ "$(lipo -archs "$LITERT_LM_LIBRARY")" == "arm64" ]]
   codesign --verify --strict "$APP_FRAMEWORKS/libsherpa-onnx-c-api.dylib"
   codesign --verify --strict "$APP_FRAMEWORKS/libonnxruntime.1.24.4.dylib"
   codesign --verify --strict "$APP_FRAMEWORKS/libtextify-transcribe.0.1.3.dylib"
+  codesign --verify --strict "$LITERT_LM_LIBRARY"
   TEXTIFY_MODEL_MANIFEST_PUBLIC_KEY_BASE64="$MODEL_CATALOG_PUBLIC_KEY_BASE64" \
     TEXTIFY_MODEL_MANIFEST_KEY_ID="$MODEL_CATALOG_KEY_ID" \
     "$ROOT_DIR/script/models/verify_model_manifest.sh" \

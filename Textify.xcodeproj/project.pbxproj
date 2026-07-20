@@ -8,32 +8,51 @@
 
 /* Begin PBXBuildFile section */
 		00C40789CFF04783D96839AD /* whisper.cpp.txt in Resources */ = {isa = PBXBuildFile; fileRef = B5E142BEBD39AA35B2C2A16F /* whisper.cpp.txt */; };
+		11FD7F8316A64487858A9CEF /* SwiftNIO.txt in Resources */ = {isa = PBXBuildFile; fileRef = 1CF14F373C1BB3AFACD0BD5B /* SwiftNIO.txt */; };
+		1245A89E25B6AC062D7A70D1 /* transcribe.cpp.txt in Resources */ = {isa = PBXBuildFile; fileRef = 3567D5257D3C4693797A76CC /* transcribe.cpp.txt */; };
 		1B7EAFF9974199AFC617F1FA /* ACKNOWLEDGMENTS.md in Resources */ = {isa = PBXBuildFile; fileRef = 1CB78709709A243F50FFFCF0 /* ACKNOWLEDGMENTS.md */; };
 		214BD35622CF9B9C7D5AB31C /* ONNX_Runtime.txt in Resources */ = {isa = PBXBuildFile; fileRef = 261F5703526A4920FC4DFF9D /* ONNX_Runtime.txt */; };
 		225D483CCD7F74E4320FCAA1 /* TextifyInsertion in Frameworks */ = {isa = PBXBuildFile; productRef = 07F283ACA2766E166455A5EF /* TextifyInsertion */; };
 		24B9C8C0EB665F386AC9A049 /* TextifyTranscription in Frameworks */ = {isa = PBXBuildFile; productRef = 5A754B4772812D6F6B03E1B5 /* TextifyTranscription */; };
+		2BA724319382989A1C583610 /* MLXSwiftLM.txt in Resources */ = {isa = PBXBuildFile; fileRef = 626CE18A6793738D87F81A13 /* MLXSwiftLM.txt */; };
 		352499832F959F080E70F038 /* TextifyModels in Frameworks */ = {isa = PBXBuildFile; productRef = 55B2B6B8EA96A06F9F2110FC /* TextifyModels */; };
+		393F62F18EE6C7EAAFDFE1F3 /* SwiftTransformers.txt in Resources */ = {isa = PBXBuildFile; fileRef = 23EF947B0D979C0131808D9F /* SwiftTransformers.txt */; };
 		3B0FD05953AE11637273FC75 /* TextifyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F80B1907E994ACF795B14A1 /* TextifyApp.swift */; };
+		4035112A36E706A5E546260E /* SwiftHuggingFace.txt in Resources */ = {isa = PBXBuildFile; fileRef = 8BE1E7363BFCFA5AB888ECA0 /* SwiftHuggingFace.txt */; };
 		46245AB98B48D7BC8D492056 /* TextifyRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = 0BD9D2AC02C77D2DE0E3FD37 /* TextifyRuntime */; };
+		4E83A89278A0C79CBF5AEA5E /* SwiftNumerics.txt in Resources */ = {isa = PBXBuildFile; fileRef = A832DFCDACE99CAE41017E5F /* SwiftNumerics.txt */; };
 		503BE9FCFD1D80B2DF7C9BA3 /* MenuBarRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = C32C98F05AD92486666F9717 /* MenuBarRoot.swift */; };
+		51BB395291A1261B7259452D /* SwiftCrypto.txt in Resources */ = {isa = PBXBuildFile; fileRef = FB0EFFE778B8D9895B709876 /* SwiftCrypto.txt */; };
 		540E3CA7AD2B1392BA874392 /* TextifyCore in Frameworks */ = {isa = PBXBuildFile; productRef = B53B43D517933AD130F94821 /* TextifyCore */; };
 		545A09C7EA9374897B657BA6 /* AppPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CF0AB1D69531402DCE40D70 /* AppPaths.swift */; };
 		55134887FB3786EEAC7F8CD4 /* RecordingOverlayWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22DFC5ADE2174CBEA8D692D7 /* RecordingOverlayWindow.swift */; };
+		596E0360F338A0F644669E47 /* SwiftSystem.txt in Resources */ = {isa = PBXBuildFile; fileRef = 32299B3438710241007D7BA9 /* SwiftSystem.txt */; };
+		5CBAAFC507E7F0CFBFD14254 /* SwiftCollections.txt in Resources */ = {isa = PBXBuildFile; fileRef = 571CC5300AD3FA1F34564F0C /* SwiftCollections.txt */; };
+		64BAF0B9382B64D43EF14710 /* SwiftJinja.txt in Resources */ = {isa = PBXBuildFile; fileRef = FA70F155E156CF0333DDB847 /* SwiftJinja.txt */; };
+		6A364A441FCF57DA734D6D57 /* MLXAudioSwift.txt in Resources */ = {isa = PBXBuildFile; fileRef = E63D1ED9495AC2C1A95E866B /* MLXAudioSwift.txt */; };
 		6A51BA26C3D3B66F0B321F3B /* FunASR_Model_License_1.1.txt in Resources */ = {isa = PBXBuildFile; fileRef = 39F5933A65048AFC4CEC13C2 /* FunASR_Model_License_1.1.txt */; };
 		6CAA4DB722FE9720BAFDCD09 /* ProductionModelManifestLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70DF2341D0286566EE14C37A /* ProductionModelManifestLoader.swift */; };
+		6D63DC47C566F31B048CD477 /* EventSource.txt in Resources */ = {isa = PBXBuildFile; fileRef = FCA476E0930186FF787D9C63 /* EventSource.txt */; };
 		6DEA13BA30DC7587CC42280E /* sherpa-onnx.txt in Resources */ = {isa = PBXBuildFile; fileRef = 8AD879F0D8719F8540E69AAA /* sherpa-onnx.txt */; };
 		7BD8D1C22BB1F0EE2536BB3D /* TextifyHotkeys in Frameworks */ = {isa = PBXBuildFile; productRef = 48F8807F9DA4FFCFE56FACA7 /* TextifyHotkeys */; };
+		7E307B0C0E5791635E601B45 /* SwiftSyntax.txt in Resources */ = {isa = PBXBuildFile; fileRef = B96F34B62CE298F0736DC70F /* SwiftSyntax.txt */; };
 		9B4DF1DED0EE9DA1B7C5CE5C /* TextifySettings in Frameworks */ = {isa = PBXBuildFile; productRef = 9430CD33F9E9B82564632D30 /* TextifySettings */; };
 		A144C92E74AAF7D61126BDC4 /* LaunchAtLoginController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77EBF4271CB3FC9AE19B1DE5 /* LaunchAtLoginController.swift */; };
+		AA52799E88857371AD78CBAC /* TextifyVisualSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 521E635A02FA359283D0D319 /* TextifyVisualSystem.swift */; };
+		B3D0D133AA19D87D88A454EE /* MLXSwift.txt in Resources */ = {isa = PBXBuildFile; fileRef = 9951D35B4B5345C255BC7FCF /* MLXSwift.txt */; };
 		B8A079B1778C11DC35E50AED /* TextifyAudio in Frameworks */ = {isa = PBXBuildFile; productRef = B1677768EEB0E11CB0915BF3 /* TextifyAudio */; };
 		BAA39168D933BC34A5957FFD /* ModelInstallProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01131FE96D27558A2041D9B4 /* ModelInstallProgressView.swift */; };
+		C87B35194E13C6B8347A9AA8 /* LiteRT-LM.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2C6154B49DBC9110E0F6A6C5 /* LiteRT-LM.txt */; };
+		D68C511E485467C12023BA63 /* SwiftASN1.txt in Resources */ = {isa = PBXBuildFile; fileRef = 9510A25BCF86D6827E535C91 /* SwiftASN1.txt */; };
 		D8D18BF5FDF50911E7580A66 /* TextifyDiagnostics in Frameworks */ = {isa = PBXBuildFile; productRef = 95C59065380C81191E03CD94 /* TextifyDiagnostics */; };
 		DEDA5C75CEC9F016E1620904 /* THIRD_PARTY_NOTICES.md in Resources */ = {isa = PBXBuildFile; fileRef = 50EFA53917D5428EA5F8CFDD /* THIRD_PARTY_NOTICES.md */; };
 		E4C0244160BA9CEE6A7445AD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F7E292AC1DD24E083692F969 /* Assets.xcassets */; };
 		E7D38CE2027D09A3B73C8AF6 /* SettingsRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC943A14D084BC8D112A71EB /* SettingsRootView.swift */; };
 		F088E249B21EAB13FB7FA38E /* FluidAudio.txt in Resources */ = {isa = PBXBuildFile; fileRef = 7CE755CBD32543074B8433D8 /* FluidAudio.txt */; };
 		F328A0C3A3107E02586111FA /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35A0D6F1EF4A7DB14D99D2D6 /* AppDelegate.swift */; };
+		F5A00884B700CBB2ADE2DA16 /* SwiftAtomics.txt in Resources */ = {isa = PBXBuildFile; fileRef = AEFEFF555251FEBD7FDD9B9A /* SwiftAtomics.txt */; };
 		F846FDC25A332B69852DEA3A /* OnboardingRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44C5780DE99C8DD3D79B7EFC /* OnboardingRootView.swift */; };
+		F8839E7DC406FE2BCF8E199D /* yyjson.txt in Resources */ = {isa = PBXBuildFile; fileRef = 0EFB7B3B702120578207D4FB /* yyjson.txt */; };
 		FECC8E50DA0E6FD0AC8F8B50 /* AppServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DE762BA89473A6795A5D976 /* AppServices.swift */; };
 /* End PBXBuildFile section */
 
@@ -41,24 +60,43 @@
 		01131FE96D27558A2041D9B4 /* ModelInstallProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelInstallProgressView.swift; sourceTree = "<group>"; };
 		047F02C7C6B402C590F2375D /* Textify */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Textify; path = .; sourceTree = SOURCE_ROOT; };
 		0DE762BA89473A6795A5D976 /* AppServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServices.swift; sourceTree = "<group>"; };
+		0EFB7B3B702120578207D4FB /* yyjson.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = yyjson.txt; sourceTree = "<group>"; };
 		1CB78709709A243F50FFFCF0 /* ACKNOWLEDGMENTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ACKNOWLEDGMENTS.md; sourceTree = "<group>"; };
+		1CF14F373C1BB3AFACD0BD5B /* SwiftNIO.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftNIO.txt; sourceTree = "<group>"; };
 		22DFC5ADE2174CBEA8D692D7 /* RecordingOverlayWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingOverlayWindow.swift; sourceTree = "<group>"; };
+		23EF947B0D979C0131808D9F /* SwiftTransformers.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftTransformers.txt; sourceTree = "<group>"; };
 		261F5703526A4920FC4DFF9D /* ONNX_Runtime.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = ONNX_Runtime.txt; sourceTree = "<group>"; };
+		2C6154B49DBC9110E0F6A6C5 /* LiteRT-LM.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "LiteRT-LM.txt"; sourceTree = "<group>"; };
+		32299B3438710241007D7BA9 /* SwiftSystem.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftSystem.txt; sourceTree = "<group>"; };
+		3567D5257D3C4693797A76CC /* transcribe.cpp.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = transcribe.cpp.txt; sourceTree = "<group>"; };
 		35A0D6F1EF4A7DB14D99D2D6 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		39F5933A65048AFC4CEC13C2 /* FunASR_Model_License_1.1.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = FunASR_Model_License_1.1.txt; sourceTree = "<group>"; };
 		44C5780DE99C8DD3D79B7EFC /* OnboardingRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingRootView.swift; sourceTree = "<group>"; };
 		50EFA53917D5428EA5F8CFDD /* THIRD_PARTY_NOTICES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = THIRD_PARTY_NOTICES.md; sourceTree = "<group>"; };
+		521E635A02FA359283D0D319 /* TextifyVisualSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextifyVisualSystem.swift; sourceTree = "<group>"; };
+		571CC5300AD3FA1F34564F0C /* SwiftCollections.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftCollections.txt; sourceTree = "<group>"; };
 		5F80B1907E994ACF795B14A1 /* TextifyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextifyApp.swift; sourceTree = "<group>"; };
+		626CE18A6793738D87F81A13 /* MLXSwiftLM.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = MLXSwiftLM.txt; sourceTree = "<group>"; };
 		6CF0AB1D69531402DCE40D70 /* AppPaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPaths.swift; sourceTree = "<group>"; };
 		70DF2341D0286566EE14C37A /* ProductionModelManifestLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionModelManifestLoader.swift; sourceTree = "<group>"; };
 		77EBF4271CB3FC9AE19B1DE5 /* LaunchAtLoginController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginController.swift; sourceTree = "<group>"; };
 		7CE755CBD32543074B8433D8 /* FluidAudio.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = FluidAudio.txt; sourceTree = "<group>"; };
 		8AD879F0D8719F8540E69AAA /* sherpa-onnx.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "sherpa-onnx.txt"; sourceTree = "<group>"; };
+		8BE1E7363BFCFA5AB888ECA0 /* SwiftHuggingFace.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftHuggingFace.txt; sourceTree = "<group>"; };
+		9510A25BCF86D6827E535C91 /* SwiftASN1.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftASN1.txt; sourceTree = "<group>"; };
+		9951D35B4B5345C255BC7FCF /* MLXSwift.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = MLXSwift.txt; sourceTree = "<group>"; };
+		A832DFCDACE99CAE41017E5F /* SwiftNumerics.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftNumerics.txt; sourceTree = "<group>"; };
 		AC943A14D084BC8D112A71EB /* SettingsRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRootView.swift; sourceTree = "<group>"; };
+		AEFEFF555251FEBD7FDD9B9A /* SwiftAtomics.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftAtomics.txt; sourceTree = "<group>"; };
 		B5E142BEBD39AA35B2C2A16F /* whisper.cpp.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = whisper.cpp.txt; sourceTree = "<group>"; };
+		B96F34B62CE298F0736DC70F /* SwiftSyntax.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftSyntax.txt; sourceTree = "<group>"; };
 		C32C98F05AD92486666F9717 /* MenuBarRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarRoot.swift; sourceTree = "<group>"; };
+		E63D1ED9495AC2C1A95E866B /* MLXAudioSwift.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = MLXAudioSwift.txt; sourceTree = "<group>"; };
 		F0C61DAF2351DEC5C3365040 /* Textify.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Textify.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F7E292AC1DD24E083692F969 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		FA70F155E156CF0333DDB847 /* SwiftJinja.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftJinja.txt; sourceTree = "<group>"; };
+		FB0EFFE778B8D9895B709876 /* SwiftCrypto.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftCrypto.txt; sourceTree = "<group>"; };
+		FCA476E0930186FF787D9C63 /* EventSource.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = EventSource.txt; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -167,6 +205,7 @@
 			children = (
 				C32C98F05AD92486666F9717 /* MenuBarRoot.swift */,
 				01131FE96D27558A2041D9B4 /* ModelInstallProgressView.swift */,
+				521E635A02FA359283D0D319 /* TextifyVisualSystem.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -187,11 +226,29 @@
 		FD4044AC38DB32795D3285FA /* THIRD_PARTY_LICENSES */ = {
 			isa = PBXGroup;
 			children = (
+				FCA476E0930186FF787D9C63 /* EventSource.txt */,
 				7CE755CBD32543074B8433D8 /* FluidAudio.txt */,
 				39F5933A65048AFC4CEC13C2 /* FunASR_Model_License_1.1.txt */,
+				2C6154B49DBC9110E0F6A6C5 /* LiteRT-LM.txt */,
+				E63D1ED9495AC2C1A95E866B /* MLXAudioSwift.txt */,
+				9951D35B4B5345C255BC7FCF /* MLXSwift.txt */,
+				626CE18A6793738D87F81A13 /* MLXSwiftLM.txt */,
 				261F5703526A4920FC4DFF9D /* ONNX_Runtime.txt */,
 				8AD879F0D8719F8540E69AAA /* sherpa-onnx.txt */,
+				9510A25BCF86D6827E535C91 /* SwiftASN1.txt */,
+				AEFEFF555251FEBD7FDD9B9A /* SwiftAtomics.txt */,
+				571CC5300AD3FA1F34564F0C /* SwiftCollections.txt */,
+				FB0EFFE778B8D9895B709876 /* SwiftCrypto.txt */,
+				8BE1E7363BFCFA5AB888ECA0 /* SwiftHuggingFace.txt */,
+				FA70F155E156CF0333DDB847 /* SwiftJinja.txt */,
+				1CF14F373C1BB3AFACD0BD5B /* SwiftNIO.txt */,
+				A832DFCDACE99CAE41017E5F /* SwiftNumerics.txt */,
+				B96F34B62CE298F0736DC70F /* SwiftSyntax.txt */,
+				32299B3438710241007D7BA9 /* SwiftSystem.txt */,
+				23EF947B0D979C0131808D9F /* SwiftTransformers.txt */,
+				3567D5257D3C4693797A76CC /* transcribe.cpp.txt */,
 				B5E142BEBD39AA35B2C2A16F /* whisper.cpp.txt */,
+				0EFB7B3B702120578207D4FB /* yyjson.txt */,
 			);
 			path = THIRD_PARTY_LICENSES;
 			sourceTree = "<group>";
@@ -208,7 +265,10 @@
 				EDD0FEA652A12CDF7580DB5E /* Frameworks */,
 				4F5B7C3414F628F9E65E9524 /* Embed Signed Model Catalog */,
 				44A433A3F7913AA4FC53B788 /* Compile Whisper Metal Library */,
+				DEDF280DAED9AA4E18D3D97B /* Embed MLX Metal Library */,
 				72EA27DD4E0B2637CBC1C044 /* Embed sherpa-onnx Runtime */,
+				B8AFC14E71D737CA919FDF7A /* Embed transcribe.cpp Runtime */,
+				621E56C67CB1EB1DA5AA6D03 /* Thin and Sign LiteRT-LM Runtime */,
 			);
 			buildRules = (
 			);
@@ -274,12 +334,30 @@
 			files = (
 				1B7EAFF9974199AFC617F1FA /* ACKNOWLEDGMENTS.md in Resources */,
 				E4C0244160BA9CEE6A7445AD /* Assets.xcassets in Resources */,
+				6D63DC47C566F31B048CD477 /* EventSource.txt in Resources */,
 				F088E249B21EAB13FB7FA38E /* FluidAudio.txt in Resources */,
 				6A51BA26C3D3B66F0B321F3B /* FunASR_Model_License_1.1.txt in Resources */,
+				C87B35194E13C6B8347A9AA8 /* LiteRT-LM.txt in Resources */,
+				6A364A441FCF57DA734D6D57 /* MLXAudioSwift.txt in Resources */,
+				B3D0D133AA19D87D88A454EE /* MLXSwift.txt in Resources */,
+				2BA724319382989A1C583610 /* MLXSwiftLM.txt in Resources */,
 				214BD35622CF9B9C7D5AB31C /* ONNX_Runtime.txt in Resources */,
+				D68C511E485467C12023BA63 /* SwiftASN1.txt in Resources */,
+				F5A00884B700CBB2ADE2DA16 /* SwiftAtomics.txt in Resources */,
+				5CBAAFC507E7F0CFBFD14254 /* SwiftCollections.txt in Resources */,
+				51BB395291A1261B7259452D /* SwiftCrypto.txt in Resources */,
+				4035112A36E706A5E546260E /* SwiftHuggingFace.txt in Resources */,
+				64BAF0B9382B64D43EF14710 /* SwiftJinja.txt in Resources */,
+				11FD7F8316A64487858A9CEF /* SwiftNIO.txt in Resources */,
+				4E83A89278A0C79CBF5AEA5E /* SwiftNumerics.txt in Resources */,
+				7E307B0C0E5791635E601B45 /* SwiftSyntax.txt in Resources */,
+				596E0360F338A0F644669E47 /* SwiftSystem.txt in Resources */,
+				393F62F18EE6C7EAAFDFE1F3 /* SwiftTransformers.txt in Resources */,
 				DEDA5C75CEC9F016E1620904 /* THIRD_PARTY_NOTICES.md in Resources */,
 				6DEA13BA30DC7587CC42280E /* sherpa-onnx.txt in Resources */,
+				1245A89E25B6AC062D7A70D1 /* transcribe.cpp.txt in Resources */,
 				00C40789CFF04783D96839AD /* whisper.cpp.txt in Resources */,
+				F8839E7DC406FE2BCF8E199D /* yyjson.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -329,6 +407,28 @@
 			shellPath = /bin/sh;
 			shellScript = "CATALOG_DIRECTORY=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/ModelCatalog\"\nmkdir -p \"$CATALOG_DIRECTORY\"\n/bin/cp \"$SRCROOT/models/manifest.json\" \"$CATALOG_DIRECTORY/manifest.json\"\n/bin/cp \"$SRCROOT/models/manifest.json.sig\" \"$CATALOG_DIRECTORY/manifest.json.sig\"\n";
 		};
+		621E56C67CB1EB1DA5AA6D03 /* Thin and Sign LiteRT-LM Runtime */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/script/runtime/embed_litert_lm_runtime.sh",
+				"$(BUILT_PRODUCTS_DIR)/libCLiteRTLM_mac.dylib",
+				"$(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/libCLiteRTLM_mac.dylib",
+			);
+			name = "Thin and Sign LiteRT-LM Runtime";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/litert-lm-runtime.stamp",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"$SRCROOT/script/runtime/embed_litert_lm_runtime.sh\" \\\n  \"$BUILT_PRODUCTS_DIR/libCLiteRTLM_mac.dylib\" \\\n  \"$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH\" \\\n  \"${EXPANDED_CODE_SIGN_IDENTITY:--}\"\ntouch \"$DERIVED_FILE_DIR/litert-lm-runtime.stamp\"\n";
+		};
 		72EA27DD4E0B2637CBC1C044 /* Embed sherpa-onnx Runtime */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -352,6 +452,49 @@
 			shellPath = /bin/sh;
 			shellScript = "\"$SRCROOT/script/runtime/embed_sherpa_runtime.sh\" \\\n  \"$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH\" \\\n  \"${EXPANDED_CODE_SIGN_IDENTITY:--}\"\n";
 		};
+		B8AFC14E71D737CA919FDF7A /* Embed transcribe.cpp Runtime */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/script/runtime/embed_transcribe_cpp_runtime.sh",
+				"$(SRCROOT)/Vendor/transcribe.cpp/v0.1.3/lib/libtextify-transcribe.0.1.3.dylib",
+				"$(SRCROOT)/Vendor/transcribe.cpp/v0.1.3/EXPORTED_SYMBOLS",
+			);
+			name = "Embed transcribe.cpp Runtime";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/libtextify-transcribe.0.1.3.dylib",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"$SRCROOT/script/runtime/embed_transcribe_cpp_runtime.sh\" \\\n  \"$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH\" \\\n  \"${EXPANDED_CODE_SIGN_IDENTITY:--}\"\n";
+		};
+		DEDF280DAED9AA4E18D3D97B /* Embed MLX Metal Library */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/script/runtime/embed_mlx_metallib.sh",
+				"$(SRCROOT)/Vendor/mlx-swift/0.31.3/mlx.metallib",
+			);
+			name = "Embed MLX Metal Library";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/mlx.metallib",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"$SRCROOT/script/runtime/embed_mlx_metallib.sh\" \\\n  \"$TARGET_BUILD_DIR/$EXECUTABLE_FOLDER_PATH/mlx.metallib\" \\\n  \"${EXPANDED_CODE_SIGN_IDENTITY:--}\"\n";
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -370,6 +513,7 @@
 				55134887FB3786EEAC7F8CD4 /* RecordingOverlayWindow.swift in Sources */,
 				E7D38CE2027D09A3B73C8AF6 /* SettingsRootView.swift in Sources */,
 				3B0FD05953AE11637273FC75 /* TextifyApp.swift in Sources */,
+				AA52799E88857371AD78CBAC /* TextifyVisualSystem.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -22,6 +22,8 @@ final class AppServices {
     let launchAtLoginLocation: any LaunchAtLoginLocationChecking
     let startupIssue: AppStartupIssue?
 
+    private var installedModelsStore: InstalledModelsStore
+
     @ObservationIgnored lazy var modelInstallCoordinator = ModelInstallCoordinator(
         installOperation: { [weak self] modelID, onStateChange in
             guard let self,
@@ -50,6 +52,7 @@ final class AppServices {
                 }
                 onStateChange(state)
             }
+            self.refreshInstalledModels()
             try Task.checkCancellation()
             onStateChange(DownloadState(
                 modelID: modelID,
@@ -173,6 +176,7 @@ final class AppServices {
         self.waitBeforeTerminalStatusDismissal = waitBeforeTerminalStatusDismissal
         self.startupIssue = startupIssue
         self.runtimeIssue = startupIssue == nil ? nil : .persistentStorageUnavailable
+        self.installedModelsStore = Self.loadInstalledModelsStore(paths: paths)
         self.preferences = settingsStore.load()
         self.launchAtLoginStatus = launchAtLoginLocation.isSupported ? launchAtLogin.status() : .unsupportedLocation
         updateOverlay()
@@ -364,7 +368,11 @@ final class AppServices {
     }
 
     var installedModels: [ModelEntry] {
-        loadInstalledModelsStore()?.records.map(\.model) ?? []
+        installedModelsStore.records.map(\.model)
+    }
+
+    func refreshInstalledModels() {
+        installedModelsStore = Self.loadInstalledModelsStore(paths: paths)
     }
 
     var availableTranscriptionLanguages: [TranscriptionLanguage] {
@@ -430,8 +438,10 @@ final class AppServices {
                 licenseName: "User-provided model; license not verified by Textify"
             )
         )
+        refreshInstalledModels()
         guard await activateInstalledModel(record.model.id) else {
             try? importer.removeImportedModel(modelID: record.model.id)
+            refreshInstalledModels()
             throw ModelInstallCoordinatorError.modelPreparationFailed
         }
         return record.model
@@ -447,20 +457,21 @@ final class AppServices {
         _ = try await Task.detached(priority: .utility) {
             try manager.remove(modelID: modelID)
         }.value
+        refreshInstalledModels()
         _ = await dictation.refreshReadiness()
     }
 
     private func installedModel(_ modelID: String) -> InstalledModelRecord? {
-        loadInstalledModelsStore()?.record(forModelID: modelID)
+        installedModelsStore.record(forModelID: modelID)
     }
 
-    private func loadInstalledModelsStore() -> InstalledModelsStore? {
+    private static func loadInstalledModelsStore(paths: AppPaths) -> InstalledModelsStore {
         guard let data = try? Data(contentsOf: ModelStorageLayout(
             rootDirectory: paths.modelsDirectory
         ).installedStoreURL),
               let store = try? JSONDecoder().decode(InstalledModelsStore.self, from: data)
         else {
-            return nil
+            return InstalledModelsStore()
         }
         return store
     }
@@ -549,12 +560,19 @@ final class AppServices {
         let paraformerRuntime = ParaformerRuntime()
         let sherpaOnnxRuntime = SherpaOnnxRuntime()
         let transcribeCppRuntime = TranscribeCppRuntime()
+        let mlxAudioRuntime = MLXAudioRuntime()
+        let liteRTLMRuntime = LiteRTLMRuntime(
+            cacheDirectory: paths.applicationSupportDirectory
+                .appendingPathComponent("LiteRTLMCache", isDirectory: true).path
+        )
         let transcriber = MultiEngineRuntimeTranscribingAdapter(
             whisper: WhisperRuntimeTranscribingAdapter(runtime: whisperRuntime),
             parakeet: ParakeetRuntimeTranscribingAdapter(runtime: parakeetRuntime),
             paraformer: ParaformerRuntimeTranscribingAdapter(runtime: paraformerRuntime),
             sherpaOnnx: SherpaOnnxRuntimeTranscribingAdapter(runtime: sherpaOnnxRuntime),
-            transcribeCpp: TranscribeCppRuntimeTranscribingAdapter(runtime: transcribeCppRuntime)
+            transcribeCpp: TranscribeCppRuntimeTranscribingAdapter(runtime: transcribeCppRuntime),
+            mlxAudio: MLXAudioRuntimeTranscribingAdapter(runtime: mlxAudioRuntime),
+            liteRTLM: LiteRTLMRuntimeTranscribingAdapter(runtime: liteRTLMRuntime)
         )
         var preferences = settingsStore.load()
         if preferences.microphoneSelection != .systemDefault {

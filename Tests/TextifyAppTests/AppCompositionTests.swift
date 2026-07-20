@@ -4,6 +4,7 @@ import TextifyAudio
 import TextifyDiagnostics
 @testable import TextifyHotkeys
 import TextifyInsertion
+import TextifyModels
 import TextifyRuntime
 import TextifySettings
 import TextifyTranscription
@@ -65,6 +66,33 @@ final class AppCompositionTests: XCTestCase {
         XCTAssertEqual(services.paths.settingsFileURL.lastPathComponent, "settings.json")
         XCTAssertEqual(services.preferences, services.settingsStore.load())
         XCTAssertEqual(services.dictation.status, DictationRuntimeStatus.idle)
+    }
+
+    @MainActor
+    func testInstalledModelQueriesUseCachedStoreUntilExplicitRefresh() throws {
+        let paths = try Self.makeTemporaryPaths()
+        let model = try Self.catalogModel(id: ProductionModelPolicy.requiredModelID)
+        let storeURL = ModelStorageLayout(rootDirectory: paths.modelsDirectory).installedStoreURL
+        let installedStore = InstalledModelsStore(records: [
+            InstalledModelRecord(
+                model: model,
+                installedAt: "2026-07-20T00:00:00Z",
+                localFilesByManifestFilename: ["model.bin": "/tmp/model.bin"]
+            ),
+        ])
+        try JSONEncoder().encode(installedStore).write(to: storeURL, options: .atomic)
+
+        let services = try Self.makeServices(paths: paths)
+
+        XCTAssertTrue(services.isModelInstalled(model.id))
+        XCTAssertEqual(services.installedModels.map(\.id), [model.id])
+
+        try JSONEncoder().encode(InstalledModelsStore()).write(to: storeURL, options: .atomic)
+
+        XCTAssertTrue(services.isModelInstalled(model.id))
+        services.refreshInstalledModels()
+        XCTAssertFalse(services.isModelInstalled(model.id))
+        XCTAssertTrue(services.installedModels.isEmpty)
     }
 
     func testAppPathsFactoryUsesTextifySupportLocationsWithoutUserLibrarySideEffects() throws {
@@ -713,6 +741,7 @@ final class AppCompositionTests: XCTestCase {
     @MainActor
     private static func makeServices(
         preferences: AppPreferences = .defaults,
+        paths providedPaths: AppPaths? = nil,
         hotkeyMonitor: GlobalHotkeyMonitor? = nil,
         launchAtLogin: FakeLaunchAtLoginManager? = nil,
         launchAtLoginLocation: any LaunchAtLoginLocationChecking = FixedLaunchAtLoginLocation(isSupported: true),
@@ -720,7 +749,7 @@ final class AppCompositionTests: XCTestCase {
         overlayPresenter: (any RecordingOverlayPresenting)? = nil,
         waitBeforeProcessingIndicator: @escaping @Sendable () async -> Void = {}
     ) throws -> AppServices {
-        let paths = try makeTemporaryPaths()
+        let paths = try providedPaths ?? makeTemporaryPaths()
         let settingsStore = SettingsStore(storage: .file(paths.settingsFileURL))
         settingsStore.save(preferences)
         let diagnosticsLogger = DiagnosticsLogger(directory: paths.logsDirectory)
@@ -754,6 +783,17 @@ final class AppCompositionTests: XCTestCase {
             overlayPresenter: overlayPresenter,
             waitBeforeProcessingIndicator: waitBeforeProcessingIndicator
         )
+    }
+
+    private static func catalogModel(id: String) throws -> ModelEntry {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let manifest = try ModelManifest.decode(
+            Data(contentsOf: repositoryRoot.appendingPathComponent("models/manifest.json"))
+        )
+        return try XCTUnwrap(manifest.models.first { $0.id == id })
     }
 
     private static func makeTemporaryPaths() throws -> AppPaths {

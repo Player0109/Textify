@@ -98,6 +98,16 @@ targets:
           - $(SRCROOT)/Vendor/whisper.cpp/ggml/src/ggml-metal/ggml-metal.metal
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/default.metallib
+      - name: Embed MLX Metal Library
+        script: |
+          "$SRCROOT/script/runtime/embed_mlx_metallib.sh" \
+            "$TARGET_BUILD_DIR/$EXECUTABLE_FOLDER_PATH/mlx.metallib" \
+            "${EXPANDED_CODE_SIGN_IDENTITY:--}"
+        inputFiles:
+          - $(SRCROOT)/script/runtime/embed_mlx_metallib.sh
+          - $(SRCROOT)/Vendor/mlx-swift/0.31.3/mlx.metallib
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/mlx.metallib
       - name: Embed sherpa-onnx Runtime
         script: |
           "$SRCROOT/script/runtime/embed_sherpa_runtime.sh" \
@@ -121,6 +131,19 @@ targets:
           - $(SRCROOT)/Vendor/transcribe.cpp/v0.1.3/EXPORTED_SYMBOLS
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/libtextify-transcribe.0.1.3.dylib
+      - name: Thin and Sign LiteRT-LM Runtime
+        script: |
+          "$SRCROOT/script/runtime/embed_litert_lm_runtime.sh" \
+            "$BUILT_PRODUCTS_DIR/libCLiteRTLM_mac.dylib" \
+            "$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH" \
+            "${EXPANDED_CODE_SIGN_IDENTITY:--}"
+          touch "$DERIVED_FILE_DIR/litert-lm-runtime.stamp"
+        inputFiles:
+          - $(SRCROOT)/script/runtime/embed_litert_lm_runtime.sh
+          - $(BUILT_PRODUCTS_DIR)/libCLiteRTLM_mac.dylib
+          - $(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/libCLiteRTLM_mac.dylib
+        outputFiles:
+          - $(DERIVED_FILE_DIR)/litert-lm-runtime.stamp
 
 schemes:
   Textify:

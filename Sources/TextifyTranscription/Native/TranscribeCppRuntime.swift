@@ -3,6 +3,48 @@ import TextifyTranscribeCppShim
 
 public enum TranscribeCppModelVariant: String, Equatable, Sendable {
     case funASRMLTNanoQ8 = "funasr-mlt-nano-2512-q8"
+    case canaryQwen2_5B = "canary-qwen-2.5b"
+    case qwen3ASR0_6B = "qwen3-asr-0.6b"
+    case qwen3ASR1_7B = "qwen3-asr-1.7b"
+    case parakeetTDT0_6BV2 = "parakeet-tdt-0.6b-v2"
+    case parakeetTDT0_6BV3 = "parakeet-tdt-0.6b-v3"
+    case nemotron3_5ASRStreaming0_6B = "nemotron-3.5-asr-streaming-0.6b"
+
+    public var supportsAutomaticLanguageDetection: Bool {
+        switch self {
+        case .qwen3ASR0_6B, .qwen3ASR1_7B, .parakeetTDT0_6BV3,
+             .nemotron3_5ASRStreaming0_6B:
+            return true
+        case .funASRMLTNanoQ8, .canaryQwen2_5B, .parakeetTDT0_6BV2:
+            return false
+        }
+    }
+
+    var supportedLanguageCodes: Set<String> {
+        switch self {
+        case .funASRMLTNanoQ8:
+            return TranscribeCppRuntime.supportedLanguageCodes
+        case .canaryQwen2_5B:
+            return ["en"]
+        case .parakeetTDT0_6BV2:
+            return ["en"]
+        case .qwen3ASR0_6B, .qwen3ASR1_7B, .parakeetTDT0_6BV3,
+             .nemotron3_5ASRStreaming0_6B:
+            return []
+        }
+    }
+
+    var maximumAudioSamples: Int {
+        switch self {
+        case .funASRMLTNanoQ8:
+            return 60 * 16000
+        case .canaryQwen2_5B:
+            return 40 * 16000
+        case .qwen3ASR0_6B, .qwen3ASR1_7B, .parakeetTDT0_6BV2,
+             .parakeetTDT0_6BV3, .nemotron3_5ASRStreaming0_6B:
+            return 60 * 16000
+        }
+    }
 }
 
 public enum TranscribeCppRuntimeFailure: String, Equatable, Codable, Sendable {
@@ -26,6 +68,7 @@ public enum TranscribeCppRuntimeError: Error, Equatable, Sendable {
     case unsupportedVariant(String)
     case unsupportedLanguage(String)
     case automaticLanguageDetectionUnsupported
+    case automaticLanguageDetectionRequired
     case loadFailed(String)
     case warmupFailed(String)
     case notLoaded
@@ -35,7 +78,7 @@ public enum TranscribeCppRuntimeError: Error, Equatable, Sendable {
     case transcriptionFailed(String)
 }
 
-struct TranscribeCppSessionResult: Equatable, Sendable {
+struct TranscribeCppSessionResult: Equatable {
     let text: String
 }
 
@@ -49,7 +92,7 @@ protocol TranscribeCppRuntimeSession: Sendable {
     func unload() async
 }
 
-struct TranscribeCppRuntimeBackend: Sendable {
+struct TranscribeCppRuntimeBackend {
     let load: @Sendable (
         _ runtimeDirectory: URL,
         _ modelURL: URL,
@@ -60,11 +103,8 @@ struct TranscribeCppRuntimeBackend: Sendable {
     static let native = TranscribeCppRuntimeBackend {
         runtimeDirectory,
         modelURL,
-        variant,
+        _,
         threadCount in
-        guard variant == .funASRMLTNanoQ8 else {
-            throw TranscribeCppRuntimeError.unsupportedVariant(variant.rawValue)
-        }
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: modelURL.path, isDirectory: &isDirectory),
               !isDirectory.boolValue
@@ -98,7 +138,7 @@ private actor NativeTranscribeCppSession: TranscribeCppRuntimeSession {
         modelURL: URL,
         threadCount: Int
     ) throws -> OpaquePointer {
-        var errorBuffer = [CChar](repeating: 0, count: 2_048)
+        var errorBuffer = [CChar](repeating: 0, count: 2048)
         let context = runtimeDirectory.path.withCString { runtimePath in
             modelURL.path.withCString { modelPath in
                 TextifyTranscribeCppCreate(
@@ -146,7 +186,7 @@ private actor NativeTranscribeCppSession: TranscribeCppRuntimeSession {
             throw TranscribeCppRuntimeError.notLoaded
         }
         var textPointer: UnsafeMutablePointer<CChar>?
-        var errorBuffer = [CChar](repeating: 0, count: 2_048)
+        var errorBuffer = [CChar](repeating: 0, count: 2048)
         let status = languageCode.withCString { language in
             samples.withUnsafeBufferPointer { buffer in
                 TextifyTranscribeCppTranscribe(
@@ -192,7 +232,7 @@ private actor NativeTranscribeCppSession: TranscribeCppRuntimeSession {
 }
 
 public actor TranscribeCppRuntime: TranscriptionProvider {
-    public static let maximumAudioSamples = 60 * 16_000
+    public static let maximumAudioSamples = 60 * 16000
     public static let supportedLanguageCodes: Set<String> = [
         "ar", "en", "id", "ja", "ko", "ms", "th", "tl", "vi", "yue", "zh",
     ]
@@ -208,7 +248,7 @@ public actor TranscribeCppRuntime: TranscriptionProvider {
         self.runtimeDirectory = runtimeDirectory
             ?? Bundle.main.privateFrameworksURL?.path
             ?? ""
-        self.backend = .native
+        backend = .native
     }
 
     init(runtimeDirectory: String, backend: TranscribeCppRuntimeBackend) {
@@ -224,7 +264,10 @@ public actor TranscribeCppRuntime: TranscriptionProvider {
         threadCount: Int = 4,
         warmup: Bool = true
     ) async throws {
-        let languageCode = try Self.requireSupportedLanguage(languageCode)
+        let languageCode = try Self.requireSupportedLanguage(
+            languageCode,
+            variant: variant
+        )
         let requestedConfiguration = LoadedConfiguration(
             modelID: modelID,
             modelPath: modelPath,
@@ -235,7 +278,8 @@ public actor TranscribeCppRuntime: TranscriptionProvider {
         if case let .ready(loadedModelID) = state,
            loadedModelID == modelID,
            loadedConfiguration == requestedConfiguration,
-           session != nil {
+           session != nil
+        {
             return
         }
 
@@ -257,7 +301,7 @@ public actor TranscribeCppRuntime: TranscriptionProvider {
             state = .failed(modelID: modelID, reason: .missingModelFile)
             throw TranscribeCppRuntimeError.missingModelFile(modelPath)
         }
-        guard (1...4).contains(threadCount) else {
+        guard (1 ... 4).contains(threadCount) else {
             state = .failed(modelID: modelID, reason: .loadFailed)
             throw TranscribeCppRuntimeError.loadFailed(
                 "The transcribe.cpp thread count must be between 1 and 4."
@@ -278,7 +322,7 @@ public actor TranscribeCppRuntime: TranscriptionProvider {
             guard await loadedSession.backendName == "metal" else {
                 await loadedSession.unload()
                 throw TranscribeCppRuntimeError.loadFailed(
-                    "Fun-ASR did not load on the required Metal backend."
+                    "The speech model did not load on the required Metal backend."
                 )
             }
         } catch {
@@ -295,8 +339,8 @@ public actor TranscribeCppRuntime: TranscriptionProvider {
         if warmup {
             do {
                 _ = try await loadedSession.transcribe(
-                    samples: Array(repeating: 0, count: 6_400),
-                    sampleRate: 16_000,
+                    samples: Array(repeating: 0, count: 6400),
+                    sampleRate: 16000,
                     languageCode: languageCode
                 )
             } catch {
@@ -315,7 +359,7 @@ public actor TranscribeCppRuntime: TranscriptionProvider {
     }
 
     public func transcribe(_ audio: TranscriptionAudioBuffer) async throws -> TranscriptionResult {
-        guard audio.sampleRate == 16_000, audio.channelCount == 1 else {
+        guard audio.sampleRate == 16000, audio.channelCount == 1 else {
             throw TranscribeCppRuntimeError.invalidAudioFormat(
                 sampleRate: audio.sampleRate,
                 channelCount: audio.channelCount
@@ -324,9 +368,11 @@ public actor TranscribeCppRuntime: TranscriptionProvider {
         guard !audio.samples.isEmpty else {
             throw TranscribeCppRuntimeError.emptyAudio
         }
-        guard audio.samples.count <= Self.maximumAudioSamples else {
+        let maximumAudioSamples = loadedConfiguration?.variant.maximumAudioSamples
+            ?? Self.maximumAudioSamples
+        guard audio.samples.count <= maximumAudioSamples else {
             throw TranscribeCppRuntimeError.audioTooLong(
-                maximumSamples: Self.maximumAudioSamples,
+                maximumSamples: maximumAudioSamples,
                 actualSamples: audio.samples.count
             )
         }
@@ -341,7 +387,7 @@ public actor TranscribeCppRuntime: TranscriptionProvider {
         let hasAudibleSignal = audio.samples.contains { abs($0) >= 0.001 }
         if !hasAudibleSignal {
             let audioDurationMs = Int(
-                (Double(audio.samples.count) / Double(audio.sampleRate) * 1_000).rounded()
+                (Double(audio.samples.count) / Double(audio.sampleRate) * 1000).rounded()
             )
             return TranscriptionResult(
                 text: "",
@@ -366,7 +412,7 @@ public actor TranscribeCppRuntime: TranscriptionProvider {
                 (DispatchTime.now().uptimeNanoseconds - start + 999_999) / 1_000_000
             )
             let audioDurationMs = Int(
-                (Double(audio.samples.count) / Double(audio.sampleRate) * 1_000).rounded()
+                (Double(audio.samples.count) / Double(audio.sampleRate) * 1000).rounded()
             )
             let hasLinguisticContent = result.text.unicodeScalars.contains {
                 CharacterSet.alphanumerics.contains($0)
@@ -389,7 +435,10 @@ public actor TranscribeCppRuntime: TranscriptionProvider {
         }
     }
 
-    public static func requireSupportedLanguage(_ languageCode: String) throws -> String {
+    public static func requireSupportedLanguage(
+        _ languageCode: String,
+        variant: TranscribeCppModelVariant = .funASRMLTNanoQ8
+    ) throws -> String {
         let normalized = languageCode
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
@@ -397,10 +446,16 @@ public actor TranscribeCppRuntime: TranscriptionProvider {
             .first
             .map(String.init)
             ?? ""
+        if variant.supportsAutomaticLanguageDetection {
+            guard normalized == "auto" else {
+                throw TranscribeCppRuntimeError.automaticLanguageDetectionRequired
+            }
+            return normalized
+        }
         guard normalized != "auto" else {
             throw TranscribeCppRuntimeError.automaticLanguageDetectionUnsupported
         }
-        guard supportedLanguageCodes.contains(normalized) else {
+        guard variant.supportedLanguageCodes.contains(normalized) else {
             throw TranscribeCppRuntimeError.unsupportedLanguage(languageCode)
         }
         return normalized
@@ -416,7 +471,7 @@ public actor TranscribeCppRuntime: TranscriptionProvider {
         await session.unload()
     }
 
-    private struct LoadedConfiguration: Equatable, Sendable {
+    private struct LoadedConfiguration: Equatable {
         let modelID: String
         let modelPath: String
         let variant: TranscribeCppModelVariant

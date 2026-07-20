@@ -82,6 +82,170 @@ enum TextifyRealtimeBenchmarkCLI {
                     reference: options.reference,
                     feedMode: options.feedMode
                 )
+            case .mlxParakeetRNNT1_1B:
+                result = try await MLXAudioBenchmark.run(
+                    engine: options.engine,
+                    variant: .parakeetRNNT1_1B,
+                    modelID: "parakeet-rnnt-1.1b",
+                    modelLicense: "CC-BY-4.0",
+                    audio: audio,
+                    modelDirectoryURL: options.mlxModelURL!,
+                    reference: options.reference,
+                    feedMode: options.feedMode
+                )
+            case .mlxCohereTranscribe03_2026:
+                result = try await MLXAudioBenchmark.run(
+                    engine: options.engine,
+                    variant: .cohereTranscribe03_2026,
+                    modelID: "cohere-transcribe-03-2026-mlx-8bit",
+                    modelLicense: "Apache-2.0",
+                    audio: audio,
+                    modelDirectoryURL: options.mlxModelURL!,
+                    reference: options.reference,
+                    feedMode: options.feedMode
+                )
+            case .mlxWhisperLargeV3Turbo:
+                result = try await MLXAudioBenchmark.run(
+                    engine: options.engine,
+                    variant: .whisperLargeV3Turbo,
+                    modelID: "mlx-community/whisper-large-v3-turbo",
+                    modelLicense: "MIT",
+                    audio: audio,
+                    modelDirectoryURL: options.mlxModelURL!,
+                    reference: options.reference,
+                    feedMode: options.feedMode
+                )
+            case .mlxQwen3ASR0_6B8Bit:
+                result = try await MLXAudioBenchmark.run(
+                    engine: options.engine,
+                    variant: .qwen3ASR0_6B8Bit,
+                    modelID: "mlx-community/Qwen3-ASR-0.6B-8bit",
+                    modelLicense: "Apache-2.0",
+                    audio: audio,
+                    modelDirectoryURL: options.mlxModelURL!,
+                    reference: options.reference,
+                    feedMode: options.feedMode
+                )
+            case .mlxQwen3ASR1_7B8Bit:
+                result = try await MLXAudioBenchmark.run(
+                    engine: options.engine,
+                    variant: .qwen3ASR1_7B8Bit,
+                    modelID: "mlx-community/Qwen3-ASR-1.7B-8bit",
+                    modelLicense: "Apache-2.0",
+                    audio: audio,
+                    modelDirectoryURL: options.mlxModelURL!,
+                    reference: options.reference,
+                    feedMode: options.feedMode
+                )
+            case .mlxParakeetTDT0_6BV2:
+                result = try await MLXAudioBenchmark.run(
+                    engine: options.engine,
+                    variant: .parakeetTDT0_6BV2,
+                    modelID: "mlx-community/parakeet-tdt-0.6b-v2",
+                    modelLicense: "CC-BY-4.0",
+                    audio: audio,
+                    modelDirectoryURL: options.mlxModelURL!,
+                    reference: options.reference,
+                    feedMode: options.feedMode
+                )
+            case .mlxParakeetTDT0_6BV3:
+                result = try await MLXAudioBenchmark.run(
+                    engine: options.engine,
+                    variant: .parakeetTDT0_6BV3,
+                    modelID: "mlx-community/parakeet-tdt-0.6b-v3",
+                    modelLicense: "CC-BY-4.0",
+                    audio: audio,
+                    modelDirectoryURL: options.mlxModelURL!,
+                    reference: options.reference,
+                    feedMode: options.feedMode
+                )
+            case .mlxNemotron3_5ASRStreaming0_6B:
+                result = try await MLXAudioBenchmark.run(
+                    engine: options.engine,
+                    variant: .nemotron3_5ASRStreaming0_6B,
+                    modelID: "mlx-community/nemotron-3.5-asr-streaming-0.6b",
+                    modelLicense: "NVIDIA Open Model License",
+                    audio: audio,
+                    modelDirectoryURL: options.mlxModelURL!,
+                    reference: options.reference,
+                    feedMode: options.feedMode
+                )
+            case .canaryQwen2_5B:
+                result = try await TranscribeCppBenchmark.runCanaryQwen(
+                    audio: audio,
+                    runtimeDirectoryURL: options.transcribeRuntimeURL!,
+                    modelURL: options.transcribeModelURL!,
+                    reference: options.reference,
+                    feedMode: options.feedMode
+                )
+            case .transcribeQwen3ASR0_6B:
+                result = try await TranscribeCppBenchmark.runModel(
+                    engine: options.engine,
+                    variant: .qwen3ASR0_6B,
+                    languageCode: "auto",
+                    modelLicense: "Apache-2.0",
+                    audio: audio,
+                    runtimeDirectoryURL: options.transcribeRuntimeURL!,
+                    modelURL: options.transcribeModelURL!,
+                    reference: options.reference,
+                    feedMode: options.feedMode
+                )
+            case .transcribeQwen3ASR1_7B:
+                result = try await TranscribeCppBenchmark.runModel(
+                    engine: options.engine,
+                    variant: .qwen3ASR1_7B,
+                    languageCode: "auto",
+                    modelLicense: "Apache-2.0",
+                    audio: audio,
+                    runtimeDirectoryURL: options.transcribeRuntimeURL!,
+                    modelURL: options.transcribeModelURL!,
+                    reference: options.reference,
+                    feedMode: options.feedMode
+                )
+            case .transcribeParakeetTDT0_6BV2:
+                result = try await TranscribeCppBenchmark.runModel(
+                    engine: options.engine,
+                    variant: .parakeetTDT0_6BV2,
+                    languageCode: "en",
+                    modelLicense: "CC-BY-4.0",
+                    audio: audio,
+                    runtimeDirectoryURL: options.transcribeRuntimeURL!,
+                    modelURL: options.transcribeModelURL!,
+                    reference: options.reference,
+                    feedMode: options.feedMode
+                )
+            case .transcribeParakeetTDT0_6BV3:
+                result = try await TranscribeCppBenchmark.runModel(
+                    engine: options.engine,
+                    variant: .parakeetTDT0_6BV3,
+                    languageCode: "auto",
+                    modelLicense: "CC-BY-4.0",
+                    audio: audio,
+                    runtimeDirectoryURL: options.transcribeRuntimeURL!,
+                    modelURL: options.transcribeModelURL!,
+                    reference: options.reference,
+                    feedMode: options.feedMode
+                )
+            case .transcribeNemotron3_5ASRStreaming0_6B:
+                result = try await TranscribeCppBenchmark.runModel(
+                    engine: options.engine,
+                    variant: .nemotron3_5ASRStreaming0_6B,
+                    languageCode: "auto",
+                    modelLicense: "OpenMDW-1.1",
+                    audio: audio,
+                    runtimeDirectoryURL: options.transcribeRuntimeURL!,
+                    modelURL: options.transcribeModelURL!,
+                    reference: options.reference,
+                    feedMode: options.feedMode
+                )
+            case .liteRTGemma4_12B:
+                result = try await LiteRTLMBenchmark.runGemma4(
+                    audio: audio,
+                    modelURL: options.liteRTModelURL!,
+                    cacheURL: options.liteRTCacheURL,
+                    reference: options.reference,
+                    feedMode: options.feedMode
+                )
             }
 
             let encoder = JSONEncoder()

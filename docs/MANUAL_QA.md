@@ -280,7 +280,7 @@ does not substitute for the release-maintainer QA pass.
 
 ## Immutable Hugging Face Catalog Verification - 2026-07-19
 
-This verification includes the current nine-model catalog.
+This verification includes the then-current nine-model catalog.
 
 - PASS: `bash script/release/validate_release.sh` completed 362 tests with zero
   failures and six explicit opt-in hardware/network skips, then built the
@@ -321,3 +321,92 @@ This verification includes the current nine-model catalog.
 - BLOCKED: Developer ID signing, notarization, stapling, Gatekeeper assessment,
   and final manual dictation through every promoted catalog entry still require
   the credentialed release-maintainer machine.
+
+## Benchmark Model Expansion Verification - 2026-07-20
+
+- PASS: the exact Whisper Large V2 and V3 q5_0 downloads matched their signed
+  byte sizes and SHA-256 values before inference.
+- PASS: both artifacts transcribed all ten fixed OpenSLR utterances through the
+  release-built whisper.cpp Metal path. V2 measured 3.33% aggregate WER and
+  551 ms median/746 ms p95 release-to-final; V3 measured 3.81% aggregate WER
+  and 542.5 ms median/728 ms p95.
+- PASS: the tracked Ed25519 signature and production catalog policy verify for
+  the expanded eleven-model catalog. Its 105 Hugging Face leaves are exact
+  commit-pinned URLs with byte sizes and SHA-256 values.
+- PASS: `script/release/validate_release.sh` completed 376 tests with zero
+  failures and seven explicit native/network skips, built the arm64 Release
+  executable, and passed catalog, plist, entitlement, architecture,
+  release-string, native-runtime, and shell-syntax policies.
+
+## MLX Whisper Large V3 Turbo Verification - 2026-07-20
+
+- PASS: `bash script/release/validate_release.sh` completed 403 tests with zero
+  failures and eight explicit opt-in native/network skips, verified the signed
+  15-model catalog, built the arm64 SwiftPM Release executable, and passed the
+  native-runtime, bundled-license, and MLX Metal-library checks.
+- PASS: the benchmark package's three tests passed. The exact
+  `mlx-community/whisper-large-v3-turbo` revision and the exact original-model
+  tokenizer assets matched all ten signed byte sizes and SHA-256 values.
+- PASS: native inference used MLX Metal and the fully local ten-file directory.
+  The first fixed OpenSLR clip transcribed at 0 WER; the complete 210-word
+  corpus measured 3.33% aggregate WER, 321.5 ms median, 416 ms p95/max, and
+  1,748,041,728 bytes peak resident memory.
+- PASS: `script/build_and_run.sh --stage-full-release` produced the exact app at
+  `dist/Textify.app`. Its tracked catalog and signature are byte-identical,
+  both Metal libraries are valid, the MLX library matches its pinned SHA-256,
+  the app and five explicitly packaged native binaries are arm64, no model
+  weights are bundled, and strict deep ad-hoc signature verification passes.
+- BLOCKED: Developer ID signing, notarization/stapling, Gatekeeper assessment,
+  and final clean-machine interactive dictation still require the credentialed
+  release-maintainer workflow. This ad-hoc staged app is for local testing.
+
+## Qwen3-ASR MLX And GGUF Verification - 2026-07-20
+
+- PASS: both nine-file MLX directories and all six requested GGUF files matched
+  the final signed catalog's immutable revision, exact byte size, and SHA-256.
+- PASS: all eight entries transcribed the complete ten-utterance fixed English
+  corpus on the Apple M4 Max through their required Metal backends. MLX 0.6B
+  and 1.7B measured 3.20% and 1.83% WER; the GGUF variants measured
+  3.33–3.65% WER with 156.5–317.5 ms median finalization.
+- PASS: both MLX variants and the 0.6B/1.7B Q5_K_M GGUF routes transcribed all
+  ten fixed Hindi fixtures with automatic language detection. The GGUF routes
+  measured 11.36%/10.05% and 10.00%/7.00% WER/CER respectively.
+- PASS: `swift test` and `script/release/validate_release.sh` each completed
+  409 tests with zero failures and eight explicit opt-in native/network skips.
+  The standalone benchmark package's three tests also passed.
+- PASS: the final detached signature verifies the 23-model catalog with key ID
+  `textify-model-manifest-2026-huggingface`; structural tests cover every Qwen
+  runtime variant, artifact layout, automatic-language contract, size, hash,
+  and measured picker presentation.
+- PASS: `script/build_and_run.sh --stage-full-release` produced the arm64 app
+  at `dist/Textify.app`. It contains byte-identical catalog/signature files,
+  the verified MLX Metal library and transcribe.cpp runtime, no model weights,
+  and passes strict deep ad-hoc code-signature verification.
+- BLOCKED: Developer ID signing, notarization/stapling, Gatekeeper assessment,
+  and final clean-machine interactive model switching require the credentialed
+  release-maintainer workflow. This ad-hoc staged app is for local testing.
+
+## Parakeet TDT And Nemotron MLX/GGUF Verification - 2026-07-20
+
+- PASS: the three exact MLX directories and nine exact F16, Q8_0, and Q5_K_M
+  GGUF files matched their immutable source revisions, signed byte sizes, and
+  SHA-256 hashes. The Handy repositories publish F16 rather than BF16.
+- PASS: all twelve choices transcribed the complete fixed ten-utterance,
+  210-word English corpus on the Apple M4 Max through their required native
+  Metal backends. Aggregate WER ranged from 0.48% to 3.33%, median
+  release-to-final latency ranged from 67 to 137 ms, and every p95 remained
+  under Textify's 700 ms target.
+- PASS: the signed catalog contains 35 models and structural tests cover every
+  new runtime variant, language policy, artifact layout, revision, byte size,
+  and SHA-256. Nemotron is deliberately presented as batch dictation without a
+  live-streaming claim.
+- PASS: `swift test` and `script/release/validate_release.sh` each completed
+  414 tests with zero failures and eight explicit opt-in native/network skips.
+  The standalone benchmark package's three tests also passed.
+- PASS: `script/build_and_run.sh --stage-full-release` produced the arm64
+  ad-hoc app at `dist/Textify.app`; the staged app contains the verified
+  35-model catalog/signature, required MLX and transcribe.cpp Metal runtimes,
+  notices, no model weights, and passed the release artifact checks.
+- BLOCKED: Developer ID signing, notarization/stapling, Gatekeeper assessment,
+  and final clean-machine interactive model switching require the credentialed
+  release-maintainer workflow. This ad-hoc staged app is for local testing.

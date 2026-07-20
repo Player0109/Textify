@@ -38,25 +38,37 @@ the completed recording locally, then inserts the final text into the active
 text field when possible. It intentionally does not show live partial captions;
 the optimization target is near-instant final text after release.
 
-The runtime supports four offline engine families on Apple Silicon:
+The runtime supports six offline engine families on Apple Silicon:
 
 - Whisper GGML/GGUF through whisper.cpp and Metal, including verified custom
   model import;
 - NVIDIA Parakeet through FluidAudio, Core ML, and Apple Neural Engine;
+- Parakeet RNNT/TDT, Nemotron 3.5 ASR, Cohere Transcribe, Whisper Turbo, and
+  Qwen3-ASR through MLX Audio Swift and Metal;
+- Canary-Qwen, Parakeet TDT, Nemotron 3.5 ASR, and Qwen3-ASR GGUF through the
+  isolated transcribe.cpp Metal runtime;
 - Paraformer-large Chinese through FluidAudio, Core ML, and Apple Neural
   Engine; and
 - ReazonSpeech K2 V2 and SenseVoiceSmall through pinned sherpa-onnx and ONNX
   Runtime libraries on the Apple Silicon CPU.
 
-The shipped signed catalog offers nine choices: Whisper small.en, Whisper
-Large V3 Turbo for measured English/Hindi use, four Parakeet variants, and the
-Paraformer Chinese specialist, compact Fast ReazonSpeech Japanese, and Accurate
-SenseVoiceSmall with automatic English, Mandarin, Cantonese, Japanese, and
-Korean selection. Whisper small.en downloads from an immutable Textify release
-asset; Turbo, Core ML, ReazonSpeech, and SenseVoice model files download from
-exact commit-pinned public Hugging Face files. Every file is checked against its
-signed byte size and SHA-256 before it can become active. Textify does not keep
-transcript history or use proprietary/cloud ASR.
+The shipped signed catalog offers 35 choices: Whisper small.en;
+Experimental Whisper Large V2 and V3; Whisper Large V3 Turbo for measured
+English/Hindi use plus a separate Experimental MLX Turbo choice for English;
+Accurate Canary-Qwen 2.5B for English; four Core ML Parakeet variants plus
+Experimental Parakeet RNNT 1.1B and Cohere Transcribe; the Paraformer Chinese
+specialist; compact Fast ReazonSpeech Japanese; and Accurate SenseVoiceSmall
+with automatic English, Mandarin, Cantonese, Japanese, and Korean selection;
+plus Experimental Qwen3-ASR 0.6B and 1.7B choices in MLX 8-bit and GGUF BF16,
+Q8_0, and Q5_K_M formats; and Experimental Parakeet TDT V2, Parakeet TDT V3,
+and Nemotron 3.5 ASR in native MLX plus GGUF F16, Q8_0, and Q5_K_M formats.
+V3 and Nemotron use automatic language detection. Nemotron remains a
+whole-recording batch route in Textify and does not expose live partials.
+Whisper small.en downloads from an immutable Textify release asset; the other
+Whisper, Core ML, MLX, Canary-Qwen, ReazonSpeech, and SenseVoice model files
+download from exact commit-pinned public Hugging Face files. Every file is
+checked against its signed byte size and SHA-256 before it can become active.
+Textify does not keep transcript history or use proprietary/cloud ASR.
 
 Recording length follows the active model's declared capability. Most Whisper
 and Parakeet entries allow the app-wide 60-second maximum. Paraformer,
