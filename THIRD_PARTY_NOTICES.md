@@ -106,6 +106,22 @@ use the package's network-backed pretrained-model loader.
 - Exact copied license texts for MLX, Hugging Face Swift, Swift project,
   EventSource, and yyjson dependencies: `THIRD_PARTY_LICENSES/`
 
+## MossFormer2 SE voice-cleaning models
+
+MossFormer2 SE model assets are optional external downloads and are not
+included in the application bundle or this repository snapshot.
+
+- FP32 conversion: https://huggingface.co/starkdmi/MossFormer2-SE at
+  `8744c59f925154f4ba2e9f15ae7eeaa870f80118`
+- FP16 conversion: https://huggingface.co/starkdmi/MossFormer2-SE-fp16 at
+  `dd04b1b736b9f49951433b7f051cd8d32eb024b6`
+- 8-bit conversion: https://huggingface.co/starkdmi/MossFormer2-SE-8bit at
+  `694e69b58f2457e02d96f4ba7fa151a28b07805a`
+- Original model: https://huggingface.co/alibabasglab/MossFormer2_SE_48K
+- Converted checkpoint license: Apache-2.0
+- Every config and weight revision, byte size, and checksum is pinned by the
+  signed Textify model catalog
+
 ## Qwen3-ASR models
 
 Qwen3-ASR model assets are optional external downloads and are not included in

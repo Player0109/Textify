@@ -52,7 +52,13 @@ The runtime supports six offline engine families on Apple Silicon:
 - ReazonSpeech K2 V2 and SenseVoiceSmall through pinned sherpa-onnx and ONNX
   Runtime libraries on the Apple Silicon CPU.
 
-The shipped signed catalog offers 35 choices: Whisper small.en;
+Textify can optionally clean each completed recording before ASR with
+MossFormer2 SE on MLX Metal. The separately installed FP32, FP16, and 8-bit
+cleaners operate locally and in memory; FP16 is recommended and is enabled
+when installed. If cleaning fails, Textify warns and sends the original audio
+to the selected transcription model.
+
+The shipped signed catalog offers 35 transcription choices: Whisper small.en;
 Experimental Whisper Large V2 and V3; Whisper Large V3 Turbo for measured
 English/Hindi use plus a separate Experimental MLX Turbo choice for English;
 Accurate Canary-Qwen 2.5B for English; four Core ML Parakeet variants plus
@@ -62,6 +68,8 @@ with automatic English, Mandarin, Cantonese, Japanese, and Korean selection;
 plus Experimental Qwen3-ASR 0.6B and 1.7B choices in MLX 8-bit and GGUF BF16,
 Q8_0, and Q5_K_M formats; and Experimental Parakeet TDT V2, Parakeet TDT V3,
 and Nemotron 3.5 ASR in native MLX plus GGUF F16, Q8_0, and Q5_K_M formats.
+It also offers three independent MossFormer2 SE voice-cleaning choices: FP32,
+FP16, and 8-bit.
 V3 and Nemotron use automatic language detection. Nemotron remains a
 whole-recording batch route in Textify and does not expose live partials.
 Whisper small.en downloads from an immutable Textify release asset; the other

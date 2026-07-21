@@ -13,6 +13,7 @@ import TextifyTranscription
 public final class AppDictationService {
     public private(set) var status: DictationRuntimeStatus
     public private(set) var readiness: ReadinessSnapshot
+    public private(set) var voiceCleaningStatus: VoiceCleaningRuntimeStatus
 
     private let dependencies: RuntimeDependencies
     private var triggerStateMachine: TriggerStateMachine
@@ -30,6 +31,7 @@ public final class AppDictationService {
         self.dependencies = dependencies
         self.triggerStateMachine = triggerStateMachine
         self.status = .idle
+        self.voiceCleaningStatus = .disabled
         self.readiness = ReadinessSnapshot(
             permissions: RuntimePermissionSnapshot(
                 microphone: .unknown,
@@ -94,6 +96,8 @@ public final class AppDictationService {
                 )
             }
         }
+
+        await prepareVoiceCleaner(preferences: preferences)
 
         return await refreshReadiness()
     }
@@ -375,8 +379,12 @@ public final class AppDictationService {
                 channelCount: audio.channelCount,
                 samples: audio.samples
             )
+            let preparedAudio = await voiceCleanedAudio(
+                transcriptionAudio,
+                preferences: preferences
+            )
             let inferenceStartedAt = dependencies.clock.nowMilliseconds()
-            let result = try await dependencies.transcriber.transcribe(transcriptionAudio)
+            let result = try await dependencies.transcriber.transcribe(preparedAudio)
             let inferenceDurationMs = max(
                 0,
                 dependencies.clock.nowMilliseconds() - inferenceStartedAt
@@ -486,6 +494,92 @@ public final class AppDictationService {
             insertionSessionID = nil
             activationTarget = nil
             status = .failed(.transcriptionFailed)
+        }
+    }
+
+    private func prepareVoiceCleaner(preferences: AppPreferences) async {
+        guard let selectedModelID = preferences.activeVoiceCleaningModelID else {
+            await dependencies.voiceCleaner.unload()
+            voiceCleaningStatus = .disabled
+            return
+        }
+        guard let model = await dependencies.models.resolveActiveVoiceCleaningModel(
+            preferences: preferences
+        ), case .ready = await dependencies.models.readiness(for: model) else {
+            await dependencies.voiceCleaner.unload()
+            voiceCleaningStatus = .warning(
+                modelID: selectedModelID,
+                reason: .modelUnavailable
+            )
+            return
+        }
+
+        voiceCleaningStatus = .preparing(modelID: model.id)
+        let startedAt = dependencies.clock.nowMilliseconds()
+        do {
+            try await dependencies.voiceCleaner.prepare(model: model)
+            voiceCleaningStatus = .ready(modelID: model.id)
+            await dependencies.diagnostics.log(
+                .voiceCleaning(
+                    modelID: model.id,
+                    durationMs: max(0, dependencies.clock.nowMilliseconds() - startedAt),
+                    result: "ready"
+                )
+            )
+        } catch {
+            voiceCleaningStatus = .warning(modelID: model.id, reason: .modelUnavailable)
+            await dependencies.diagnostics.log(
+                .voiceCleaning(
+                    modelID: model.id,
+                    durationMs: max(0, dependencies.clock.nowMilliseconds() - startedAt),
+                    result: "raw_audio_fallback"
+                )
+            )
+        }
+    }
+
+    private func voiceCleanedAudio(
+        _ audio: TranscriptionAudioBuffer,
+        preferences: AppPreferences
+    ) async -> TranscriptionAudioBuffer {
+        guard let selectedModelID = preferences.activeVoiceCleaningModelID else {
+            if voiceCleaningStatus != .disabled {
+                await dependencies.voiceCleaner.unload()
+                voiceCleaningStatus = .disabled
+            }
+            return audio
+        }
+        guard let model = await dependencies.models.resolveActiveVoiceCleaningModel(
+            preferences: preferences
+        ), case .ready = await dependencies.models.readiness(for: model) else {
+            await dependencies.voiceCleaner.unload()
+            voiceCleaningStatus = .warning(modelID: selectedModelID, reason: .modelUnavailable)
+            return audio
+        }
+
+        let startedAt = dependencies.clock.nowMilliseconds()
+        do {
+            try await dependencies.voiceCleaner.prepare(model: model)
+            let cleaned = try await dependencies.voiceCleaner.clean(audio)
+            voiceCleaningStatus = .ready(modelID: model.id)
+            await dependencies.diagnostics.log(
+                .voiceCleaning(
+                    modelID: model.id,
+                    durationMs: max(0, dependencies.clock.nowMilliseconds() - startedAt),
+                    result: "cleaned"
+                )
+            )
+            return cleaned
+        } catch {
+            voiceCleaningStatus = .warning(modelID: model.id, reason: .processingFailed)
+            await dependencies.diagnostics.log(
+                .voiceCleaning(
+                    modelID: model.id,
+                    durationMs: max(0, dependencies.clock.nowMilliseconds() - startedAt),
+                    result: "raw_audio_fallback"
+                )
+            )
+            return audio
         }
     }
 

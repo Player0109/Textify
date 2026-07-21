@@ -168,6 +168,7 @@ let package = Package(
                 .product(name: "FluidAudio", package: "FluidAudio"),
                 .product(name: "MLX", package: "mlx-swift"),
                 .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
+                .product(name: "MLXAudioSTS", package: "mlx-audio-swift"),
                 .target(name: "CLiteRTLM_mac", condition: .when(platforms: [.macOS]))
             ]
         ),

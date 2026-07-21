@@ -114,17 +114,35 @@ public enum ProductionModelPolicy {
                 throw ProductionModelPolicyError.invalidRuntimeParameters(modelID: model.id)
             }
 
-            switch (model.runtime.engine, model.runtime.accelerator, model.runtime.artifactLayout) {
-            case (.whisperCpp, .metalGPU, .singleFile),
-                 (.fluidAudioParakeet, .coreMLNeuralEngine, .modelDirectory),
-                 (.fluidAudioParaformer, .coreMLNeuralEngine, .modelDirectory),
-                 (.sherpaOnnx, .cpu, .modelDirectory),
-                 (.transcribeCpp, .metalGPU, .singleFile),
-                 (.mlxAudio, .metalGPU, .modelDirectory),
-                 (.liteRTLM, .metalGPU, .singleFile):
-                break
-            default:
-                throw ProductionModelPolicyError.incompatibleRuntime(modelID: model.id)
+            switch model.purpose {
+            case .transcription:
+                switch (model.runtime.engine, model.runtime.accelerator, model.runtime.artifactLayout) {
+                case (.whisperCpp, .metalGPU, .singleFile),
+                     (.fluidAudioParakeet, .coreMLNeuralEngine, .modelDirectory),
+                     (.fluidAudioParaformer, .coreMLNeuralEngine, .modelDirectory),
+                     (.sherpaOnnx, .cpu, .modelDirectory),
+                     (.transcribeCpp, .metalGPU, .singleFile),
+                     (.mlxAudio, .metalGPU, .modelDirectory),
+                     (.liteRTLM, .metalGPU, .singleFile):
+                    break
+                default:
+                    throw ProductionModelPolicyError.incompatibleRuntime(modelID: model.id)
+                }
+            case .voiceCleaning:
+                guard model.runtime.engine == .mlxAudio,
+                      model.runtime.accelerator == .metalGPU,
+                      model.runtime.artifactLayout == .modelDirectory,
+                      [
+                        "mossformer2-se-fp32",
+                        "mossformer2-se-fp16",
+                        "mossformer2-se-int8",
+                      ].contains(model.runtime.variant),
+                      model.capabilities.languages == ["*"],
+                      !model.capabilities.supportsTranslation,
+                      !model.capabilities.supportsCustomVocabulary
+                else {
+                    throw ProductionModelPolicyError.incompatibleRuntime(modelID: model.id)
+                }
             }
 
             var filenames = Set<String>()

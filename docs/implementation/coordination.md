@@ -298,6 +298,31 @@ Task 1 must merge before parallel Wave 1 work begins.
 - Cloud-only services and models whose published minimum hardware cannot fit an
   Apple Silicon Mac must not be represented as locally runnable. Similarly named
   open models are not substitutes for the exact requested model names.
+
+## MossFormer2 Voice Cleaning Handoff - 2026-07-20
+
+- The user-directed voice-cleaning work owns the narrow model-purpose,
+  preferences, install/selection, MLX speech-enhancement runtime, preprocessing,
+  diagnostics, catalog, Models-pane, and focused test changes required for the
+  exact `starkdmi/MossFormer2-SE`, `starkdmi/MossFormer2-SE-fp16`, and
+  `starkdmi/MossFormer2-SE-8bit` repositories.
+- Preserve every existing ASR engine, benchmark-model expansion, visual-system,
+  packaging, and concurrently uncommitted change in shared files. Voice-cleaning
+  entries are independently installed preprocessors and must never become the
+  active ASR model.
+- Reuse the already pinned native `mlx-audio-swift` and MLX Swift dependencies.
+  Enhancement must use Textify-managed, exact commit-pinned local artifacts and
+  in-memory audio only; it must not add Python, subprocesses, mutable Hub fetches,
+  saved recordings, or transcript/audio diagnostics.
+- The user selected fp16 as the automatically enabled recommendation after it is
+  installed. Cleaning remains disableable. If an enabled cleaner fails to load
+  or enhance a recording, Textify continues with the original audio and surfaces
+  a non-blocking warning instead of blocking dictation.
+- The MossFormer2 model contract is 48 kHz mono. Textify may resample its
+  canonical 16 kHz mono dictation buffer to 48 kHz for enhancement and back to
+  16 kHz before every ASR engine. Promotion requires focused resampling/runtime
+  tests, a real native Metal smoke, a valid signed catalog, full tests, and the
+  existing release checks.
 - The MLX Audio runtime addition requires one exhaustive-switch label in the
   redesign-owned `Sources/Textify/SettingsUI/SettingsRootView.swift`. The model
   workstream owns only the new `mlx_audio` to `MLX Audio` label case and must
@@ -570,3 +595,24 @@ Task 1 must merge before parallel Wave 1 work begins.
   corpus at 0.48–3.33% WER with 67–137 ms median finalization. The final signed
   catalog contains 35 models. Full release validation and staged-app checks
   remain required before handoff.
+
+## Local Ad-Hoc Launch Signing Handoff - 2026-07-21
+
+- The user-directed launch fix owns the minimum Task 14 bundle changes needed
+  to make locally ad-hoc-signed Xcode apps load Textify's embedded native
+  runtimes under Hardened Runtime and to make staged-app verification launch
+  the produced executable long enough to catch `dyld` failures.
+- Keep the production `Textify.entitlements` strict. The library-validation
+  exception is limited to a separate local entitlement used by Debug builds
+  and the explicit `--stage-full-release` developer workflow; Developer ID
+  archives continue using the production entitlement and consistently signed
+  nested code.
+- Preserve all model, runtime, catalog, UI, and concurrently uncommitted work.
+  Verification must reproduce the current `libCLiteRTLM_mac.dylib` Team-ID
+  rejection before the fix and prove the rebuilt app remains alive afterward.
+- Completed verification: the staged Release workflow first failed its new
+  launch smoke with exit 134 and the expected LiteRT-LM Team-ID rejection. With
+  the local entitlement applied, the same workflow passes, Launch Services
+  keeps Textify alive beyond five seconds with normal AppKit/Metal startup, all
+  436 tests pass with 9 native opt-in skips, and release validation confirms the
+  default Release configuration still uses `Textify.entitlements`.

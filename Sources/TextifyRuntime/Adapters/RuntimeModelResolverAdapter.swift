@@ -40,6 +40,7 @@ public actor RuntimeModelResolverAdapter: RuntimeModelResolving {
         guard preferences.modelSelectionScope == .curatedInstalledModels,
               let modelID = preferences.activeModelID,
               let record = try? loadStore().record(forModelID: modelID),
+              record.model.purpose == .transcription,
               let installedFiles = installedFiles(for: record),
               let firstInstalledFile = installedFiles.first
         else {
@@ -89,7 +90,35 @@ public actor RuntimeModelResolverAdapter: RuntimeModelResolving {
             variant: record.model.runtime.variant,
             accelerator: record.model.runtime.accelerator,
             artifactLayout: record.model.runtime.artifactLayout,
-            runtimeParameters: runtimeParameters
+            runtimeParameters: runtimeParameters,
+            purpose: record.model.purpose
+        )
+    }
+
+    public func resolveActiveVoiceCleaningModel(preferences: AppPreferences) async -> RuntimeActiveModel? {
+        guard let modelID = preferences.activeVoiceCleaningModelID,
+              let record = try? loadStore().record(forModelID: modelID),
+              record.model.purpose == .voiceCleaning,
+              let installedFiles = installedFiles(for: record),
+              !installedFiles.isEmpty,
+              let installedDirectory = try? layout.installedModelDirectory(modelID: record.model.id)
+        else {
+            return nil
+        }
+
+        return RuntimeActiveModel(
+            id: record.model.id,
+            displayName: record.model.displayName,
+            tier: record.model.tier,
+            localModelPath: installedDirectory.path,
+            useGPU: true,
+            threadCount: nil,
+            engine: record.model.runtime.engine,
+            variant: record.model.runtime.variant,
+            accelerator: record.model.runtime.accelerator,
+            artifactLayout: record.model.runtime.artifactLayout,
+            runtimeParameters: record.model.runtimeParameters,
+            purpose: record.model.purpose
         )
     }
 

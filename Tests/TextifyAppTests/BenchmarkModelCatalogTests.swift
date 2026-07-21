@@ -475,6 +475,64 @@ final class BenchmarkModelCatalogTests: XCTestCase {
         }
     }
 
+    func testMossFormer2VoiceCleanersUsePinnedLocalMLXMetalArtifacts() throws {
+        let manifest = try verifiedManifest()
+        let expected: [String: (
+            variant: String,
+            revision: String,
+            sizeBytes: Int64,
+            weightsSize: Int64,
+            weightsSHA256: String
+        )] = [
+            "mossformer2-se-fp32": (
+                "mossformer2-se-fp32",
+                "8744c59f925154f4ba2e9f15ae7eeaa870f80118",
+                221_178_344,
+                221_178_088,
+                "8e47b75ca25dc402db5420c45c868544da8d2ac43b21a919197da113d4d81313"
+            ),
+            "mossformer2-se-fp16": (
+                "mossformer2-se-fp16",
+                "dd04b1b736b9f49951433b7f051cd8d32eb024b6",
+                110_652_884,
+                110_652_628,
+                "61e63484df9c2be7e1111ca0346d431422a98b263331021a67c2d7ddb2f67a85"
+            ),
+            "mossformer2-se-int8": (
+                "mossformer2-se-int8",
+                "694e69b58f2457e02d96f4ba7fa151a28b07805a",
+                90_089_718,
+                90_089_394,
+                "89a0a7fef6de4a7b25bac7365ea60e9b490e978d2ad2fc95c381092f06a5315f"
+            ),
+        ]
+
+        for (modelID, artifact) in expected {
+            let model = try XCTUnwrap(manifest.models.first { $0.id == modelID })
+            XCTAssertEqual(model.purpose, .voiceCleaning)
+            XCTAssertEqual(model.runtime.engine, .mlxAudio)
+            XCTAssertEqual(model.runtime.variant, artifact.variant)
+            XCTAssertEqual(model.runtime.accelerator, .metalGPU)
+            XCTAssertEqual(model.runtime.artifactLayout, .modelDirectory)
+            XCTAssertEqual(model.capabilities.languages, ["*"])
+            XCTAssertEqual(model.runtimeParameters.maxAudioSeconds, 60)
+            XCTAssertEqual(model.files.count, 2)
+            XCTAssertEqual(model.sizeBytes, artifact.sizeBytes)
+            XCTAssertTrue(
+                model.files.allSatisfy {
+                    $0.url.contains("/resolve/\(artifact.revision)/")
+                        && $0.relativePath == $0.filename
+                }
+            )
+            XCTAssertNotNil(model.files.first { $0.filename == "config.json" })
+            let weights = try XCTUnwrap(
+                model.files.first { $0.filename == "model.safetensors" }
+            )
+            XCTAssertEqual(weights.sizeBytes, artifact.weightsSize)
+            XCTAssertEqual(weights.sha256, artifact.weightsSHA256)
+        }
+    }
+
     private func verifiedManifest() throws -> ModelManifest {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

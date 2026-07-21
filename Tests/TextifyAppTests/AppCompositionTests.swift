@@ -95,6 +95,43 @@ final class AppCompositionTests: XCTestCase {
         XCTAssertTrue(services.installedModels.isEmpty)
     }
 
+    @MainActor
+    func testVoiceCleanerActivationDoesNotReplaceActiveTranscriptionModel() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let transcriptionModel = try Self.catalogModel(id: ProductionModelPolicy.requiredModelID)
+        let cleaner = try Self.catalogModel(id: "mossformer2-se-fp16")
+        let storeURL = ModelStorageLayout(rootDirectory: paths.modelsDirectory).installedStoreURL
+        let installedStore = InstalledModelsStore(records: [
+            InstalledModelRecord(
+                model: transcriptionModel,
+                installedAt: "2026-07-20T00:00:00Z",
+                localFilesByManifestFilename: ["model.bin": "/tmp/model.bin"]
+            ),
+            InstalledModelRecord(
+                model: cleaner,
+                installedAt: "2026-07-20T00:00:00Z",
+                localFilesByManifestFilename: [
+                    "config.json": "/tmp/mossformer/config.json",
+                    "model.safetensors": "/tmp/mossformer/model.safetensors",
+                ]
+            ),
+        ])
+        try JSONEncoder().encode(installedStore).write(to: storeURL, options: .atomic)
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = transcriptionModel.id
+        let services = try Self.makeServices(preferences: preferences, paths: paths)
+
+        let activated = await services.activateInstalledModel(cleaner.id)
+
+        XCTAssertTrue(activated)
+        XCTAssertEqual(services.preferences.activeModelID, transcriptionModel.id)
+        XCTAssertEqual(services.preferences.activeVoiceCleaningModelID, cleaner.id)
+        XCTAssertTrue(services.isModelActive(cleaner.id))
+        await services.disableVoiceCleaning()
+        XCTAssertNil(services.preferences.activeVoiceCleaningModelID)
+        XCTAssertEqual(services.settingsStore.load().activeModelID, transcriptionModel.id)
+    }
+
     func testAppPathsFactoryUsesTextifySupportLocationsWithoutUserLibrarySideEffects() throws {
         let root = Self.temporaryDirectory()
         let paths = try AppPaths.make(

@@ -54,6 +54,28 @@ final class AppServices {
             }
             self.refreshInstalledModels()
             try Task.checkCancellation()
+            guard let installedModel = manifest.models.first(where: { $0.id == modelID }) else {
+                throw ModelInstallCoordinatorError.modelPreparationFailed
+            }
+            if installedModel.purpose == .voiceCleaning {
+                onStateChange(DownloadState(
+                    modelID: modelID,
+                    phase: .installing,
+                    message: "Preparing voice cleaning."
+                ))
+                self.preferences.activeVoiceCleaningModelID = modelID
+                self.savePreferences()
+                _ = await self.dictation.prepareActiveModelIfAvailable()
+                try Task.checkCancellation()
+                onStateChange(DownloadState(
+                    modelID: modelID,
+                    phase: .installed,
+                    bytesDownloaded: installedModel.sizeBytes,
+                    totalBytes: installedModel.sizeBytes,
+                    message: "Voice cleaner installed and enabled."
+                ))
+                return
+            }
             onStateChange(DownloadState(
                 modelID: modelID,
                 phase: .installing,
@@ -75,12 +97,11 @@ final class AppServices {
                 _ = await self.dictation.prepareActiveModelIfAvailable()
                 throw ModelInstallCoordinatorError.modelPreparationFailed
             }
-            let installedModel = manifest.models.first { $0.id == modelID }
             onStateChange(DownloadState(
                 modelID: modelID,
                 phase: .installed,
-                bytesDownloaded: installedModel?.sizeBytes ?? 0,
-                totalBytes: installedModel?.sizeBytes ?? 0,
+                bytesDownloaded: installedModel.sizeBytes,
+                totalBytes: installedModel.sizeBytes,
                 message: "Model installed and ready."
             ))
         }
@@ -157,7 +178,7 @@ final class AppServices {
         launchAtLoginLocation: any LaunchAtLoginLocationChecking = LaunchAtLoginLocationChecker(),
         overlayPresenter: (any RecordingOverlayPresenting)? = nil,
         waitBeforeProcessingIndicator: @escaping @Sendable () async -> Void = {
-            try? await Task.sleep(nanoseconds: 450_000_000)
+            try? await Task.sleep(nanoseconds: 900_000_000)
         },
         waitBeforeTerminalStatusDismissal: @escaping @Sendable () async -> Void = {
             try? await Task.sleep(nanoseconds: 2_500_000_000)
@@ -367,6 +388,18 @@ final class AppServices {
         installedModel(modelID) != nil
     }
 
+    func isModelActive(_ modelID: String) -> Bool {
+        guard let model = installedModel(modelID)?.model else {
+            return false
+        }
+        switch model.purpose {
+        case .transcription:
+            return preferences.activeModelID == modelID
+        case .voiceCleaning:
+            return preferences.activeVoiceCleaningModelID == modelID
+        }
+    }
+
     var installedModels: [ModelEntry] {
         installedModelsStore.records.map(\.model)
     }
@@ -403,8 +436,14 @@ final class AppServices {
 
     @discardableResult
     func activateInstalledModel(_ modelID: String) async -> Bool {
-        guard isModelInstalled(modelID) else {
+        guard let model = installedModel(modelID)?.model else {
             return false
+        }
+        if model.purpose == .voiceCleaning {
+            preferences.activeVoiceCleaningModelID = modelID
+            savePreferences()
+            _ = await dictation.prepareActiveModelIfAvailable()
+            return true
         }
         let previousModelID = preferences.activeModelID
         let previousLanguage = preferences.transcriptionLanguage
@@ -422,6 +461,12 @@ final class AppServices {
             return false
         }
         return true
+    }
+
+    func disableVoiceCleaning() async {
+        preferences.activeVoiceCleaningModelID = nil
+        savePreferences()
+        _ = await dictation.prepareActiveModelIfAvailable()
     }
 
     func importCustomWhisperModel(
@@ -448,7 +493,8 @@ final class AppServices {
     }
 
     func removeInstalledModel(_ modelID: String) async throws {
-        guard preferences.activeModelID != modelID else {
+        guard preferences.activeModelID != modelID,
+              preferences.activeVoiceCleaningModelID != modelID else {
             throw AppModelRemovalError.activeModelMustBeSwitchedFirst
         }
         let manager = InstalledModelManager(
@@ -561,6 +607,7 @@ final class AppServices {
         let sherpaOnnxRuntime = SherpaOnnxRuntime()
         let transcribeCppRuntime = TranscribeCppRuntime()
         let mlxAudioRuntime = MLXAudioRuntime()
+        let mossFormer2VoiceCleaningRuntime = MossFormer2VoiceCleaningRuntime()
         let liteRTLMRuntime = LiteRTLMRuntime(
             cacheDirectory: paths.applicationSupportDirectory
                 .appendingPathComponent("LiteRTLMCache", isDirectory: true).path
@@ -587,6 +634,9 @@ final class AppServices {
             models: RuntimeModelResolverAdapter(layout: modelLayout),
             audio: RuntimeAudioRecorderAdapter(),
             transcriber: transcriber,
+            voiceCleaner: MossFormer2RuntimeVoiceCleaner(
+                runtime: mossFormer2VoiceCleaningRuntime
+            ),
             targetCapturer: targetChecker,
             inserter: PasteInsertionService(
                 pasteboard: SystemPasteboardClient(),
@@ -660,7 +710,7 @@ enum AppModelRemovalError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .activeModelMustBeSwitchedFirst:
-            return "Select another installed model before deleting the active model."
+            return "Select another model or disable voice cleaning before deleting the active model."
         }
     }
 }

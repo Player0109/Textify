@@ -17,7 +17,8 @@ Whisper-only, and no-Core-ML boundaries. Textify remains arm64-only, uses the
 system-default microphone, and is distributed as a manually updated GitHub
 Release DMG. It now supports a signed multi-model catalog, multiple installed
 models, safe switching/deletion, verified custom Whisper import, Whisper on
-Metal, and released FluidAudio batch engines on Core ML/Apple Neural Engine.
+Metal, released FluidAudio batch engines on Core ML/Apple Neural Engine, and
+optional MossFormer2 speech enhancement before ASR.
 It still omits Sparkle, history, vocabulary/custom words, per-app profiles,
 cloud ASR, and live partial transcription. The trigger is user-selectable from
 the four curated choices, with Right Command as the default. A runtime is not a
@@ -716,6 +717,11 @@ States:
 - Installed, active: Active badge and Delete
 - Deprecated installed model: "No longer in curated list" badge
 
+Voice-cleaning models are a separate selection from the active transcription
+model. Installing a cleaner activates it without changing the active ASR
+model. The recommended MossFormer2 FP16 cleaner activates immediately after
+installation; users may switch to FP32 or 8-bit, or disable cleaning.
+
 First installed model auto-activates.
 
 Subsequent installed models do not auto-switch.
@@ -1100,7 +1106,7 @@ Overlay:
 On trigger release:
 
 - Overlay disappears immediately in the common path.
-- If processing exceeds about 400-500 ms, show lightweight delayed processing indicator.
+- If processing exceeds about 900 ms, show lightweight delayed processing indicator.
 - Show errors only for actionable failures.
 
 Cancel:
@@ -1208,6 +1214,20 @@ Silence/VAD:
 - Full-clip no speech skips transcription and silently no-ops.
 
 No raw audio retention by default.
+
+Optional voice cleaning:
+
+- Runs after canonical 16 kHz mono capture and before every transcription
+  engine.
+- Uses a separately installed MossFormer2 SE FP32, FP16, or 8-bit MLX model;
+  FP16 is the recommended default.
+- Resamples 16 kHz input to the model's required 48 kHz in memory, enhances it
+  on MLX Metal, then resamples back to an exact-length 16 kHz mono buffer.
+- Never writes intermediate audio to disk.
+- Loads and warms the selected cleaner independently from the ASR model.
+- If loading or enhancement fails, sends the original canonical audio to ASR,
+  shows a non-blocking Raw Audio Fallback warning, and records only technical
+  diagnostics without audio or transcript content.
 
 ## 20. Transcription Runtime
 

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added optional MossFormer2 SE FP32, FP16, and 8-bit voice cleaning on MLX
+  Metal before every ASR backend, with independent model selection, in-memory
+  16/48 kHz conversion, FP16 auto-enable after install, and raw-audio fallback.
 - Added a signed multi-model catalog, resumable atomic multi-file installs,
   switching, deletion, rollback, and verified custom Whisper GGML/GGUF import.
 - Added engine-aware offline transcription with Whisper/Metal, native

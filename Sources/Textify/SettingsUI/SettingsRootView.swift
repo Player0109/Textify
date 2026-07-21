@@ -542,26 +542,13 @@ private struct ModelsSettingsPane: View {
         let installedModels = services.installedModels
         let completeCatalog = makeCatalog(installedModels: installedModels)
         let visibleCatalog = catalogQuery.apply(to: completeCatalog)
-        let selectedModel = activeModel(in: completeCatalog)
         let installedModelIDs = Set(installedModels.map(\.id))
 
         return SettingsPaneLayout(
-            title: "Dictation Models",
-            subtitle: "Choose the local speech engine that fits your language, speed, and available storage."
+            title: "Local Models",
+            subtitle: "Choose a dictation model and optional voice cleaner. Everything runs on your Mac.",
+            maxContentWidth: 1_360
         ) {
-            ModelCommandDeck(
-                model: selectedModel,
-                readiness: services.dictation.readiness.model,
-                catalogCount: completeCatalog.count,
-                installedCount: installedModelIDs.count
-            )
-
-            TextifySectionLabel(
-                title: "Local model catalog",
-                detail: "Compare speed, quality, footprint, and runtime before choosing what runs on your Mac."
-            )
-            .padding(.top, 4)
-
             ModelCatalogToolbar(
                 sort: $catalogSort,
                 format: $catalogFormat,
@@ -571,6 +558,48 @@ private struct ModelsSettingsPane: View {
                 onReset: resetCatalogQuery
             )
 
+            HStack(spacing: 14) {
+                Button("Verify Installed", systemImage: "checkmark.seal") {
+                    Task {
+                        _ = await services.dictation.refreshReadiness()
+                        modelMessage = services.dictation.readiness.model.settingsModelStatus
+                    }
+                }
+
+                Button(
+                    isImporting ? "Importing" : "Import Whisper Model…",
+                    systemImage: "square.and.arrow.down"
+                ) {
+                    chooseCustomWhisperModel()
+                }
+                .disabled(isInstalling || isImporting)
+
+                Spacer(minLength: 12)
+
+                if services.modelCatalogCoordinator.isLoading {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Loading signed catalog")
+                        .foregroundStyle(.secondary)
+                } else if let errorMessage = services.modelCatalogCoordinator.errorMessage {
+                    Text(errorMessage)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                } else if ProductionModelInstallConfiguration.current == nil {
+                    Text("Signed catalog unavailable in this build")
+                        .foregroundStyle(.secondary)
+                }
+
+                if let modelMessage {
+                    Text(modelMessage)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            .font(.callout)
+            .buttonStyle(.borderless)
+            .padding(.horizontal, 4)
+
             ModelCatalogSurface(
                 models: visibleCatalog,
                 onReset: resetCatalogQuery
@@ -578,7 +607,7 @@ private struct ModelsSettingsPane: View {
                 TextifyModelCard(
                     model: model,
                     isInstalled: installedModelIDs.contains(model.id),
-                    isActive: services.preferences.activeModelID == model.id,
+                    isActive: services.isModelActive(model.id),
                     isActivating: activatingModelID == model.id,
                     isBusy: activatingModelID != nil || isInstalling || isImporting,
                     installState: ModelInstallRowPresentation.state(
@@ -590,9 +619,15 @@ private struct ModelsSettingsPane: View {
                         Task {
                             let activated = await services.activateInstalledModel(model.id)
                             modelMessage = activated
-                                ? "\(model.displayName) is active and ready."
+                                ? model.activationMessage
                                 : "Textify kept the previous model because \(model.displayName) could not be prepared."
                             activatingModelID = nil
+                        }
+                    },
+                    onDisable: {
+                        Task {
+                            await services.disableVoiceCleaning()
+                            modelMessage = "Voice cleaning is off."
                         }
                     },
                     onInstall: {
@@ -610,44 +645,6 @@ private struct ModelsSettingsPane: View {
                 )
             }
 
-            if services.modelCatalogCoordinator.isLoading {
-                HStack(spacing: 10) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Loading signed catalog")
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 8)
-            } else if let errorMessage = services.modelCatalogCoordinator.errorMessage {
-                Text(errorMessage)
-                    .foregroundStyle(.secondary)
-            }
-
-            SettingsSection("Model tools") {
-                HStack(spacing: 12) {
-                    Button("Verify Installed Model") {
-                        Task {
-                            _ = await services.dictation.refreshReadiness()
-                            modelMessage = services.dictation.readiness.model.settingsModelStatus
-                        }
-                    }
-
-                    Button(isImporting ? "Importing" : "Import Whisper GGML/GGUF") {
-                        chooseCustomWhisperModel()
-                    }
-                    .disabled(isInstalling || isImporting)
-                }
-
-                if ProductionModelInstallConfiguration.current == nil {
-                    Text("Signed model manifest is not configured in this build.")
-                        .foregroundStyle(.secondary)
-                }
-
-                if let modelMessage {
-                    Text(modelMessage)
-                        .foregroundStyle(.secondary)
-                }
-            }
         }
         .task {
             _ = await services.dictation.refreshReadiness()
@@ -703,13 +700,18 @@ private struct ModelsSettingsPane: View {
         let completeCatalog = signedCatalog + installedModels
             .filter { !signedIDs.contains($0.id) }
             .map { ProductionModelPresentation(model: $0, isCurated: false) }
-        guard let activeModelID = services.preferences.activeModelID,
-              let activeIndex = completeCatalog.firstIndex(where: { $0.id == activeModelID }) else {
-            return completeCatalog
-        }
+        let activeIDs = [
+            services.preferences.activeModelID,
+            services.preferences.activeVoiceCleaningModelID,
+        ].compactMap { $0 }
         var orderedCatalog = completeCatalog
-        let activeModel = orderedCatalog.remove(at: activeIndex)
-        orderedCatalog.insert(activeModel, at: 0)
+        for activeID in activeIDs.reversed() {
+            guard let activeIndex = orderedCatalog.firstIndex(where: { $0.id == activeID }) else {
+                continue
+            }
+            let activeModel = orderedCatalog.remove(at: activeIndex)
+            orderedCatalog.insert(activeModel, at: 0)
+        }
         return orderedCatalog
     }
 
@@ -719,22 +721,6 @@ private struct ModelsSettingsPane: View {
             format: catalogFormat,
             precision: catalogPrecision
         )
-    }
-
-    private func activeModel(
-        in catalog: [ProductionModelPresentation]
-    ) -> ProductionModelPresentation? {
-        guard let activeModelID = services.preferences.activeModelID else {
-            return nil
-        }
-        return catalog.first { $0.id == activeModelID }
-            ?? ProductionModelPresentation(
-                id: activeModelID,
-                displayName: activeModelID,
-                description: "Installed local model.",
-                details: nil,
-                isCurated: false
-            )
     }
 
     private func resetCatalogQuery() {
@@ -781,6 +767,86 @@ private struct ModelsSettingsPane: View {
             } catch {
                 modelMessage = "Import failed: \(String(describing: error))"
             }
+        }
+    }
+}
+
+private struct VoiceCleaningDeck: View {
+    let model: ProductionModelPresentation?
+    let status: VoiceCleaningRuntimeStatus
+    let onDisable: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "waveform.badge.minus")
+                .font(.title2)
+                .foregroundStyle(statusTone)
+                .frame(width: 34)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("VOICE CLEANING")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .tracking(0.9)
+                    .foregroundStyle(.secondary)
+                Text(model?.displayName ?? "Off")
+                    .font(.system(.headline, design: .rounded, weight: .semibold))
+                Text(statusDetail)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            TextifyStatusBadge(title: statusTitle, tone: statusBadgeTone)
+            if model != nil {
+                Button("Disable", action: onDisable)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            }
+        }
+        .padding(14)
+        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 13))
+        .overlay {
+            RoundedRectangle(cornerRadius: 13)
+                .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+        }
+    }
+
+    private var statusTitle: String {
+        switch status {
+        case .disabled: "OFF"
+        case .preparing: "PREPARING"
+        case .ready: "ENABLED"
+        case .warning: "RAW FALLBACK"
+        }
+    }
+
+    private var statusDetail: String {
+        switch status {
+        case .disabled:
+            "Install and enable a MossFormer2 model to reduce background noise before ASR."
+        case .preparing:
+            "Loading the local MLX cleaner on Metal."
+        case .ready:
+            "Recorded audio is cleaned locally before it reaches the dictation model."
+        case .warning:
+            "Cleaning was unavailable, so Textify continued with the original audio."
+        }
+    }
+
+    private var statusTone: Color {
+        switch status {
+        case .ready: TextifyVisualIdentity.readyMint
+        case .warning: TextifyVisualIdentity.recordCoral
+        case .disabled, .preparing: TextifyVisualIdentity.voiceViolet
+        }
+    }
+
+    private var statusBadgeTone: TextifyStatusBadge.Tone {
+        switch status {
+        case .ready: .success
+        case .warning: .warning
+        case .disabled, .preparing: .neutral
         }
     }
 }
@@ -906,7 +972,7 @@ private struct ModelCatalogToolbar: View {
     var body: some View {
         HStack(spacing: 10) {
             Label("\(resultCount) of \(totalCount)", systemImage: "line.3.horizontal.decrease")
-                .font(.system(.caption, design: .rounded, weight: .semibold))
+                .font(.system(.callout, design: .rounded, weight: .semibold))
                 .foregroundStyle(hasFilters ? TextifyVisualIdentity.voiceViolet : .secondary)
                 .accessibilityLabel("Showing \(resultCount) of \(totalCount) models")
 
@@ -925,7 +991,7 @@ private struct ModelCatalogToolbar: View {
             }
             .labelsHidden()
             .pickerStyle(.segmented)
-            .frame(width: 224)
+            .frame(width: 218)
 
             Spacer(minLength: 8)
 
@@ -961,12 +1027,10 @@ private struct ModelCatalogToolbar: View {
         .font(.callout)
         .buttonStyle(.borderless)
         .controlSize(.small)
-        .padding(.horizontal, 12)
-        .frame(height: 44)
-        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .stroke(Color.primary.opacity(0.09), lineWidth: 1)
+        .padding(.horizontal, 4)
+        .padding(.bottom, 12)
+        .overlay(alignment: .bottom) {
+            Divider()
         }
     }
 
@@ -1009,10 +1073,10 @@ private struct ModelCatalogSurface<Row: View>: View {
             }
         }
         .background(Color(nsColor: .controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
-                .stroke(Color.primary.opacity(0.12), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.primary.opacity(0.13), lineWidth: 1)
         }
     }
 }
@@ -1048,15 +1112,16 @@ private struct ModelCatalogColumnHeader: View {
                 .frame(width: 86, alignment: .leading)
             Text("SPEED")
                 .frame(width: 86, alignment: .leading)
-            Text("FOOTPRINT")
-                .frame(width: 112, alignment: .leading)
+            Text("FEATURES")
+                .frame(width: 138, alignment: .leading)
         }
         .font(.system(size: 10, weight: .bold, design: .monospaced))
         .tracking(0.9)
         .foregroundStyle(.secondary)
-        .padding(.leading, 80)
-        .padding(.trailing, 16)
-        .frame(height: 42)
+        .padding(.leading, 108)
+        .padding(.trailing, 18)
+        .frame(height: 46)
+        .background(Color.primary.opacity(0.018))
         .accessibilityHidden(true)
     }
 }
@@ -1069,6 +1134,7 @@ private struct TextifyModelCard: View {
     let isBusy: Bool
     let installState: DownloadState?
     let onUse: () -> Void
+    let onDisable: () -> Void
     let onInstall: () -> Void
     let onCancelInstall: () -> Void
     let onRetryInstall: () -> Void
@@ -1079,16 +1145,16 @@ private struct TextifyModelCard: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 11) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center, spacing: 12) {
                 ModelSelectionIndicator(isInstalled: isInstalled, isActive: isActive)
 
-                ModelEngineTile(icon: model.engineIcon, isActive: isActive)
+                ModelProviderTile(provider: model.provider, isActive: isActive)
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 7) {
-                        Text(model.displayName)
-                            .font(.system(.headline, design: .rounded, weight: .bold))
+                        Text(model.catalogDisplayName)
+                            .font(.system(size: 16, weight: .semibold))
                             .lineLimit(1)
                         if !model.isCurated {
                             TextifyStatusBadge(title: "NO LONGER CURATED", tone: .warning)
@@ -1098,6 +1164,32 @@ private struct TextifyModelCard: View {
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
+
+                    HStack(spacing: 6) {
+                        Text(model.provider.name.uppercased())
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            .tracking(0.7)
+                            .foregroundStyle(model.provider.accent)
+                        Text("•")
+                            .foregroundStyle(.tertiary)
+                        Text(model.engineName)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text("•")
+                            .foregroundStyle(.tertiary)
+                        Text(model.supportTier.uppercased())
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            .tracking(0.6)
+                            .foregroundStyle(tierTone.color)
+                        if model.purpose == .voiceCleaning {
+                            Text("• VOICE CLEANING")
+                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .tracking(0.6)
+                                .foregroundStyle(TextifyVisualIdentity.voiceViolet)
+                        }
+                    }
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -1105,23 +1197,27 @@ private struct TextifyModelCard: View {
                     .frame(width: 86, alignment: .leading)
                 ModelSignalMetric(level: model.speedSignalLevel, label: model.speedLabel)
                     .frame(width: 86, alignment: .leading)
-                ModelFootprintMetric(model: model)
-                    .frame(width: 112, alignment: .leading)
+                ModelFeaturesMetric(model: model)
+                    .frame(width: 138, alignment: .leading)
             }
 
             HStack(spacing: 10) {
                 Spacer()
-                    .frame(width: 68)
+                    .frame(width: 92)
 
                 if isActivating {
                     ProgressView()
                         .controlSize(.small)
                         .accessibilityLabel("Preparing model")
                 } else if isActive {
-                    Label("Active", systemImage: "waveform.badge.checkmark")
+                    Label(model.activeLabel, systemImage: "waveform.badge.checkmark")
                         .foregroundStyle(TextifyVisualIdentity.readyMint)
+                    if model.purpose == .voiceCleaning {
+                        Button("Disable", systemImage: "power", action: onDisable)
+                            .disabled(isBusy)
+                    }
                 } else if isInstalled {
-                    Button("Use Model", systemImage: "waveform", action: onUse)
+                    Button(model.useLabel, systemImage: "waveform", action: onUse)
                         .disabled(isBusy)
                 }
 
@@ -1131,7 +1227,7 @@ private struct TextifyModelCard: View {
                             .disabled(isBusy || ProductionModelInstallConfiguration.current == nil)
                             .foregroundStyle(.secondary)
                     } else {
-                        Button("Install", systemImage: "arrow.down.circle", action: onInstall)
+                        Button(model.installLabel, systemImage: "arrow.down.circle", action: onInstall)
                             .disabled(isBusy || ProductionModelInstallConfiguration.current == nil)
                     }
                 }
@@ -1160,38 +1256,41 @@ private struct TextifyModelCard: View {
                     onCancel: onCancelInstall,
                     onRetry: onRetryInstall
                 )
-                .padding(.leading, 80)
+                .padding(.leading, 104)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
             if showsDetails {
                 ModelDetailGrid(model: model)
-                    .padding(.leading, 80)
+                    .padding(.leading, 104)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 15)
-        .frame(minHeight: 106, alignment: .topLeading)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 16)
+        .frame(minHeight: 120, alignment: .topLeading)
         .background(activeBackground)
         .overlay(alignment: .leading) {
             if isActive {
                 Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [TextifyVisualIdentity.voiceViolet, TextifyVisualIdentity.readyMint],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
+                    .fill(TextifyVisualIdentity.voiceViolet)
                     .frame(width: 3)
             }
         }
         .overlay(alignment: .bottom) {
             Divider()
-                .padding(.leading, 80)
+                .padding(.leading, 108)
         }
         .accessibilityElement(children: .contain)
+    }
+
+    private var tierTone: TextifyStatusBadge.Tone {
+        switch model.supportTier {
+        case "Recommended": .accent
+        case "Fast", "Accurate": .success
+        case "Experimental": .neutral
+        default: .neutral
+        }
     }
 
     private var activeBackground: Color {
@@ -1199,8 +1298,8 @@ private struct TextifyModelCard: View {
             return .clear
         }
         return colorScheme == .dark
-            ? TextifyVisualIdentity.consoleSelection.opacity(0.72)
-            : TextifyVisualIdentity.voiceViolet.opacity(0.09)
+            ? TextifyVisualIdentity.consoleSelection.opacity(0.66)
+            : TextifyVisualIdentity.voiceViolet.opacity(0.075)
     }
 }
 
@@ -1339,24 +1438,31 @@ private struct ModelSelectionIndicator: View {
     }
 }
 
-private struct ModelEngineTile: View {
-    let icon: String
+private struct ModelProviderTile: View {
+    let provider: ModelProviderIdentity
     let isActive: Bool
 
     var body: some View {
-        Image(systemName: icon)
-            .font(.system(size: 18, weight: .semibold))
-            .foregroundStyle(isActive ? TextifyVisualIdentity.readyMint : TextifyVisualIdentity.voiceViolet)
-            .frame(width: 38, height: 38)
+        Group {
+            if let systemImage = provider.systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(size: 21, weight: .semibold))
+            } else {
+                Text(provider.mark)
+                    .font(.system(size: provider.mark.count > 1 ? 11 : 18, weight: .bold, design: .rounded))
+            }
+        }
+            .foregroundStyle(provider.accent)
+            .frame(width: 46, height: 46)
             .background(
-                (isActive ? TextifyVisualIdentity.readyMint : TextifyVisualIdentity.voiceViolet).opacity(0.12),
-                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                provider.accent.opacity(isActive ? 0.18 : 0.12),
+                in: RoundedRectangle(cornerRadius: 11, style: .continuous)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .stroke(provider.accent.opacity(isActive ? 0.42 : 0.22), lineWidth: 1)
             }
-            .accessibilityHidden(true)
+            .accessibilityLabel(provider.name)
     }
 }
 
@@ -1387,13 +1493,14 @@ private struct ModelSignalMetric: View {
     }
 }
 
-private struct ModelFootprintMetric: View {
+private struct ModelFeaturesMetric: View {
     let model: ProductionModelPresentation
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Label(model.sizeDescription, systemImage: "internaldrive")
             Label(model.languageDescription, systemImage: "character.bubble")
+            Label(model.acceleratorName, systemImage: "cpu")
         }
         .font(.system(size: 10, weight: .medium, design: .rounded))
         .foregroundStyle(.secondary)
@@ -1987,6 +2094,68 @@ struct ModelCatalogQuery: Equatable {
     }
 }
 
+enum ModelProviderIdentity: String, Equatable {
+    case openAI
+    case nvidia
+    case cohere
+    case alibaba
+    case apple
+    case mlx
+    case reazon
+    case mossFormer
+    case community
+
+    var name: String {
+        switch self {
+        case .openAI: "OpenAI"
+        case .nvidia: "NVIDIA"
+        case .cohere: "Cohere"
+        case .alibaba: "Alibaba"
+        case .apple: "Apple"
+        case .mlx: "MLX Community"
+        case .reazon: "Reazon"
+        case .mossFormer: "MossFormer"
+        case .community: "Open model"
+        }
+    }
+
+    var mark: String {
+        switch self {
+        case .openAI: "AI"
+        case .nvidia: "N"
+        case .cohere: "C"
+        case .alibaba: "Q"
+        case .apple: "A"
+        case .mlx: "MLX"
+        case .reazon: "R"
+        case .mossFormer: "M"
+        case .community: "•"
+        }
+    }
+
+    var systemImage: String? {
+        switch self {
+        case .apple: "apple.logo"
+        case .community: "cube.transparent"
+        default: nil
+        }
+    }
+
+    var accent: Color {
+        switch self {
+        case .openAI: Color(red: 0.063, green: 0.639, blue: 0.498)
+        case .nvidia: Color(red: 0.463, green: 0.725, blue: 0.000)
+        case .cohere: Color(red: 0.875, green: 0.478, blue: 0.443)
+        case .alibaba: Color(red: 0.980, green: 0.455, blue: 0.173)
+        case .apple: Color.primary
+        case .mlx: TextifyVisualIdentity.voiceViolet
+        case .reazon: Color(red: 0.247, green: 0.565, blue: 0.969)
+        case .mossFormer: Color(red: 0.710, green: 0.384, blue: 0.922)
+        case .community: TextifyVisualIdentity.slate
+        }
+    }
+}
+
 struct ProductionModelPresentation: Equatable, Identifiable {
     let id: String
     let displayName: String
@@ -2009,6 +2178,7 @@ struct ProductionModelPresentation: Equatable, Identifiable {
     let sourceURL: URL?
     let artifactName: String
     let checksum: String?
+    let purpose: ModelPurpose
 
     init(
         id: String,
@@ -2031,7 +2201,8 @@ struct ProductionModelPresentation: Equatable, Identifiable {
         sourceName: String = "Model source",
         sourceURL: URL? = nil,
         artifactName: String = "Local model",
-        checksum: String? = nil
+        checksum: String? = nil,
+        purpose: ModelPurpose = .transcription
     ) {
         self.id = id
         self.displayName = displayName
@@ -2054,6 +2225,7 @@ struct ProductionModelPresentation: Equatable, Identifiable {
         self.sourceURL = sourceURL
         self.artifactName = artifactName
         self.checksum = checksum
+        self.purpose = purpose
     }
 
     static let v1_1 = ProductionModelPresentation(
@@ -2082,6 +2254,7 @@ struct ProductionModelPresentation: Equatable, Identifiable {
         id = model.id
         displayName = model.displayName
         description = model.description
+        purpose = model.purpose
         self.isCurated = isCurated
         artifactFormat = Self.artifactFormat(for: model)
         artifactPrecision = Self.artifactPrecision(for: model)
@@ -2126,6 +2299,64 @@ struct ProductionModelPresentation: Equatable, Identifiable {
         case "Fast", "Experimental": 3
         default: 2
         }
+    }
+
+    var catalogDisplayName: String {
+        let parts = displayName.split(separator: "-", maxSplits: 1).map {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        let tierPrefixes = ["Accurate", "Balanced", "Experimental", "Fast", "Recommended", "Specialist"]
+        guard parts.count == 2, tierPrefixes.contains(parts[0]) else {
+            return displayName
+        }
+        return parts[1]
+    }
+
+    var provider: ModelProviderIdentity {
+        let identity = "\(displayName) \(sourceName) \(engineName)".lowercased()
+        if identity.contains("cohere") {
+            return .cohere
+        }
+        if identity.contains("parakeet") || identity.contains("canary") || identity.contains("nemotron") {
+            return .nvidia
+        }
+        if identity.contains("whisper") {
+            return .openAI
+        }
+        if identity.contains("qwen") || identity.contains("paraformer") || identity.contains("sensevoice") {
+            return .alibaba
+        }
+        if identity.contains("reazon") {
+            return .reazon
+        }
+        if identity.contains("mossformer") {
+            return .mossFormer
+        }
+        if identity.contains("apple") {
+            return .apple
+        }
+        if identity.contains("mlx") {
+            return .mlx
+        }
+        return .community
+    }
+
+    var activationMessage: String {
+        purpose == .voiceCleaning
+            ? "\(displayName) is enabled before dictation."
+            : "\(displayName) is active and ready."
+    }
+
+    var activeLabel: String {
+        purpose == .voiceCleaning ? "Cleaning Enabled" : "Active"
+    }
+
+    var useLabel: String {
+        purpose == .voiceCleaning ? "Use Cleaner" : "Use Model"
+    }
+
+    var installLabel: String {
+        purpose == .voiceCleaning ? "Install & Enable" : "Install"
     }
 
     var speedSignalLevel: Int {
@@ -2200,8 +2431,8 @@ struct ProductionModelPresentation: Equatable, Identifiable {
             .lowercased()
 
         let precisionPatterns: [(ModelArtifactPrecision, [String])] = [
-            (.thirtyTwoBit, ["f32", "32-bit", "32bit"]),
-            (.sixteenBit, ["bf16", "f16", "16-bit", "16bit"]),
+            (.thirtyTwoBit, ["fp32", "f32", "32-bit", "32bit"]),
+            (.sixteenBit, ["fp16", "bf16", "f16", "16-bit", "16bit"]),
             (.eightBit, ["q8", "int8", "8-bit", "8bit"]),
             (.fiveBit, ["q5", "5-bit", "5bit"]),
             (.fourBit, ["q4", "int4", "4-bit", "4bit"]),
@@ -2213,6 +2444,9 @@ struct ProductionModelPresentation: Equatable, Identifiable {
     }
 
     private static func languageDescription(for languageCodes: [String]) -> String {
+        if languageCodes == ["*"] {
+            return "Language agnostic"
+        }
         guard languageCodes.count == 1, let code = languageCodes.first else {
             return "\(languageCodes.count) languages"
         }
@@ -2348,15 +2582,18 @@ extension MicrophonePermissionStatus {
 private struct SettingsPaneLayout<Content: View>: View {
     let title: String
     let subtitleOverride: String?
+    let maxContentWidth: CGFloat
     @ViewBuilder var content: Content
 
     init(
         title: String,
         subtitle: String? = nil,
+        maxContentWidth: CGFloat = TextifyWindowMetrics.readableContentWidth,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
         self.subtitleOverride = subtitle
+        self.maxContentWidth = maxContentWidth
         self.content = content()
     }
 
@@ -2368,7 +2605,7 @@ private struct SettingsPaneLayout<Content: View>: View {
 
                 content
             }
-            .frame(maxWidth: TextifyWindowMetrics.readableContentWidth, alignment: .leading)
+            .frame(maxWidth: maxContentWidth, alignment: .leading)
             .padding(.horizontal, 32)
             .padding(.vertical, 30)
             .frame(maxWidth: .infinity, alignment: .topLeading)

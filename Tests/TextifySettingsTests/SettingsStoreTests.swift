@@ -9,6 +9,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(preferences.microphoneSelection, .systemDefault)
         XCTAssertEqual(preferences.transcriptionLanguage, .english)
         XCTAssertEqual(preferences.modelSelectionScope, .curatedInstalledModels)
+        XCTAssertNil(preferences.activeVoiceCleaningModelID)
         XCTAssertTrue(preferences.keepTextifyInDock)
         XCTAssertTrue(preferences.automaticallyCheckForUpdates)
         XCTAssertTrue(preferences.launchAtLoginEnabled)
@@ -108,12 +109,14 @@ final class SettingsStoreTests: XCTestCase {
         preferences.trigger = .rightOption
         preferences.keepTextifyInDock = false
         preferences.activeModelID = "whisper-small-en-balanced"
+        preferences.activeVoiceCleaningModelID = "mossformer2-se-fp16"
         store.save(preferences)
 
         let reloaded = SettingsStore(storage: .file(fileURL)).load()
         XCTAssertEqual(reloaded.trigger, .rightOption)
         XCTAssertFalse(reloaded.keepTextifyInDock)
         XCTAssertEqual(reloaded.activeModelID, "whisper-small-en-balanced")
+        XCTAssertEqual(reloaded.activeVoiceCleaningModelID, "mossformer2-se-fp16")
 
         let json = String(decoding: try Data(contentsOf: fileURL), as: UTF8.self)
         XCTAssertTrue(json.contains("\"trigger\""))

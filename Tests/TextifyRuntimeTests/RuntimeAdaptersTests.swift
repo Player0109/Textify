@@ -472,6 +472,79 @@ final class RuntimeAdaptersTests: XCTestCase {
         XCTAssertEqual(readiness, .ready(modelID: model.id))
     }
 
+    func testModelResolverKeepsVoiceCleanerSeparateFromTranscriptionModel() async throws {
+        let directory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let layout = ModelStorageLayout(rootDirectory: directory)
+        let weightsData = Data("mossformer weights".utf8)
+        let baseModel = Self.modelEntry(filename: Self.fixtureFilename, data: weightsData)
+        let weights = ModelFile(
+            filename: "model.safetensors",
+            relativePath: "model.safetensors",
+            url: "https://huggingface.co/starkdmi/MossFormer2-SE-fp16/resolve/dd04b1b736b9f49951433b7f051cd8d32eb024b6/model.safetensors",
+            sha256: Self.sha256Hex(weightsData),
+            sizeBytes: Int64(weightsData.count)
+        )
+        let cleaner = ModelEntry(
+            id: "mossformer2-se-fp16",
+            displayName: "Recommended - MossFormer2 SE FP16",
+            tier: "recommended",
+            description: "Local voice cleaning.",
+            sizeBytes: Int64(weightsData.count),
+            files: [weights],
+            licenses: baseModel.licenses,
+            provenance: baseModel.provenance,
+            runtimeParameters: .legacyEnglishWhisper,
+            hallucinationThresholds: baseModel.hallucinationThresholds,
+            minAppVersion: "1.1.0",
+            runtime: ModelRuntimeDescriptor(
+                engine: .mlxAudio,
+                variant: "mossformer2-se-fp16",
+                accelerator: .metalGPU,
+                artifactLayout: .modelDirectory
+            ),
+            capabilities: ModelCapabilities(
+                languages: ["*"],
+                supportsTranslation: false,
+                supportsCustomVocabulary: false
+            ),
+            presentation: nil,
+            purpose: .voiceCleaning
+        )
+        let weightsURL = try layout.installedArtifactURL(
+            modelID: cleaner.id,
+            relativePath: "model.safetensors"
+        )
+        try FileManager.default.createDirectory(
+            at: weightsURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try weightsData.write(to: weightsURL)
+        let store = InstalledModelsStore(records: [
+            InstalledModelRecord(
+                model: cleaner,
+                installedAt: "2026-07-20T00:00:00Z",
+                localFilesByManifestFilename: [weights.filename: weightsURL.path]
+            ),
+        ])
+        let resolver = Self.modelResolver(layout: layout, store: store)
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = cleaner.id
+        preferences.activeVoiceCleaningModelID = cleaner.id
+
+        let transcriptionModel = await resolver.resolveActiveModel(preferences: preferences)
+        let voiceCleaner = await resolver.resolveActiveVoiceCleaningModel(
+            preferences: preferences
+        )
+        let readiness = await resolver.readiness(for: voiceCleaner)
+
+        XCTAssertNil(transcriptionModel)
+        XCTAssertEqual(voiceCleaner?.id, cleaner.id)
+        XCTAssertEqual(voiceCleaner?.purpose, .voiceCleaning)
+        XCTAssertEqual(voiceCleaner?.localModelPath, weightsURL.deletingLastPathComponent().path)
+        XCTAssertEqual(readiness, .ready(modelID: cleaner.id))
+    }
+
     func testModelResolverReturnsDirectoryEngineAndVerifiesEveryArtifact() async throws {
         let directory = Self.temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

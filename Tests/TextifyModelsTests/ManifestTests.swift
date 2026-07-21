@@ -34,6 +34,33 @@ final class ManifestTests: XCTestCase {
         XCTAssertEqual(manifest.models.first?.runtimeParameters.temperatureFallback, [])
         XCTAssertEqual(manifest.models.first?.runtime, .legacyWhisper)
         XCTAssertEqual(manifest.models.first?.capabilities, .legacyEnglishWhisper)
+        XCTAssertEqual(manifest.models.first?.purpose, .transcription)
+    }
+
+    func testManifestParsesVoiceCleaningPurpose() throws {
+        let manifest = try voiceCleaningManifest(
+            engine: "mlx_audio",
+            accelerator: "metal_gpu",
+            artifactLayout: "model_directory"
+        )
+
+        XCTAssertEqual(manifest.models.first?.purpose, .voiceCleaning)
+        XCTAssertNoThrow(try ProductionModelPolicy.validateProductionManifest(manifest))
+    }
+
+    func testProductionPolicyRejectsVoiceCleanerOnTranscriptionRuntime() throws {
+        let manifest = try voiceCleaningManifest(
+            engine: "whisper_cpp",
+            accelerator: "metal_gpu",
+            artifactLayout: "single_file"
+        )
+
+        XCTAssertThrowsError(try ProductionModelPolicy.validateProductionManifest(manifest)) { error in
+            XCTAssertEqual(
+                error as? ProductionModelPolicyError,
+                .incompatibleRuntime(modelID: ProductionModelPolicy.requiredModelID)
+            )
+        }
     }
 
     func testManifestParsesExplicitEngineAndCapabilities() throws {
@@ -246,6 +273,36 @@ final class ManifestTests: XCTestCase {
             JSONSerialization.jsonObject(with: Self.validManifestData) as? [String: Any]
         )
         json["generatedAt"] = generatedAt
+        return try ModelManifest.decode(JSONSerialization.data(withJSONObject: json))
+    }
+
+    private func voiceCleaningManifest(
+        engine: String,
+        accelerator: String,
+        artifactLayout: String
+    ) throws -> ModelManifest {
+        var json = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Self.validManifestData) as? [String: Any]
+        )
+        var models = try XCTUnwrap(json["models"] as? [[String: Any]])
+        models[0]["purpose"] = "voice_cleaning"
+        models[0]["runtime"] = [
+            "engine": engine,
+            "variant": "mossformer2-se-fp16",
+            "accelerator": accelerator,
+            "artifactLayout": artifactLayout
+        ]
+        models[0]["capabilities"] = [
+            "languages": ["*"],
+            "supportsTranslation": false,
+            "supportsCustomVocabulary": false
+        ]
+        if artifactLayout == "model_directory" {
+            var files = try XCTUnwrap(models[0]["files"] as? [[String: Any]])
+            files[0]["relativePath"] = files[0]["filename"]
+            models[0]["files"] = files
+        }
+        json["models"] = models
         return try ModelManifest.decode(JSONSerialization.data(withJSONObject: json))
     }
 }

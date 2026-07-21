@@ -1,7 +1,8 @@
 # Textify Curated Models
 
-The signed catalog shipped with the current app contains 35 curated
-choices: Whisper small.en; Experimental Whisper Large V2 and V3 q5_0; Whisper
+The signed catalog shipped with the current app contains 38 curated choices:
+35 transcription models and three independent voice-cleaning models. The ASR
+choices are Whisper small.en; Experimental Whisper Large V2 and V3 q5_0; Whisper
 Large V3 Turbo q5_0 and a separate MLX Turbo entry; Accurate Canary-Qwen 2.5B;
 Parakeet TDT 0.6B V3, V2, and TDT-CTC 110M; Parakeet RNNT 1.1B; Cohere
 Transcribe; Parakeet Japanese; the Paraformer Chinese specialist; ReazonSpeech
@@ -12,6 +13,27 @@ V2, Parakeet TDT V3, and Nemotron 3.5 ASR entries in MLX and GGUF F16, Q8_0,
 and Q5_K_M formats. The catalog and signature are
 bundled; model weights
 remain external and are downloaded only after the user chooses a model.
+
+## MossFormer2 SE voice cleaning
+
+The optional voice-cleaning choices are separate from the active ASR model and
+run before every transcription backend. They use the pinned MLX Audio Swift
+MossFormer2 SE implementation on Metal, resampling Textify's canonical 16 kHz
+mono buffer to the model's native 48 kHz and back entirely in memory. A failure
+does not block dictation: Textify exposes a Raw Audio Fallback warning and sends
+the original canonical buffer to ASR.
+
+| Model id | Tier | Exact revision | Installed bytes | Weights SHA-256 |
+| --- | --- | --- | ---: | --- |
+| `mossformer2-se-fp32` | Accurate | `8744c59f925154f4ba2e9f15ae7eeaa870f80118` | 221,178,344 | `8e47b75ca25dc402db5420c45c868544da8d2ac43b21a919197da113d4d81313` |
+| `mossformer2-se-fp16` | Recommended | `dd04b1b736b9f49951433b7f051cd8d32eb024b6` | 110,652,884 | `61e63484df9c2be7e1111ca0346d431422a98b263331021a67c2d7ddb2f67a85` |
+| `mossformer2-se-int8` | Fast | `694e69b58f2457e02d96f4ba7fa151a28b07805a` | 90,089,718 | `89a0a7fef6de4a7b25bac7365ea60e9b490e978d2ad2fc95c381092f06a5315f` |
+
+Each directory contains an exact `config.json` and `model.safetensors` from
+the corresponding `starkdmi` Hugging Face repository. FP16 is the recommended
+choice and becomes active when installed. Installing or switching a cleaner
+never changes the transcription model. The converted checkpoints are
+Apache-2.0.
 
 The GitHub Pages catalog may temporarily lag an app release. Textify verifies
 the bundled and remote catalogs independently and selects the whole catalog

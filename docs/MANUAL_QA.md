@@ -53,6 +53,14 @@ release-blocking.
   refused until another model is selected.
 - [ ] 30. Accelerator verification fails closed when Metal or Neural Engine
   execution is unavailable; Textify never silently accepts a CPU fallback.
+- [ ] 31. Install MossFormer2 SE FP16; it becomes the active voice cleaner
+  without changing the active transcription model, and noisy dictation is
+  cleaned before ASR.
+- [ ] 32. Switch among FP32, FP16, and 8-bit cleaners, then disable cleaning;
+  each selection persists across relaunch and the ASR selection stays intact.
+- [ ] 33. Force the selected cleaner to fail loading or processing; Textify
+  shows Raw Audio Fallback, completes dictation with the original audio, and
+  diagnostics contain no audio or transcript content.
 
 ## Supporting Commands
 

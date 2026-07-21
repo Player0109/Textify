@@ -15,6 +15,7 @@ APP_FRAMEWORKS="$APP_CONTENTS/Frameworks"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
 RESOURCE_INFO_PLIST="$ROOT_DIR/Resources/Info.plist"
+LOCAL_ENTITLEMENTS="$ROOT_DIR/Textify.Local.entitlements"
 WHISPER_RESOURCE_BUNDLE_NAME="Textify_WhisperCppVendor.bundle"
 METAL_LIBRARY="$APP_RESOURCES/default.metallib"
 MLX_METAL_LIBRARY="$APP_MACOS/mlx.metallib"
@@ -117,6 +118,33 @@ verify_staged_app() {
       "$MODEL_CATALOG_SIGNATURE"
 }
 
+verify_staged_app_launch() {
+  local launch_log
+  local launch_pid
+  local launch_status
+
+  launch_log="$(mktemp -t textify-launch-smoke)"
+  "$APP_BINARY" >"$launch_log" 2>&1 &
+  launch_pid=$!
+  sleep 2
+
+  if ! kill -0 "$launch_pid" >/dev/null 2>&1; then
+    if wait "$launch_pid"; then
+      launch_status=0
+    else
+      launch_status=$?
+    fi
+    echo "staged app exited during launch smoke test with status $launch_status" >&2
+    /bin/cat "$launch_log" >&2
+    rm -f "$launch_log"
+    exit 1
+  fi
+
+  kill "$launch_pid" >/dev/null 2>&1 || true
+  wait "$launch_pid" >/dev/null 2>&1 || true
+  rm -f "$launch_log"
+}
+
 open_app() {
   /usr/bin/open -n "$APP_BUNDLE"
 }
@@ -129,11 +157,12 @@ open_full_app() {
 
 stage_full_release_app() {
   "$ROOT_DIR/script/generate_xcode_project.sh"
-  xcodebuild -project "$ROOT_DIR/Textify.xcodeproj" -scheme "$APP_NAME" -configuration Release -destination 'platform=macOS' -derivedDataPath "$DERIVED_DATA_DIR" build
+  xcodebuild -project "$ROOT_DIR/Textify.xcodeproj" -scheme "$APP_NAME" -configuration Release -destination 'platform=macOS' -derivedDataPath "$DERIVED_DATA_DIR" CODE_SIGN_ENTITLEMENTS="$LOCAL_ENTITLEMENTS" build
   [[ -d "$FULL_RELEASE_APP_BUNDLE" ]]
   rm -rf "$APP_BUNDLE"
   /usr/bin/ditto "$FULL_RELEASE_APP_BUNDLE" "$APP_BUNDLE"
   verify_staged_app
+  verify_staged_app_launch
 }
 
 stop_app

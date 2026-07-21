@@ -57,6 +57,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
     public var transcriptionLanguage: TranscriptionLanguage
     public var modelSelectionScope: ModelSelectionScope
     public var activeModelID: String?
+    public var activeVoiceCleaningModelID: String?
     public var keepTextifyInDock: Bool
     public var automaticallyCheckForUpdates: Bool
     public var launchAtLoginEnabled: Bool
@@ -78,6 +79,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         transcriptionLanguage: TranscriptionLanguage = .english,
         modelSelectionScope: ModelSelectionScope = .curatedInstalledModels,
         activeModelID: String? = nil,
+        activeVoiceCleaningModelID: String? = nil,
         keepTextifyInDock: Bool = true,
         automaticallyCheckForUpdates: Bool = true,
         launchAtLoginEnabled: Bool = true,
@@ -93,6 +95,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         self.transcriptionLanguage = transcriptionLanguage
         self.modelSelectionScope = modelSelectionScope
         self.activeModelID = activeModelID
+        self.activeVoiceCleaningModelID = activeVoiceCleaningModelID
         self.keepTextifyInDock = keepTextifyInDock
         self.automaticallyCheckForUpdates = automaticallyCheckForUpdates
         self.launchAtLoginEnabled = launchAtLoginEnabled
@@ -126,6 +129,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         case transcriptionLanguage
         case modelSelectionScope
         case activeModelID
+        case activeVoiceCleaningModelID
         case keepTextifyInDock
         case legacyShowInDock = "showInDock"
         case automaticallyCheckForUpdates
@@ -163,6 +167,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
             transcriptionLanguage: try container.decodeIfPresent(TranscriptionLanguage.self, forKey: .transcriptionLanguage) ?? defaults.transcriptionLanguage,
             modelSelectionScope: try container.decodeIfPresent(ModelSelectionScope.self, forKey: .modelSelectionScope) ?? defaults.modelSelectionScope,
             activeModelID: try container.decodeIfPresent(String.self, forKey: .activeModelID) ?? defaults.activeModelID,
+            activeVoiceCleaningModelID: try container.decodeIfPresent(String.self, forKey: .activeVoiceCleaningModelID) ?? defaults.activeVoiceCleaningModelID,
             keepTextifyInDock: keepTextifyInDock,
             automaticallyCheckForUpdates: try container.decodeIfPresent(Bool.self, forKey: .automaticallyCheckForUpdates) ?? defaults.automaticallyCheckForUpdates,
             launchAtLoginEnabled: launchAtLogin,
@@ -182,6 +187,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         try container.encode(transcriptionLanguage, forKey: .transcriptionLanguage)
         try container.encode(modelSelectionScope, forKey: .modelSelectionScope)
         try container.encodeIfPresent(activeModelID, forKey: .activeModelID)
+        try container.encodeIfPresent(activeVoiceCleaningModelID, forKey: .activeVoiceCleaningModelID)
         try container.encode(keepTextifyInDock, forKey: .keepTextifyInDock)
         try container.encode(automaticallyCheckForUpdates, forKey: .automaticallyCheckForUpdates)
         try container.encode(launchAtLoginEnabled, forKey: .launchAtLoginEnabled)

@@ -1,6 +1,6 @@
 {
   "manifestVersion": 1,
-  "generatedAt": "2026-07-20T06:37:46Z",
+  "generatedAt": "2026-07-20T15:06:25Z",
   "models": [
     {
       "id": "ggml-small.en-q5_1",
@@ -4167,6 +4167,243 @@
         "accuracyTradeoff": "2.86% English WER; Textify exposes whole-recording batch dictation, not upstream streaming partials",
         "requirements": "Apple Silicon with Metal; about 0.56 GB disk, 0.92 GB measured peak process memory, and a 60-second recording limit"
       }
+    },
+    {
+      "id": "mossformer2-se-fp32",
+      "displayName": "Accurate - MossFormer2 SE FP32",
+      "tier": "accurate",
+      "description": "Full-precision MossFormer2 speech enhancement for local noise suppression before transcription.",
+      "sizeBytes": 221178344,
+      "files": [
+        {
+          "filename": "config.json",
+          "relativePath": "config.json",
+          "url": "https://huggingface.co/starkdmi/MossFormer2-SE/resolve/8744c59f925154f4ba2e9f15ae7eeaa870f80118/config.json",
+          "sha256": "b30e89a3309031630e219cae6afc695727b961d3fec542824502b80a2dbbd217",
+          "sizeBytes": 256
+        },
+        {
+          "filename": "model.safetensors",
+          "relativePath": "model.safetensors",
+          "url": "https://huggingface.co/starkdmi/MossFormer2-SE/resolve/8744c59f925154f4ba2e9f15ae7eeaa870f80118/model.safetensors",
+          "sha256": "8e47b75ca25dc402db5420c45c868544da8d2ac43b21a919197da113d4d81313",
+          "sizeBytes": 221178088
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "MossFormer2 SE MLX checkpoint",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "provenance": {
+        "sourceName": "starkdmi/MossFormer2-SE",
+        "sourceUrl": "https://huggingface.co/starkdmi/MossFormer2-SE",
+        "sourceRevision": "8744c59f925154f4ba2e9f15ae7eeaa870f80118",
+        "sourceFile": "model.safetensors",
+        "originalModelName": "alibabasglab/MossFormer2_SE_48K",
+        "originalModelUrl": "https://huggingface.co/alibabasglab/MossFormer2_SE_48K",
+        "mirroredBy": "starkdmi",
+        "mirroredAt": "2026-07-20"
+      },
+      "runtimeParameters": {
+        "language": "*",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "mlx_audio",
+        "variant": "mossformer2-se-fp32",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "model_directory"
+      },
+      "capabilities": {
+        "languages": [
+          "*"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "Runs before speech recognition and adds recording-length-dependent preprocessing time",
+        "accuracyTradeoff": "Full-precision enhancement with the largest download of the three cleaner variants",
+        "requirements": "Apple Silicon with Metal; about 221 MB disk; internally processes 48 kHz mono audio"
+      },
+      "purpose": "voice_cleaning"
+    },
+    {
+      "id": "mossformer2-se-fp16",
+      "displayName": "Recommended - MossFormer2 SE FP16",
+      "tier": "recommended",
+      "description": "Half-precision MossFormer2 speech enhancement for local noise suppression before transcription.",
+      "sizeBytes": 110652884,
+      "files": [
+        {
+          "filename": "config.json",
+          "relativePath": "config.json",
+          "url": "https://huggingface.co/starkdmi/MossFormer2-SE-fp16/resolve/dd04b1b736b9f49951433b7f051cd8d32eb024b6/config.json",
+          "sha256": "b30e89a3309031630e219cae6afc695727b961d3fec542824502b80a2dbbd217",
+          "sizeBytes": 256
+        },
+        {
+          "filename": "model.safetensors",
+          "relativePath": "model.safetensors",
+          "url": "https://huggingface.co/starkdmi/MossFormer2-SE-fp16/resolve/dd04b1b736b9f49951433b7f051cd8d32eb024b6/model.safetensors",
+          "sha256": "61e63484df9c2be7e1111ca0346d431422a98b263331021a67c2d7ddb2f67a85",
+          "sizeBytes": 110652628
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "MossFormer2 SE MLX checkpoint",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "provenance": {
+        "sourceName": "starkdmi/MossFormer2-SE-fp16",
+        "sourceUrl": "https://huggingface.co/starkdmi/MossFormer2-SE-fp16",
+        "sourceRevision": "dd04b1b736b9f49951433b7f051cd8d32eb024b6",
+        "sourceFile": "model.safetensors",
+        "originalModelName": "alibabasglab/MossFormer2_SE_48K",
+        "originalModelUrl": "https://huggingface.co/alibabasglab/MossFormer2_SE_48K",
+        "mirroredBy": "starkdmi",
+        "mirroredAt": "2026-07-20"
+      },
+      "runtimeParameters": {
+        "language": "*",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "mlx_audio",
+        "variant": "mossformer2-se-fp16",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "model_directory"
+      },
+      "capabilities": {
+        "languages": [
+          "*"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "Runs before speech recognition and adds recording-length-dependent preprocessing time",
+        "accuracyTradeoff": "Recommended balance of enhancement precision and download size",
+        "requirements": "Apple Silicon with Metal; about 111 MB disk; internally processes 48 kHz mono audio"
+      },
+      "purpose": "voice_cleaning"
+    },
+    {
+      "id": "mossformer2-se-int8",
+      "displayName": "Fast - MossFormer2 SE 8-bit",
+      "tier": "fast",
+      "description": "8-bit MossFormer2 speech enhancement for local noise suppression before transcription.",
+      "sizeBytes": 90089718,
+      "files": [
+        {
+          "filename": "config.json",
+          "relativePath": "config.json",
+          "url": "https://huggingface.co/starkdmi/MossFormer2-SE-8bit/resolve/694e69b58f2457e02d96f4ba7fa151a28b07805a/config.json",
+          "sha256": "c2aa1debeabb6b94744dd54310319a3ed6bc4c7468e1e3edb07f5901f7c5e96c",
+          "sizeBytes": 324
+        },
+        {
+          "filename": "model.safetensors",
+          "relativePath": "model.safetensors",
+          "url": "https://huggingface.co/starkdmi/MossFormer2-SE-8bit/resolve/694e69b58f2457e02d96f4ba7fa151a28b07805a/model.safetensors",
+          "sha256": "89a0a7fef6de4a7b25bac7365ea60e9b490e978d2ad2fc95c381092f06a5315f",
+          "sizeBytes": 90089394
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "MossFormer2 SE MLX checkpoint",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "provenance": {
+        "sourceName": "starkdmi/MossFormer2-SE-8bit",
+        "sourceUrl": "https://huggingface.co/starkdmi/MossFormer2-SE-8bit",
+        "sourceRevision": "694e69b58f2457e02d96f4ba7fa151a28b07805a",
+        "sourceFile": "model.safetensors",
+        "originalModelName": "alibabasglab/MossFormer2_SE_48K",
+        "originalModelUrl": "https://huggingface.co/alibabasglab/MossFormer2_SE_48K",
+        "mirroredBy": "starkdmi",
+        "mirroredAt": "2026-07-20"
+      },
+      "runtimeParameters": {
+        "language": "*",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "mlx_audio",
+        "variant": "mossformer2-se-int8",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "model_directory"
+      },
+      "capabilities": {
+        "languages": [
+          "*"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "Runs before speech recognition and adds recording-length-dependent preprocessing time",
+        "accuracyTradeoff": "Smallest download; 8-bit quantization can trade enhancement fidelity for size",
+        "requirements": "Apple Silicon with Metal; about 90 MB disk; internally processes 48 kHz mono audio"
+      },
+      "purpose": "voice_cleaning"
     }
   ]
 }

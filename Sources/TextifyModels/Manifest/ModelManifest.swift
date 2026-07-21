@@ -33,6 +33,11 @@ public struct ModelManifest: Codable, Equatable, Sendable {
     }
 }
 
+public enum ModelPurpose: String, Codable, Equatable, Sendable {
+    case transcription
+    case voiceCleaning = "voice_cleaning"
+}
+
 public enum TranscriptionEngine: String, Codable, Equatable, Sendable {
     case whisperCpp = "whisper_cpp"
     case fluidAudioParakeet = "fluid_audio_parakeet"
@@ -186,6 +191,7 @@ public struct ModelEntry: Codable, Equatable, Sendable {
     public let runtime: ModelRuntimeDescriptor
     public let capabilities: ModelCapabilities
     public let presentation: ModelUserPresentation?
+    public let purpose: ModelPurpose
 
     public init(
         id: String,
@@ -214,7 +220,8 @@ public struct ModelEntry: Codable, Equatable, Sendable {
             minAppVersion: minAppVersion,
             runtime: .legacyWhisper,
             capabilities: .legacyEnglishWhisper,
-            presentation: nil
+            presentation: nil,
+            purpose: .transcription
         )
     }
 
@@ -247,7 +254,8 @@ public struct ModelEntry: Codable, Equatable, Sendable {
             minAppVersion: minAppVersion,
             runtime: runtime,
             capabilities: capabilities,
-            presentation: nil
+            presentation: nil,
+            purpose: .transcription
         )
     }
 
@@ -265,7 +273,8 @@ public struct ModelEntry: Codable, Equatable, Sendable {
         minAppVersion: String,
         runtime: ModelRuntimeDescriptor,
         capabilities: ModelCapabilities,
-        presentation: ModelUserPresentation?
+        presentation: ModelUserPresentation?,
+        purpose: ModelPurpose = .transcription
     ) {
         self.id = id
         self.displayName = displayName
@@ -281,6 +290,7 @@ public struct ModelEntry: Codable, Equatable, Sendable {
         self.runtime = runtime
         self.capabilities = capabilities
         self.presentation = presentation
+        self.purpose = purpose
     }
 
     public init(from decoder: Decoder) throws {
@@ -304,6 +314,7 @@ public struct ModelEntry: Codable, Equatable, Sendable {
         runtime = try container.decodeIfPresent(ModelRuntimeDescriptor.self, forKey: .runtime) ?? .legacyWhisper
         capabilities = try container.decodeIfPresent(ModelCapabilities.self, forKey: .capabilities) ?? .legacyEnglishWhisper
         presentation = try container.decodeIfPresent(ModelUserPresentation.self, forKey: .presentation)
+        purpose = try container.decodeIfPresent(ModelPurpose.self, forKey: .purpose) ?? .transcription
     }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
@@ -321,6 +332,7 @@ public struct ModelEntry: Codable, Equatable, Sendable {
         case runtime
         case capabilities
         case presentation
+        case purpose
 
         static let legacyRequired: [CodingKeys] = [
             .id,

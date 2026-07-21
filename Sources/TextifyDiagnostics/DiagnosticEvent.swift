@@ -44,6 +44,11 @@ public enum DiagnosticEvent: Encodable, Sendable {
         durationMs: Int,
         result: String
     )
+    case voiceCleaning(
+        modelID: String,
+        durationMs: Int,
+        result: String
+    )
 
     private enum CodingKeys: String, CodingKey {
         case event
@@ -160,6 +165,12 @@ public enum DiagnosticEvent: Encodable, Sendable {
             try container.encode(sanitize(tier, forKey: .tier), forKey: .tier)
             try container.encode(sanitize(engine, forKey: .engine), forKey: .engine)
             try container.encode(sanitize(accelerator, forKey: .accelerator), forKey: .accelerator)
+            try container.encode(durationMs, forKey: .durationMs)
+            try container.encode(sanitize(result, forKey: .result), forKey: .result)
+
+        case let .voiceCleaning(modelID, durationMs, result):
+            try container.encode("voice_cleaning", forKey: .event)
+            try container.encode(sanitize(modelID, forKey: .modelID), forKey: .modelID)
             try container.encode(durationMs, forKey: .durationMs)
             try container.encode(sanitize(result, forKey: .result), forKey: .result)
         }

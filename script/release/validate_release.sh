@@ -17,8 +17,14 @@ plutil -lint Resources/Info.plist
 [[ "$(/usr/libexec/PlistBuddy -c "Print :CFBundleIconName" Resources/Info.plist)" == "AppIcon" ]]
 [[ -n "$(/usr/libexec/PlistBuddy -c "Print :NSMicrophoneUsageDescription" Resources/Info.plist)" ]]
 [[ "$(/usr/libexec/PlistBuddy -c "Print :com.apple.security.device.audio-input" Textify.entitlements)" == "true" ]]
+[[ "$(/usr/libexec/PlistBuddy -c "Print :com.apple.security.device.audio-input" Textify.Local.entitlements)" == "true" ]]
+[[ "$(/usr/libexec/PlistBuddy -c "Print :com.apple.security.cs.disable-library-validation" Textify.Local.entitlements)" == "true" ]]
 if /usr/libexec/PlistBuddy -c "Print :com.apple.security.app-sandbox" Textify.entitlements >/dev/null 2>&1; then
   echo "Textify must remain non-sandboxed for global hotkeys and cross-app insertion." >&2
+  exit 1
+fi
+if /usr/libexec/PlistBuddy -c "Print :com.apple.security.cs.disable-library-validation" Textify.entitlements >/dev/null 2>&1; then
+  echo "Production Textify builds must keep library validation enabled." >&2
   exit 1
 fi
 for icon in Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-*.png; do

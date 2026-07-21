@@ -10,6 +10,18 @@ public enum DictationRuntimeStatus: Equatable, Sendable {
     case failed(ProductionDictationError)
 }
 
+public enum VoiceCleaningRuntimeStatus: Equatable, Sendable {
+    case disabled
+    case preparing(modelID: String)
+    case ready(modelID: String)
+    case warning(modelID: String, reason: VoiceCleaningWarningReason)
+}
+
+public enum VoiceCleaningWarningReason: String, Equatable, Sendable {
+    case modelUnavailable
+    case processingFailed
+}
+
 public enum DictationCancellationReason: Equatable, Sendable {
     case releasedBeforeActivation
     case shortcutUseBeforeSpeech

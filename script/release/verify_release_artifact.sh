@@ -118,6 +118,10 @@ if /usr/libexec/PlistBuddy -c "Print :com.apple.security.app-sandbox" "$ENTITLEM
   echo "Exported Textify.app unexpectedly has the App Sandbox entitlement." >&2
   exit 1
 fi
+if /usr/libexec/PlistBuddy -c "Print :com.apple.security.cs.disable-library-validation" "$ENTITLEMENTS_PLIST" >/dev/null 2>&1; then
+  echo "Exported Textify.app unexpectedly disables library validation." >&2
+  exit 1
+fi
 
 if [[ -n "$GATEKEEPER_MODE" ]]; then
   [[ "$GATEKEEPER_MODE" == "--gatekeeper" ]]

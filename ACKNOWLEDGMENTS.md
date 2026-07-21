@@ -18,6 +18,11 @@ through the pinned transcribe.cpp Metal runtime. Runtime model loading is
 restricted to Textify-managed local
 directories; network-backed package loading APIs are not used.
 
+Optional MossFormer2 SE MLX speech-enhancement conversions are provided by
+starkdmi and run through the same pinned local MLX Audio Swift and MLX Swift
+stack before transcription. The FP32, FP16, and 8-bit weights are separate
+downloads and are licensed under Apache-2.0.
+
 Whisper was developed and released by OpenAI. The English, multilingual, and
 Japanese Parakeet models were released by NVIDIA. Paraformer-large Chinese and
 SenseVoiceSmall come from the FunASR/ModelScope ecosystem; Textify retains the

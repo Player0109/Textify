@@ -72,6 +72,7 @@ targets:
         MARKETING_VERSION: "1.1.0"
       configs:
         Debug:
+          CODE_SIGN_ENTITLEMENTS: Textify.Local.entitlements
           ONLY_ACTIVE_ARCH: YES
         Release:
           ONLY_ACTIVE_ARCH: NO

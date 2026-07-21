@@ -55,6 +55,32 @@ final class ProductionUITests: XCTestCase {
         XCTAssertFalse(deprecated.isCurated)
     }
 
+    func testModelCatalogUsesCleanNamesAndRecognizableProviders() {
+        XCTAssertEqual(ProductionModelPresentation.v1_1.catalogDisplayName, "Whisper small.en q5_1")
+        XCTAssertEqual(ProductionModelPresentation.v1_1.provider, .openAI)
+
+        let parakeetOnMLX = ProductionModelPresentation(
+            id: "parakeet-mlx",
+            displayName: "Experimental - Parakeet V3 MLX",
+            description: "Community MLX conversion.",
+            details: nil,
+            engineName: "MLX Audio",
+            sourceName: "mlx-community/parakeet-tdt-0.6b-v3"
+        )
+        XCTAssertEqual(parakeetOnMLX.catalogDisplayName, "Parakeet V3 MLX")
+        XCTAssertEqual(parakeetOnMLX.provider, .nvidia)
+
+        let cohere = ProductionModelPresentation(
+            id: "cohere",
+            displayName: "Cohere Transcribe",
+            description: "Local speech model.",
+            details: nil,
+            sourceName: "community/cohere-transcribe"
+        )
+        XCTAssertEqual(cohere.catalogDisplayName, "Cohere Transcribe")
+        XCTAssertEqual(cohere.provider, .cohere)
+    }
+
     func testModelCatalogCanSortByQualityOrSpeed() {
         let accurate = ProductionModelPresentation(
             id: "accurate",
@@ -158,6 +184,18 @@ final class ProductionUITests: XCTestCase {
         XCTAssertEqual(
             try presentation("parakeet-tdt-0.6b-v2-mlx").artifactPrecision,
             .thirtyTwoBit
+        )
+        XCTAssertEqual(
+            try presentation("mossformer2-se-fp32").artifactPrecision,
+            .thirtyTwoBit
+        )
+        XCTAssertEqual(
+            try presentation("mossformer2-se-fp16").artifactPrecision,
+            .sixteenBit
+        )
+        XCTAssertEqual(
+            try presentation("mossformer2-se-int8").artifactPrecision,
+            .eightBit
         )
     }
 
@@ -394,6 +432,9 @@ final class ProductionUITests: XCTestCase {
                 "nemotron-3.5-asr-streaming-0.6b-f16",
                 "nemotron-3.5-asr-streaming-0.6b-q8-0",
                 "nemotron-3.5-asr-streaming-0.6b-q5-k-m",
+                "mossformer2-se-fp32",
+                "mossformer2-se-fp16",
+                "mossformer2-se-int8",
             ]
         )
     }

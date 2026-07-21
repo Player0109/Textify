@@ -512,6 +512,60 @@ final class AppDictationServiceTests: XCTestCase {
         XCTAssertEqual(insertionDiagnosticCount, 1)
     }
 
+    func testVoiceCleaningRunsBeforeASRWhenSelected() async {
+        var preferences = AppPreferences.defaults
+        preferences.activeVoiceCleaningModelID = RuntimeActiveModel.voiceCleanerFixture.id
+        let original = CanonicalAudioBuffer(samples: [0.1, 0.2, 0.3])
+        let cleaned = TranscriptionAudioBuffer(samples: [0.7, 0.8, 0.9])
+        let fakes = RuntimeFakes.ready(audio: original, preferences: preferences)
+        await fakes.models.setVoiceCleaningModel(.voiceCleanerFixture)
+        await fakes.voiceCleaner.setOutput(cleaned)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+        await service.handleTriggerAction(.finishRecording)
+
+        let transcribedAudio = await fakes.transcriber.lastAudio()
+        let cleaningCallCount = await fakes.voiceCleaner.cleanCallCount()
+        let diagnosticCount = await fakes.diagnostics.voiceCleaningCount()
+        XCTAssertEqual(transcribedAudio, cleaned)
+        XCTAssertEqual(cleaningCallCount, 1)
+        XCTAssertEqual(diagnosticCount, 1)
+        XCTAssertEqual(
+            service.voiceCleaningStatus,
+            .ready(modelID: RuntimeActiveModel.voiceCleanerFixture.id)
+        )
+    }
+
+    func testVoiceCleaningFailureFallsBackToOriginalAudioAndWarns() async {
+        var preferences = AppPreferences.defaults
+        preferences.activeVoiceCleaningModelID = RuntimeActiveModel.voiceCleanerFixture.id
+        let original = CanonicalAudioBuffer(samples: [0.1, 0.2, 0.3])
+        let fakes = RuntimeFakes.ready(audio: original, preferences: preferences)
+        await fakes.models.setVoiceCleaningModel(.voiceCleanerFixture)
+        await fakes.voiceCleaner.setCleanError(FakeVoiceCleaningError.failed)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+        await service.handleTriggerAction(.finishRecording)
+
+        let transcribedAudio = await fakes.transcriber.lastAudio()
+        XCTAssertEqual(
+            transcribedAudio,
+            TranscriptionAudioBuffer(samples: original.samples)
+        )
+        XCTAssertEqual(
+            service.voiceCleaningStatus,
+            .warning(
+                modelID: RuntimeActiveModel.voiceCleanerFixture.id,
+                reason: .processingFailed
+            )
+        )
+        let diagnosticCount = await fakes.diagnostics.voiceCleaningCount()
+        XCTAssertEqual(diagnosticCount, 1)
+        XCTAssertEqual(service.status, .completed(textLengthBucket: "1-50"))
+    }
+
     func testHallucinationSignalsSilentlyDiscardBeforePostProcessingAndInsertion() async {
         let suspiciousResults = [
             TranscriptionResult(
@@ -742,6 +796,7 @@ private struct RuntimeFakes {
     let models: FakeRuntimeModels
     let audio: FakeRuntimeAudio
     let transcriber: FakeRuntimeTranscriber
+    let voiceCleaner: FakeRuntimeVoiceCleaner
     let targetCapturer: FakeRuntimeTargetCapturer
     let inserter: FakeInsertionService
     let diagnostics: FakeRuntimeDiagnostics
@@ -755,6 +810,7 @@ private struct RuntimeFakes {
             models: models,
             audio: audio,
             transcriber: transcriber,
+            voiceCleaner: voiceCleaner,
             targetCapturer: targetCapturer,
             inserter: inserter,
             diagnostics: diagnostics,
@@ -784,6 +840,7 @@ private struct RuntimeFakes {
             audio: FakeRuntimeAudio(audio: audio),
             transcriber: transcriptionResult.map(FakeRuntimeTranscriber.init(result:))
                 ?? FakeRuntimeTranscriber(transcript: transcript),
+            voiceCleaner: FakeRuntimeVoiceCleaner(),
             targetCapturer: FakeRuntimeTargetCapturer(target: target),
             inserter: FakeInsertionService(),
             diagnostics: FakeRuntimeDiagnostics(),
@@ -836,6 +893,7 @@ private struct RuntimeFakes {
             models: FakeRuntimeModels(activeModel: activeModel, readiness: readiness),
             audio: FakeRuntimeAudio(audio: CanonicalAudioBuffer(samples: [0.1, 0.2, 0.3])),
             transcriber: FakeRuntimeTranscriber(transcript: "hello period"),
+            voiceCleaner: FakeRuntimeVoiceCleaner(),
             targetCapturer: FakeRuntimeTargetCapturer(target: .fixture),
             inserter: FakeInsertionService(),
             diagnostics: FakeRuntimeDiagnostics(),
@@ -947,6 +1005,7 @@ private actor FakeRuntimePermissions: RuntimePermissionChecking {
 
 private actor FakeRuntimeModels: RuntimeModelResolving {
     private var activeModel: RuntimeActiveModel?
+    private var voiceCleaningModel: RuntimeActiveModel?
     private var readinessOverride: RuntimeModelReadiness?
 
     init(activeModel: RuntimeActiveModel?, readiness: RuntimeModelReadiness? = nil) {
@@ -968,9 +1027,17 @@ private actor FakeRuntimeModels: RuntimeModelResolving {
         return .ready(modelID: model.id)
     }
 
+    func resolveActiveVoiceCleaningModel(preferences: AppPreferences) async -> RuntimeActiveModel? {
+        voiceCleaningModel
+    }
+
     func setActiveModel(_ activeModel: RuntimeActiveModel?) {
         self.activeModel = activeModel
         readinessOverride = nil
+    }
+
+    func setVoiceCleaningModel(_ model: RuntimeActiveModel?) {
+        voiceCleaningModel = model
     }
 
 }
@@ -1107,6 +1174,7 @@ private actor FakeRuntimeTranscriber: RuntimeTranscribing {
     private var suspendUntilReleased = false
     private var prepareSuspensionContinuation: CheckedContinuation<Void, Never>?
     private var suspensionContinuation: CheckedContinuation<Void, Never>?
+    private var lastAudioValue: TranscriptionAudioBuffer?
 
     var readiness: RuntimeModelReadiness {
         get async {
@@ -1160,6 +1228,7 @@ private actor FakeRuntimeTranscriber: RuntimeTranscribing {
 
     func transcribe(_ audio: TranscriptionAudioBuffer) async throws -> TranscriptionResult {
         transcribeCountValue += 1
+        lastAudioValue = audio
         if suspendUntilReleased {
             await withCheckedContinuation { continuation in
                 suspensionContinuation = continuation
@@ -1169,6 +1238,10 @@ private actor FakeRuntimeTranscriber: RuntimeTranscribing {
             throw transcribeError
         }
         return result
+    }
+
+    func lastAudio() -> TranscriptionAudioBuffer? {
+        lastAudioValue
     }
 
     func setSuspendUntilReleased(_ suspendUntilReleased: Bool) {
@@ -1201,6 +1274,40 @@ private actor FakeRuntimeTranscriber: RuntimeTranscribing {
         let continuation = prepareSuspensionContinuation
         prepareSuspensionContinuation = nil
         continuation?.resume()
+    }
+}
+
+private enum FakeVoiceCleaningError: Error {
+    case failed
+}
+
+private actor FakeRuntimeVoiceCleaner: RuntimeVoiceCleaning {
+    private var output: TranscriptionAudioBuffer?
+    private var cleanError: Error?
+    private var cleanCalls = 0
+
+    func prepare(model: RuntimeActiveModel) async throws {}
+
+    func clean(_ audio: TranscriptionAudioBuffer) async throws -> TranscriptionAudioBuffer {
+        cleanCalls += 1
+        if let cleanError {
+            throw cleanError
+        }
+        return output ?? audio
+    }
+
+    func unload() async {}
+
+    func setOutput(_ output: TranscriptionAudioBuffer?) {
+        self.output = output
+    }
+
+    func setCleanError(_ error: Error?) {
+        cleanError = error
+    }
+
+    func cleanCallCount() -> Int {
+        cleanCalls
     }
 }
 
@@ -1251,6 +1358,7 @@ private actor FakeRuntimeDiagnostics: RuntimeDiagnosticsLogging {
     private var excludedAppBlockCountValue = 0
     private var insertionAttemptCountValue = 0
     private var modelLoadCountValue = 0
+    private var voiceCleaningCountValue = 0
 
     func log(_ event: DiagnosticEvent) async {
         switch event {
@@ -1264,6 +1372,8 @@ private actor FakeRuntimeDiagnostics: RuntimeDiagnosticsLogging {
             insertionAttemptCountValue += 1
         case .modelLoad:
             modelLoadCountValue += 1
+        case .voiceCleaning:
+            voiceCleaningCountValue += 1
         case .appStarted, .launchAtLoginChange:
             break
         }
@@ -1287,6 +1397,10 @@ private actor FakeRuntimeDiagnostics: RuntimeDiagnosticsLogging {
 
     func modelLoadCount() -> Int {
         modelLoadCountValue
+    }
+
+    func voiceCleaningCount() -> Int {
+        voiceCleaningCountValue
     }
 }
 
@@ -1354,6 +1468,21 @@ private extension RuntimeActiveModel {
         localModelPath: "/tmp/ggml-small.en-q5_1.bin",
         useGPU: true,
         threadCount: 1
+    )
+
+    static let voiceCleanerFixture = RuntimeActiveModel(
+        id: "mossformer2-se-fp16",
+        displayName: "Voice Cleaning - MossFormer2 SE fp16",
+        tier: "recommended",
+        localModelPath: "/tmp/mossformer2-se-fp16",
+        useGPU: true,
+        threadCount: nil,
+        engine: .mlxAudio,
+        variant: MossFormer2VoiceCleaningVariant.fp16.rawValue,
+        accelerator: .metalGPU,
+        artifactLayout: .modelDirectory,
+        runtimeParameters: .legacyEnglishWhisper,
+        purpose: .voiceCleaning
     )
 
     static func fixtureWithMaximumAudioSeconds(_ maximumAudioSeconds: Int) -> RuntimeActiveModel {

@@ -18,6 +18,7 @@ public struct RuntimeActiveModel: Equatable, Sendable {
     public let accelerator: ModelAccelerator
     public let artifactLayout: ModelArtifactLayout
     public let runtimeParameters: RuntimeParameters
+    public let purpose: ModelPurpose
 
     public init(
         id: String,
@@ -38,7 +39,8 @@ public struct RuntimeActiveModel: Equatable, Sendable {
             variant: ModelRuntimeDescriptor.legacyWhisper.variant,
             accelerator: .metalGPU,
             artifactLayout: .singleFile,
-            runtimeParameters: .legacyEnglishWhisper
+            runtimeParameters: .legacyEnglishWhisper,
+            purpose: .transcription
         )
     }
 
@@ -53,7 +55,8 @@ public struct RuntimeActiveModel: Equatable, Sendable {
         variant: String,
         accelerator: ModelAccelerator,
         artifactLayout: ModelArtifactLayout,
-        runtimeParameters: RuntimeParameters
+        runtimeParameters: RuntimeParameters,
+        purpose: ModelPurpose = .transcription
     ) {
         self.id = id
         self.displayName = displayName
@@ -66,6 +69,7 @@ public struct RuntimeActiveModel: Equatable, Sendable {
         self.accelerator = accelerator
         self.artifactLayout = artifactLayout
         self.runtimeParameters = runtimeParameters
+        self.purpose = purpose
     }
 }
 
@@ -75,6 +79,7 @@ public struct RuntimeDependencies: Sendable {
     public let models: any RuntimeModelResolving
     public let audio: any RuntimeAudioRecording
     public let transcriber: any RuntimeTranscribing
+    public let voiceCleaner: any RuntimeVoiceCleaning
     public let targetCapturer: any InsertionTargetCapturing
     public let inserter: any InsertionService
     public let diagnostics: any RuntimeDiagnosticsLogging
@@ -87,6 +92,7 @@ public struct RuntimeDependencies: Sendable {
         models: any RuntimeModelResolving,
         audio: any RuntimeAudioRecording,
         transcriber: any RuntimeTranscribing,
+        voiceCleaner: any RuntimeVoiceCleaning = DisabledRuntimeVoiceCleaning(),
         targetCapturer: any InsertionTargetCapturing,
         inserter: any InsertionService,
         diagnostics: any RuntimeDiagnosticsLogging,
@@ -98,6 +104,7 @@ public struct RuntimeDependencies: Sendable {
         self.models = models
         self.audio = audio
         self.transcriber = transcriber
+        self.voiceCleaner = voiceCleaner
         self.targetCapturer = targetCapturer
         self.inserter = inserter
         self.diagnostics = diagnostics
@@ -117,7 +124,14 @@ public protocol RuntimePermissionChecking: Sendable {
 
 public protocol RuntimeModelResolving: Sendable {
     func resolveActiveModel(preferences: AppPreferences) async -> RuntimeActiveModel?
+    func resolveActiveVoiceCleaningModel(preferences: AppPreferences) async -> RuntimeActiveModel?
     func readiness(for model: RuntimeActiveModel?) async -> RuntimeModelReadiness
+}
+
+public extension RuntimeModelResolving {
+    func resolveActiveVoiceCleaningModel(preferences: AppPreferences) async -> RuntimeActiveModel? {
+        nil
+    }
 }
 
 public protocol RuntimeAudioRecording: Sendable {
@@ -135,6 +149,24 @@ public protocol RuntimeTranscribing: Sendable {
     var readiness: RuntimeModelReadiness { get async }
     func prepare(model: RuntimeActiveModel) async throws
     func transcribe(_ audio: TranscriptionAudioBuffer) async throws -> TranscriptionResult
+}
+
+public protocol RuntimeVoiceCleaning: Sendable {
+    func prepare(model: RuntimeActiveModel) async throws
+    func clean(_ audio: TranscriptionAudioBuffer) async throws -> TranscriptionAudioBuffer
+    func unload() async
+}
+
+public struct DisabledRuntimeVoiceCleaning: RuntimeVoiceCleaning {
+    public init() {}
+
+    public func prepare(model: RuntimeActiveModel) async throws {}
+
+    public func clean(_ audio: TranscriptionAudioBuffer) async throws -> TranscriptionAudioBuffer {
+        audio
+    }
+
+    public func unload() async {}
 }
 
 public protocol RuntimeDiagnosticsLogging: Sendable {

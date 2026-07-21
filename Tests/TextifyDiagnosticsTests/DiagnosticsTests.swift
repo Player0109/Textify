@@ -2,6 +2,20 @@ import TextifyDiagnostics
 import XCTest
 
 final class DiagnosticsTests: XCTestCase {
+    func testVoiceCleaningEventContainsOnlyTechnicalMetadata() throws {
+        let event = DiagnosticEvent.voiceCleaning(
+            modelID: "mossformer2-se-fp16",
+            durationMs: 42,
+            result: "raw_audio_fallback"
+        )
+
+        let data = try JSONEncoder().encode(event)
+        let json = String(decoding: data, as: UTF8.self)
+        XCTAssertTrue(json.contains("voice_cleaning"))
+        XCTAssertFalse(json.contains("samples"))
+        XCTAssertFalse(json.contains("transcript"))
+        XCTAssertFalse(json.contains("audioData"))
+    }
     func testInsertionEventContainsNoContentFields() throws {
         let event = DiagnosticEvent.insertionAttempt(
             textLengthBucket: "201-500",
