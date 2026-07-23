@@ -540,10 +540,16 @@ private struct ModelsSettingsPane: View {
     @State private var catalogPrecision: ModelArtifactPrecision?
 
     var body: some View {
-        let installedModels = services.installedModels
-        let completeCatalog = makeCatalog(installedModels: installedModels)
-        let visibleCatalog = catalogQuery.apply(to: completeCatalog)
-        let installedModelIDs = Set(installedModels.map(\.id))
+        let catalogExperience = ModelCatalogExperience(
+            trustedModels: services.modelCatalogCoordinator.models,
+            installedRecords: services.installedModelRecords,
+            activePreferences: ModelCatalogActivePreferences(
+                transcriptionModelID: services.preferences.activeModelID,
+                voiceCleaningModelID: services.preferences.activeVoiceCleaningModelID
+            ),
+            transferState: services.modelInstallCoordinator.state,
+            query: catalogQuery
+        )
 
         return SettingsPaneLayout(
             title: "Dictation Models",
@@ -570,26 +576,24 @@ private struct ModelsSettingsPane: View {
             }
 
             ModelCatalogSurface(
-                models: visibleCatalog,
+                rows: catalogExperience.rows,
                 onReset: resetCatalogQuery
-            ) { model in
+            ) { row in
                 TextifyModelCard(
-                    model: model,
-                    isInstalled: installedModelIDs.contains(model.id),
-                    isActive: services.isModelActive(model.id),
-                    isActivating: activatingModelID == model.id,
+                    model: row.model,
+                    isInstalled: row.isInstalled,
+                    isActive: row.isActive,
+                    isActivating: activatingModelID == row.id,
                     isBusy: activatingModelID != nil || isInstalling || isImporting,
-                    installState: ModelInstallRowPresentation.state(
-                        for: model.id,
-                        from: services.modelInstallCoordinator.state
-                    ),
+                    install: row.install,
+                    actions: row.actions,
                     onUse: {
-                        activatingModelID = model.id
+                        activatingModelID = row.id
                         Task {
-                            let activated = await services.activateInstalledModel(model.id)
+                            let activated = await services.activateInstalledModel(row.id)
                             modelMessage = activated
-                                ? model.activationMessage
-                                : "Textify kept the previous model because \(model.displayName) could not be prepared."
+                                ? row.model.activationMessage
+                                : "Textify kept the previous model because \(row.model.displayName) could not be prepared."
                             activatingModelID = nil
                         }
                     },
@@ -600,7 +604,7 @@ private struct ModelsSettingsPane: View {
                         }
                     },
                     onInstall: {
-                        services.modelInstallCoordinator.start(modelID: model.id)
+                        services.modelInstallCoordinator.start(modelID: row.id)
                     },
                     onCancelInstall: {
                         services.modelInstallCoordinator.cancel()
@@ -609,7 +613,7 @@ private struct ModelsSettingsPane: View {
                         services.modelInstallCoordinator.retry()
                     },
                     onDelete: {
-                        pendingRemovalModel = model
+                        pendingRemovalModel = row.model
                     }
                 )
             }
@@ -676,30 +680,6 @@ private struct ModelsSettingsPane: View {
 
     private var isInstalling: Bool {
         services.modelInstallCoordinator.isActive
-    }
-
-    private func makeCatalog(installedModels: [ModelEntry]) -> [ProductionModelPresentation] {
-        let models = services.modelCatalogCoordinator.models
-        let signedCatalog = models.isEmpty
-            ? ProductionModelPresentation.visibleCatalog
-            : models.map { ProductionModelPresentation(model: $0) }
-        let signedIDs = Set(signedCatalog.map(\.id))
-        let completeCatalog = signedCatalog + installedModels
-            .filter { !signedIDs.contains($0.id) }
-            .map { ProductionModelPresentation(model: $0, isCurated: false) }
-        let activeIDs = [
-            services.preferences.activeModelID,
-            services.preferences.activeVoiceCleaningModelID,
-        ].compactMap { $0 }
-        var orderedCatalog = completeCatalog
-        for activeID in activeIDs.reversed() {
-            guard let activeIndex = orderedCatalog.firstIndex(where: { $0.id == activeID }) else {
-                continue
-            }
-            let activeModel = orderedCatalog.remove(at: activeIndex)
-            orderedCatalog.insert(activeModel, at: 0)
-        }
-        return orderedCatalog
     }
 
     private var catalogQuery: ModelCatalogQuery {
@@ -1013,16 +993,16 @@ private struct ModelCatalogToolbar: View {
 }
 
 private struct ModelCatalogSurface<Row: View>: View {
-    let models: [ProductionModelPresentation]
+    let rows: [ModelCatalogRowPresentation]
     let onReset: () -> Void
-    let row: (ProductionModelPresentation) -> Row
+    let row: (ModelCatalogRowPresentation) -> Row
 
     init(
-        models: [ProductionModelPresentation],
+        rows: [ModelCatalogRowPresentation],
         onReset: @escaping () -> Void,
-        @ViewBuilder row: @escaping (ProductionModelPresentation) -> Row
+        @ViewBuilder row: @escaping (ModelCatalogRowPresentation) -> Row
     ) {
-        self.models = models
+        self.rows = rows
         self.onReset = onReset
         self.row = row
     }
@@ -1031,12 +1011,12 @@ private struct ModelCatalogSurface<Row: View>: View {
         VStack(spacing: 0) {
             ModelCatalogColumnHeader()
             Divider()
-            if models.isEmpty {
+            if rows.isEmpty {
                 ModelCatalogEmptyState(onReset: onReset)
             } else {
                 LazyVStack(spacing: 0) {
-                    ForEach(models) { model in
-                        row(model)
+                    ForEach(rows) { catalogRow in
+                        row(catalogRow)
                     }
                 }
             }
@@ -1101,7 +1081,8 @@ private struct TextifyModelCard: View {
     let isActive: Bool
     let isActivating: Bool
     let isBusy: Bool
-    let installState: DownloadState?
+    let install: ModelCatalogInstallPresentation?
+    let actions: Set<ModelCatalogRowAction>
     let onUse: () -> Void
     let onDisable: () -> Void
     let onInstall: () -> Void
@@ -1156,47 +1137,48 @@ private struct TextifyModelCard: View {
                 } else if isActive {
                     Label(model.activeLabel, systemImage: "waveform.badge.checkmark")
                         .foregroundStyle(TextifyVisualIdentity.readyMint)
-                    if model.purpose == .voiceCleaning {
+                    if actions.contains(.disable) {
                         Button("Disable", systemImage: "power", action: onDisable)
                             .disabled(isBusy)
                     }
-                } else if isInstalled {
+                } else if actions.contains(.use) {
                     Button(model.useLabel, systemImage: "waveform", action: onUse)
                         .disabled(isBusy)
                 }
 
-                if installState == nil {
-                    if isInstalled {
-                        Button("Reinstall", systemImage: "arrow.clockwise", action: onInstall)
-                            .disabled(isBusy || ProductionModelInstallConfiguration.current == nil)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Button(model.installLabel, systemImage: "arrow.down.circle", action: onInstall)
-                            .disabled(isBusy || ProductionModelInstallConfiguration.current == nil)
-                    }
+                if actions.contains(.reinstall) {
+                    Button("Reinstall", systemImage: "arrow.clockwise", action: onInstall)
+                        .disabled(isBusy || ProductionModelInstallConfiguration.current == nil)
+                        .foregroundStyle(.secondary)
+                } else if actions.contains(.install) {
+                    Button(model.installLabel, systemImage: "arrow.down.circle", action: onInstall)
+                        .disabled(isBusy || ProductionModelInstallConfiguration.current == nil)
                 }
 
-                if isInstalled {
+                if actions.contains(.delete) {
                     Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
                         .disabled(isActive || isBusy)
                         .foregroundStyle(TextifyVisualIdentity.recordCoral)
                 }
 
-                Button(showsDetails ? "Hide Details" : "Details", systemImage: "info.circle") {
-                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
-                        showsDetails.toggle()
+                if actions.contains(.details) {
+                    Button(showsDetails ? "Hide Details" : "Details", systemImage: "info.circle") {
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
+                            showsDetails.toggle()
+                        }
                     }
+                    .foregroundStyle(.secondary)
                 }
-                .foregroundStyle(.secondary)
 
                 Spacer(minLength: 0)
             }
             .font(.callout)
             .buttonStyle(.borderless)
 
-            if let installState {
+            if let install {
                 ModelCardInstallProgress(
-                    state: installState,
+                    install: install,
+                    actions: actions,
                     onCancel: onCancelInstall,
                     onRetry: onRetryInstall
                 )
@@ -1244,41 +1226,20 @@ private struct TextifyModelCard: View {
     }
 }
 
-enum ModelInstallRowPresentation {
-    static func state(for modelID: String, from state: DownloadState?) -> DownloadState? {
-        guard let state, state.modelID == modelID, state.phase != .installed else {
-            return nil
-        }
-        return state
-    }
-
-    static func offersCancel(for state: DownloadState) -> Bool {
-        state.isActive
-    }
-
-    static func offersRetry(for state: DownloadState) -> Bool {
-        switch state.phase {
-        case .interrupted, .failed, .cancelled:
-            return true
-        case .checkingSpace, .downloading, .verifying, .installing, .installed:
-            return false
-        }
-    }
-}
-
 private struct ModelCardInstallProgress: View {
-    let state: DownloadState
+    let install: ModelCatalogInstallPresentation
+    let actions: Set<ModelCatalogRowAction>
     let onCancel: () -> Void
     let onRetry: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 8) {
-                Label(ModelInstallProgressPresentation.title(for: state), systemImage: phaseIcon)
+                Label(install.title, systemImage: phaseIcon)
                     .font(.system(.callout, design: .rounded, weight: .semibold))
                     .foregroundStyle(statusColor)
 
-                if let percentText = ModelInstallProgressPresentation.percentText(for: state) {
+                if let percentText = install.percentText {
                     Text(percentText)
                         .font(.system(.caption, design: .monospaced, weight: .bold))
                         .foregroundStyle(statusColor)
@@ -1286,23 +1247,23 @@ private struct ModelCardInstallProgress: View {
 
                 Spacer(minLength: 8)
 
-                if ModelInstallRowPresentation.offersCancel(for: state) {
+                if actions.contains(.cancelInstall) {
                     Button("Cancel", systemImage: "xmark.circle", action: onCancel)
-                } else if ModelInstallRowPresentation.offersRetry(for: state) {
+                } else if actions.contains(.retryInstall) {
                     Button("Retry", systemImage: "arrow.clockwise", action: onRetry)
                 }
             }
 
-            if state.totalBytes > 0 {
-                ProgressView(value: ModelInstallProgressPresentation.progressValue(for: state), total: 1)
+            if install.state.totalBytes > 0 {
+                ProgressView(value: install.progressValue, total: 1)
                     .tint(statusColor)
-            } else if state.isActive {
+            } else if install.state.isActive {
                 ProgressView()
                     .controlSize(.small)
                     .tint(statusColor)
             }
 
-            Text(ModelInstallProgressPresentation.detailText(for: state))
+            Text(install.detailText)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -1324,7 +1285,7 @@ private struct ModelCardInstallProgress: View {
     }
 
     private var statusColor: Color {
-        switch state.phase {
+        switch install.state.phase {
         case .interrupted, .failed:
             return TextifyVisualIdentity.recordCoral
         case .cancelled:
@@ -1335,7 +1296,7 @@ private struct ModelCardInstallProgress: View {
     }
 
     private var phaseIcon: String {
-        switch state.phase {
+        switch install.state.phase {
         case .checkingSpace:
             return "internaldrive"
         case .downloading:
@@ -2308,133 +2269,7 @@ private struct RuntimeStatusRow: View {
     }
 }
 
-enum ModelCatalogSort: String, CaseIterable, Identifiable {
-    case catalog
-    case quality
-    case speed
-
-    var id: Self { self }
-
-    var title: String {
-        switch self {
-        case .catalog: "Catalog"
-        case .quality: "Quality"
-        case .speed: "Speed"
-        }
-    }
-}
-
-enum ModelArtifactFormat: String, CaseIterable, Identifiable {
-    case mlx
-    case gguf
-    case other
-
-    static let filterOptions: [ModelArtifactFormat] = [.mlx, .gguf]
-
-    var id: Self { self }
-
-    var title: String {
-        switch self {
-        case .mlx: "MLX"
-        case .gguf: "GGUF"
-        case .other: "Other"
-        }
-    }
-}
-
-enum ModelArtifactPrecision: String, CaseIterable, Identifiable {
-    case thirtyTwoBit
-    case sixteenBit
-    case eightBit
-    case fiveBit
-    case fourBit
-    case other
-
-    static let filterOptions: [ModelArtifactPrecision] = [
-        .thirtyTwoBit,
-        .sixteenBit,
-        .eightBit,
-        .fiveBit,
-        .fourBit,
-    ]
-
-    var id: Self { self }
-
-    var title: String {
-        switch self {
-        case .thirtyTwoBit: "32-bit"
-        case .sixteenBit: "16-bit"
-        case .eightBit: "8-bit"
-        case .fiveBit: "5-bit"
-        case .fourBit: "4-bit"
-        case .other: "Other"
-        }
-    }
-}
-
-struct ModelCatalogQuery: Equatable {
-    var sort: ModelCatalogSort = .catalog
-    var format: ModelArtifactFormat?
-    var precision: ModelArtifactPrecision?
-
-    func apply(to models: [ProductionModelPresentation]) -> [ProductionModelPresentation] {
-        let matches = models.enumerated().filter { _, model in
-            (format == nil || model.artifactFormat == format)
-                && (precision == nil || model.artifactPrecision == precision)
-        }
-
-        switch sort {
-        case .catalog:
-            return matches.map(\.element)
-        case .quality:
-            return matches.sorted { lhs, rhs in
-                if lhs.element.qualityScore != rhs.element.qualityScore {
-                    return (lhs.element.qualityScore ?? -1)
-                        > (rhs.element.qualityScore ?? -1)
-                }
-                return lhs.offset < rhs.offset
-            }
-            .map(\.element)
-        case .speed:
-            return matches.sorted { lhs, rhs in
-                if lhs.element.speedScore != rhs.element.speedScore {
-                    return (lhs.element.speedScore ?? -1)
-                        > (rhs.element.speedScore ?? -1)
-                }
-                return lhs.offset < rhs.offset
-            }
-            .map(\.element)
-        }
-    }
-}
-
-enum ModelProviderIdentity: String, Equatable {
-    case openAI
-    case nvidia
-    case cohere
-    case qwen
-    case alibaba
-    case apple
-    case mlx
-    case reazon
-    case mossFormer
-    case community
-
-    var name: String {
-        switch self {
-        case .openAI: "OpenAI"
-        case .nvidia: "NVIDIA"
-        case .cohere: "Cohere"
-        case .qwen: "Qwen by Alibaba Cloud"
-        case .alibaba: "Alibaba Cloud"
-        case .apple: "Apple"
-        case .mlx: "Apple MLX"
-        case .reazon: "Reazon Human Interaction Lab"
-        case .mossFormer: "Alibaba Speech Lab"
-        case .community: "Open model"
-        }
-    }
-
+extension ModelProviderIdentity {
     var logoAssetName: String? {
         switch self {
         case .openAI: "VendorOpenAI"
@@ -2491,372 +2326,6 @@ enum ModelProviderIdentity: String, Equatable {
         case .mossFormer: Color(red: 0.710, green: 0.384, blue: 0.922)
         case .community: TextifyVisualIdentity.slate
         }
-    }
-}
-
-struct ProductionModelPresentation: Equatable, Identifiable {
-    let id: String
-    let displayName: String
-    let description: String
-    let details: String?
-    let isCurated: Bool
-    let supportTier: String
-    let expectedFinalization: String
-    let accuracyTradeoff: String
-    let requirements: String
-    let artifactFormat: ModelArtifactFormat
-    let artifactPrecision: ModelArtifactPrecision
-    let engineName: String
-    let engineIcon: String
-    let acceleratorName: String
-    let sizeDescription: String
-    let languageDescription: String
-    let licenseDescription: String
-    let sourceName: String
-    let sourceURL: URL?
-    let artifactName: String
-    let checksum: String?
-    let purpose: ModelPurpose
-    let benchmark: ModelBenchmarkRating?
-
-    init(
-        id: String,
-        displayName: String,
-        description: String,
-        details: String?,
-        isCurated: Bool = true,
-        supportTier: String = "Custom",
-        expectedFinalization: String = "Varies by model",
-        accuracyTradeoff: String = "See model description",
-        requirements: String = "Apple Silicon",
-        artifactFormat: ModelArtifactFormat = .other,
-        artifactPrecision: ModelArtifactPrecision = .other,
-        engineName: String = "Local runtime",
-        engineIcon: String = "waveform.circle",
-        acceleratorName: String = "Apple Silicon",
-        sizeDescription: String = "Local",
-        languageDescription: String = "Varies",
-        licenseDescription: String = "See source",
-        sourceName: String = "Model source",
-        sourceURL: URL? = nil,
-        artifactName: String = "Local model",
-        checksum: String? = nil,
-        purpose: ModelPurpose = .transcription,
-        benchmark: ModelBenchmarkRating? = nil
-    ) {
-        self.id = id
-        self.displayName = displayName
-        self.description = description
-        self.details = details
-        self.isCurated = isCurated
-        self.supportTier = supportTier
-        self.expectedFinalization = expectedFinalization
-        self.accuracyTradeoff = accuracyTradeoff
-        self.requirements = requirements
-        self.artifactFormat = artifactFormat
-        self.artifactPrecision = artifactPrecision
-        self.engineName = engineName
-        self.engineIcon = engineIcon
-        self.acceleratorName = acceleratorName
-        self.sizeDescription = sizeDescription
-        self.languageDescription = languageDescription
-        self.licenseDescription = licenseDescription
-        self.sourceName = sourceName
-        self.sourceURL = sourceURL
-        self.artifactName = artifactName
-        self.checksum = checksum
-        self.purpose = purpose
-        self.benchmark = benchmark
-    }
-
-    static let v1_1 = ProductionModelPresentation(
-        id: ProductionModelPolicy.requiredModelID,
-        displayName: "Balanced - Whisper small.en q5_1",
-        description: "Local English dictation model for Textify V1.1.",
-        details: "Whisper.cpp • Metal GPU • English",
-        supportTier: "Recommended",
-        expectedFinalization: "Near-instant after release",
-        accuracyTradeoff: "Balanced English speed and accuracy",
-        requirements: "Apple Silicon • about 182 MB download",
-        artifactPrecision: .fiveBit,
-        engineName: "Whisper.cpp",
-        engineIcon: "waveform.circle",
-        acceleratorName: "Metal GPU",
-        sizeDescription: "182 MB",
-        languageDescription: "English",
-        licenseDescription: "MIT",
-        sourceName: "ggerganov/whisper.cpp",
-        artifactName: "ggml-small.en-q5_1.bin"
-    )
-
-    static let visibleCatalog: [ProductionModelPresentation] = [v1_1]
-
-    init(model: ModelEntry, isCurated: Bool = true) {
-        id = model.id
-        displayName = model.displayName
-        description = model.description
-        purpose = model.purpose
-        self.isCurated = isCurated
-        artifactFormat = Self.artifactFormat(for: model)
-        artifactPrecision = Self.artifactPrecision(for: model)
-        let enginePresentation = switch model.runtime.engine {
-        case .whisperCpp: ("Whisper.cpp", "waveform.circle")
-        case .fluidAudioParakeet: ("Parakeet", "bolt.horizontal.circle")
-        case .fluidAudioParaformer: ("Paraformer", "character.waveform")
-        case .sherpaOnnx: ("sherpa-onnx", "point.3.connected.trianglepath.dotted")
-        case .transcribeCpp: ("transcribe.cpp", "cpu")
-        case .mlxAudio: ("MLX Audio", "sparkles.rectangle.stack")
-        case .liteRTLM: ("LiteRT-LM", "cube.transparent")
-        }
-        engineName = enginePresentation.0
-        engineIcon = enginePresentation.1
-        acceleratorName = switch model.runtime.accelerator {
-        case .metalGPU: "Metal GPU"
-        case .coreMLNeuralEngine: "Core ML / Neural Engine"
-        case .cpu: "Apple Silicon CPU"
-        }
-        languageDescription = Self.languageDescription(for: model.capabilities.languages)
-        sizeDescription = ByteCountFormatter.string(fromByteCount: model.sizeBytes, countStyle: .file)
-        let license = model.licenses.first?.name ?? "License metadata unavailable"
-        details = "\(engineName) • \(acceleratorName) • \(languageDescription) • \(sizeDescription) • \(license)"
-        licenseDescription = model.licenses.map(\.spdxId).joined(separator: " + ")
-        sourceName = model.provenance.sourceName
-        sourceURL = Self.publicSourceURL(from: model.provenance.sourceUrl)
-        artifactName = model.files.count == 1
-            ? (model.files.first?.filename ?? "Model artifact")
-            : "\(model.files.count) signed files"
-        checksum = model.files.first?.sha256
-        supportTier = Self.supportTier(for: model.tier)
-        expectedFinalization = model.presentation?.expectedFinalization
-            ?? Self.fallbackFinalization(for: model.tier)
-        accuracyTradeoff = model.presentation?.accuracyTradeoff ?? model.description
-        requirements = model.presentation?.requirements ?? "Apple Silicon • \(acceleratorName)"
-        benchmark = model.benchmark
-    }
-
-    var qualitySignalLevel: Int {
-        benchmark?.quality.level ?? 0
-    }
-
-    var catalogDisplayName: String {
-        let parts = displayName.split(separator: "-", maxSplits: 1).map {
-            $0.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        let tierPrefixes = ["Accurate", "Balanced", "Experimental", "Fast", "Recommended", "Specialist"]
-        guard parts.count == 2, tierPrefixes.contains(parts[0]) else {
-            return displayName
-        }
-        return parts[1]
-    }
-
-    var provider: ModelProviderIdentity {
-        let identity = "\(displayName) \(sourceName) \(engineName)".lowercased()
-        if identity.contains("cohere") {
-            return .cohere
-        }
-        if identity.contains("parakeet") || identity.contains("canary") || identity.contains("nemotron") {
-            return .nvidia
-        }
-        if identity.contains("whisper") {
-            return .openAI
-        }
-        if identity.contains("qwen") {
-            return .qwen
-        }
-        if identity.contains("paraformer") || identity.contains("sensevoice") || identity.contains("mossformer") {
-            return .alibaba
-        }
-        if identity.contains("reazon") {
-            return .reazon
-        }
-        if identity.contains("apple") {
-            return .apple
-        }
-        if identity.contains("mlx") {
-            return .mlx
-        }
-        return .community
-    }
-
-    var activationMessage: String {
-        purpose == .voiceCleaning
-            ? "\(displayName) is enabled before dictation."
-            : "\(displayName) is active and ready."
-    }
-
-    var activeLabel: String {
-        purpose == .voiceCleaning ? "Cleaning Enabled" : "Active"
-    }
-
-    var useLabel: String {
-        purpose == .voiceCleaning ? "Use Cleaner" : "Use Model"
-    }
-
-    var installLabel: String {
-        purpose == .voiceCleaning ? "Install & Enable" : "Install"
-    }
-
-    var speedSignalLevel: Int {
-        benchmark?.speed?.level ?? 0
-    }
-
-    var qualityLabel: String {
-        benchmark?.quality.label ?? "Unrated"
-    }
-
-    var speedLabel: String {
-        benchmark?.speed?.label ?? "Unrated"
-    }
-
-    var qualityScore: Int? {
-        benchmark?.quality.score
-    }
-
-    var speedScore: Int? {
-        benchmark?.speed?.score
-    }
-
-    var qualityEvidenceDescription: String? {
-        guard let quality = benchmark?.quality else {
-            return nil
-        }
-        return "\(quality.score)/100 • \(quality.label) • \(quality.speechItems) speech cases"
-    }
-
-    var wordErrorRateDescription: String {
-        benchmark?.quality.components.map {
-            "\(Self.benchmarkComponentName($0.id)) \(Self.percent($0.wordErrorRate))"
-        }.joined(separator: " • ") ?? "Unrated"
-    }
-
-    var noSpeechEvidenceDescription: String {
-        guard let quality = benchmark?.quality else {
-            return "Unrated"
-        }
-        return "\(quality.noSpeechItems) cases • \(Self.percent(quality.noSpeechFalsePositiveRate)) false positives"
-    }
-
-    var speedEvidenceDescription: String? {
-        guard let speed = benchmark?.speed else {
-            if benchmark?.speedUnratedReason != nil {
-                return "Unrated — repeated-run p95 was unstable"
-            }
-            return nil
-        }
-        return "\(speed.score)/100 • p50 \(speed.p50ReleaseToFinalMs) ms • p95 \(speed.p95ReleaseToFinalMs) ms • p95 RTF \(String(format: "%.3f", speed.p95RealTimeFactor))"
-    }
-
-    var benchmarkProvenanceDescription: String? {
-        guard let benchmark else {
-            return nil
-        }
-        return "\(benchmark.measuredAt) • \(benchmark.referenceHost.chip) • \(benchmark.referenceHost.operatingSystem)"
-    }
-
-    var benchmarkPolicyDescription: String {
-        guard let benchmark else {
-            return "Unrated"
-        }
-        return "\(benchmark.policyID) • \(benchmark.runCount) runs • suite \(benchmark.suiteIndexSHA256.prefix(12)) • source \(benchmark.sourceRevision.prefix(12))"
-    }
-
-    var benchmarkRuntimeDescription: String {
-        guard let benchmark else {
-            return "Unrated"
-        }
-        return "\(benchmark.engine) • \(benchmark.engineVersion) • \(benchmark.computeBackend)"
-    }
-
-    private static func supportTier(for tier: String) -> String {
-        switch tier.lowercased() {
-        case "balanced", "recommended": "Recommended"
-        case "fast": "Fast"
-        case "accurate": "Accurate"
-        case "specialist": "Specialist"
-        case "experimental": "Experimental"
-        case "custom": "Custom"
-        default: "Experimental"
-        }
-    }
-
-    private static func benchmarkComponentName(_ id: String) -> String {
-        switch id {
-        case "open-asr-english-nightly-v1": "Open ASR"
-        case "edacc-english-nightly-v1": "EdAcc"
-        case "berst-english-nightly-v1": "BERSt"
-        default: id
-        }
-    }
-
-    private static func percent(_ value: Double) -> String {
-        String(format: "%.1f%%", value * 100)
-    }
-
-    private static func fallbackFinalization(for tier: String) -> String {
-        switch tier.lowercased() {
-        case "fast": "Fastest available tier"
-        case "balanced", "recommended": "Near-instant after release"
-        case "accurate": "May take longer for higher accuracy"
-        case "specialist": "Varies by specialist model"
-        default: "Experimental; benchmark data incomplete"
-        }
-    }
-
-    private static func artifactFormat(for model: ModelEntry) -> ModelArtifactFormat {
-        if model.runtime.engine == .mlxAudio {
-            return .mlx
-        }
-        if model.files.contains(where: { $0.filename.lowercased().hasSuffix(".gguf") }) {
-            return .gguf
-        }
-        return .other
-    }
-
-    private static func artifactPrecision(for model: ModelEntry) -> ModelArtifactPrecision {
-        let searchableMetadata = ([
-            model.id,
-            model.displayName,
-            model.description,
-            model.runtime.variant,
-            model.provenance.sourceFile,
-        ] + model.files.map(\.filename))
-            .joined(separator: " ")
-            .lowercased()
-
-        let precisionPatterns: [(ModelArtifactPrecision, [String])] = [
-            (.thirtyTwoBit, ["fp32", "f32", "32-bit", "32bit"]),
-            (.sixteenBit, ["fp16", "bf16", "f16", "16-bit", "16bit"]),
-            (.eightBit, ["q8", "int8", "8-bit", "8bit"]),
-            (.fiveBit, ["q5", "5-bit", "5bit"]),
-            (.fourBit, ["q4", "int4", "4-bit", "4bit"]),
-        ]
-
-        return precisionPatterns.first { _, patterns in
-            patterns.contains(where: searchableMetadata.contains)
-        }?.0 ?? .other
-    }
-
-    private static func languageDescription(for languageCodes: [String]) -> String {
-        if languageCodes == ["*"] {
-            return "Language agnostic"
-        }
-        guard languageCodes.count == 1, let code = languageCodes.first else {
-            return "\(languageCodes.count) languages"
-        }
-        return switch code.lowercased() {
-        case "en": "English"
-        case "ja": "Japanese"
-        case "zh": "Chinese"
-        default: code.uppercased()
-        }
-    }
-
-    private static func publicSourceURL(from value: String) -> URL? {
-        guard let url = URL(string: value),
-              url.scheme == "https" || url.scheme == "http" else {
-            return nil
-        }
-        return url
     }
 }
 

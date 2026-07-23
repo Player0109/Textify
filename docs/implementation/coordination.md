@@ -773,3 +773,15 @@ Task 1 must merge before parallel Wave 1 work begins.
   The four newly exposed transcribe.cpp families have catalog, resolver,
   adapter, and runtime coverage; their multi-gigabyte native artifact smokes
   remain explicit opt-in tests and were not run in this checkout.
+
+## Model Catalog Experience Seam Handoff - 2026-07-23
+
+- GitHub issue #2 owns the narrow behavior-preserving prefactor that moves the
+  current signed-catalog, installed-model, active-preference, query, and
+  download-state derivation behind one pure catalog-experience boundary.
+- This slice may add that boundary under the existing settings UI ownership,
+  route the current flat model page through it, and add focused semantic app
+  tests. It must preserve current v2 catalog decoding, visible order, ratings,
+  active state, install progress, and user-facing actions.
+- Manifest v3, hierarchical rows, revised action semantics, persistent queues,
+  storage inventory, and runtime behavior remain owned by later tickets.

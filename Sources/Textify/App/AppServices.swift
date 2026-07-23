@@ -404,6 +404,10 @@ final class AppServices {
         installedModelsStore.records.map(\.model)
     }
 
+    var installedModelRecords: [InstalledModelRecord] {
+        installedModelsStore.records
+    }
+
     func refreshInstalledModels() {
         installedModelsStore = Self.loadInstalledModelsStore(paths: paths)
     }
