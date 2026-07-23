@@ -86,13 +86,16 @@ public struct DiagnosticsRedactor: Sendable {
         "pasteboardSnapshotSucceeded",
         "pasteboardWriteSucceeded",
         "requestedAction",
+        "reasonCode",
         "result",
         "secureFieldDetected",
+        "stage",
         "statusAfter",
         "statusBefore",
         "succeeded",
         "targetChanged",
         "textLengthBucket",
+        "timestamp",
         "tier"
     ]
 }
@@ -120,6 +123,9 @@ enum DiagnosticsStringSanitizer {
         if key == "modelID" {
             return sanitizeModelID(normalized)
         }
+        if key == "timestamp" {
+            return sanitizeTimestamp(normalized)
+        }
 
         if let allowedValues = closedValueAllowlists[key] {
             return allowedValues.contains(normalized) ? normalized : unknownValue
@@ -146,16 +152,32 @@ enum DiagnosticsStringSanitizer {
             "distil-whisper-",
             "ggml-",
             "moonshine-",
+            "mossformer2-",
+            "nemotron-",
             "parakeet-",
             "paraformer-",
             "qwen-",
+            "qwen3-",
             "reazonspeech-",
             "sensevoice-",
+            "whisper-large-",
             "whisperkit-"
         ]
         guard allowedPrefixes.contains(where: value.hasPrefix),
               value.count <= 128,
               value.range(of: #"^[A-Za-z0-9][A-Za-z0-9._-]+$"#, options: .regularExpression) != nil
+        else {
+            return unknownValue
+        }
+        return value
+    }
+
+    private static func sanitizeTimestamp(_ value: String) -> String {
+        guard value.count <= 32,
+              value.range(
+                  of: #"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$"#,
+                  options: .regularExpression
+              ) != nil
         else {
             return unknownValue
         }
@@ -186,7 +208,10 @@ enum DiagnosticsStringSanitizer {
         "engine": [
             "fluid_audio_parakeet",
             "fluid_audio_paraformer",
+            "litert_lm",
+            "mlx_audio",
             "sherpa_onnx",
+            "transcribe_cpp",
             "whisper_cpp",
             unknownValue
         ],
@@ -196,8 +221,10 @@ enum DiagnosticsStringSanitizer {
             "insertion_attempt",
             "launch_at_login_change",
             "model_load",
+            "runtime_failure",
             "speech_recognition_completed",
             "speech_recognition_discarded",
+            "voice_cleaning",
             unknownValue
         ],
         "errorDomain": [
@@ -227,14 +254,39 @@ enum DiagnosticsStringSanitizer {
             "enable",
             unknownValue
         ],
+        "reasonCode": [
+            "audio_too_long",
+            "automatic_language_detection_required",
+            "automatic_language_detection_unsupported",
+            "empty_audio",
+            "incompatible_runtime_configuration",
+            "inference_failed",
+            "invalid_audio_format",
+            "missing_model",
+            "missing_runtime",
+            "model_load_failed",
+            "model_warmup_failed",
+            "runtime_not_loaded",
+            "runtime_unavailable",
+            "unsupported_language",
+            "unsupported_variant",
+            unknownValue
+        ],
         "result": [
+            "cleaned",
             "failed",
             "failure",
             "missing_model",
+            "raw_audio_fallback",
             "ready",
             "success",
             "unavailable",
             "unloaded",
+            unknownValue
+        ],
+        "stage": [
+            "inference",
+            "model_prepare",
             unknownValue
         ],
         "statusAfter": [
@@ -265,7 +317,10 @@ enum DiagnosticsStringSanitizer {
             "accurate",
             "balanced",
             "custom",
+            "experimental",
             "fast",
+            "recommended",
+            "specialist",
             unknownValue
         ]
     ]

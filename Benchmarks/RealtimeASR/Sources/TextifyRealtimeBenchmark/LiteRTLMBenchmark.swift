@@ -57,7 +57,8 @@ enum LiteRTLMBenchmark {
             maximumFeedLagMs: 0,
             transcript: transcription.text,
             reference: reference,
-            resources: resources
+            resources: resources,
+            productionMetadata: transcription
         )
     }
 }

@@ -707,6 +707,9 @@ Rows show:
 - Installed size
 - License
 - Source link
+- Quality rating from signed comparable benchmark evidence, otherwise
+  `Unrated`
+- Speed rating from signed stable repeated-run evidence, otherwise `Unrated`
 - Current state
 
 States:
@@ -739,6 +742,13 @@ Manifest refresh:
 - Fetch silently when Models pane opens.
 - Manual Refresh button.
 - Fetch failure falls back to cached/built-in manifest.
+
+Support tiers are curator labels, not measurements. The Models pane must never
+derive quality or speed bars from `tier`. Quality and speed sorting uses
+the signed numeric benchmark score, keeps stable catalog order for ties, and
+places unrated entries after rated entries. Model details show the raw
+component WERs, no-speech false-positive rate, p50/p95/RTF, measurement date,
+reference host, runtime version, policy ID, suite hash, and run count.
 
 ### 13.4 Vocabulary
 
@@ -1663,6 +1673,41 @@ must contain real byte sizes and SHA-256 values.
 }
 ```
 
+Manifest version 1 remains supported and cannot contain benchmark ratings.
+Manifest version 2 adds an optional strict `benchmark` object to each model.
+Missing benchmark evidence is valid and means `Unrated`; it is never
+replaced with a tier-derived estimate.
+
+The English benchmark schema-version-1 object is generated, not hand-calculated. It
+binds the policy and suite IDs, suite-index SHA-256, model ID, canonical
+artifact fingerprint, language, exact engine/version/license/compute route,
+source Git revision, measurement timestamp, reference host, and three-run count. Its quality block
+contains the absolute score/level/label, 732 speech and 200 no-speech item
+counts, production-filtered no-speech false-positive rate, and Open ASR, EdAcc,
+and BERSt WER/score/weight components. Its speed block contains the absolute
+score/level/label, p50 and p95 release-to-final latency, p95 real-time factor,
+and repeated-run p95 spread. When spread exceeds the policy limit, `speed`
+is omitted and `speedUnratedReason` is `unstable-p95`.
+
+The artifact fingerprint is SHA-256 over UTF-8 lines sorted by effective
+artifact path (`relativePath` or `filename`):
+
+```text
+path<TAB>lowercase-file-sha256<TAB>sizeBytes<LF>
+```
+
+The universal suite is `english-catalog-rating-v1`: the exact 29-second,
+932-case index with pinned component-manifest hashes. The current scoring
+policy is `english-catalog-rating-v2`. Quality uses the median component WER
+across three complete runs, and its user-facing level and label map directly
+from the rounded weighted quality score. The production-filtered no-speech
+false-positive rate remains signed evidence and a regression signal but does
+not modify that level. Speed excludes load/warmup, uses all 732 speech cases,
+and is publishable only from three accelerated resident runs on Apple M4 Max
+whose p95 latency and RTF relative spread are each at most 15 percent. The v1
+scoring policy remains immutable historical evidence for its earlier
+no-speech-capped candidates.
+
 Do not store thread count or Metal settings in manifest.
 
 Use `licenses: []`, not a single `license`, because the converted file source,
@@ -1774,7 +1819,7 @@ Signature file format:
   "algorithm": "Ed25519",
   "keyId": "model-manifest-v1",
   "manifestFile": "manifest.json",
-  "contentType": "application/vnd.textify.model-manifest+json;version=1",
+  "contentType": "application/vnd.textify.model-manifest+json;version=<manifestVersion>",
   "contentSHA256": "lowercase-hex-sha256-of-exact-manifest-json-bytes",
   "signature": "base64url-no-padding-ed25519-signature"
 }
@@ -1790,7 +1835,7 @@ signatureType=io.github.Player0109.Textify.model-manifest
 algorithm=Ed25519
 keyId=model-manifest-v1
 manifestFile=manifest.json
-contentType=application/vnd.textify.model-manifest+json;version=1
+contentType=application/vnd.textify.model-manifest+json;version=<manifestVersion>
 contentSHA256=<lowercase-hex-sha256-of-exact-manifest-json-bytes>
 ```
 
@@ -1806,6 +1851,8 @@ Verification order:
 8. Rebuild the canonical payload exactly.
 9. Verify the Ed25519 signature using the embedded public key for `keyId`.
 10. Only then parse and strict-schema-validate `manifest.json`.
+11. Require manifest version 1 or 2 and require the signed content-type version
+    to equal `manifestVersion` exactly.
 
 `keyId` is an opaque ASCII identifier into the app's embedded manifest
 verification key table. Unknown `keyId` means reject, with no degraded trust

@@ -25,6 +25,24 @@ final class AppDictationServiceTests: XCTestCase {
         XCTAssertTrue(snapshot.canDictate)
     }
 
+    func testPrepareFailureLogsClosedRuntimeReason() async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.transcriber.setPrepareError(
+            TranscribeCppRuntimeError.automaticLanguageDetectionRequired
+        )
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        _ = await service.prepareActiveModelIfAvailable()
+
+        let failures = await fakes.diagnostics.runtimeFailures()
+        XCTAssertEqual(failures.count, 1)
+        XCTAssertEqual(failures.first?.stage, "model_prepare")
+        XCTAssertEqual(
+            failures.first?.reasonCode,
+            "automatic_language_detection_required"
+        )
+    }
+
     func testPrepareActiveModelSkipsMissingInstall() async {
         let fakes = RuntimeFakes.blocked(
             blocker: .activeModelMissing(modelID: RuntimeActiveModel.fixture.id)
@@ -729,6 +747,10 @@ final class AppDictationServiceTests: XCTestCase {
         XCTAssertEqual(service.status, .failed(.transcriptionFailed))
         let insertedTexts = await fakes.inserter.insertedTexts()
         XCTAssertEqual(insertedTexts, [])
+        let failures = await fakes.diagnostics.runtimeFailures()
+        XCTAssertEqual(failures.count, 1)
+        XCTAssertEqual(failures.first?.stage, "inference")
+        XCTAssertEqual(failures.first?.reasonCode, "inference_failed")
     }
 
     private func assertTranscriberReadinessBlocks(
@@ -1359,6 +1381,7 @@ private actor FakeRuntimeDiagnostics: RuntimeDiagnosticsLogging {
     private var insertionAttemptCountValue = 0
     private var modelLoadCountValue = 0
     private var voiceCleaningCountValue = 0
+    private var runtimeFailureValues: [(stage: String, reasonCode: String)] = []
 
     func log(_ event: DiagnosticEvent) async {
         switch event {
@@ -1372,6 +1395,8 @@ private actor FakeRuntimeDiagnostics: RuntimeDiagnosticsLogging {
             insertionAttemptCountValue += 1
         case .modelLoad:
             modelLoadCountValue += 1
+        case let .runtimeFailure(_, _, _, stage, reasonCode):
+            runtimeFailureValues.append((stage, reasonCode))
         case .voiceCleaning:
             voiceCleaningCountValue += 1
         case .appStarted, .launchAtLoginChange:
@@ -1401,6 +1426,10 @@ private actor FakeRuntimeDiagnostics: RuntimeDiagnosticsLogging {
 
     func voiceCleaningCount() -> Int {
         voiceCleaningCountValue
+    }
+
+    func runtimeFailures() -> [(stage: String, reasonCode: String)] {
+        runtimeFailureValues
     }
 }
 

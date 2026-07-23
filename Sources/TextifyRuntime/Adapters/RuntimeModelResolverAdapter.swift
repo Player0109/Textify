@@ -63,7 +63,11 @@ public actor RuntimeModelResolverAdapter: RuntimeModelResolving {
             || record.model.capabilities.languages.contains(selectedLanguage)
             || record.model.capabilities.languages.contains("*")
         let baseParameters = record.model.runtimeParameters
-        let runtimeParameters = supportsSelectedLanguage
+        let requiresAutomaticLanguage = baseParameters.detectLanguage
+            && baseParameters.language.lowercased() == "auto"
+        let runtimeParameters = requiresAutomaticLanguage
+            ? baseParameters
+            : supportsSelectedLanguage
             ? RuntimeParameters(
                 language: selectedLanguage == "auto" ? baseParameters.language : selectedLanguage,
                 detectLanguage: selectedLanguage == "auto",

@@ -1,29 +1,34 @@
 import SwiftUI
 
 enum TextifyVisualIdentity {
-    static let signatureElement = "Release line"
+    static let signatureElement = "Spokenly blue selection"
 
-    static let voiceVioletHex = "#7667F2"
-    static let readyMintHex = "#34C892"
-    static let recordCoralHex = "#FF5C68"
+    static let voiceVioletHex = "#0A84FF"
+    static let readyMintHex = "#30D158"
+    static let recordCoralHex = "#FF453A"
 
-    static let voiceViolet = Color(red: 0.463, green: 0.404, blue: 0.949)
-    static let readyMint = Color(red: 0.204, green: 0.784, blue: 0.573)
-    static let recordCoral = Color(red: 1.000, green: 0.361, blue: 0.408)
-    static let warmWarning = Color(red: 0.957, green: 0.620, blue: 0.180)
-    static let slate = Color(red: 0.400, green: 0.439, blue: 0.522)
-    static let consoleSelection = Color(red: 0.105, green: 0.153, blue: 0.225)
+    static let voiceViolet = Color(red: 0.039, green: 0.518, blue: 1.000)
+    static let readyMint = Color(red: 0.188, green: 0.820, blue: 0.345)
+    static let recordCoral = Color(red: 1.000, green: 0.271, blue: 0.227)
+    static let warmWarning = Color(red: 1.000, green: 0.749, blue: 0.078)
+    static let slate = Color(red: 0.557, green: 0.557, blue: 0.576)
+    static let windowSurface = Color(red: 0.110, green: 0.110, blue: 0.118)
+    static let sidebarSurface = Color(red: 0.092, green: 0.092, blue: 0.098)
+    static let cardSurface = Color(red: 0.127, green: 0.127, blue: 0.135)
+    static let raisedSurface = Color(red: 0.153, green: 0.153, blue: 0.163)
+    static let separator = Color.white.opacity(0.105)
+    static let consoleSelection = Color(red: 0.105, green: 0.165, blue: 0.247)
 }
 
 enum TextifyWindowMetrics {
     static let mainWidth: CGFloat = 1_080
-    static let mainHeight: CGFloat = 720
-    static let mainMinimumWidth: CGFloat = 920
-    static let mainMinimumHeight: CGFloat = 620
+    static let mainHeight: CGFloat = 700
+    static let mainMinimumWidth: CGFloat = 1_060
+    static let mainMinimumHeight: CGFloat = 666
     static let onboardingWidth: CGFloat = 820
     static let onboardingHeight: CGFloat = 560
-    static let sidebarWidth: CGFloat = 220
-    static let readableContentWidth: CGFloat = 820
+    static let sidebarWidth: CGFloat = 258
+    static let readableContentWidth: CGFloat = 730
 }
 
 enum TextifyReadinessPresentation {
@@ -134,11 +139,11 @@ struct TextifyStatusBadge: View {
 
     var body: some View {
         Text(title)
-            .font(.system(.caption, design: .rounded, weight: .semibold))
+            .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(tone.color)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 4)
-            .background(tone.color.opacity(0.13), in: Capsule(style: .continuous))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(tone.color.opacity(0.13), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
             .accessibilityLabel(title)
     }
 }
@@ -147,30 +152,17 @@ struct TextifyCard<Content: View>: View {
     var padding: CGFloat = 18
     @ViewBuilder let content: Content
 
-    @Environment(\.colorScheme) private var colorScheme
-
     var body: some View {
         content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color(nsColor: .controlBackgroundColor))
-                    .overlay {
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(colorScheme == .dark ? 0.035 : 0.18),
-                                Color.clear
-                            ],
-                            startPoint: .top,
-                            endPoint: .center
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    }
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(TextifyVisualIdentity.cardSurface)
             }
             .overlay {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.primary.opacity(colorScheme == .dark ? 0.11 : 0.08), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(TextifyVisualIdentity.separator, lineWidth: 1)
             }
     }
 }
@@ -180,25 +172,13 @@ struct TextifyPaneHeader: View {
     let subtitle: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 3) {
             Text(title)
-                .font(.system(size: 32, weight: .bold, design: .rounded))
-                .tracking(-0.8)
+                .font(.system(size: 26, weight: .semibold))
+                .tracking(-0.35)
             Text(subtitle)
-                .font(.body)
+                .font(.system(size: 14))
                 .foregroundStyle(.secondary)
-
-            LinearGradient(
-                colors: [
-                    TextifyVisualIdentity.voiceViolet,
-                    TextifyVisualIdentity.readyMint.opacity(0.72),
-                    Color.clear
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-            .frame(width: 118, height: 2)
-            .padding(.top, 7)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
@@ -212,7 +192,7 @@ struct TextifySectionLabel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.system(.headline, design: .rounded, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
             if let detail {
                 Text(detail)
                     .font(.callout)
@@ -228,23 +208,15 @@ struct TextifyKeycap: View {
 
     var body: some View {
         Text(title)
-            .font(.system(.callout, design: .rounded, weight: .semibold))
+            .font(.system(size: 13, weight: .semibold))
             .lineLimit(1)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                LinearGradient(
-                    colors: [Color.primary.opacity(0.12), Color.primary.opacity(0.05)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                ),
-                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-            )
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(TextifyVisualIdentity.raisedSurface, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Color.primary.opacity(0.16), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .stroke(TextifyVisualIdentity.separator, lineWidth: 1)
             }
-            .shadow(color: .black.opacity(0.08), radius: 1, y: 1)
     }
 }
 
@@ -259,6 +231,8 @@ extension SettingsPane {
             return "Pick the local speech model that fits your language and speed."
         case .privacy:
             return "Control permissions and the apps where Textify stays silent."
+        case .logs:
+            return "Inspect privacy-safe runtime events without leaving Textify."
         case .advanced:
             return "Inspect runtime health and export privacy-safe diagnostics."
         }

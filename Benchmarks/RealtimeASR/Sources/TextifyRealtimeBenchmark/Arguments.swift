@@ -40,7 +40,9 @@ enum FeedMode: String, Codable {
 
 struct BenchmarkOptions {
     let engine: BenchmarkEngine
-    let audioURL: URL
+    let audioURL: URL?
+    let batchJobsURL: URL?
+    let batchOutputDirectoryURL: URL?
     let reference: String?
     let whisperModelURL: URL?
     let mlxModelURL: URL?
@@ -76,8 +78,29 @@ struct BenchmarkOptions {
                 "--engine must name a supported benchmark engine, including whisper or mlx-parakeet-rnnt-1.1b"
             )
         }
-        guard let audioPath = values["--audio"] else {
-            throw BenchmarkCLIError.invalidArguments("--audio is required")
+        let audioURL = values["--audio"].map {
+            URL(fileURLWithPath: $0).standardizedFileURL
+        }
+        let batchJobsURL = values["--batch-jobs"].map {
+            URL(fileURLWithPath: $0).standardizedFileURL
+        }
+        let batchOutputDirectoryURL = values["--batch-output-dir"].map {
+            URL(fileURLWithPath: $0, isDirectory: true).standardizedFileURL
+        }
+        guard (audioURL == nil) != (batchJobsURL == nil) else {
+            throw BenchmarkCLIError.invalidArguments(
+                "Provide exactly one of --audio or --batch-jobs"
+            )
+        }
+        if batchJobsURL != nil, batchOutputDirectoryURL == nil {
+            throw BenchmarkCLIError.invalidArguments(
+                "--batch-output-dir is required with --batch-jobs"
+            )
+        }
+        if audioURL != nil, batchOutputDirectoryURL != nil {
+            throw BenchmarkCLIError.invalidArguments(
+                "--batch-output-dir may only be used with --batch-jobs"
+            )
         }
 
         let feedModeValue = values["--feed-mode"] ?? FeedMode.realtime.rawValue
@@ -172,7 +195,9 @@ struct BenchmarkOptions {
 
         return BenchmarkOptions(
             engine: engine,
-            audioURL: URL(fileURLWithPath: audioPath).standardizedFileURL,
+            audioURL: audioURL,
+            batchJobsURL: batchJobsURL,
+            batchOutputDirectoryURL: batchOutputDirectoryURL,
             reference: values["--reference"],
             whisperModelURL: whisperModelURL,
             mlxModelURL: mlxModelURL,

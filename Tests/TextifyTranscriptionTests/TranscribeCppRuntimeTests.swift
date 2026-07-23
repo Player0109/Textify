@@ -85,6 +85,75 @@ final class TranscribeCppRuntimeTests: XCTestCase {
         await runtime.unload()
     }
 
+    func testNativeRuntimeLoadsArticleModelsOnMetalWhenEnabled() async throws {
+        guard ProcessInfo.processInfo.environment["TEXTIFY_RUN_ARTICLE_ASR_NATIVE_TESTS"] == "1" else {
+            throw XCTSkip(
+                "Set TEXTIFY_RUN_ARTICLE_ASR_NATIVE_TESTS=1 for the pinned article-model Metal smokes."
+            )
+        }
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let runtimeDirectory = repositoryRoot
+            .appendingPathComponent("Vendor/transcribe.cpp/v0.1.3/lib", isDirectory: true)
+        let candidates: [(String, String, TranscribeCppModelVariant)] = [
+            (
+                "granite-speech-4.1-2b-q5-k-m",
+                "granite-speech-4.1-2b-Q5_K_M.gguf",
+                .graniteSpeech4_1_2B
+            ),
+            (
+                "granite-speech-4.1-2b-nar-q5-k-m",
+                "granite-speech-4.1-2b-nar-Q5_K_M.gguf",
+                .graniteSpeech4_1_2BNAR
+            ),
+            (
+                "voxtral-mini-4b-realtime-2602-q4-k-m",
+                "Voxtral-Mini-4B-Realtime-2602-Q4_K_M.gguf",
+                .voxtralMini4BRealtime2602
+            ),
+            (
+                "moss-transcribe-diarize-0.9b-q5-k-m",
+                "MOSS-Transcribe-Diarize-Q5_K_M.gguf",
+                .mossTranscribeDiarize0_9B
+            ),
+        ]
+        let audioURL = repositoryRoot.appendingPathComponent(
+            "Benchmarks/RealtimeASR/.benchmark-data/openslr31/LibriSpeech/dev-clean-2/1272/141231/1272-141231-0000.flac"
+        )
+        let audio = try Self.loadPCMMono16K(from: audioURL)
+
+        for (modelID, filename, variant) in candidates {
+            let modelURL = repositoryRoot
+                .appendingPathComponent(".build/model-artifact-audit", isDirectory: true)
+                .appendingPathComponent(modelID, isDirectory: true)
+                .appendingPathComponent(filename)
+            guard FileManager.default.fileExists(atPath: modelURL.path) else {
+                XCTFail("The pinned article-model audit artifact is missing: \(modelURL.path)")
+                return
+            }
+            let runtime = TranscribeCppRuntime(runtimeDirectory: runtimeDirectory.path)
+            try await runtime.load(
+                modelID: modelID,
+                modelPath: modelURL.path,
+                variant: variant,
+                languageCode: "auto",
+                warmup: false
+            )
+
+            let result = try await runtime.transcribe(audio)
+            XCTAssertTrue(
+                result.text.unicodeScalars.contains {
+                    CharacterSet.alphanumerics.contains($0)
+                },
+                "\(modelID) returned no linguistic content."
+            )
+            XCTAssertLessThan(result.timing?.inferenceDurationMs ?? .max, 10_000, modelID)
+            await runtime.unload()
+        }
+    }
+
     func testLoadWarmsResidentMetalSessionAndTranscribes() async throws {
         let runtimeDirectory = try Self.makeTemporaryDirectory()
         let modelURL = try Self.makeTemporaryModelFile()
@@ -247,6 +316,10 @@ final class TranscribeCppRuntimeTests: XCTestCase {
         for variant in [
             TranscribeCppModelVariant.parakeetTDT0_6BV3,
             .nemotron3_5ASRStreaming0_6B,
+            .graniteSpeech4_1_2B,
+            .graniteSpeech4_1_2BNAR,
+            .voxtralMini4BRealtime2602,
+            .mossTranscribeDiarize0_9B,
         ] {
             XCTAssertEqual(
                 try TranscribeCppRuntime.requireSupportedLanguage("auto", variant: variant),
@@ -280,6 +353,40 @@ final class TranscribeCppRuntimeTests: XCTestCase {
             )
             _ = try await runtime.transcribe(
                 TranscriptionAudioBuffer(samples: Array(repeating: 0.1, count: 16000))
+            )
+
+            let calls = await session.callsSnapshot()
+            XCTAssertEqual(calls.map(\.languageCode), ["auto", "auto"])
+        }
+    }
+
+    func testArticleModelsUseAutomaticLanguageForWarmupAndInference() async throws {
+        let runtimeDirectory = try Self.makeTemporaryDirectory()
+        let modelURL = try Self.makeTemporaryModelFile()
+        defer {
+            try? FileManager.default.removeItem(at: runtimeDirectory)
+            try? FileManager.default.removeItem(at: modelURL.deletingLastPathComponent())
+        }
+
+        for variant in [
+            TranscribeCppModelVariant.graniteSpeech4_1_2B,
+            .graniteSpeech4_1_2BNAR,
+            .voxtralMini4BRealtime2602,
+            .mossTranscribeDiarize0_9B,
+        ] {
+            let session = FakeTranscribeCppSession()
+            let runtime = TranscribeCppRuntime(
+                runtimeDirectory: runtimeDirectory.path,
+                backend: TranscribeCppRuntimeBackend { _, _, _, _ in session }
+            )
+            try await runtime.load(
+                modelID: variant.rawValue,
+                modelPath: modelURL.path,
+                variant: variant,
+                languageCode: "auto"
+            )
+            _ = try await runtime.transcribe(
+                TranscriptionAudioBuffer(samples: Array(repeating: 0.1, count: 16_000))
             )
 
             let calls = await session.callsSnapshot()

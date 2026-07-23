@@ -57,7 +57,8 @@ enum ParaformerBenchmark {
             maximumFeedLagMs: 0,
             transcript: result.text,
             reference: reference,
-            resources: resources
+            resources: resources,
+            productionMetadata: result
         )
     }
 }

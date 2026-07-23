@@ -1,6 +1,6 @@
 {
-  "manifestVersion": 1,
-  "generatedAt": "2026-07-20T15:06:25Z",
+  "manifestVersion": 2,
+  "generatedAt": "2026-07-23T12:30:59Z",
   "models": [
     {
       "id": "ggml-small.en-q5_1",
@@ -70,6 +70,64 @@
         "expectedFinalization": "Near-instant after release",
         "accuracyTradeoff": "Reliable English default with the smallest promoted download",
         "requirements": "Apple Silicon with Metal; about 190 MB disk"
+      },
+      "benchmark": {
+        "artifactFingerprint": "6f808ad7ce55e237b95dcd8066bc4631c4726c4059ffdb8f2a2f7d08a6eb5761",
+        "computeBackend": "whisper.cpp Metal requested; CPU operations remain possible",
+        "engine": "whisper",
+        "engineVersion": "Textify vendored whisper.cpp",
+        "language": "en",
+        "measuredAt": "2026-07-22T23:17:00Z",
+        "modelID": "ggml-small.en-q5_1",
+        "modelLicense": "MIT",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 84.59166732548027,
+              "weight": 0.5,
+              "wordErrorRate": 0.10392916436081903
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 68.49507151240691,
+              "weight": 0.3,
+              "wordErrorRate": 0.2554711924966503
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 66.98423900258761,
+              "weight": 0.2,
+              "wordErrorRate": 0.3516819571865443
+            }
+          ],
+          "label": "High",
+          "level": 4,
+          "noSpeechFalsePositiveRate": 0.725,
+          "noSpeechItems": 200,
+          "score": 76,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Fast",
+          "level": 4,
+          "p50ReleaseToFinalMs": 101,
+          "p95RealTimeFactor": 0.05985915492957746,
+          "p95ReleaseToFinalMs": 249,
+          "relativeP95Spread": 0.12028094820017551,
+          "score": 88
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -146,6 +204,64 @@
         "expectedFinalization": "551 ms median and 746 ms p95 release-to-final on the fixed M4 Max English sample",
         "accuracyTradeoff": "3.33% English WER on Textify's fixed 210-word sample; substantially larger than the default",
         "requirements": "Apple Silicon with Metal; about 1.08 GB disk and 1.49 GB peak memory"
+      },
+      "benchmark": {
+        "artifactFingerprint": "aa978513006a3546c2c0640e3dc80f31a6de8876a2a86d0ee4369689ec10c9de",
+        "computeBackend": "whisper.cpp Metal requested; CPU operations remain possible",
+        "engine": "whisper",
+        "engineVersion": "Textify vendored whisper.cpp",
+        "language": "en",
+        "measuredAt": "2026-07-22T22:58:52Z",
+        "modelID": "whisper-large-v2-q5_0",
+        "modelLicense": "MIT",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 87.4061190607953,
+              "weight": 0.5,
+              "wordErrorRate": 0.09407858328721638
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 73.27295200307447,
+              "weight": 0.3,
+              "wordErrorRate": 0.2349263063867798
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 77.2759350741002,
+              "weight": 0.2,
+              "wordErrorRate": 0.2981651376146789
+            }
+          ],
+          "label": "High",
+          "level": 4,
+          "noSpeechFalsePositiveRate": 0.74,
+          "noSpeechItems": 200,
+          "score": 81,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Slow",
+          "level": 1,
+          "p50ReleaseToFinalMs": 454,
+          "p95RealTimeFactor": 0.28611898016997167,
+          "p95ReleaseToFinalMs": 924,
+          "relativeP95Spread": 0.008658008658008658,
+          "score": 18
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -222,6 +338,56 @@
         "expectedFinalization": "542.5 ms median and 728 ms p95 release-to-final on the fixed M4 Max English sample",
         "accuracyTradeoff": "3.81% English WER on Textify's fixed 210-word sample; substantially larger than the default",
         "requirements": "Apple Silicon with Metal; about 1.08 GB disk and 1.50 GB peak memory"
+      },
+      "benchmark": {
+        "artifactFingerprint": "0f9654584056f3139e5f68a7662938ebddcbc9464fedca60c059831fe5ebc9a2",
+        "computeBackend": "whisper.cpp Metal requested; CPU operations remain possible",
+        "engine": "whisper",
+        "engineVersion": "Textify vendored whisper.cpp",
+        "language": "en",
+        "measuredAt": "2026-07-22T17:49:26Z",
+        "modelID": "whisper-large-v3-q5_0",
+        "modelLicense": "MIT",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 85.0027670171555,
+              "weight": 0.5,
+              "wordErrorRate": 0.10249031543995572
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 77.1679632726404,
+              "weight": 0.3,
+              "wordErrorRate": 0.21817775792764627
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 79.62832274758878,
+              "weight": 0.2,
+              "wordErrorRate": 0.28593272171253825
+            }
+          ],
+          "label": "High",
+          "level": 4,
+          "noSpeechFalsePositiveRate": 0.335,
+          "noSpeechItems": 200,
+          "score": 82,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speedUnratedReason": "unstable-p95",
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -299,6 +465,64 @@
         "expectedFinalization": "English 367 ms median/415 ms p95; Hindi 536.5 ms median/734 ms p95 on fixed M4 Max samples",
         "accuracyTradeoff": "Higher-capacity English and Hindi specialist; 4.29% English WER and 22.05% Hindi WER on Textify's narrow fixed samples",
         "requirements": "Apple Silicon with Metal; about 574 MB disk and 700 MB peak memory"
+      },
+      "benchmark": {
+        "artifactFingerprint": "99b5649dd3c2ae1e105d331f4b81d46fe12a604d84002b4f5be4b7a1b48c68c1",
+        "computeBackend": "whisper.cpp Metal requested; CPU operations remain possible",
+        "engine": "whisper",
+        "engineVersion": "Textify vendored whisper.cpp",
+        "language": "en",
+        "measuredAt": "2026-07-22T22:12:14Z",
+        "modelID": "whisper-large-v3-turbo-q5_0",
+        "modelLicense": "MIT",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 84.08569847418768,
+              "weight": 0.5,
+              "wordErrorRate": 0.10570005534034312
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 77.1160297890462,
+              "weight": 0.3,
+              "wordErrorRate": 0.2184010719071014
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 83.15690425782168,
+              "weight": 0.2,
+              "wordErrorRate": 0.26758409785932724
+            }
+          ],
+          "label": "High",
+          "level": 4,
+          "noSpeechFalsePositiveRate": 0.235,
+          "noSpeechItems": 200,
+          "score": 82,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Measured",
+          "level": 2,
+          "p50ReleaseToFinalMs": 359,
+          "p95RealTimeFactor": 0.24482758620689654,
+          "p95ReleaseToFinalMs": 428,
+          "relativeP95Spread": 0.026946975973488003,
+          "score": 52
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -622,6 +846,64 @@
         "expectedFinalization": "Typically under 100 ms after release on M4-class Apple Silicon",
         "accuracyTradeoff": "Best measured English accuracy plus 25-language European coverage",
         "requirements": "Apple Silicon, macOS 14.4+, about 483 MB disk; first preparation may take several seconds"
+      },
+      "benchmark": {
+        "artifactFingerprint": "62d789a1f97b76dc80c7c5a8d666ac5c01d443311fdd80df1d23eaa8ae135e27",
+        "computeBackend": "Core ML CPU preprocessor + CPU/Apple Neural Engine inference",
+        "engine": "parakeet-tdt-v3",
+        "engineVersion": "Textify ParakeetRuntime / FluidAudio 0.15.5",
+        "language": "en",
+        "measuredAt": "2026-07-22T23:21:19Z",
+        "modelID": "parakeet-tdt-0.6b-v3",
+        "modelLicense": "CC-BY-4.0",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 92.02308482884023,
+              "weight": 0.5,
+              "wordErrorRate": 0.07791920309905921
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 90.51486855635302,
+              "weight": 0.3,
+              "wordErrorRate": 0.160786065207682
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 81.09856504351917,
+              "weight": 0.2,
+              "wordErrorRate": 0.2782874617737003
+            }
+          ],
+          "label": "High",
+          "level": 4,
+          "noSpeechFalsePositiveRate": 0.075,
+          "noSpeechItems": 200,
+          "score": 89,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Fastest",
+          "level": 5,
+          "p50ReleaseToFinalMs": 60,
+          "p95RealTimeFactor": 0.037142857142857144,
+          "p95ReleaseToFinalMs": 116,
+          "relativeP95Spread": 0.008620689655172414,
+          "score": 98
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -804,6 +1086,64 @@
         "expectedFinalization": "Typically under 100 ms after release on M4-class Apple Silicon",
         "accuracyTradeoff": "Smallest Parakeet memory footprint; lower published accuracy than the 0.6B variants",
         "requirements": "Apple Silicon, macOS 14.4+, about 228 MB disk; first preparation may take tens of seconds"
+      },
+      "benchmark": {
+        "artifactFingerprint": "6972b542cd54db730778f0bb8d8153c064aaf718d9a417a276b38f9306c6dfad",
+        "computeBackend": "Core ML CPU preprocessor + CPU/Apple Neural Engine inference",
+        "engine": "parakeet-tdt-ctc-110m",
+        "engineVersion": "Textify ParakeetRuntime / FluidAudio 0.15.5",
+        "language": "en",
+        "measuredAt": "2026-07-22T23:07:27Z",
+        "modelID": "parakeet-tdt-ctc-110m",
+        "modelLicense": "CC-BY-4.0",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 87.08988852873743,
+              "weight": 0.5,
+              "wordErrorRate": 0.09518539014941893
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 74.57128909292977,
+              "weight": 0.3,
+              "wordErrorRate": 0.22934345690040198
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 67.57233592095976,
+              "weight": 0.2,
+              "wordErrorRate": 0.3486238532110092
+            }
+          ],
+          "label": "High",
+          "level": 4,
+          "noSpeechFalsePositiveRate": 0.02,
+          "noSpeechItems": 200,
+          "score": 79,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Fastest",
+          "level": 5,
+          "p50ReleaseToFinalMs": 35,
+          "p95RealTimeFactor": 0.02158273381294964,
+          "p95ReleaseToFinalMs": 68,
+          "relativeP95Spread": 0.03219828584665271,
+          "score": 100
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -1021,6 +1361,64 @@
         "expectedFinalization": "Typically under 100 ms after release on M4-class Apple Silicon",
         "accuracyTradeoff": "English-only high-recall model with a larger memory footprint than 110M",
         "requirements": "Apple Silicon, macOS 14.4+, about 465 MB disk; first preparation may take about a minute"
+      },
+      "benchmark": {
+        "artifactFingerprint": "09748db87da84b6aa8b2f22a718fbdb728409af9b170c14e5d319ff972091355",
+        "computeBackend": "Core ML CPU preprocessor + CPU/Apple Neural Engine inference",
+        "engine": "parakeet-tdt-v2",
+        "engineVersion": "Textify ParakeetRuntime / FluidAudio 0.15.5",
+        "language": "en",
+        "measuredAt": "2026-07-22T19:05:36Z",
+        "modelID": "parakeet-tdt-0.6b-v2",
+        "modelLicense": "CC-BY-4.0",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 91.70685429678235,
+              "weight": 0.5,
+              "wordErrorRate": 0.07902600996126176
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 87.03532515554079,
+              "weight": 0.3,
+              "wordErrorRate": 0.17574810183117462
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 82.86285579863561,
+              "weight": 0.2,
+              "wordErrorRate": 0.2691131498470948
+            }
+          ],
+          "label": "High",
+          "level": 4,
+          "noSpeechFalsePositiveRate": 0.105,
+          "noSpeechItems": 200,
+          "score": 89,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Fastest",
+          "level": 5,
+          "p50ReleaseToFinalMs": 66,
+          "p95RealTimeFactor": 0.04191176470588235,
+          "p95ReleaseToFinalMs": 105,
+          "relativeP95Spread": 0.054397346470903905,
+          "score": 97
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -1132,6 +1530,64 @@
         "expectedFinalization": "128.5 ms median and 241 ms p95 release-to-final on the fixed M4 Max English sample",
         "accuracyTradeoff": "1.90% English WER on Textify's fixed 210-word sample; highest measured accuracy with a very large download",
         "requirements": "Apple Silicon with Metal and at least 16 GB memory; about 4.28 GB disk and 4.46 GB peak process memory"
+      },
+      "benchmark": {
+        "artifactFingerprint": "52f198ce81f5e11690bbfac8293a7e8fbda4d9cd874294a42ff3cfeb64aa5870",
+        "computeBackend": "MLX Metal required and verified by Textify runtime",
+        "engine": "mlx-parakeet-rnnt-1.1b",
+        "engineVersion": "mlx-audio-swift d302a5c; MLX 0.31.3",
+        "language": "en",
+        "measuredAt": "2026-07-22T21:44:36Z",
+        "modelID": "parakeet-rnnt-1.1b",
+        "modelLicense": "CC-BY-4.0",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 93.47774527630642,
+              "weight": 0.5,
+              "wordErrorRate": 0.0728278915329275
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 79.60883700156839,
+              "weight": 0.3,
+              "wordErrorRate": 0.20768200089325592
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 81.09856504351917,
+              "weight": 0.2,
+              "wordErrorRate": 0.2782874617737003
+            }
+          ],
+          "label": "High",
+          "level": 4,
+          "noSpeechFalsePositiveRate": 0.225,
+          "noSpeechItems": 200,
+          "score": 87,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Fast",
+          "level": 4,
+          "p50ReleaseToFinalMs": 86,
+          "p95RealTimeFactor": 0.03880190605854323,
+          "p95ReleaseToFinalMs": 285,
+          "relativeP95Spread": 0.017543859649122806,
+          "score": 89
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -1236,6 +1692,64 @@
         "expectedFinalization": "121.5 ms median and 304 ms p95 release-to-final on the fixed M4 Max English sample",
         "accuracyTradeoff": "2.86% English WER with punctuation on Textify's fixed 210-word sample; English-only and capped at 30 seconds",
         "requirements": "Apple Silicon with Metal; about 2.42 GB disk, 2.53 GB peak process memory, and a 30-second recording limit"
+      },
+      "benchmark": {
+        "artifactFingerprint": "a1ba42268524514727ac416a5a73038b2a7d0a1127c114d80f0234a19db1fc11",
+        "computeBackend": "MLX Metal required and verified by Textify runtime",
+        "engine": "mlx-cohere-transcribe-03-2026",
+        "engineVersion": "mlx-audio-swift d302a5c; MLX 0.31.3",
+        "language": "en",
+        "measuredAt": "2026-07-22T21:53:32Z",
+        "modelID": "cohere-transcribe-03-2026-mlx-8bit",
+        "modelLicense": "Apache-2.0",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 94.77429045774369,
+              "weight": 0.5,
+              "wordErrorRate": 0.06828998339789706
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 79.03756868203206,
+              "weight": 0.3,
+              "wordErrorRate": 0.21013845466726216
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 83.45095271700775,
+              "weight": 0.2,
+              "wordErrorRate": 0.26605504587155965
+            }
+          ],
+          "label": "High",
+          "level": 4,
+          "noSpeechFalsePositiveRate": 0.735,
+          "noSpeechItems": 200,
+          "score": 88,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Fast",
+          "level": 4,
+          "p50ReleaseToFinalMs": 85,
+          "p95RealTimeFactor": 0.042105263157894736,
+          "p95ReleaseToFinalMs": 267,
+          "relativeP95Spread": 0.011235955056179775,
+          "score": 89
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -1382,6 +1896,64 @@
         "expectedFinalization": "321.5 ms median and 416 ms p95 release-to-final on the fixed M4 Max English sample",
         "accuracyTradeoff": "3.33% English WER on Textify's fixed 210-word sample; larger download and memory use than the 5-bit whisper.cpp Turbo route",
         "requirements": "Apple Silicon with Metal and at least 8 GB memory; about 1.62 GB disk and 1.75 GB peak process memory"
+      },
+      "benchmark": {
+        "artifactFingerprint": "f5df80580d8bd1f5b136a5238d9c37bfef57e4ec74a9e1910fa31ebd5ceda558",
+        "computeBackend": "MLX Metal required and verified by Textify runtime",
+        "engine": "mlx-whisper-large-v3-turbo",
+        "engineVersion": "mlx-audio-swift d302a5c; MLX 0.31.3",
+        "language": "en",
+        "measuredAt": "2026-07-22T22:30:14Z",
+        "modelID": "whisper-large-v3-turbo-mlx",
+        "modelLicense": "MIT",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 84.05407542098189,
+              "weight": 0.5,
+              "wordErrorRate": 0.10581073602656337
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 77.63536462498831,
+              "weight": 0.3,
+              "wordErrorRate": 0.21616793211255025
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 86.97953422724063,
+              "weight": 0.2,
+              "wordErrorRate": 0.24770642201834864
+            }
+          ],
+          "label": "High",
+          "level": 4,
+          "noSpeechFalsePositiveRate": 0.79,
+          "noSpeechItems": 200,
+          "score": 83,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Measured",
+          "level": 2,
+          "p50ReleaseToFinalMs": 274,
+          "p95RealTimeFactor": 0.17410071942446043,
+          "p95ReleaseToFinalMs": 491,
+          "relativeP95Spread": 0.05272794942477347,
+          "score": 57
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -1986,6 +2558,64 @@
         "expectedFinalization": "About 139 ms Japanese median, 223 ms English median, and 128 ms Mandarin median on fixed M4 Max samples",
         "accuracyTradeoff": "Best measured Japanese option at 10.86% CER; also measured at 3.81% English WER and 6.15% Mandarin CER",
         "requirements": "Apple Silicon, about 240 MB disk, automatic selection across five languages, 29-second recording limit; a 29-second stress clip finalized in about 882 ms on M4 Max"
+      },
+      "benchmark": {
+        "artifactFingerprint": "fc7b0caf1b05b117625936bc01081f9968b5a988c336c0101d30df4b4439de96",
+        "computeBackend": "ONNX Runtime cpu (4 threads)",
+        "engine": "sensevoice-small-int8",
+        "engineVersion": "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
+        "language": "en",
+        "measuredAt": "2026-07-22T19:24:02Z",
+        "modelID": "sensevoice-small-int8-2024-07-17",
+        "modelLicense": "FunASR Model License 1.1",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 81.93533085619416,
+              "weight": 0.5,
+              "wordErrorRate": 0.11322634200332042
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 70.31274343820435,
+              "weight": 0.3,
+              "wordErrorRate": 0.2476552032157213
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 61.39731827805222,
+              "weight": 0.2,
+              "wordErrorRate": 0.38073394495412843
+            }
+          ],
+          "label": "Balanced",
+          "level": 3,
+          "noSpeechFalsePositiveRate": 0.23,
+          "noSpeechItems": 200,
+          "score": 74,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Balanced",
+          "level": 3,
+          "p50ReleaseToFinalMs": 136,
+          "p95RealTimeFactor": 0.03787878787878788,
+          "p95ReleaseToFinalMs": 655,
+          "relativeP95Spread": 0.005714285714285777,
+          "score": 64
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -2151,9 +2781,67 @@
         "supportsCustomVocabulary": false
       },
       "presentation": {
-      "expectedFinalization": "191.5 ms median and 277 ms p95 finalization on Textify's fixed English corpus on M4 Max",
-      "accuracyTradeoff": "3.20% English WER; automatic Hindi measured 15.00% WER and 12.39% CER on the fixed sample",
-      "requirements": "Apple Silicon with Metal; about 1.01 GB disk, 1.16 GB measured peak process memory, and a 60-second recording limit"
+        "expectedFinalization": "191.5 ms median and 277 ms p95 finalization on Textify's fixed English corpus on M4 Max",
+        "accuracyTradeoff": "3.20% English WER; automatic Hindi measured 15.00% WER and 12.39% CER on the fixed sample",
+        "requirements": "Apple Silicon with Metal; about 1.01 GB disk, 1.16 GB measured peak process memory, and a 60-second recording limit"
+      },
+      "benchmark": {
+        "artifactFingerprint": "de2e6cd92eeb29de76e35c2c4e9037b35963f367fc32d530c68aab1cf7d638c6",
+        "computeBackend": "MLX Metal required and verified by Textify runtime",
+        "engine": "mlx-qwen3-asr-0.6b-8bit",
+        "engineVersion": "mlx-audio-swift d302a5c; MLX 0.31.3",
+        "language": "en",
+        "measuredAt": "2026-07-22T21:22:58Z",
+        "modelID": "qwen3-asr-0.6b-mlx-8bit",
+        "modelLicense": "Apache-2.0",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 86.58391967744485,
+              "weight": 0.5,
+              "wordErrorRate": 0.096956281128943
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 78.05083249374202,
+              "weight": 0.3,
+              "wordErrorRate": 0.21438142027690935
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 66.1020936250294,
+              "weight": 0.2,
+              "wordErrorRate": 0.3562691131498471
+            }
+          ],
+          "label": "High",
+          "level": 4,
+          "noSpeechFalsePositiveRate": 0,
+          "noSpeechItems": 200,
+          "score": 80,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Fast",
+          "level": 4,
+          "p50ReleaseToFinalMs": 112,
+          "p95RealTimeFactor": 0.05116741182314953,
+          "p95ReleaseToFinalMs": 340,
+          "relativeP95Spread": 0.00894354177249052,
+          "score": 83
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -2319,9 +3007,67 @@
         "supportsCustomVocabulary": false
       },
       "presentation": {
-      "expectedFinalization": "211.5 ms median and 421 ms p95 finalization on Textify's fixed English corpus on M4 Max",
-      "accuracyTradeoff": "1.83% English WER; automatic Hindi measured 14.77% WER and 11.67% CER but 894 ms median finalization",
-      "requirements": "Apple Silicon with Metal; about 2.47 GB disk, 2.62 GB measured peak process memory, and a 60-second recording limit"
+        "expectedFinalization": "211.5 ms median and 421 ms p95 finalization on Textify's fixed English corpus on M4 Max",
+        "accuracyTradeoff": "1.83% English WER; automatic Hindi measured 14.77% WER and 11.67% CER but 894 ms median finalization",
+        "requirements": "Apple Silicon with Metal; about 2.47 GB disk, 2.62 GB measured peak process memory, and a 60-second recording limit"
+      },
+      "benchmark": {
+        "artifactFingerprint": "59e9ce883a7ebc584522ef2fce07451eb1845fdd5141f24351505805b0345c68",
+        "computeBackend": "MLX Metal required and verified by Textify runtime",
+        "engine": "mlx-qwen3-asr-1.7b-8bit",
+        "engineVersion": "mlx-audio-swift d302a5c; MLX 0.31.3",
+        "language": "en",
+        "measuredAt": "2026-07-22T21:36:04Z",
+        "modelID": "qwen3-asr-1.7b-mlx-8bit",
+        "modelLicense": "Apache-2.0",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 90.97952407304926,
+              "weight": 0.5,
+              "wordErrorRate": 0.08157166574432761
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 85.26958671333756,
+              "weight": 0.3,
+              "wordErrorRate": 0.1833407771326485
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 68.74852975770406,
+              "weight": 0.2,
+              "wordErrorRate": 0.3425076452599388
+            }
+          ],
+          "label": "High",
+          "level": 4,
+          "noSpeechFalsePositiveRate": 0.015,
+          "noSpeechItems": 200,
+          "score": 85,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Balanced",
+          "level": 3,
+          "p50ReleaseToFinalMs": 178,
+          "p95RealTimeFactor": 0.08073654390934844,
+          "p95ReleaseToFinalMs": 614,
+          "relativeP95Spread": 0.007027701258704956,
+          "score": 61
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -2424,9 +3170,67 @@
         "supportsCustomVocabulary": false
       },
       "presentation": {
-      "expectedFinalization": "178.5 ms median and 305 ms p95 finalization on Textify's fixed English corpus on M4 Max",
-      "accuracyTradeoff": "3.65% English WER; highest-precision 0.6B GGUF choice at more than twice the measured memory of Q5_K_M",
-      "requirements": "Apple Silicon with Metal; about 1.57 GB disk, 2.61 GB measured peak process memory, and a 60-second recording limit"
+        "expectedFinalization": "178.5 ms median and 305 ms p95 finalization on Textify's fixed English corpus on M4 Max",
+        "accuracyTradeoff": "3.65% English WER; highest-precision 0.6B GGUF choice at more than twice the measured memory of Q5_K_M",
+        "requirements": "Apple Silicon with Metal; about 1.57 GB disk, 2.61 GB measured peak process memory, and a 60-second recording limit"
+      },
+      "benchmark": {
+        "artifactFingerprint": "3880254729fe380b8ab414f0cd00ee8a7cf9a3f1a902c74406495d6a3861571c",
+        "computeBackend": "transcribe.cpp Metal required and verified by Textify runtime",
+        "engine": "transcribe-qwen3-asr-0.6b",
+        "engineVersion": "transcribe.cpp 0.1.3 (5a5a496)",
+        "language": "en",
+        "measuredAt": "2026-07-22T19:46:34Z",
+        "modelID": "qwen3-asr-0.6b-bf16",
+        "modelLicense": "Apache-2.0",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 90.91627796663768,
+              "weight": 0.5,
+              "wordErrorRate": 0.08179302711676813
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 87.08725863913499,
+              "weight": 0.3,
+              "wordErrorRate": 0.17552478785171952
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 86.97953422724063,
+              "weight": 0.2,
+              "wordErrorRate": 0.24770642201834864
+            }
+          ],
+          "label": "High",
+          "level": 4,
+          "noSpeechFalsePositiveRate": 0.005,
+          "noSpeechItems": 200,
+          "score": 89,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Fast",
+          "level": 4,
+          "p50ReleaseToFinalMs": 122,
+          "p95RealTimeFactor": 0.056643356643356645,
+          "p95ReleaseToFinalMs": 422,
+          "relativeP95Spread": 0.044884268496266956,
+          "score": 77
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -2529,9 +3333,67 @@
         "supportsCustomVocabulary": false
       },
       "presentation": {
-      "expectedFinalization": "156.5 ms median and 260 ms p95 finalization on Textify's fixed English corpus on M4 Max",
-      "accuracyTradeoff": "3.65% English WER; middle 0.6B GGUF disk and memory choice with no measured English gain over Q5_K_M",
-      "requirements": "Apple Silicon with Metal; about 0.85 GB disk, 1.57 GB measured peak process memory, and a 60-second recording limit"
+        "expectedFinalization": "156.5 ms median and 260 ms p95 finalization on Textify's fixed English corpus on M4 Max",
+        "accuracyTradeoff": "3.65% English WER; middle 0.6B GGUF disk and memory choice with no measured English gain over Q5_K_M",
+        "requirements": "Apple Silicon with Metal; about 0.85 GB disk, 1.57 GB measured peak process memory, and a 60-second recording limit"
+      },
+      "benchmark": {
+        "artifactFingerprint": "24c7a8b1247a9b71eb6481d481a85d5656ee00572258ffce5316c43082d8a920",
+        "computeBackend": "transcribe.cpp Metal required and verified by Textify runtime",
+        "engine": "transcribe-qwen3-asr-0.6b",
+        "engineVersion": "transcribe.cpp 0.1.3 (5a5a496)",
+        "language": "en",
+        "measuredAt": "2026-07-22T19:38:14Z",
+        "modelID": "qwen3-asr-0.6b-q8-0",
+        "modelLicense": "Apache-2.0",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 91.23250849869555,
+              "weight": 0.5,
+              "wordErrorRate": 0.08068622025456558
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 87.24305908991764,
+              "weight": 0.3,
+              "wordErrorRate": 0.17485484591335418
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 86.68548576805456,
+              "weight": 0.2,
+              "wordErrorRate": 0.2492354740061162
+            }
+          ],
+          "label": "High",
+          "level": 4,
+          "noSpeechFalsePositiveRate": 0.005,
+          "noSpeechItems": 200,
+          "score": 89,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Fast",
+          "level": 4,
+          "p50ReleaseToFinalMs": 112,
+          "p95RealTimeFactor": 0.05327102803738318,
+          "p95ReleaseToFinalMs": 355,
+          "relativeP95Spread": 0.03380281690140845,
+          "score": 82
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -2634,9 +3496,67 @@
         "supportsCustomVocabulary": false
       },
       "presentation": {
-      "expectedFinalization": "174.5 ms median and 283 ms p95 finalization on Textify's fixed English corpus on M4 Max",
-      "accuracyTradeoff": "3.65% English WER; automatic Hindi measured 11.36% WER and 10.05% CER with the smallest 0.6B footprint",
-      "requirements": "Apple Silicon with Metal; about 0.65 GB disk, 1.26 GB measured peak process memory, and a 60-second recording limit"
+        "expectedFinalization": "174.5 ms median and 283 ms p95 finalization on Textify's fixed English corpus on M4 Max",
+        "accuracyTradeoff": "3.65% English WER; automatic Hindi measured 11.36% WER and 10.05% CER with the smallest 0.6B footprint",
+        "requirements": "Apple Silicon with Metal; about 0.65 GB disk, 1.26 GB measured peak process memory, and a 60-second recording limit"
+      },
+      "benchmark": {
+        "artifactFingerprint": "16e97d847ad61c82dd673493d5d7af7d8d47e771877d0eab0bb21b4c99309a5d",
+        "computeBackend": "transcribe.cpp Metal required and verified by Textify runtime",
+        "engine": "transcribe-qwen3-asr-0.6b",
+        "engineVersion": "transcribe.cpp 0.1.3 (5a5a496)",
+        "language": "en",
+        "measuredAt": "2026-07-22T19:31:01Z",
+        "modelID": "qwen3-asr-0.6b-q5-k-m",
+        "modelLicense": "Apache-2.0",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 90.78978575381453,
+              "weight": 0.5,
+              "wordErrorRate": 0.08223574986164914
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 85.8408550328739,
+              "weight": 0.3,
+              "wordErrorRate": 0.18088432335864224
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 86.68548576805456,
+              "weight": 0.2,
+              "wordErrorRate": 0.2492354740061162
+            }
+          ],
+          "label": "High",
+          "level": 4,
+          "noSpeechFalsePositiveRate": 0,
+          "noSpeechItems": 200,
+          "score": 88,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Fast",
+          "level": 4,
+          "p50ReleaseToFinalMs": 100,
+          "p95RealTimeFactor": 0.04579439252336449,
+          "p95ReleaseToFinalMs": 340,
+          "relativeP95Spread": 0.06707314868546416,
+          "score": 84
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -2739,9 +3659,67 @@
         "supportsCustomVocabulary": false
       },
       "presentation": {
-      "expectedFinalization": "317.5 ms median and 545 ms p95 finalization on Textify's fixed English corpus on M4 Max",
-      "accuracyTradeoff": "3.33% English WER; highest-precision 1.7B GGUF choice with the largest measured memory footprint",
-      "requirements": "Apple Silicon with Metal; about 4.08 GB disk, 6.52 GB measured peak process memory, at least 16 GB unified memory, and a 60-second recording limit"
+        "expectedFinalization": "317.5 ms median and 545 ms p95 finalization on Textify's fixed English corpus on M4 Max",
+        "accuracyTradeoff": "3.33% English WER; highest-precision 1.7B GGUF choice with the largest measured memory footprint",
+        "requirements": "Apple Silicon with Metal; about 4.08 GB disk, 6.52 GB measured peak process memory, at least 16 GB unified memory, and a 60-second recording limit"
+      },
+      "benchmark": {
+        "artifactFingerprint": "5c554fa56fce74a3b840a5f758758e33c3c596eea923d162a8fb2df05f4b1e4a",
+        "computeBackend": "transcribe.cpp Metal required and verified by Textify runtime",
+        "engine": "transcribe-qwen3-asr-1.7b",
+        "engineVersion": "transcribe.cpp 0.1.3 (5a5a496)",
+        "language": "en",
+        "measuredAt": "2026-07-22T20:59:38Z",
+        "modelID": "qwen3-asr-1.7b-bf16",
+        "modelLicense": "Apache-2.0",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 93.25638390386591,
+              "weight": 0.5,
+              "wordErrorRate": 0.07360265633646929
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 91.96900609699098,
+              "weight": 0.3,
+              "wordErrorRate": 0.15453327378293882
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 91.39026111503175,
+              "weight": 0.2,
+              "wordErrorRate": 0.22477064220183487
+            }
+          ],
+          "label": "Highest",
+          "level": 5,
+          "noSpeechFalsePositiveRate": 0.01,
+          "noSpeechItems": 200,
+          "score": 92,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Measured",
+          "level": 2,
+          "p50ReleaseToFinalMs": 212,
+          "p95RealTimeFactor": 0.09011857707509881,
+          "p95ReleaseToFinalMs": 801,
+          "relativeP95Spread": 0.029033465336312656,
+          "score": 47
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -2844,9 +3822,67 @@
         "supportsCustomVocabulary": false
       },
       "presentation": {
-      "expectedFinalization": "231 ms median and 393 ms p95 finalization on Textify's fixed English corpus on M4 Max",
-      "accuracyTradeoff": "3.33% English WER; middle 1.7B GGUF disk and memory choice with no measured English gain over Q5_K_M",
-      "requirements": "Apple Silicon with Metal; about 2.19 GB disk, 3.64 GB measured peak process memory, and a 60-second recording limit"
+        "expectedFinalization": "231 ms median and 393 ms p95 finalization on Textify's fixed English corpus on M4 Max",
+        "accuracyTradeoff": "3.33% English WER; middle 1.7B GGUF disk and memory choice with no measured English gain over Q5_K_M",
+        "requirements": "Apple Silicon with Metal; about 2.19 GB disk, 3.64 GB measured peak process memory, and a 60-second recording limit"
+      },
+      "benchmark": {
+        "artifactFingerprint": "85afd8b84fe4964b2cb633f5dfcebbf10173a9e4a75df3547ece8c7fcbfe3e24",
+        "computeBackend": "transcribe.cpp Metal required and verified by Textify runtime",
+        "engine": "transcribe-qwen3-asr-1.7b",
+        "engineVersion": "transcribe.cpp 0.1.3 (5a5a496)",
+        "language": "en",
+        "measuredAt": "2026-07-22T20:45:31Z",
+        "modelID": "qwen3-asr-1.7b-q8-0",
+        "modelLicense": "Apache-2.0",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 93.22476085066013,
+              "weight": 0.5,
+              "wordErrorRate": 0.07371333702268953
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 91.76127216261413,
+              "weight": 0.3,
+              "wordErrorRate": 0.15542652970075926
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 91.09621265584568,
+              "weight": 0.2,
+              "wordErrorRate": 0.22629969418960244
+            }
+          ],
+          "label": "Highest",
+          "level": 5,
+          "noSpeechFalsePositiveRate": 0.015,
+          "noSpeechItems": 200,
+          "score": 92,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Balanced",
+          "level": 3,
+          "p50ReleaseToFinalMs": 154,
+          "p95RealTimeFactor": 0.06662134602311352,
+          "p95ReleaseToFinalMs": 568,
+          "relativeP95Spread": 0.022697964296670873,
+          "score": 66
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -2949,9 +3985,67 @@
         "supportsCustomVocabulary": false
       },
       "presentation": {
-      "expectedFinalization": "210 ms median and 346 ms p95 finalization on Textify's fixed English corpus on M4 Max",
-      "accuracyTradeoff": "3.33% English WER; automatic Hindi measured 10.00% WER and 7.00% CER with the smallest 1.7B GGUF footprint",
-      "requirements": "Apple Silicon with Metal; about 1.52 GB disk, 2.63 GB measured peak process memory, and a 60-second recording limit"
+        "expectedFinalization": "210 ms median and 346 ms p95 finalization on Textify's fixed English corpus on M4 Max",
+        "accuracyTradeoff": "3.33% English WER; automatic Hindi measured 10.00% WER and 7.00% CER with the smallest 1.7B GGUF footprint",
+        "requirements": "Apple Silicon with Metal; about 1.52 GB disk, 2.63 GB measured peak process memory, and a 60-second recording limit"
+      },
+      "benchmark": {
+        "artifactFingerprint": "2d430c07d81f2fe6f96593ca48d98a9c309b1dcc4a5ee99fd76c17cd2c63fa07",
+        "computeBackend": "transcribe.cpp Metal required and verified by Textify runtime",
+        "engine": "transcribe-qwen3-asr-1.7b",
+        "engineVersion": "transcribe.cpp 0.1.3 (5a5a496)",
+        "language": "en",
+        "measuredAt": "2026-07-22T20:34:58Z",
+        "modelID": "qwen3-asr-1.7b-q5-k-m",
+        "modelLicense": "Apache-2.0",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 92.75041505257333,
+              "weight": 0.5,
+              "wordErrorRate": 0.07537354731599336
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 91.13807035948356,
+              "weight": 0.3,
+              "wordErrorRate": 0.15810629745422064
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 97.27123029875322,
+              "weight": 0.2,
+              "wordErrorRate": 0.19418960244648317
+            }
+          ],
+          "label": "Highest",
+          "level": 5,
+          "noSpeechFalsePositiveRate": 0.015,
+          "noSpeechItems": 200,
+          "score": 93,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Balanced",
+          "level": 3,
+          "p50ReleaseToFinalMs": 142,
+          "p95RealTimeFactor": 0.06194029850746269,
+          "p95ReleaseToFinalMs": 519,
+          "relativeP95Spread": 0.03909777334942837,
+          "score": 70
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -3063,6 +4157,64 @@
         "expectedFinalization": "80 ms median and 192 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
         "accuracyTradeoff": "0.48% English WER; exact F32 MLX directory with a larger disk and memory footprint than the GGUF choices",
         "requirements": "Apple Silicon with Metal; about 2.47 GB disk, 2.64 GB measured peak process memory, and a 60-second recording limit"
+      },
+      "benchmark": {
+        "artifactFingerprint": "a23f268b805916aec8e357bb1288726318c306d3fd55c41985377755d26a04e3",
+        "computeBackend": "MLX Metal required and verified by Textify runtime",
+        "engine": "mlx-parakeet-tdt-0.6b-v2",
+        "engineVersion": "mlx-audio-swift d302a5c; MLX 0.31.3",
+        "language": "en",
+        "measuredAt": "2026-07-22T21:03:51Z",
+        "modelID": "parakeet-tdt-0.6b-v2-mlx",
+        "modelLicense": "CC-BY-4.0",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 93.7939758083643,
+              "weight": 0.5,
+              "wordErrorRate": 0.07172108467072495
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 87.08725863913499,
+              "weight": 0.3,
+              "wordErrorRate": 0.17552478785171952
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 87.2735826864267,
+              "weight": 0.2,
+              "wordErrorRate": 0.24617737003058104
+            }
+          ],
+          "label": "Highest",
+          "level": 5,
+          "noSpeechFalsePositiveRate": 0.125,
+          "noSpeechItems": 200,
+          "score": 90,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Fastest",
+          "level": 5,
+          "p50ReleaseToFinalMs": 29,
+          "p95RealTimeFactor": 0.013970588235294118,
+          "p95ReleaseToFinalMs": 83,
+          "relativeP95Spread": 0.008154188287620434,
+          "score": 100
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -3198,6 +4350,64 @@
         "expectedFinalization": "67 ms median and 291 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
         "accuracyTradeoff": "2.38% English WER; automatic selection across 25 declared European languages, with Textify corpus evidence currently limited to English",
         "requirements": "Apple Silicon with Metal; about 2.51 GB disk, 2.68 GB measured peak process memory, and a 60-second recording limit"
+      },
+      "benchmark": {
+        "artifactFingerprint": "8cf3b692dad395549d774dd38ab20bbd1f7a9acf92db739bc782e4d1c2fa8204",
+        "computeBackend": "MLX Metal required and verified by Textify runtime",
+        "engine": "mlx-parakeet-tdt-0.6b-v3",
+        "engineVersion": "mlx-audio-swift d302a5c; MLX 0.31.3",
+        "language": "en",
+        "measuredAt": "2026-07-22T21:08:06Z",
+        "modelID": "parakeet-tdt-0.6b-v3-mlx",
+        "modelLicense": "CC-BY-4.0",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 95.05889793659577,
+              "weight": 0.5,
+              "wordErrorRate": 0.06729385722191478
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 92.07287306417939,
+              "weight": 0.3,
+              "wordErrorRate": 0.1540866458240286
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 87.5676311456128,
+              "weight": 0.2,
+              "wordErrorRate": 0.24464831804281345
+            }
+          ],
+          "label": "Highest",
+          "level": 5,
+          "noSpeechFalsePositiveRate": 0.095,
+          "noSpeechItems": 200,
+          "score": 93,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Fastest",
+          "level": 5,
+          "p50ReleaseToFinalMs": 30,
+          "p95RealTimeFactor": 0.014164305949008499,
+          "p95ReleaseToFinalMs": 83,
+          "relativeP95Spread": 0.013519594795147432,
+          "score": 100
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -3329,6 +4539,64 @@
         "expectedFinalization": "137 ms median and 413 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
         "accuracyTradeoff": "3.33% English WER; Textify exposes whole-recording batch dictation, not upstream streaming partials",
         "requirements": "Apple Silicon with Metal; about 1.28 GB disk, 1.44 GB measured peak process memory, and a 60-second recording limit"
+      },
+      "benchmark": {
+        "artifactFingerprint": "70aaff2d36e866811241c1badc619b10d98c4ff8eb1824a63329a4ddd43f997b",
+        "computeBackend": "MLX Metal required and verified by Textify runtime",
+        "engine": "mlx-nemotron-3.5-asr-streaming-0.6b",
+        "engineVersion": "mlx-audio-swift d302a5c; MLX 0.31.3",
+        "language": "en",
+        "measuredAt": "2026-07-22T21:14:29Z",
+        "modelID": "nemotron-3.5-asr-streaming-0.6b-mlx",
+        "modelLicense": "NVIDIA Open Model License",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 75.95857380030041,
+              "weight": 0.5,
+              "wordErrorRate": 0.13414499169894853
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 73.68841987182817,
+              "weight": 0.3,
+              "wordErrorRate": 0.2331397945511389
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 50.51752528816748,
+              "weight": 0.2,
+              "wordErrorRate": 0.43730886850152906
+            }
+          ],
+          "label": "Balanced",
+          "level": 3,
+          "noSpeechFalsePositiveRate": 0.005,
+          "noSpeechItems": 200,
+          "score": 70,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Fastest",
+          "level": 5,
+          "p50ReleaseToFinalMs": 54,
+          "p95RealTimeFactor": 0.020388349514563107,
+          "p95ReleaseToFinalMs": 222,
+          "relativeP95Spread": 0.016359934174894727,
+          "score": 95
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -3405,6 +4673,64 @@
         "expectedFinalization": "74 ms median and 159 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
         "accuracyTradeoff": "0.48% English WER; F16 GGUF choice at the largest V2 disk and memory footprint",
         "requirements": "Apple Silicon with Metal; about 1.24 GB disk, 1.51 GB measured peak process memory, and a 60-second recording limit"
+      },
+      "benchmark": {
+        "artifactFingerprint": "21e9ce7e7d3970c3ede39d8a9c074f17ea49d8d360bcd451684d82dcb7a2abcd",
+        "computeBackend": "transcribe.cpp Metal required and verified by Textify runtime",
+        "engine": "transcribe-parakeet-tdt-0.6b-v2",
+        "engineVersion": "transcribe.cpp 0.1.3 (5a5a496)",
+        "language": "en",
+        "measuredAt": "2026-07-22T19:57:43Z",
+        "modelID": "parakeet-tdt-0.6b-v2-f16",
+        "modelLicense": "CC-BY-4.0",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 93.85722191477586,
+              "weight": 0.5,
+              "wordErrorRate": 0.07149972329828445
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 87.24305908991764,
+              "weight": 0.3,
+              "wordErrorRate": 0.17485484591335418
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 84.92119501293811,
+              "weight": 0.2,
+              "wordErrorRate": 0.25840978593272174
+            }
+          ],
+          "label": "Highest",
+          "level": 5,
+          "noSpeechFalsePositiveRate": 0.115,
+          "noSpeechItems": 200,
+          "score": 90,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Fastest",
+          "level": 5,
+          "p50ReleaseToFinalMs": 40,
+          "p95RealTimeFactor": 0.021379310344827585,
+          "p95ReleaseToFinalMs": 113,
+          "relativeP95Spread": 0.017699115044247787,
+          "score": 100
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -3481,6 +4807,64 @@
         "expectedFinalization": "107 ms median and 208 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
         "accuracyTradeoff": "0.48% English WER; Q8_0 GGUF choice at a middle V2 disk and memory footprint",
         "requirements": "Apple Silicon with Metal; about 0.73 GB disk, 1.00 GB measured peak process memory, and a 60-second recording limit"
+      },
+      "benchmark": {
+        "artifactFingerprint": "d72a297c34e8659bf19d1fd955f8f6f61a8dd917d789818a70fde3ac52ee0a88",
+        "computeBackend": "transcribe.cpp Metal required and verified by Textify runtime",
+        "engine": "transcribe-parakeet-tdt-0.6b-v2",
+        "engineVersion": "transcribe.cpp 0.1.3 (5a5a496)",
+        "language": "en",
+        "measuredAt": "2026-07-22T19:53:59Z",
+        "modelID": "parakeet-tdt-0.6b-v2-q8-0",
+        "modelLicense": "CC-BY-4.0",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 93.95209107439322,
+              "weight": 0.5,
+              "wordErrorRate": 0.07116768123962369
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 87.4507930242945,
+              "weight": 0.3,
+              "wordErrorRate": 0.1739615899955337
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 85.50929193131027,
+              "weight": 0.2,
+              "wordErrorRate": 0.25535168195718655
+            }
+          ],
+          "label": "Highest",
+          "level": 5,
+          "noSpeechFalsePositiveRate": 0.115,
+          "noSpeechItems": 200,
+          "score": 90,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Fastest",
+          "level": 5,
+          "p50ReleaseToFinalMs": 39,
+          "p95RealTimeFactor": 0.021246458923512748,
+          "p95ReleaseToFinalMs": 115,
+          "relativeP95Spread": 0.017391304347826087,
+          "score": 100
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -3557,6 +4941,64 @@
         "expectedFinalization": "107 ms median and 216 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
         "accuracyTradeoff": "0.48% English WER; Q5_K_M GGUF choice at the smallest V2 disk and memory footprint",
         "requirements": "Apple Silicon with Metal; about 0.54 GB disk, 0.81 GB measured peak process memory, and a 60-second recording limit"
+      },
+      "benchmark": {
+        "artifactFingerprint": "f2d7d99243e6e7e0ae3ce15f2e0d5b7782a96f45d410dfd440ac734e6f665dbb",
+        "computeBackend": "transcribe.cpp Metal required and verified by Textify runtime",
+        "engine": "transcribe-parakeet-tdt-0.6b-v2",
+        "engineVersion": "transcribe.cpp 0.1.3 (5a5a496)",
+        "language": "en",
+        "measuredAt": "2026-07-22T19:50:22Z",
+        "modelID": "parakeet-tdt-0.6b-v2-q5-k-m",
+        "modelLicense": "CC-BY-4.0",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 94.07858328721636,
+              "weight": 0.5,
+              "wordErrorRate": 0.07072495849474267
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 86.82759122116394,
+              "weight": 0.3,
+              "wordErrorRate": 0.1766413577489951
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 86.09738884968242,
+              "weight": 0.2,
+              "wordErrorRate": 0.25229357798165136
+            }
+          ],
+          "label": "Highest",
+          "level": 5,
+          "noSpeechFalsePositiveRate": 0.11,
+          "noSpeechItems": 200,
+          "score": 90,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Fastest",
+          "level": 5,
+          "p50ReleaseToFinalMs": 42,
+          "p95RealTimeFactor": 0.022302158273381296,
+          "p95ReleaseToFinalMs": 120,
+          "relativeP95Spread": 0.016666666666666666,
+          "score": 100
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -3657,6 +5099,64 @@
         "expectedFinalization": "99 ms median and 143 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
         "accuracyTradeoff": "2.38% English WER; automatic selection across 25 declared European languages, with Textify corpus evidence currently limited to English",
         "requirements": "Apple Silicon with Metal; about 1.26 GB disk, 1.60 GB measured peak process memory, and a 60-second recording limit"
+      },
+      "benchmark": {
+        "artifactFingerprint": "9acee5dd4750f7d6588046daeb3dd00d0ee608cc75125f463edcdd995c1c242b",
+        "computeBackend": "transcribe.cpp Metal required and verified by Textify runtime",
+        "engine": "transcribe-parakeet-tdt-0.6b-v3",
+        "engineVersion": "transcribe.cpp 0.1.3 (5a5a496)",
+        "language": "en",
+        "measuredAt": "2026-07-22T20:09:36Z",
+        "modelID": "parakeet-tdt-0.6b-v3-f16",
+        "modelLicense": "CC-BY-4.0",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 94.96402877697841,
+              "weight": 0.5,
+              "wordErrorRate": 0.06762589928057554
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 92.12480654777362,
+              "weight": 0.3,
+              "wordErrorRate": 0.15386333184457346
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 86.97953422724063,
+              "weight": 0.2,
+              "wordErrorRate": 0.24770642201834864
+            }
+          ],
+          "label": "Highest",
+          "level": 5,
+          "noSpeechFalsePositiveRate": 0.11,
+          "noSpeechItems": 200,
+          "score": 93,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Fastest",
+          "level": 5,
+          "p50ReleaseToFinalMs": 43,
+          "p95RealTimeFactor": 0.022535211267605635,
+          "p95ReleaseToFinalMs": 127,
+          "relativeP95Spread": 0.023622047244094488,
+          "score": 100
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -3757,6 +5257,64 @@
         "expectedFinalization": "75 ms median and 98 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
         "accuracyTradeoff": "2.38% English WER; automatic selection across 25 declared European languages, with Textify corpus evidence currently limited to English",
         "requirements": "Apple Silicon with Metal; about 0.74 GB disk, 1.07 GB measured peak process memory, and a 60-second recording limit"
+      },
+      "benchmark": {
+        "artifactFingerprint": "e200009be14263441d3c721ee959ad988c203f23baa0654d33302e2f0b434989",
+        "computeBackend": "transcribe.cpp Metal required and verified by Textify runtime",
+        "engine": "transcribe-parakeet-tdt-0.6b-v3",
+        "engineVersion": "transcribe.cpp 0.1.3 (5a5a496)",
+        "language": "en",
+        "measuredAt": "2026-07-22T20:05:37Z",
+        "modelID": "parakeet-tdt-0.6b-v3-q8-0",
+        "modelLicense": "CC-BY-4.0",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 95.21701320262471,
+              "weight": 0.5,
+              "wordErrorRate": 0.0667404537908135
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 92.07287306417939,
+              "weight": 0.3,
+              "wordErrorRate": 0.1540866458240286
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 86.97953422724063,
+              "weight": 0.2,
+              "wordErrorRate": 0.24770642201834864
+            }
+          ],
+          "label": "Highest",
+          "level": 5,
+          "noSpeechFalsePositiveRate": 0.11,
+          "noSpeechItems": 200,
+          "score": 93,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Fastest",
+          "level": 5,
+          "p50ReleaseToFinalMs": 43,
+          "p95RealTimeFactor": 0.022302158273381296,
+          "p95ReleaseToFinalMs": 128,
+          "relativeP95Spread": 0.012136793596895342,
+          "score": 100
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -3857,6 +5415,64 @@
         "expectedFinalization": "98 ms median and 134 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
         "accuracyTradeoff": "2.38% English WER; automatic selection across 25 declared European languages, with Textify corpus evidence currently limited to English",
         "requirements": "Apple Silicon with Metal; about 0.55 GB disk, 0.88 GB measured peak process memory, and a 60-second recording limit"
+      },
+      "benchmark": {
+        "artifactFingerprint": "f65cbe4f7a88dbb3d28e74778b5560816f7ae9a5ba57cba6fe7578c4fd65a3f2",
+        "computeBackend": "transcribe.cpp Metal required and verified by Textify runtime",
+        "engine": "transcribe-parakeet-tdt-0.6b-v3",
+        "engineVersion": "transcribe.cpp 0.1.3 (5a5a496)",
+        "language": "en",
+        "measuredAt": "2026-07-22T20:01:45Z",
+        "modelID": "parakeet-tdt-0.6b-v3-q5-k-m",
+        "modelLicense": "CC-BY-4.0",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 94.77429045774369,
+              "weight": 0.5,
+              "wordErrorRate": 0.06828998339789706
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 92.12480654777362,
+              "weight": 0.3,
+              "wordErrorRate": 0.15386333184457346
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 86.09738884968242,
+              "weight": 0.2,
+              "wordErrorRate": 0.25229357798165136
+            }
+          ],
+          "label": "Highest",
+          "level": 5,
+          "noSpeechFalsePositiveRate": 0.105,
+          "noSpeechItems": 200,
+          "score": 92,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Fastest",
+          "level": 5,
+          "p50ReleaseToFinalMs": 45,
+          "p95RealTimeFactor": 0.023484848484848483,
+          "p95ReleaseToFinalMs": 134,
+          "relativeP95Spread": 0.022388059701492536,
+          "score": 100
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -3960,6 +5576,64 @@
         "expectedFinalization": "129 ms median and 220 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
         "accuracyTradeoff": "3.33% English WER; Textify exposes whole-recording batch dictation, not upstream streaming partials",
         "requirements": "Apple Silicon with Metal; about 1.28 GB disk, 1.65 GB measured peak process memory, and a 60-second recording limit"
+      },
+      "benchmark": {
+        "artifactFingerprint": "e85f879bd5c3915d8653b53899c43b951bf0ddf5e574a917954e69caf7466c9c",
+        "computeBackend": "transcribe.cpp Metal required and verified by Textify runtime",
+        "engine": "transcribe-nemotron-3.5-asr-streaming-0.6b",
+        "engineVersion": "transcribe.cpp 0.1.3 (5a5a496)",
+        "language": "en",
+        "measuredAt": "2026-07-22T20:25:05Z",
+        "modelID": "nemotron-3.5-asr-streaming-0.6b-f16",
+        "modelLicense": "OpenMDW-1.1",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 76.27480433235829,
+              "weight": 0.5,
+              "wordErrorRate": 0.13303818483674598
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 71.97461491321914,
+              "weight": 0.3,
+              "wordErrorRate": 0.24050915587315766
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 52.86991296165608,
+              "weight": 0.2,
+              "wordErrorRate": 0.42507645259938837
+            }
+          ],
+          "label": "Balanced",
+          "level": 3,
+          "noSpeechFalsePositiveRate": 0,
+          "noSpeechItems": 200,
+          "score": 70,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Fastest",
+          "level": 5,
+          "p50ReleaseToFinalMs": 58,
+          "p95RealTimeFactor": 0.026623376623376622,
+          "p95ReleaseToFinalMs": 201,
+          "relativeP95Spread": 0.014925373134328358,
+          "score": 96
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -4063,6 +5737,64 @@
         "expectedFinalization": "123 ms median and 230 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
         "accuracyTradeoff": "3.33% English WER; Textify exposes whole-recording batch dictation, not upstream streaming partials",
         "requirements": "Apple Silicon with Metal; about 0.75 GB disk, 1.11 GB measured peak process memory, and a 60-second recording limit"
+      },
+      "benchmark": {
+        "artifactFingerprint": "0dc4272d91be5a3369ac8b9d7ea70a4bd75cb2943568bcf4fc0e8fce5c93493b",
+        "computeBackend": "transcribe.cpp Metal required and verified by Textify runtime",
+        "engine": "transcribe-nemotron-3.5-asr-streaming-0.6b",
+        "engineVersion": "transcribe.cpp 0.1.3 (5a5a496)",
+        "language": "en",
+        "measuredAt": "2026-07-22T20:19:55Z",
+        "modelID": "nemotron-3.5-asr-streaming-0.6b-q8-0",
+        "modelLicense": "OpenMDW-1.1",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 76.46454265159302,
+              "weight": 0.5,
+              "wordErrorRate": 0.13237410071942446
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 71.8188144624365,
+              "weight": 0.3,
+              "wordErrorRate": 0.241179097811523
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 55.22230063514466,
+              "weight": 0.2,
+              "wordErrorRate": 0.41284403669724773
+            }
+          ],
+          "label": "Balanced",
+          "level": 3,
+          "noSpeechFalsePositiveRate": 0,
+          "noSpeechItems": 200,
+          "score": 71,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Fastest",
+          "level": 5,
+          "p50ReleaseToFinalMs": 57,
+          "p95RealTimeFactor": 0.026623376623376622,
+          "p95ReleaseToFinalMs": 204,
+          "relativeP95Spread": 0.0196078431372549,
+          "score": 96
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
       }
     },
     {
@@ -4166,6 +5898,480 @@
         "expectedFinalization": "130 ms median and 306 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
         "accuracyTradeoff": "2.86% English WER; Textify exposes whole-recording batch dictation, not upstream streaming partials",
         "requirements": "Apple Silicon with Metal; about 0.56 GB disk, 0.92 GB measured peak process memory, and a 60-second recording limit"
+      },
+      "benchmark": {
+        "artifactFingerprint": "a0fc0181821d2accf5f9164f0d75a08150cd169c04909a91e5280b2a934dfc9c",
+        "computeBackend": "transcribe.cpp Metal required and verified by Textify runtime",
+        "engine": "transcribe-nemotron-3.5-asr-streaming-0.6b",
+        "engineVersion": "transcribe.cpp 0.1.3 (5a5a496)",
+        "language": "en",
+        "measuredAt": "2026-07-22T20:14:48Z",
+        "modelID": "nemotron-3.5-asr-streaming-0.6b-q5-k-m",
+        "modelLicense": "OpenMDW-1.1",
+        "policyID": "english-catalog-rating-v2",
+        "quality": {
+          "components": [
+            {
+              "id": "open-asr-english-nightly-v1",
+              "score": 76.78077318365088,
+              "weight": 0.5,
+              "wordErrorRate": 0.1312672938572219
+            },
+            {
+              "id": "edacc-english-nightly-v1",
+              "score": 73.0132845851034,
+              "weight": 0.3,
+              "wordErrorRate": 0.23604287628405538
+            },
+            {
+              "id": "berst-english-nightly-v1",
+              "score": 48.753234533051035,
+              "weight": 0.2,
+              "wordErrorRate": 0.44648318042813456
+            }
+          ],
+          "label": "Balanced",
+          "level": 3,
+          "noSpeechFalsePositiveRate": 0,
+          "noSpeechItems": 200,
+          "score": 70,
+          "speechItems": 732
+        },
+        "referenceHost": {
+          "architecture": "arm64",
+          "chip": "Apple M4 Max",
+          "operatingSystem": "Version 26.5.2 (Build 25F84)"
+        },
+        "runCount": 3,
+        "schemaVersion": 1,
+        "sourceRevision": "5a6be4dc5fed6bf1e7e83801425ae9d7cba761a3",
+        "speed": {
+          "label": "Fastest",
+          "level": 5,
+          "p50ReleaseToFinalMs": 59,
+          "p95RealTimeFactor": 0.027338129496402876,
+          "p95ReleaseToFinalMs": 205,
+          "relativeP95Spread": 0.015659584620074506,
+          "score": 95
+        },
+        "suiteID": "english-catalog-rating-v1",
+        "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      }
+    },
+    {
+      "id": "granite-speech-4.1-2b-q5-k-m",
+      "displayName": "Experimental - Granite Speech 4.1 2B",
+      "tier": "experimental",
+      "description": "Exact Q5_K_M Granite Speech 4.1 2B GGUF for offline six-language dictation with automatic language detection through transcribe.cpp Metal.",
+      "sizeBytes": 1829704544,
+      "files": [
+        {
+          "filename": "granite-speech-4.1-2b-Q5_K_M.gguf",
+          "url": "https://huggingface.co/handy-computer/granite-speech-4.1-2b-gguf/resolve/58e7710fd7039ded5a185668eef5f71ca5d9d919/granite-speech-4.1-2b-Q5_K_M.gguf",
+          "sha256": "63e0d3a82fa6f0f4688af0b7d7ee784864d271b7be820f4ea43c8298c59b0ac5",
+          "sizeBytes": 1829704544
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "IBM Granite Speech 4.1 2B model weights and GGUF conversion",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "scope": "transcribe.cpp runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "handy-computer/granite-speech-4.1-2b-gguf",
+        "sourceUrl": "https://huggingface.co/handy-computer/granite-speech-4.1-2b-gguf",
+        "sourceRevision": "58e7710fd7039ded5a185668eef5f71ca5d9d919",
+        "sourceFile": "granite-speech-4.1-2b-Q5_K_M.gguf",
+        "originalModelName": "IBM Granite Speech 4.1 2B",
+        "originalModelUrl": "https://huggingface.co/ibm-granite/granite-speech-4.1-2b",
+        "mirroredBy": "handy-computer",
+        "mirroredAt": "2026-06-29"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "transcribe_cpp",
+        "variant": "granite-speech-4.1-2b",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "en",
+          "fr",
+          "de",
+          "es",
+          "pt",
+          "ja"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "Unrated in Textify; the pinned runtime's M4 Max publication measured about 1.0 seconds for 35.3 seconds of audio",
+        "accuracyTradeoff": "Six-language autoregressive model; the selected Q5_K_M artifact measured 1.33% LibriSpeech test-clean WER upstream",
+        "requirements": "Apple Silicon with Metal; about 1.83 GB disk, automatic language detection, and a 60-second Textify recording limit"
+      }
+    },
+    {
+      "id": "granite-speech-4.1-2b-nar-q5-k-m",
+      "displayName": "Experimental - Granite Speech 4.1 2B NAR",
+      "tier": "experimental",
+      "description": "Exact Q5_K_M non-autoregressive Granite Speech 4.1 2B GGUF for fast offline five-language dictation through transcribe.cpp Metal.",
+      "sizeBytes": 1782089344,
+      "files": [
+        {
+          "filename": "granite-speech-4.1-2b-nar-Q5_K_M.gguf",
+          "url": "https://huggingface.co/handy-computer/granite-speech-4.1-2b-nar-gguf/resolve/ca53e8273416eb7e888f19bcebbcb9b6ab3edc17/granite-speech-4.1-2b-nar-Q5_K_M.gguf",
+          "sha256": "88d7c7b5b8b59c95bb6580a1e7d5d81cae63943cef71405ff477527b0bb69fca",
+          "sizeBytes": 1782089344
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "IBM Granite Speech 4.1 2B NAR model weights and GGUF conversion",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "scope": "transcribe.cpp runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "handy-computer/granite-speech-4.1-2b-nar-gguf",
+        "sourceUrl": "https://huggingface.co/handy-computer/granite-speech-4.1-2b-nar-gguf",
+        "sourceRevision": "ca53e8273416eb7e888f19bcebbcb9b6ab3edc17",
+        "sourceFile": "granite-speech-4.1-2b-nar-Q5_K_M.gguf",
+        "originalModelName": "IBM Granite Speech 4.1 2B NAR",
+        "originalModelUrl": "https://huggingface.co/ibm-granite/granite-speech-4.1-2b-nar",
+        "mirroredBy": "handy-computer",
+        "mirroredAt": "2026-06-29"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "transcribe_cpp",
+        "variant": "granite-speech-4.1-2b-nar",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "en",
+          "fr",
+          "de",
+          "es",
+          "pt"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "Unrated in Textify; the pinned runtime's M4 Max publication measured about 664 ms for 35.3 seconds of audio",
+        "accuracyTradeoff": "Fast single-pass editor without translation or timestamps; the selected Q5_K_M artifact measured 1.25% LibriSpeech test-clean WER upstream",
+        "requirements": "Apple Silicon with Metal; about 1.78 GB disk, implicit language detection, and a 60-second Textify recording limit"
+      }
+    },
+    {
+      "id": "voxtral-mini-4b-realtime-2602-q4-k-m",
+      "displayName": "Experimental - Voxtral Mini 4B Realtime 2602",
+      "tier": "experimental",
+      "description": "Exact Q4_K_M Voxtral Mini 4B Realtime 2602 GGUF for offline 13-language dictation through its transcribe.cpp Metal path.",
+      "sizeBytes": 2830493984,
+      "files": [
+        {
+          "filename": "Voxtral-Mini-4B-Realtime-2602-Q4_K_M.gguf",
+          "url": "https://huggingface.co/handy-computer/Voxtral-Mini-4B-Realtime-2602-gguf/resolve/b3e1c979e3775cbd0a49a65878a0ec7f06789ed7/Voxtral-Mini-4B-Realtime-2602-Q4_K_M.gguf",
+          "sha256": "39dc1f65539373a406edea7490505822d77c12edff521744678717eef4da4723",
+          "sizeBytes": 2830493984
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "Mistral Voxtral Mini 4B Realtime 2602 model weights and GGUF conversion",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "scope": "transcribe.cpp runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "handy-computer/Voxtral-Mini-4B-Realtime-2602-gguf",
+        "sourceUrl": "https://huggingface.co/handy-computer/Voxtral-Mini-4B-Realtime-2602-gguf",
+        "sourceRevision": "b3e1c979e3775cbd0a49a65878a0ec7f06789ed7",
+        "sourceFile": "Voxtral-Mini-4B-Realtime-2602-Q4_K_M.gguf",
+        "originalModelName": "Mistral Voxtral Mini 4B Realtime 2602",
+        "originalModelUrl": "https://huggingface.co/mistralai/Voxtral-Mini-4B-Realtime-2602",
+        "mirroredBy": "handy-computer",
+        "mirroredAt": "2026-06-28"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "transcribe_cpp",
+        "variant": "voxtral-mini-4b-realtime-2602",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "en",
+          "fr",
+          "es",
+          "de",
+          "ru",
+          "zh",
+          "ja",
+          "it",
+          "pt",
+          "nl",
+          "ar",
+          "hi",
+          "ko"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "Unrated in Textify; the pinned runtime's M4 Max publication measured about 3.91 seconds for 35.3 seconds of audio",
+        "accuracyTradeoff": "13-language automatic recognition; the selected Q4_K_M artifact matched the 2.08% LibriSpeech test-clean reference WER upstream",
+        "requirements": "Apple Silicon with Metal; about 2.83 GB disk, automatic language detection, and Textify currently uses the offline final-result path"
+      }
+    },
+    {
+      "id": "moss-transcribe-diarize-0.9b-q5-k-m",
+      "displayName": "Experimental - MOSS Transcribe-Diarize 0.9B",
+      "tier": "experimental",
+      "description": "Exact Q5_K_M MOSS Transcribe-Diarize GGUF for offline English and Chinese transcription with inline speaker labels through transcribe.cpp Metal.",
+      "sizeBytes": 700313760,
+      "files": [
+        {
+          "filename": "MOSS-Transcribe-Diarize-Q5_K_M.gguf",
+          "url": "https://huggingface.co/handy-computer/MOSS-Transcribe-Diarize-gguf/resolve/6fdfa33aed776bbb0ac11a1a9835634fe6d75dd7/MOSS-Transcribe-Diarize-Q5_K_M.gguf",
+          "sha256": "52deaeff931272f3d49eb437f0f4916e42fce9f42e68db250047408241cf473c",
+          "sizeBytes": 700313760
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "OpenMOSS MOSS Transcribe-Diarize model weights and GGUF conversion",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "scope": "transcribe.cpp runtime and conversion tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "handy-computer/MOSS-Transcribe-Diarize-gguf",
+        "sourceUrl": "https://huggingface.co/handy-computer/MOSS-Transcribe-Diarize-gguf",
+        "sourceRevision": "6fdfa33aed776bbb0ac11a1a9835634fe6d75dd7",
+        "sourceFile": "MOSS-Transcribe-Diarize-Q5_K_M.gguf",
+        "originalModelName": "OpenMOSS MOSS Transcribe-Diarize",
+        "originalModelUrl": "https://huggingface.co/OpenMOSS-Team/MOSS-Transcribe-Diarize",
+        "mirroredBy": "handy-computer",
+        "mirroredAt": "2026-07-13"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "transcribe_cpp",
+        "variant": "moss-transcribe-diarize-0.9b",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "en",
+          "zh"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "Unrated in Textify; the pinned runtime's M4 Max publication measured about 1.27 seconds for 35.3 seconds of audio",
+        "accuracyTradeoff": "English and Chinese with generated inline speaker/timestamp spans; the selected Q5_K_M artifact measured 1.99% LibriSpeech test-clean WER upstream",
+        "requirements": "Apple Silicon with Metal; about 700 MB disk, automatic language selection, and a 60-second Textify recording limit"
+      }
+    },
+    {
+      "id": "omnilingual-asr-300m-ctc-int8",
+      "displayName": "Experimental - Omnilingual ASR 300M",
+      "tier": "experimental",
+      "description": "Exact INT8 Omnilingual ASR 300M CTC export for offline automatic transcription across more than 1,600 languages through sherpa-onnx.",
+      "sizeBytes": 365438543,
+      "files": [
+        {
+          "filename": "model.int8.onnx",
+          "relativePath": "model.int8.onnx",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12/resolve/6abf1ece20cd2308bdb7d13cd78ec1c44fa4c094/model.int8.onnx",
+          "sha256": "e7c4e54ee4c4c47829cc6667d5d00ed8ea7bef1dcfeef0fce766f77752a2726c",
+          "sizeBytes": 365352120
+        },
+        {
+          "filename": "tokens.txt",
+          "relativePath": "tokens.txt",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12/resolve/6abf1ece20cd2308bdb7d13cd78ec1c44fa4c094/tokens.txt",
+          "sha256": "a7a044c52cb29cbe8b0dc1953e92cefd4ca16b0ed968177b6beab21f9a7d0b31",
+          "sizeBytes": 86423
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "Meta Omnilingual ASR weights and ONNX conversion",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "scope": "sherpa-onnx runtime and ONNX conversion",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/13d0ae6c539d2809d32f5eaa3ef1db0c459d0b24/LICENSE"
+        },
+        {
+          "scope": "ONNX Runtime",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/microsoft/onnxruntime/v1.24.4/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "csukuangfj/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12",
+        "sourceUrl": "https://huggingface.co/csukuangfj/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12",
+        "sourceRevision": "6abf1ece20cd2308bdb7d13cd78ec1c44fa4c094",
+        "sourceFile": "Official INT8 ONNX model and token table",
+        "originalModelName": "Meta Omnilingual ASR CTC 300M",
+        "originalModelUrl": "https://huggingface.co/facebook/omniASR-CTC-300M",
+        "mirroredBy": "csukuangfj",
+        "mirroredAt": "2025-11-14"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 40
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "sherpa_onnx",
+        "variant": "omnilingual-asr-300m-ctc-int8",
+        "accelerator": "cpu",
+        "artifactLayout": "model_directory"
+      },
+      "capabilities": {
+        "languages": [
+          "*"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "Unrated in Textify; runs locally through the pinned sherpa-onnx CPU runtime",
+        "accuracyTradeoff": "Broadest language coverage in the catalog via a compact CTC model; accuracy varies substantially by language",
+        "requirements": "Apple Silicon CPU; about 365 MB disk, automatic language-agnostic decoding, and a 40-second recording limit"
       }
     },
     {

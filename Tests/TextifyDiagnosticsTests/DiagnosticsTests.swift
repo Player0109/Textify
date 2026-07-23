@@ -57,6 +57,29 @@ final class DiagnosticsTests: XCTestCase {
         XCTAssertEqual(object["backendReadiness"] as? String, "ready")
     }
 
+    func testRuntimeFailurePreservesClosedQwenFailureMetadata() throws {
+        let event = DiagnosticEvent.runtimeFailure(
+            modelID: "qwen3-asr-1.7b-bf16",
+            engine: "transcribe_cpp",
+            accelerator: "metal_gpu",
+            stage: "model_prepare",
+            reasonCode: "automatic_language_detection_required"
+        )
+
+        let (object, json) = try encodedJSONObject(for: event)
+
+        XCTAssertEqual(object["event"] as? String, "runtime_failure")
+        XCTAssertEqual(object["modelID"] as? String, "qwen3-asr-1.7b-bf16")
+        XCTAssertEqual(object["engine"] as? String, "transcribe_cpp")
+        XCTAssertEqual(object["stage"] as? String, "model_prepare")
+        XCTAssertEqual(
+            object["reasonCode"] as? String,
+            "automatic_language_detection_required"
+        )
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("transcript"))
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("message"))
+    }
+
     func testExportIsSingleJSONDocument() throws {
         let exporter = DiagnosticsExporter()
         let exported = try exporter.export(events: [.appStarted(appVersion: "1.0.0", macOSVersion: "14.0")])
@@ -95,6 +118,58 @@ final class DiagnosticsTests: XCTestCase {
         let lines = contents.split(separator: "\n")
         XCTAssertEqual(lines.count, 2)
         XCTAssertTrue(lines.allSatisfy { $0.first == "{" && $0.last == "}" })
+    }
+
+    func testLoggerAddsATimestampWithoutChangingTheClosedEventPayload() async throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let timestamp = Date(timeIntervalSince1970: 1_787_478_400)
+        let logger = DiagnosticsLogger(
+            directory: directory,
+            date: timestamp,
+            now: { timestamp }
+        )
+
+        try await logger.log(.dictationBlockedExcludedApp)
+
+        let contents = try String(contentsOf: logger.logFileURL, encoding: .utf8)
+        let line = try XCTUnwrap(contents.split(separator: "\n").first)
+        let data = try XCTUnwrap(String(line).data(using: .utf8))
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        XCTAssertEqual(object["event"] as? String, "dictation_blocked_excluded_app")
+        XCTAssertNotNil(object["timestamp"] as? String)
+        XCTAssertEqual(object.count, 2)
+    }
+
+    func testRecentLogReaderReturnsNewestRedactedEntries() throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try writeFile(
+            "log-2026-07-22.jsonl",
+            contents: #"{"event":"model_load","modelID":"ggml-small.en-q5_1","result":"ready","message":"secret"}"# + "\n",
+            in: directory
+        )
+        try writeFile(
+            "log-2026-07-23.jsonl",
+            contents: [
+                #"{"event":"runtime_failure","modelID":"qwen3-asr-1.7b-bf16","engine":"transcribe_cpp","accelerator":"metal_gpu","stage":"model_prepare","reasonCode":"automatic_language_detection_required","timestamp":"2026-07-23T08:48:00.000Z","text":"secret"}"#,
+                #"{"event":"app_started","appVersion":"1.1.0","timestamp":"2026-07-23T08:49:00.000Z"}"#
+            ].joined(separator: "\n") + "\n",
+            in: directory
+        )
+
+        let entries = try DiagnosticsLogReader().recentEntries(
+            from: directory,
+            limit: 2
+        )
+
+        XCTAssertEqual(entries.map(\.event), ["app_started", "runtime_failure"])
+        XCTAssertEqual(entries[1].modelID, "qwen3-asr-1.7b-bf16")
+        XCTAssertEqual(entries[1].reasonCode, "automatic_language_detection_required")
+        XCTAssertFalse(entries.map(\.json).joined().contains("secret"))
+        XCTAssertFalse(entries.map(\.json).joined().contains(#""text""#))
     }
 
     func testLoggerRollsDailyAndAppliesRetentionWithoutRestart() async throws {

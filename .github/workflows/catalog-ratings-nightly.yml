@@ -1,0 +1,44 @@
+name: Catalog ratings nightly
+
+on:
+  schedule:
+    - cron: "30 20 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: catalog-ratings-reference-host
+  cancel-in-progress: false
+
+jobs:
+  rate:
+    runs-on: [self-hosted, macOS, ARM64, textify-m4-max]
+    timeout-minutes: 720
+    env:
+      TEXTIFY_CATALOG_RATING_CONFIG: ${{ vars.TEXTIFY_CATALOG_RATING_CONFIG }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require runner-local model configuration
+        run: |
+          test -n "$TEXTIFY_CATALOG_RATING_CONFIG"
+          test -f "$TEXTIFY_CATALOG_RATING_CONFIG"
+
+      - name: Generate unsigned candidates and regression reports
+        run: |
+          Benchmarks/RealtimeASR/run_catalog_rating_nightly.sh \
+            "$TEXTIFY_CATALOG_RATING_CONFIG" \
+            "$RUNNER_TEMP/textify-catalog-ratings"
+
+      - name: Upload candidate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: catalog-ratings-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/textify-catalog-ratings
+            Benchmarks/RealtimeASR/.benchmark-results/catalog-rating
+          if-no-files-found: error
+          retention-days: 30

@@ -9,8 +9,48 @@ enum WhisperBenchmark {
         reference: String?,
         feedMode: FeedMode
     ) async throws -> BenchmarkResult {
+        let session = WhisperBenchmarkSession(
+            modelURL: modelURL,
+            languageCode: languageCode,
+            feedMode: feedMode
+        )
+        try await session.load()
+        return try await session.transcribe(audio: audio, reference: reference)
+    }
+}
+
+final class WhisperBenchmarkSession: ResidentBenchmarkSession {
+    let engine = BenchmarkEngine.whisper
+    let modelName: String
+    private(set) var modelLoadMs = 0
+    private(set) var warmupMs = 0
+
+    private let runtime: WhisperRuntime
+    private let modelURL: URL
+    private let languageCode: String
+    private let feedMode: FeedMode
+    private var loaded = false
+
+    init(
+        modelURL: URL,
+        modelID: String? = nil,
+        languageCode: String,
+        feedMode: FeedMode
+    ) {
         let runtime = WhisperRuntime(queueLabel: "io.github.Player0109.Textify.realtime-benchmark")
-        let modelName = modelURL.deletingPathExtension().lastPathComponent
+        self.runtime = runtime
+        self.modelURL = modelURL
+        self.modelName = modelID
+            ?? ProcessInfo.processInfo.environment["TEXTIFY_BENCHMARK_MODEL_ID"]
+            ?? modelURL.deletingPathExtension().lastPathComponent
+        self.languageCode = languageCode
+        self.feedMode = feedMode
+    }
+
+    func load() async throws {
+        guard !loaded else {
+            throw BenchmarkCLIError.benchmarkFailed("Whisper benchmark session is already loaded")
+        }
 
         let loadStart = uptimeNanoseconds()
         try await runtime.load(
@@ -18,11 +58,39 @@ enum WhisperBenchmark {
             modelPath: modelURL.path,
             useGPU: true,
             threadCount: ProcessInfo.processInfo.activeProcessorCount,
-            warmup: true
+            warmup: false
         )
-        let loadMs = elapsedMilliseconds(from: loadStart)
+        let loadWallMs = elapsedMilliseconds(from: loadStart)
         let runtimeSnapshot = await runtime.snapshot()
-        let warmupMs = runtimeSnapshot.metrics.lastWarmupDurationMs ?? 0
+        modelLoadMs = runtimeSnapshot.metrics.lastLoadDurationMs ?? loadWallMs
+
+        let warmupStart = uptimeNanoseconds()
+        _ = try await runtime.transcribe(
+            TranscriptionAudioBuffer(
+                sampleRate: CanonicalBenchmarkAudio.sampleRate,
+                channelCount: 1,
+                samples: Array(repeating: 0, count: CanonicalBenchmarkAudio.sampleRate)
+            ),
+            options: WhisperTranscriptionOptions(
+                language: languageCode,
+                translate: false,
+                temperature: 0,
+                temperatureFallback: [],
+                usePreviousContext: false,
+                initialPrompt: nil
+            )
+        )
+        warmupMs = elapsedMilliseconds(from: warmupStart)
+        loaded = true
+    }
+
+    func transcribe(
+        audio: CanonicalBenchmarkAudio,
+        reference: String?
+    ) async throws -> BenchmarkResult {
+        guard loaded else {
+            throw BenchmarkCLIError.benchmarkFailed("Whisper benchmark session is not loaded")
+        }
 
         let resourceStart = ResourceUsage.current()
         let inferenceStart = uptimeNanoseconds()
@@ -52,7 +120,7 @@ enum WhisperBenchmark {
             computeBackend: "whisper.cpp Metal requested; CPU operations remain possible",
             feedMode: feedMode,
             audio: audio,
-            modelLoadMs: loadMs,
+            modelLoadMs: modelLoadMs,
             warmupMs: warmupMs,
             firstPartialMs: nil,
             partialIntervalsMs: [],
@@ -61,7 +129,14 @@ enum WhisperBenchmark {
             maximumFeedLagMs: 0,
             transcript: result.text,
             reference: reference,
-            resources: resources
+            resources: resources,
+            productionMetadata: result
         )
+    }
+
+    func unload() async {
+        guard loaded else { return }
+        await runtime.unload()
+        loaded = false
     }
 }

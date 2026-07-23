@@ -834,6 +834,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case dictation
     case models
     case privacy
+    case logs
     case advanced
 
     var id: Self { self }
@@ -848,6 +849,8 @@ enum SettingsPane: String, CaseIterable, Identifiable {
             return "Models"
         case .privacy:
             return "Privacy"
+        case .logs:
+            return "Logs"
         case .advanced:
             return "Advanced"
         }
@@ -863,6 +866,8 @@ enum SettingsPane: String, CaseIterable, Identifiable {
             return "externaldrive"
         case .privacy:
             return "hand.raised"
+        case .logs:
+            return "doc.text.magnifyingglass"
         case .advanced:
             return "slider.horizontal.3"
         }

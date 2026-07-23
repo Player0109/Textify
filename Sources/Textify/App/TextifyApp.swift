@@ -123,11 +123,20 @@ final class TextifyOnboardingWindowPresenter {
                 width: TextifyWindowMetrics.onboardingWidth,
                 height: TextifyWindowMetrics.onboardingHeight
             ),
-            styleMask: [.titled, .closable, .miniaturizable],
+            styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         window.title = "Welcome to Textify"
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.backgroundColor = NSColor(
+            calibratedRed: 0.110,
+            green: 0.110,
+            blue: 0.118,
+            alpha: 1
+        )
+        window.appearance = NSAppearance(named: .darkAqua)
         window.isReleasedWhenClosed = false
         window.contentViewController = NSHostingController(
             rootView: OnboardingRootView { [weak window] in
@@ -169,11 +178,20 @@ final class TextifyMainWindowPresenter {
                 width: TextifyWindowMetrics.mainWidth,
                 height: TextifyWindowMetrics.mainHeight
             ),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         window.title = "Textify"
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.backgroundColor = NSColor(
+            calibratedRed: 0.110,
+            green: 0.110,
+            blue: 0.118,
+            alpha: 1
+        )
+        window.appearance = NSAppearance(named: .darkAqua)
         window.contentMinSize = NSSize(
             width: TextifyWindowMetrics.mainMinimumWidth,
             height: TextifyWindowMetrics.mainMinimumHeight

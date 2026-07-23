@@ -83,7 +83,16 @@ public actor SherpaOnnxRuntimeTranscribingAdapter: RuntimeEngineTranscribing {
                 )
             }
             languageCode = requestedLanguage
-        case .qwen3ASR0_6B, .omnilingualASR300M, .dolphinSmall:
+        case .omnilingualASR300M:
+            guard model.runtimeParameters.detectLanguage,
+                  model.runtimeParameters.language == "auto"
+            else {
+                throw SherpaOnnxRuntimeError.unsupportedVariant(
+                    "Omnilingual ASR requires automatic language mode."
+                )
+            }
+            languageCode = "auto"
+        case .qwen3ASR0_6B, .dolphinSmall:
             throw SherpaOnnxRuntimeError.unsupportedVariant(
                 "This sherpa-onnx candidate has not been promoted for production use."
             )

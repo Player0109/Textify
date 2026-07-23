@@ -9,28 +9,109 @@ enum ParakeetTdtBenchmark {
         reference: String?,
         feedMode: FeedMode
     ) async throws -> BenchmarkResult {
-        let configuration = try configuration(for: engine)
-        let modelDirectory = modelsRootURL
-            .appendingPathComponent(configuration.modelID, isDirectory: true)
-        let runtime = ParakeetRuntime()
+        try await runSingleResidentBenchmark(
+            session: makeSession(
+                engine: engine,
+                modelsRootURL: modelsRootURL,
+                feedMode: feedMode
+            ),
+            audio: audio,
+            reference: reference
+        )
+    }
 
+    static func makeSession(
+        engine: BenchmarkEngine,
+        modelsRootURL: URL,
+        feedMode: FeedMode
+    ) throws -> any ResidentBenchmarkSession {
+        ParakeetTdtBenchmarkSession(
+            engine: engine,
+            configuration: try configuration(for: engine),
+            modelsRootURL: modelsRootURL,
+            feedMode: feedMode
+        )
+    }
+
+    private static func configuration(for engine: BenchmarkEngine) throws -> Configuration {
+        switch engine {
+        case .parakeetTdtV2:
+            return Configuration(modelID: "parakeet-tdt-0.6b-v2", variant: .tdtV2)
+        case .parakeetTdtV3:
+            return Configuration(modelID: "parakeet-tdt-0.6b-v3", variant: .tdtV3)
+        case .parakeetTdtCtc110M:
+            return Configuration(modelID: "parakeet-tdt-ctc-110m", variant: .tdtCtc110M)
+        case .parakeetTdtJapanese:
+            return Configuration(modelID: "parakeet-ja", variant: .tdtJapanese)
+        default:
+            throw BenchmarkCLIError.invalidArguments(
+                "Parakeet TDT benchmark received unsupported engine: \(engine.rawValue)"
+            )
+        }
+    }
+
+    fileprivate struct Configuration {
+        let modelID: String
+        let variant: ParakeetModelVariant
+    }
+}
+
+private final class ParakeetTdtBenchmarkSession: ResidentBenchmarkSession {
+    let engine: BenchmarkEngine
+    let modelName: String
+    private(set) var modelLoadMs = 0
+    private(set) var warmupMs = 0
+
+    private let runtime = ParakeetRuntime()
+    private let configuration: ParakeetTdtBenchmark.Configuration
+    private let modelDirectory: URL
+    private let feedMode: FeedMode
+    private var loaded = false
+
+    init(
+        engine: BenchmarkEngine,
+        configuration: ParakeetTdtBenchmark.Configuration,
+        modelsRootURL: URL,
+        feedMode: FeedMode
+    ) {
+        self.engine = engine
+        self.configuration = configuration
+        self.modelName = configuration.modelID
+        self.modelDirectory = modelsRootURL
+            .appendingPathComponent(configuration.modelID, isDirectory: true)
+        self.feedMode = feedMode
+    }
+
+    func load() async throws {
+        guard !loaded else {
+            throw BenchmarkCLIError.benchmarkFailed("Parakeet benchmark session is already loaded")
+        }
         let loadStart = uptimeNanoseconds()
         try await runtime.load(
-            modelID: configuration.modelID,
+            modelID: modelName,
             modelDirectory: modelDirectory.path,
             variant: configuration.variant,
             computeRoute: .neuralEngine,
             languageCode: "en",
             warmup: false
         )
-        let loadMs = elapsedMilliseconds(from: loadStart)
+        modelLoadMs = elapsedMilliseconds(from: loadStart)
 
         let warmupStart = uptimeNanoseconds()
         _ = try await runtime.transcribe(
             TranscriptionAudioBuffer(samples: Array(repeating: 0, count: 6_400))
         )
-        let warmupMs = elapsedMilliseconds(from: warmupStart)
+        warmupMs = elapsedMilliseconds(from: warmupStart)
+        loaded = true
+    }
 
+    func transcribe(
+        audio: CanonicalBenchmarkAudio,
+        reference: String?
+    ) async throws -> BenchmarkResult {
+        guard loaded else {
+            throw BenchmarkCLIError.benchmarkFailed("Parakeet benchmark session is not loaded")
+        }
         let resourceStart = ResourceUsage.current()
         let inferenceStart = uptimeNanoseconds()
         let result = try await runtime.transcribe(
@@ -42,17 +123,15 @@ enum ParakeetTdtBenchmark {
         )
         let inferenceMs = elapsedMilliseconds(from: inferenceStart)
         let resources = ResourceUsage.current().delta(from: resourceStart)
-        await runtime.unload()
-
         return makeResult(
             engine: engine,
             engineVersion: "Textify ParakeetRuntime / FluidAudio 0.15.5",
-            model: configuration.modelLabel,
+            model: modelName,
             modelLicense: "CC-BY-4.0",
             computeBackend: "Core ML CPU preprocessor + CPU/Apple Neural Engine inference",
             feedMode: feedMode,
             audio: audio,
-            modelLoadMs: loadMs,
+            modelLoadMs: modelLoadMs,
             warmupMs: warmupMs,
             firstPartialMs: nil,
             partialIntervalsMs: [],
@@ -61,46 +140,14 @@ enum ParakeetTdtBenchmark {
             maximumFeedLagMs: 0,
             transcript: result.text,
             reference: reference,
-            resources: resources
+            resources: resources,
+            productionMetadata: result
         )
     }
 
-    private static func configuration(for engine: BenchmarkEngine) throws -> Configuration {
-        switch engine {
-        case .parakeetTdtV2:
-            return Configuration(
-                modelID: "parakeet-tdt-0.6b-v2",
-                modelLabel: "parakeet-tdt-0.6b-v2 int8",
-                variant: .tdtV2
-            )
-        case .parakeetTdtV3:
-            return Configuration(
-                modelID: "parakeet-tdt-0.6b-v3",
-                modelLabel: "parakeet-tdt-0.6b-v3 int8",
-                variant: .tdtV3
-            )
-        case .parakeetTdtCtc110M:
-            return Configuration(
-                modelID: "parakeet-tdt-ctc-110m",
-                modelLabel: "parakeet-tdt-ctc-110m Core ML",
-                variant: .tdtCtc110M
-            )
-        case .parakeetTdtJapanese:
-            return Configuration(
-                modelID: "parakeet-ja",
-                modelLabel: "parakeet-tdt-0.6b Japanese int8",
-                variant: .tdtJapanese
-            )
-        default:
-            throw BenchmarkCLIError.invalidArguments(
-                "Parakeet TDT benchmark received unsupported engine: \(engine.rawValue)"
-            )
-        }
-    }
-
-    private struct Configuration {
-        let modelID: String
-        let modelLabel: String
-        let variant: ParakeetModelVariant
+    func unload() async {
+        guard loaded else { return }
+        await runtime.unload()
+        loaded = false
     }
 }

@@ -1,0 +1,93 @@
+categories:
+  identity_and_scope:
+    - name: dataset_identity
+      description: Canonical dataset name, release or version, maintainer, source URL, and pinned revision.
+      detail_level: detailed
+    - name: benchmark_role
+      description: Core release gate, public comparison, product diagnostic, stress, extended, research-only, or external-submission-only.
+      detail_level: brief
+    - name: speech_origin
+      description: Human natural, human read, replayed, simulated corruption, or synthetic speech.
+      detail_level: moderate
+    - name: product_fit
+      description: Fit for Textify's English, single-speaker, one-second-to-sixty-second local dictation workflow.
+      detail_level: detailed
+  access_and_governance:
+    - name: access
+      description: Public, gated, registered, paid, hidden, or server-side-only access and the exact download procedure.
+      detail_level: detailed
+    - name: license_and_commercial_use
+      description: License identifier and restrictions on commercial evaluation, redistribution, derived artifacts, and published results.
+      detail_level: detailed
+    - name: consent_and_privacy
+      description: Consent basis, demographic or PII fields, removal obligations, and permitted handling.
+      detail_level: detailed
+    - name: exposure_chronology
+      description: Dataset release relative to model training and evidence or risk of benchmark contamination.
+      detail_level: moderate
+  corpus_composition:
+    - name: splits_and_size
+      description: Canonical test split, hours, utterances, speakers, and word count.
+      detail_level: detailed
+    - name: speaker_and_language_coverage
+      description: Accent, dialect, first-language, gender, age, and geography coverage with reliable labels where available.
+      detail_level: detailed
+    - name: speaking_style_and_domain
+      description: Read, spontaneous, conversational, assistant command, workplace dictation, telephone, meeting, broadcast, or other domain.
+      detail_level: detailed
+    - name: duration_distribution
+      description: Minimum, median, percentiles, and maximum clip duration, including Textify-compatible duration buckets.
+      detail_level: detailed
+    - name: constituent_overlap
+      description: Shared source audio or text with other proposed benchmarks so evidence is not double-counted.
+      detail_level: detailed
+  audio_conditions:
+    - name: recording_conditions
+      description: Microphone or device, distance, channel count, sample rate, codec, clipping, speech ratio, and collection environment.
+      detail_level: detailed
+    - name: acoustic_conditions
+      description: Noise class, SNR, reverberation or RT60, room geometry, and whether conditions are measured, natural, replayed, or simulated.
+      detail_level: detailed
+  references_and_scoring:
+    - name: transcript_provenance
+      description: Human verbatim, human normalized, professional style guide, subtitle-derived, forced-aligned, automatic, or corrected automatic reference.
+      detail_level: detailed
+    - name: normalizer_identity
+      description: Exact revision and rules for case, punctuation, numbers, contractions, acronyms, fillers, partial words, and non-speech markup.
+      detail_level: detailed
+    - name: primary_metrics
+      description: Normalized WER and CER plus corpus-appropriate display-text, entity, structured-content, hallucination, or enhancement metrics.
+      detail_level: detailed
+    - name: slice_metrics
+      description: Per-group, per-condition, worst-group, speaker-macro, and corpus-macro results with defensible minimum sample sizes.
+      detail_level: detailed
+  benchmark_protocol:
+    - name: manifest_and_reproducibility
+      description: Pinned row IDs, checksums, exclusions, resampling, segmentation, and deterministic sample selection.
+      detail_level: detailed
+    - name: decode_configuration
+      description: Language, decoding strategy, temperature, prompt or hotwords, timestamps, chunking, context, and maximum duration.
+      detail_level: detailed
+    - name: pipeline_variant
+      description: Raw ASR, enhancement plus ASR, or full Textify pipeline including VAD, trimming, post-processing, and insertion-ready output.
+      detail_level: detailed
+    - name: hardware_and_runtime_identity
+      description: Mac model, chip, OS, power mode, model hash, quantization, runtime revision, backend, threads, and compiler flags.
+      detail_level: detailed
+    - name: latency_and_resources
+      description: Cold load, warmup, release-to-final, inference, RTF, p50 through p99 latency, peak RSS, CPU, energy, and thermal drift.
+      detail_level: detailed
+    - name: statistical_comparison
+      description: Paired speaker- or recording-stratified confidence intervals, failure accounting, and regression thresholds.
+      detail_level: detailed
+  textify_decision:
+    - name: recommendation
+      description: Include now, include after license review, optional diagnostic, external validation only, or exclude, with rationale.
+      detail_level: detailed
+    - name: sampling_plan
+      description: Smoke, pull-request, nightly, and release-gate sample counts and duration strata.
+      detail_level: detailed
+    - name: cleaner_ab_plan
+      description: For enhancement sets, measure noisy WER gain, clean-speech harm, false suppression, quality score, added latency, and memory.
+      detail_level: detailed
+uncertain: []

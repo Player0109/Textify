@@ -9,11 +9,17 @@ public enum TranscribeCppModelVariant: String, Equatable, Sendable {
     case parakeetTDT0_6BV2 = "parakeet-tdt-0.6b-v2"
     case parakeetTDT0_6BV3 = "parakeet-tdt-0.6b-v3"
     case nemotron3_5ASRStreaming0_6B = "nemotron-3.5-asr-streaming-0.6b"
+    case graniteSpeech4_1_2B = "granite-speech-4.1-2b"
+    case graniteSpeech4_1_2BNAR = "granite-speech-4.1-2b-nar"
+    case voxtralMini4BRealtime2602 = "voxtral-mini-4b-realtime-2602"
+    case mossTranscribeDiarize0_9B = "moss-transcribe-diarize-0.9b"
 
     public var supportsAutomaticLanguageDetection: Bool {
         switch self {
         case .qwen3ASR0_6B, .qwen3ASR1_7B, .parakeetTDT0_6BV3,
-             .nemotron3_5ASRStreaming0_6B:
+             .nemotron3_5ASRStreaming0_6B, .graniteSpeech4_1_2B,
+             .graniteSpeech4_1_2BNAR, .voxtralMini4BRealtime2602,
+             .mossTranscribeDiarize0_9B:
             return true
         case .funASRMLTNanoQ8, .canaryQwen2_5B, .parakeetTDT0_6BV2:
             return false
@@ -29,7 +35,9 @@ public enum TranscribeCppModelVariant: String, Equatable, Sendable {
         case .parakeetTDT0_6BV2:
             return ["en"]
         case .qwen3ASR0_6B, .qwen3ASR1_7B, .parakeetTDT0_6BV3,
-             .nemotron3_5ASRStreaming0_6B:
+             .nemotron3_5ASRStreaming0_6B, .graniteSpeech4_1_2B,
+             .graniteSpeech4_1_2BNAR, .voxtralMini4BRealtime2602,
+             .mossTranscribeDiarize0_9B:
             return []
         }
     }
@@ -41,7 +49,9 @@ public enum TranscribeCppModelVariant: String, Equatable, Sendable {
         case .canaryQwen2_5B:
             return 40 * 16000
         case .qwen3ASR0_6B, .qwen3ASR1_7B, .parakeetTDT0_6BV2,
-             .parakeetTDT0_6BV3, .nemotron3_5ASRStreaming0_6B:
+             .parakeetTDT0_6BV3, .nemotron3_5ASRStreaming0_6B,
+             .graniteSpeech4_1_2B, .graniteSpeech4_1_2BNAR,
+             .voxtralMini4BRealtime2602, .mossTranscribeDiarize0_9B:
             return 60 * 16000
         }
     }

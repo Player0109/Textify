@@ -7,12 +7,19 @@ enum TextifyRealtimeBenchmarkCLI {
             let options = try BenchmarkOptions.parse(
                 arguments: Array(CommandLine.arguments.dropFirst())
             )
-            guard FileManager.default.fileExists(atPath: options.audioURL.path) else {
+            if options.batchJobsURL != nil {
+                try await BatchBenchmark.run(options: options)
+                return
+            }
+            guard let audioURL = options.audioURL else {
+                throw BenchmarkCLIError.invalidArguments("--audio is required")
+            }
+            guard FileManager.default.fileExists(atPath: audioURL.path) else {
                 throw BenchmarkCLIError.invalidAudio(
-                    "Audio file does not exist: \(options.audioURL.path)"
+                    "Audio file does not exist: \(audioURL.path)"
                 )
             }
-            let audio = try CanonicalBenchmarkAudio.load(from: options.audioURL)
+            let audio = try CanonicalBenchmarkAudio.load(from: audioURL)
             guard !audio.samples.isEmpty else {
                 throw BenchmarkCLIError.invalidAudio("Audio file contains no samples")
             }

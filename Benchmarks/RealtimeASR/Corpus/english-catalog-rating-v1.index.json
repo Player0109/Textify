@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "english-catalog-rating-v1",
+  "language": "en",
+  "components": [
+    {
+      "id": "open-asr-english-nightly-v1",
+      "manifest": "open-asr-english-nightly-v1.json",
+      "sha256": "a4530d6ec459267a0c721d5d14e615b3f8e673eb84a3e9edc6339b354fe9998c",
+      "maxAudioSeconds": 29,
+      "metricsProfile": "standard"
+    },
+    {
+      "id": "berst-english-nightly-v1",
+      "manifest": "berst-english-nightly-v1.json",
+      "sha256": "49d6973a44deb0a3b7ce56418c9effb3d034f4c9f794dc3bebdc6fd9da7f6be4",
+      "maxAudioSeconds": 10,
+      "metricsProfile": "stress"
+    },
+    {
+      "id": "edacc-english-nightly-v1",
+      "manifest": "edacc-english-nightly-v1.json",
+      "sha256": "e303236302079809a39b2855babe55bff7786de364bb38d7e78c71cf69d7553b",
+      "maxAudioSeconds": 29,
+      "metricsProfile": "standard"
+    },
+    {
+      "id": "musan-no-speech-nightly-v1",
+      "manifest": "musan-no-speech-nightly-v1.json",
+      "sha256": "855024fc6c099e72812a84e0714bc0503e882394fd61f60404206457fb60a1cb",
+      "maxAudioSeconds": 29,
+      "metricsProfile": "negative-control"
+    }
+  ]
+}

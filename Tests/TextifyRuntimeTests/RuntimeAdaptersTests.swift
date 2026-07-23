@@ -420,6 +420,45 @@ final class RuntimeAdaptersTests: XCTestCase {
         XCTAssertEqual(load?.threadCount, 4)
     }
 
+    func testSherpaOnnxAdapterAllowsAutomaticLanguageForOmnilingualASR() async throws {
+        let runtime = FakeSherpaOnnxRuntime()
+        let adapter = SherpaOnnxRuntimeTranscribingAdapter(runtime: runtime)
+
+        let model = RuntimeActiveModel(
+            id: "omnilingual-asr-300m-ctc-int8",
+            displayName: "Experimental - Omnilingual ASR 300M",
+            tier: "experimental",
+            localModelPath: "/tmp/omnilingual-asr-300m-ctc-int8",
+            useGPU: false,
+            threadCount: 8,
+            engine: .sherpaOnnx,
+            variant: SherpaOnnxModelVariant.omnilingualASR300M.rawValue,
+            accelerator: .cpu,
+            artifactLayout: .modelDirectory,
+            runtimeParameters: RuntimeParameters(
+                language: "auto",
+                detectLanguage: true,
+                translate: false,
+                strategy: "greedy",
+                beamSize: 1,
+                bestOf: 1,
+                temperature: 0,
+                temperatureFallback: [],
+                noContext: true,
+                tokenTimestamps: false,
+                maxAudioSeconds: 40
+            )
+        )
+
+        try await adapter.prepare(model: model)
+
+        let load = await runtime.loadSnapshot()
+        XCTAssertEqual(load?.variant, .omnilingualASR300M)
+        XCTAssertEqual(load?.languageCode, "auto")
+        XCTAssertEqual(load?.computeRoute, .cpu)
+        XCTAssertEqual(load?.threadCount, 4)
+    }
+
     func testMultiEngineAdapterRequiresPreparedEngine() async {
         let adapter = MultiEngineRuntimeTranscribingAdapter(
             whisper: FakeEngineTranscriber(resultText: "whisper"),
@@ -470,6 +509,96 @@ final class RuntimeAdaptersTests: XCTestCase {
         XCTAssertEqual(activeModel?.localModelPath, modelURL.path)
         let readiness = await resolver.readiness(for: activeModel)
         XCTAssertEqual(readiness, .ready(modelID: model.id))
+    }
+
+    func testModelResolverPreservesRuntimeRequiredAutomaticLanguageForQwen() async throws {
+        let directory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let layout = ModelStorageLayout(rootDirectory: directory)
+        let modelData = Data("qwen model".utf8)
+        let modelID = "qwen3-asr-1.7b-bf16"
+        let filename = "Qwen3-ASR-1.7B-BF16.gguf"
+        let modelURL = try layout.installedFileURL(modelID: modelID, filename: filename)
+        try FileManager.default.createDirectory(
+            at: modelURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try modelData.write(to: modelURL)
+        let model = ModelEntry(
+            id: modelID,
+            displayName: "Qwen3-ASR 1.7B BF16",
+            tier: "experimental",
+            description: "Automatic-language local dictation.",
+            sizeBytes: Int64(modelData.count),
+            files: [
+                ModelFile(
+                    filename: filename,
+                    url: "https://huggingface.co/example/qwen/resolve/0000000000000000000000000000000000000000/\(filename)",
+                    sha256: Self.sha256Hex(modelData),
+                    sizeBytes: Int64(modelData.count)
+                )
+            ],
+            licenses: [],
+            provenance: ModelProvenance(
+                sourceName: "QwenLM/Qwen3-ASR",
+                sourceUrl: "https://huggingface.co/Qwen/Qwen3-ASR-1.7B",
+                sourceRevision: "fixture",
+                sourceFile: filename,
+                originalModelName: "Qwen3-ASR 1.7B",
+                originalModelUrl: "https://huggingface.co/Qwen/Qwen3-ASR-1.7B",
+                mirroredBy: "Textify",
+                mirroredAt: "2026-07-23"
+            ),
+            runtimeParameters: RuntimeParameters(
+                language: "auto",
+                detectLanguage: true,
+                translate: false,
+                strategy: "greedy",
+                beamSize: 1,
+                bestOf: 1,
+                temperature: 0,
+                temperatureFallback: [],
+                noContext: true,
+                tokenTimestamps: false,
+                maxAudioSeconds: 60
+            ),
+            hallucinationThresholds: HallucinationThresholds(
+                noSpeechProbabilityMax: 0.60,
+                avgLogProbabilityMin: -1.00,
+                compressionRatioMax: 2.40
+            ),
+            minAppVersion: "1.1.0",
+            runtime: ModelRuntimeDescriptor(
+                engine: .transcribeCpp,
+                variant: TranscribeCppModelVariant.qwen3ASR1_7B.rawValue,
+                accelerator: .metalGPU,
+                artifactLayout: .singleFile
+            ),
+            capabilities: ModelCapabilities(
+                languages: ["en", "hi", "zh"],
+                supportsTranslation: false,
+                supportsCustomVocabulary: false
+            )
+        )
+        let resolver = Self.modelResolver(
+            layout: layout,
+            store: Self.installedStore(model: model, localPath: modelURL.path)
+        )
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = modelID
+        preferences.transcriptionLanguage = .english
+
+        let resolvedModel = await resolver.resolveActiveModel(preferences: preferences)
+        let activeModel = try XCTUnwrap(resolvedModel)
+
+        XCTAssertEqual(activeModel.runtimeParameters.language, "auto")
+        XCTAssertTrue(activeModel.runtimeParameters.detectLanguage)
+        XCTAssertNoThrow(
+            try TranscribeCppRuntime.requireSupportedLanguage(
+                activeModel.runtimeParameters.language,
+                variant: .qwen3ASR1_7B
+            )
+        )
     }
 
     func testModelResolverKeepsVoiceCleanerSeparateFromTranscriptionModel() async throws {

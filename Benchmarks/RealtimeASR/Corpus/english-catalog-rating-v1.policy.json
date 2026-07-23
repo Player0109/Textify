@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "id": "english-catalog-rating-v1",
+  "suiteID": "english-catalog-rating-v1",
+  "language": "en",
+  "quality": {
+    "components": [
+      {
+        "id": "open-asr-english-nightly-v1",
+        "weight": 0.5,
+        "excellentWordErrorRate": 0.05,
+        "unacceptableWordErrorRate": 0.4
+      },
+      {
+        "id": "edacc-english-nightly-v1",
+        "weight": 0.3,
+        "excellentWordErrorRate": 0.12,
+        "unacceptableWordErrorRate": 0.55
+      },
+      {
+        "id": "berst-english-nightly-v1",
+        "weight": 0.2,
+        "excellentWordErrorRate": 0.18,
+        "unacceptableWordErrorRate": 0.7
+      }
+    ],
+    "noSpeechComponentID": "musan-no-speech-nightly-v1",
+    "noSpeechCaps": [
+      { "aboveFalsePositiveRate": 0.25, "maximumLevel": 1 },
+      { "aboveFalsePositiveRate": 0.1, "maximumLevel": 2 },
+      { "aboveFalsePositiveRate": 0.05, "maximumLevel": 3 },
+      { "aboveFalsePositiveRate": 0.01, "maximumLevel": 4 }
+    ]
+  },
+  "speed": {
+    "referenceChip": "Apple M4 Max",
+    "requiredFeedMode": "accelerated",
+    "requiredRuns": 3,
+    "maximumRelativeP95Spread": 0.15,
+    "releaseToFinalWeight": 0.7,
+    "realTimeFactorWeight": 0.3,
+    "excellentP95ReleaseToFinalMs": 150,
+    "unacceptableP95ReleaseToFinalMs": 1200,
+    "excellentP95RealTimeFactor": 0.02,
+    "unacceptableP95RealTimeFactor": 0.25
+  },
+  "levels": [
+    { "level": 5, "minimumScore": 90, "qualityLabel": "Highest", "speedLabel": "Fastest" },
+    { "level": 4, "minimumScore": 75, "qualityLabel": "High", "speedLabel": "Fast" },
+    { "level": 3, "minimumScore": 60, "qualityLabel": "Balanced", "speedLabel": "Balanced" },
+    { "level": 2, "minimumScore": 40, "qualityLabel": "Basic", "speedLabel": "Measured" },
+    { "level": 1, "minimumScore": 0, "qualityLabel": "Limited", "speedLabel": "Slow" }
+  ]
+}

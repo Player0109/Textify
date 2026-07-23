@@ -21,7 +21,7 @@ usage() {
   cat >&2 <<'USAGE'
 Usage: script/models/sign_model_manifest.sh [manifest.json] [manifest.json.sig]
 
-Signs the V1 canonical model-manifest envelope with the local Ed25519 private
+Signs the canonical model-manifest envelope with the local Ed25519 private
 key. The key is read from TEXTIFY_MODEL_MANIFEST_PRIVATE_KEY_BASE64 when set,
 or from the macOS Keychain account matching TEXTIFY_MODEL_MANIFEST_KEY_ID.
 USAGE
@@ -82,10 +82,16 @@ let signatureURL = URL(fileURLWithPath: args[1])
 let signatureType = "io.github.Player0109.Textify.model-manifest"
 let algorithm = "Ed25519"
 let manifestFile = "manifest.json"
-let contentType = "application/vnd.textify.model-manifest+json;version=1"
 
 do {
     let manifestData = try Data(contentsOf: manifestURL)
+    guard let manifestObject = try JSONSerialization.jsonObject(with: manifestData)
+        as? [String: Any],
+          let manifestVersion = manifestObject["manifestVersion"] as? Int,
+          manifestVersion == 1 || manifestVersion == 2 else {
+        fail("manifestVersion must be 1 or 2")
+    }
+    let contentType = "application/vnd.textify.model-manifest+json;version=\(manifestVersion)"
     let contentSHA256 = SHA256.hash(data: manifestData)
         .map { String(format: "%02x", $0) }
         .joined()

@@ -20,26 +20,64 @@ final class ProductionUITests: XCTestCase {
     func testSettingsProductionPaneSetExcludesScaffoldPanes() {
         XCTAssertEqual(
             SettingsPane.productionVisiblePanes,
-            [.general, .dictation, .models, .privacy, .advanced]
+            [.general, .dictation, .models, .privacy, .logs, .advanced]
         )
+        XCTAssertEqual(SettingsPane.logs.sidebarTitle, "Logs")
+        XCTAssertEqual(SettingsPane.logs.productionSystemImage, "doc.text.magnifyingglass")
     }
 
     func testVisualIdentitySupportsTheNativeSidebarRedesign() {
-        XCTAssertEqual(TextifyVisualIdentity.signatureElement, "Release line")
-        XCTAssertEqual(TextifyVisualIdentity.voiceVioletHex, "#7667F2")
+        XCTAssertEqual(TextifyVisualIdentity.signatureElement, "Spokenly blue selection")
+        XCTAssertEqual(TextifyVisualIdentity.voiceVioletHex, "#0A84FF")
         XCTAssertEqual(TextifyWindowMetrics.mainWidth, 1_080)
+        XCTAssertEqual(TextifyWindowMetrics.mainMinimumWidth, 1_060)
+        XCTAssertEqual(TextifyWindowMetrics.sidebarWidth, 258)
         XCTAssertGreaterThan(TextifyWindowMetrics.mainWidth, TextifyWindowMetrics.mainMinimumWidth)
         XCTAssertGreaterThan(TextifyWindowMetrics.readableContentWidth, 720)
         XCTAssertGreaterThan(TextifyWindowMetrics.onboardingWidth, 680)
     }
 
-    func testModelCatalogSignalsStayQualitativeAndTraceable() {
+    func testAccessibilityDragSourcePublishesALoadableApplicationBundleFileURL() throws {
+        let temporaryDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let appURL = temporaryDirectory.appendingPathComponent("Textify.app", isDirectory: true)
+        try FileManager.default.createDirectory(at: appURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
+
+        let item = TextifyAppDragSource.pasteboardItem(for: appURL)
+        let representation = try XCTUnwrap(item.data(forType: .fileURL))
+        let publishedURL = try XCTUnwrap(URL(dataRepresentation: representation, relativeTo: nil))
+
+        XCTAssertEqual(item.types, [.fileURL])
+        XCTAssertEqual(publishedURL.standardizedFileURL, appURL.standardizedFileURL)
+    }
+
+    @MainActor
+    func testAccessibilityPermissionMonitorDetectsAnExternalStateChange() async throws {
+        var probeCount = 0
+        let monitor = AccessibilityPermissionMonitor(
+            wait: {},
+            currentState: {
+                probeCount += 1
+                return probeCount < 3 ? .denied : .granted
+            }
+        )
+
+        let state = try await monitor.nextChange(from: .denied)
+
+        XCTAssertEqual(state, .granted)
+        XCTAssertEqual(probeCount, 3)
+    }
+
+    func testModelCatalogDoesNotInferRatingsFromSupportTier() {
         let recommended = ProductionModelPresentation.v1_1
 
-        XCTAssertEqual(recommended.qualitySignalLevel, 4)
-        XCTAssertEqual(recommended.speedSignalLevel, 4)
-        XCTAssertEqual(recommended.qualityLabel, "High")
-        XCTAssertEqual(recommended.speedLabel, "Fast")
+        XCTAssertEqual(recommended.qualitySignalLevel, 0)
+        XCTAssertEqual(recommended.speedSignalLevel, 0)
+        XCTAssertEqual(recommended.qualityLabel, "Unrated")
+        XCTAssertEqual(recommended.speedLabel, "Unrated")
+        XCTAssertNil(recommended.qualityScore)
+        XCTAssertNil(recommended.speedScore)
         XCTAssertEqual(recommended.engineName, "Whisper.cpp")
         XCTAssertEqual(recommended.acceleratorName, "Metal GPU")
         XCTAssertEqual(recommended.languageDescription, "English")
@@ -79,6 +117,36 @@ final class ProductionUITests: XCTestCase {
         )
         XCTAssertEqual(cohere.catalogDisplayName, "Cohere Transcribe")
         XCTAssertEqual(cohere.provider, .cohere)
+
+        let qwen = ProductionModelPresentation(
+            id: "qwen",
+            displayName: "Qwen3-ASR",
+            description: "Local speech model.",
+            details: nil,
+            sourceName: "QwenLM/Qwen3-ASR"
+        )
+        XCTAssertEqual(qwen.provider, .qwen)
+
+        let mossFormer = ProductionModelPresentation(
+            id: "mossformer",
+            displayName: "MossFormer2 SE",
+            description: "Local speech enhancement model.",
+            details: nil,
+            sourceName: "alibabasglab/MossFormer2_SE_48K"
+        )
+        XCTAssertEqual(mossFormer.provider, .alibaba)
+    }
+
+    func testModelProvidersUseRecognizableVendorLogoAssets() {
+        XCTAssertEqual(ModelProviderIdentity.openAI.logoAssetName, "VendorOpenAI")
+        XCTAssertEqual(ModelProviderIdentity.nvidia.logoAssetName, "VendorNVIDIA")
+        XCTAssertEqual(ModelProviderIdentity.cohere.logoAssetName, "VendorCohere")
+        XCTAssertEqual(ModelProviderIdentity.qwen.logoAssetName, "VendorQwen")
+        XCTAssertEqual(ModelProviderIdentity.alibaba.logoAssetName, "VendorAlibabaCloud")
+        XCTAssertEqual(ModelProviderIdentity.reazon.logoAssetName, "VendorReazon")
+        XCTAssertNil(ModelProviderIdentity.apple.logoAssetName)
+        XCTAssertEqual(ModelProviderIdentity.apple.systemImage, "apple.logo")
+        XCTAssertNil(ModelProviderIdentity.community.logoAssetName)
     }
 
     func testModelCatalogCanSortByQualityOrSpeed() {
@@ -87,32 +155,87 @@ final class ProductionUITests: XCTestCase {
             displayName: "Accurate",
             description: "Accuracy first.",
             details: nil,
-            supportTier: "Accurate"
+            supportTier: "Accurate",
+            benchmark: benchmarkRating(
+                modelID: "accurate",
+                qualityScore: 95,
+                qualityLevel: 5,
+                speedScore: 45,
+                speedLevel: 2
+            )
         )
         let fast = ProductionModelPresentation(
             id: "fast",
             displayName: "Fast",
             description: "Speed first.",
             details: nil,
-            supportTier: "Fast"
+            supportTier: "Fast",
+            benchmark: benchmarkRating(
+                modelID: "fast",
+                qualityScore: 60,
+                qualityLevel: 3,
+                speedScore: 96,
+                speedLevel: 5
+            )
         )
         let recommended = ProductionModelPresentation(
             id: "recommended",
             displayName: "Recommended",
             description: "Balanced.",
             details: nil,
-            supportTier: "Recommended"
+            supportTier: "Recommended",
+            benchmark: benchmarkRating(
+                modelID: "recommended",
+                qualityScore: 82,
+                qualityLevel: 4,
+                speedScore: 80,
+                speedLevel: 4
+            )
         )
-        let models = [recommended, fast, accurate]
+        let unrated = ProductionModelPresentation(
+            id: "unrated",
+            displayName: "Unrated",
+            description: "No comparable benchmark.",
+            details: nil,
+            supportTier: "Accurate"
+        )
+        let models = [unrated, recommended, fast, accurate]
 
         XCTAssertEqual(
             ModelCatalogQuery(sort: .quality).apply(to: models).map(\.id),
-            ["accurate", "recommended", "fast"]
+            ["accurate", "recommended", "fast", "unrated"]
         )
         XCTAssertEqual(
             ModelCatalogQuery(sort: .speed).apply(to: models).map(\.id),
-            ["fast", "recommended", "accurate"]
+            ["fast", "recommended", "accurate", "unrated"]
         )
+    }
+
+    func testModelCatalogExposesSignedBenchmarkEvidence() {
+        let rating = benchmarkRating(
+            modelID: "measured",
+            qualityScore: 83,
+            qualityLevel: 4,
+            speedScore: 92,
+            speedLevel: 5
+        )
+        let model = ProductionModelPresentation(
+            id: "measured",
+            displayName: "Measured",
+            description: "Measured model.",
+            details: nil,
+            supportTier: "Experimental",
+            benchmark: rating
+        )
+
+        XCTAssertEqual(model.qualityLabel, "High")
+        XCTAssertEqual(model.speedLabel, "Fastest")
+        XCTAssertEqual(model.qualityScore, 83)
+        XCTAssertEqual(model.speedScore, 92)
+        XCTAssertTrue(model.qualityEvidenceDescription?.contains("732 speech cases") == true)
+        XCTAssertTrue(model.speedEvidenceDescription?.contains("p95 205 ms") == true)
+        XCTAssertTrue(model.benchmarkPolicyDescription.contains("3 runs"))
+        XCTAssertTrue(model.benchmarkPolicyDescription.contains("source cccccccccccc"))
     }
 
     func testModelCatalogCombinesFormatAndPrecisionFilters() {
@@ -432,6 +555,11 @@ final class ProductionUITests: XCTestCase {
                 "nemotron-3.5-asr-streaming-0.6b-f16",
                 "nemotron-3.5-asr-streaming-0.6b-q8-0",
                 "nemotron-3.5-asr-streaming-0.6b-q5-k-m",
+                "granite-speech-4.1-2b-q5-k-m",
+                "granite-speech-4.1-2b-nar-q5-k-m",
+                "voxtral-mini-4b-realtime-2602-q4-k-m",
+                "moss-transcribe-diarize-0.9b-q5-k-m",
+                "omnilingual-asr-300m-ctc-int8",
                 "mossformer2-se-fp32",
                 "mossformer2-se-fp16",
                 "mossformer2-se-int8",
@@ -492,5 +620,73 @@ final class ProductionUITests: XCTestCase {
         XCTAssertTrue(OnboardingLaunchAtLoginNotice.showsLoginItemsAction(for: .requiresApproval))
         XCTAssertNil(OnboardingLaunchAtLoginNotice.message(for: .enabled))
         XCTAssertFalse(OnboardingLaunchAtLoginNotice.showsLoginItemsAction(for: .enabled))
+    }
+
+    private func benchmarkRating(
+        modelID: String,
+        qualityScore: Int,
+        qualityLevel: Int,
+        speedScore: Int,
+        speedLevel: Int
+    ) -> ModelBenchmarkRating {
+        ModelBenchmarkRating(
+            schemaVersion: 1,
+            policyID: "english-catalog-rating-v2",
+            suiteID: "english-catalog-rating-v1",
+            suiteIndexSHA256: String(repeating: "a", count: 64),
+            modelID: modelID,
+            engine: "test-engine",
+            engineVersion: "test-engine-1",
+            modelLicense: "MIT",
+            computeBackend: "Metal",
+            artifactFingerprint: String(repeating: "b", count: 64),
+            sourceRevision: String(repeating: "c", count: 40),
+            language: "en",
+            measuredAt: "2026-07-22T00:00:00Z",
+            referenceHost: ModelBenchmarkHost(
+                chip: "Apple M4 Max",
+                operatingSystem: "macOS 26.5.2 (25F84)",
+                architecture: "arm64"
+            ),
+            runCount: 3,
+            quality: ModelBenchmarkQualityRating(
+                score: qualityScore,
+                level: qualityLevel,
+                label: qualityLevel == 5 ? "Highest" : qualityLevel == 4 ? "High" : "Balanced",
+                speechItems: 732,
+                noSpeechItems: 200,
+                noSpeechFalsePositiveRate: 0,
+                components: [
+                    ModelBenchmarkQualityComponent(
+                        id: "open-asr-english-nightly-v1",
+                        wordErrorRate: 0.1,
+                        score: Double(qualityScore),
+                        weight: 0.5
+                    ),
+                    ModelBenchmarkQualityComponent(
+                        id: "edacc-english-nightly-v1",
+                        wordErrorRate: 0.2,
+                        score: Double(qualityScore),
+                        weight: 0.3
+                    ),
+                    ModelBenchmarkQualityComponent(
+                        id: "berst-english-nightly-v1",
+                        wordErrorRate: 0.3,
+                        score: Double(qualityScore),
+                        weight: 0.2
+                    ),
+                ]
+            ),
+            speed: ModelBenchmarkSpeedRating(
+                score: speedScore,
+                level: speedLevel,
+                label: speedLevel == 5 ? "Fastest" : speedLevel == 4 ? "Fast" : "Balanced",
+                p50ReleaseToFinalMs: 180,
+                p95ReleaseToFinalMs: 205,
+                p95RealTimeFactor: 0.05,
+                relativeP95Spread: 0.05
+            ),
+            speedUnratedReason: nil
+        )
     }
 }

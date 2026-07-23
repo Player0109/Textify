@@ -8,6 +8,8 @@ public enum ManifestVerificationError: Error, Equatable {
     case unknownKeyId(String)
     case unexpectedManifestFile(String)
     case unsupportedContentType(String)
+    case unsupportedManifestVersion(Int)
+    case contentTypeManifestVersionMismatch
     case contentHashMismatch
     case invalidPublicKey
     case invalidSignatureEncoding
@@ -44,7 +46,9 @@ public struct ManifestVerifier {
     public static let algorithm = "Ed25519"
     public static let signatureType = "io.github.Player0109.Textify.model-manifest"
     public static let manifestFile = "manifest.json"
-    public static let contentType = "application/vnd.textify.model-manifest+json;version=1"
+    public static let contentTypeV1 = "application/vnd.textify.model-manifest+json;version=1"
+    public static let contentTypeV2 = "application/vnd.textify.model-manifest+json;version=2"
+    public static let contentType = contentTypeV1
 
     private let trustedKeys: [TrustedModelManifestKey]
     private let legacyPolicy: LegacyManifestSignaturePolicy?
@@ -76,7 +80,9 @@ public struct ManifestVerifier {
         guard envelope.manifestFile == Self.manifestFile else {
             throw ManifestVerificationError.unexpectedManifestFile(envelope.manifestFile)
         }
-        guard envelope.contentType == Self.contentType else {
+        guard envelope.contentType == Self.contentTypeV1
+            || envelope.contentType == Self.contentTypeV2
+        else {
             throw ManifestVerificationError.unsupportedContentType(envelope.contentType)
         }
 
@@ -100,7 +106,22 @@ public struct ManifestVerifier {
         guard publicKey.isValidSignature(signatureBytes, for: payload) else {
             throw ManifestVerificationError.signatureRejected
         }
-        return try ModelManifest.decode(manifestData)
+        let manifest = try ModelManifest.decode(manifestData)
+        let expectedContentType: String
+        switch manifest.manifestVersion {
+        case 1:
+            expectedContentType = Self.contentTypeV1
+        case 2:
+            expectedContentType = Self.contentTypeV2
+        default:
+            throw ManifestVerificationError.unsupportedManifestVersion(
+                manifest.manifestVersion
+            )
+        }
+        guard envelope.contentType == expectedContentType else {
+            throw ManifestVerificationError.contentTypeManifestVersionMismatch
+        }
+        return manifest
     }
 
     private func verifyLegacy(manifestData: Data, signatureData: Data) throws -> ModelManifest {

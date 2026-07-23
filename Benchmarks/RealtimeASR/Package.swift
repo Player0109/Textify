@@ -21,13 +21,18 @@ let package = Package(
             name: "TextifyRealtimeBenchmark",
             dependencies: [
                 "BenchmarkMetrics",
+                .product(name: "TextifyCore", package: "Textify"),
                 .product(name: "TextifyTranscription", package: "Textify"),
                 .product(name: "FluidAudio", package: "FluidAudio")
             ]
         ),
+        .executableTarget(
+            name: "TextifyEvaluationTool",
+            dependencies: ["BenchmarkMetrics"]
+        ),
         .testTarget(
             name: "TextifyRealtimeBenchmarkTests",
-            dependencies: ["BenchmarkMetrics"]
+            dependencies: ["BenchmarkMetrics", "TextifyRealtimeBenchmark"]
         )
     ]
 )

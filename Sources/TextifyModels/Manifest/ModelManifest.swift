@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 public struct ModelManifest: Codable, Equatable, Sendable {
@@ -192,6 +193,7 @@ public struct ModelEntry: Codable, Equatable, Sendable {
     public let capabilities: ModelCapabilities
     public let presentation: ModelUserPresentation?
     public let purpose: ModelPurpose
+    public let benchmark: ModelBenchmarkRating?
 
     public init(
         id: String,
@@ -276,6 +278,44 @@ public struct ModelEntry: Codable, Equatable, Sendable {
         presentation: ModelUserPresentation?,
         purpose: ModelPurpose = .transcription
     ) {
+        self.init(
+            id: id,
+            displayName: displayName,
+            tier: tier,
+            description: description,
+            sizeBytes: sizeBytes,
+            files: files,
+            licenses: licenses,
+            provenance: provenance,
+            runtimeParameters: runtimeParameters,
+            hallucinationThresholds: hallucinationThresholds,
+            minAppVersion: minAppVersion,
+            runtime: runtime,
+            capabilities: capabilities,
+            presentation: presentation,
+            purpose: purpose,
+            benchmark: nil
+        )
+    }
+
+    public init(
+        id: String,
+        displayName: String,
+        tier: String,
+        description: String,
+        sizeBytes: Int64,
+        files: [ModelFile],
+        licenses: [ModelLicense],
+        provenance: ModelProvenance,
+        runtimeParameters: RuntimeParameters,
+        hallucinationThresholds: HallucinationThresholds,
+        minAppVersion: String,
+        runtime: ModelRuntimeDescriptor,
+        capabilities: ModelCapabilities,
+        presentation: ModelUserPresentation?,
+        purpose: ModelPurpose,
+        benchmark: ModelBenchmarkRating?
+    ) {
         self.id = id
         self.displayName = displayName
         self.tier = tier
@@ -291,6 +331,7 @@ public struct ModelEntry: Codable, Equatable, Sendable {
         self.capabilities = capabilities
         self.presentation = presentation
         self.purpose = purpose
+        self.benchmark = benchmark
     }
 
     public init(from decoder: Decoder) throws {
@@ -315,6 +356,7 @@ public struct ModelEntry: Codable, Equatable, Sendable {
         capabilities = try container.decodeIfPresent(ModelCapabilities.self, forKey: .capabilities) ?? .legacyEnglishWhisper
         presentation = try container.decodeIfPresent(ModelUserPresentation.self, forKey: .presentation)
         purpose = try container.decodeIfPresent(ModelPurpose.self, forKey: .purpose) ?? .transcription
+        benchmark = try container.decodeIfPresent(ModelBenchmarkRating.self, forKey: .benchmark)
     }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
@@ -333,6 +375,7 @@ public struct ModelEntry: Codable, Equatable, Sendable {
         case capabilities
         case presentation
         case purpose
+        case benchmark
 
         static let legacyRequired: [CodingKeys] = [
             .id,
@@ -347,6 +390,20 @@ public struct ModelEntry: Codable, Equatable, Sendable {
             .hallucinationThresholds,
             .minAppVersion
         ]
+    }
+
+    public func artifactFingerprint() -> String {
+        let canonical = files
+            .sorted {
+                ($0.relativePath ?? $0.filename) < ($1.relativePath ?? $1.filename)
+            }
+            .map {
+                "\($0.relativePath ?? $0.filename)\t\($0.sha256)\t\($0.sizeBytes)\n"
+            }
+            .joined()
+        return SHA256.hash(data: Data(canonical.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
     }
 }
 

@@ -34,7 +34,8 @@ final class ManifestSignatureTests: XCTestCase {
     private static func specEnvelope(
         manifestData: Data,
         privateKey: Curve25519.Signing.PrivateKey,
-        keyId: String = "test-key"
+        keyId: String = "test-key",
+        contentTypeVersion: Int = 1
     ) throws -> Data {
         let contentSHA256 = SHA256.hash(data: manifestData)
             .map { String(format: "%02x", $0) }
@@ -46,7 +47,7 @@ final class ManifestSignatureTests: XCTestCase {
         algorithm=Ed25519
         keyId=\(keyId)
         manifestFile=manifest.json
-        contentType=application/vnd.textify.model-manifest+json;version=1
+        contentType=application/vnd.textify.model-manifest+json;version=\(contentTypeVersion)
         contentSHA256=\(contentSHA256)
 
         """.utf8)
@@ -62,7 +63,7 @@ final class ManifestSignatureTests: XCTestCase {
           "algorithm": "Ed25519",
           "keyId": "\(keyId)",
           "manifestFile": "manifest.json",
-          "contentType": "application/vnd.textify.model-manifest+json;version=1",
+          "contentType": "application/vnd.textify.model-manifest+json;version=\(contentTypeVersion)",
           "contentSHA256": "\(contentSHA256)",
           "signature": "\(signature)"
         }
@@ -88,6 +89,59 @@ final class ManifestSignatureTests: XCTestCase {
         )
 
         XCTAssertEqual(manifest.manifestVersion, 1)
+    }
+
+    func testVerifierAcceptsManifestV2ContentType() throws {
+        let privateKey = Curve25519.Signing.PrivateKey()
+        let manifestData = Data(
+            #"{"manifestVersion":2,"generatedAt":"2026-07-22T00:00:00Z","models":[]}"#.utf8
+        )
+        let verifier = ManifestVerifier(trustedKeys: [
+            TrustedModelManifestKey(
+                keyId: "test-key",
+                publicKeyBase64: privateKey.publicKey.rawRepresentation.base64EncodedString()
+            )
+        ])
+
+        let manifest = try verifier.verify(
+            manifestData: manifestData,
+            signatureData: Self.specEnvelope(
+                manifestData: manifestData,
+                privateKey: privateKey,
+                contentTypeVersion: 2
+            )
+        )
+
+        XCTAssertEqual(manifest.manifestVersion, 2)
+    }
+
+    func testVerifierRejectsContentTypeVersionDifferentFromManifest() throws {
+        let privateKey = Curve25519.Signing.PrivateKey()
+        let manifestData = Data(
+            #"{"manifestVersion":2,"generatedAt":"2026-07-22T00:00:00Z","models":[]}"#.utf8
+        )
+        let verifier = ManifestVerifier(trustedKeys: [
+            TrustedModelManifestKey(
+                keyId: "test-key",
+                publicKeyBase64: privateKey.publicKey.rawRepresentation.base64EncodedString()
+            )
+        ])
+
+        XCTAssertThrowsError(
+            try verifier.verify(
+                manifestData: manifestData,
+                signatureData: Self.specEnvelope(
+                    manifestData: manifestData,
+                    privateKey: privateKey,
+                    contentTypeVersion: 1
+                )
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? ManifestVerificationError,
+                .contentTypeManifestVersionMismatch
+            )
+        }
     }
 
     func testVerifierRejectsSpecEnvelopeWhenManifestHashChanges() throws {

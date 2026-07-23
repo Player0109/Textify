@@ -30,7 +30,9 @@ struct SettingsRootView: View {
             }
         }
         .tint(TextifyVisualIdentity.voiceViolet)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .preferredColorScheme(.dark)
+        .background(TextifyVisualIdentity.windowSurface)
+        .ignoresSafeArea(.container, edges: .top)
         .frame(
             minWidth: TextifyWindowMetrics.mainMinimumWidth,
             idealWidth: TextifyWindowMetrics.mainWidth,
@@ -50,6 +52,8 @@ struct SettingsRootView: View {
             ModelsSettingsPane()
         case .privacy:
             PrivacySettingsPane()
+        case .logs:
+            LogsSettingsPane()
         case .advanced:
             AdvancedSettingsPane()
         }
@@ -62,34 +66,17 @@ private struct SettingsSidebar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 11) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(TextifyVisualIdentity.voiceViolet.opacity(0.14))
-                    TextifyVoiceMark(state: .processing, height: 22)
-                }
-                .frame(width: 38, height: 38)
+            HStack(spacing: 10) {
+                TextifyVoiceMark(state: .processing, height: 22)
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Textify")
-                        .font(.system(.title3, design: .rounded, weight: .bold))
-                    Text("Private Mac dictation")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                Text("Textify")
+                    .font(.system(size: 16, weight: .semibold))
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 20)
-            .padding(.bottom, 22)
+            .padding(.horizontal, 24)
+            .padding(.top, 45)
+            .padding(.bottom, 18)
 
-            Text("SETTINGS")
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(1.2)
-                .foregroundStyle(.tertiary)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 7)
-
-            VStack(spacing: 4) {
+            VStack(spacing: 2) {
                 ForEach(SettingsPane.productionVisiblePanes) { pane in
                     Button {
                         selection = pane
@@ -97,71 +84,61 @@ private struct SettingsSidebar: View {
                         HStack(spacing: 11) {
                             Image(systemName: pane.productionSystemImage)
                                 .font(.system(size: 14, weight: .medium))
-                                .frame(width: 20)
-                            Text(pane.title)
-                                .font(.system(.body, design: .rounded, weight: selection == pane ? .semibold : .regular))
+                                .foregroundStyle(selection == pane ? TextifyVisualIdentity.voiceViolet : Color.white.opacity(0.62))
+                                .frame(width: 18)
+                            Text(pane.sidebarTitle)
+                                .font(.system(size: 15, weight: selection == pane ? .semibold : .regular))
                             Spacer(minLength: 0)
                         }
-                        .foregroundStyle(selection == pane ? TextifyVisualIdentity.voiceViolet : Color.primary)
-                        .padding(.horizontal, 12)
-                        .frame(height: 38)
+                        .foregroundStyle(selection == pane ? Color.white : Color.white.opacity(0.62))
+                        .padding(.horizontal, 10)
+                        .frame(height: 35)
                         .background(
-                            selection == pane ? TextifyVisualIdentity.voiceViolet.opacity(0.12) : Color.clear,
-                            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            selection == pane ? TextifyVisualIdentity.consoleSelection : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
                         )
-                        .overlay(alignment: .leading) {
-                            if selection == pane {
-                                Capsule(style: .continuous)
-                                    .fill(TextifyVisualIdentity.voiceViolet)
-                                    .frame(width: 3, height: 22)
-                                    .padding(.leading, 2)
-                            }
-                        }
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityAddTraits(selection == pane ? .isSelected : [])
+
+                    if pane == .models {
+                        Divider()
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 8)
+                    }
                 }
             }
-            .padding(.horizontal, 10)
+            .padding(.leading, 15)
+            .padding(.trailing, 8)
 
             Spacer(minLength: 20)
 
             sidebarStatus
-                .padding(12)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 20)
         }
         .frame(width: TextifyWindowMetrics.sidebarWidth)
-        .background {
-            LinearGradient(
-                colors: [
-                    Color(nsColor: .underPageBackgroundColor),
-                    TextifyVisualIdentity.voiceViolet.opacity(0.035),
-                    Color(nsColor: .underPageBackgroundColor)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        }
+        .background(TextifyVisualIdentity.sidebarSurface)
     }
 
     private var sidebarStatus: some View {
         let canDictate = services.dictation.readiness.canDictate
-        return HStack(alignment: .top, spacing: 10) {
-            TextifyVoiceMark(state: canDictate ? .ready : .blocked, height: 20)
-                .padding(.top, 2)
+        return HStack(spacing: 8) {
+            Circle()
+                .fill(canDictate ? TextifyVisualIdentity.readyMint : TextifyVisualIdentity.warmWarning)
+                .frame(width: 7, height: 7)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(TextifyReadinessPresentation.title(canDictate: canDictate))
-                    .font(.system(.callout, design: .rounded, weight: .semibold))
+                    .font(.system(size: 13, weight: .medium))
                 Text(canDictate ? services.preferences.trigger.displayName : "Review setup requirements")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
                     .lineLimit(2)
             }
         }
-        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }
@@ -208,6 +185,7 @@ extension SettingsPane {
         .dictation,
         .models,
         .privacy,
+        .logs,
         .advanced
     ]
 
@@ -221,8 +199,27 @@ extension SettingsPane {
             return "externaldrive"
         case .privacy:
             return "hand.raised"
+        case .logs:
+            return "doc.text.magnifyingglass"
         case .advanced:
             return "slider.horizontal.3"
+        }
+    }
+
+    var sidebarTitle: String {
+        switch self {
+        case .general:
+            return "General Settings"
+        case .dictation:
+            return "Dictation"
+        case .models:
+            return "Dictation Models"
+        case .privacy:
+            return "Privacy"
+        case .logs:
+            return "Logs"
+        case .advanced:
+            return "Advanced"
         }
     }
 }
@@ -233,20 +230,23 @@ private struct GeneralSettingsPane: View {
     var body: some View {
         @Bindable var services = services
 
-        SettingsPaneLayout(title: "General") {
-            TextifyCard {
+        SettingsPaneLayout(
+            title: "General Preferences",
+            subtitle: "Configure Textify to match your workflow and preferences."
+        ) {
+            SettingsSection("Status") {
                 HStack(spacing: 20) {
                     ZStack {
                         Circle()
                             .fill(readinessColor.opacity(0.14))
-                        TextifyVoiceMark(state: services.dictation.readiness.canDictate ? .ready : .blocked, height: 38)
+                        TextifyVoiceMark(state: services.dictation.readiness.canDictate ? .ready : .blocked, height: 28)
                     }
-                    .frame(width: 68, height: 68)
+                    .frame(width: 52, height: 52)
 
                     VStack(alignment: .leading, spacing: 5) {
                         HStack(spacing: 8) {
                             Text(TextifyReadinessPresentation.title(canDictate: services.dictation.readiness.canDictate))
-                                .font(.system(.title2, design: .rounded, weight: .bold))
+                                .font(.system(size: 15, weight: .semibold))
                             TextifyStatusBadge(
                                 title: services.dictation.readiness.canDictate ? "READY" : "ACTION NEEDED",
                                 tone: services.dictation.readiness.canDictate ? .success : .warning
@@ -265,8 +265,9 @@ private struct GeneralSettingsPane: View {
                 }
                 .accessibilityElement(children: .combine)
             }
+            .padding(.top, 15)
 
-            SettingsSection("Startup") {
+            SettingsSection("Behavior") {
                 LabeledContent {
                     Toggle("Launch at Login", isOn: launchAtLoginBinding)
                         .labelsHidden()
@@ -283,9 +284,9 @@ private struct GeneralSettingsPane: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 launchAtLoginAction
-            }
 
-            SettingsSection("Dock") {
+                Divider()
+
                 LabeledContent {
                     Toggle(
                         DockPreferencePresentation.title,
@@ -308,7 +309,7 @@ private struct GeneralSettingsPane: View {
                 }
             }
 
-            SettingsSection("Version") {
+            SettingsSection("About") {
                 LabeledContent {
                     Text(appVersion)
                         .font(.system(.body, design: .monospaced))
@@ -545,60 +546,28 @@ private struct ModelsSettingsPane: View {
         let installedModelIDs = Set(installedModels.map(\.id))
 
         return SettingsPaneLayout(
-            title: "Local Models",
-            subtitle: "Choose a dictation model and optional voice cleaner. Everything runs on your Mac.",
+            title: "Dictation Models",
+            subtitle: "Choose how transcription runs on your Mac.",
             maxContentWidth: 1_360
         ) {
-            ModelCatalogToolbar(
-                sort: $catalogSort,
-                format: $catalogFormat,
-                precision: $catalogPrecision,
-                resultCount: visibleCatalog.count,
-                totalCount: completeCatalog.count,
-                onReset: resetCatalogQuery
-            )
-
-            HStack(spacing: 14) {
-                Button("Verify Installed", systemImage: "checkmark.seal") {
-                    Task {
-                        _ = await services.dictation.refreshReadiness()
-                        modelMessage = services.dictation.readiness.model.settingsModelStatus
-                    }
-                }
-
-                Button(
-                    isImporting ? "Importing" : "Import Whisper Model…",
-                    systemImage: "square.and.arrow.down"
-                ) {
-                    chooseCustomWhisperModel()
-                }
-                .disabled(isInstalling || isImporting)
-
-                Spacer(minLength: 12)
-
-                if services.modelCatalogCoordinator.isLoading {
+            if services.modelCatalogCoordinator.isLoading {
+                HStack(spacing: 8) {
                     ProgressView()
                         .controlSize(.small)
                     Text("Loading signed catalog")
                         .foregroundStyle(.secondary)
-                } else if let errorMessage = services.modelCatalogCoordinator.errorMessage {
-                    Text(errorMessage)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                } else if ProductionModelInstallConfiguration.current == nil {
-                    Text("Signed catalog unavailable in this build")
-                        .foregroundStyle(.secondary)
                 }
-
-                if let modelMessage {
-                    Text(modelMessage)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
+                .font(.callout)
+            } else if let message = services.modelCatalogCoordinator.errorMessage ?? modelMessage {
+                Text(message)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            } else if ProductionModelInstallConfiguration.current == nil {
+                Text("Signed catalog unavailable in this build")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
-            .font(.callout)
-            .buttonStyle(.borderless)
-            .padding(.horizontal, 4)
 
             ModelCatalogSurface(
                 models: visibleCatalog,
@@ -645,6 +614,24 @@ private struct ModelsSettingsPane: View {
                 )
             }
 
+        }
+        .overlay(alignment: .topTrailing) {
+            ModelCatalogToolbar(
+                sort: $catalogSort,
+                format: $catalogFormat,
+                precision: $catalogPrecision,
+                onReset: resetCatalogQuery,
+                onVerify: {
+                    Task {
+                        _ = await services.dictation.refreshReadiness()
+                        modelMessage = services.dictation.readiness.model.settingsModelStatus
+                    }
+                },
+                onImport: chooseCustomWhisperModel,
+                isImportDisabled: isInstalling || isImporting
+            )
+            .padding(.top, 48)
+            .padding(.trailing, 24)
         }
         .task {
             _ = await services.dictation.refreshReadiness()
@@ -965,25 +952,13 @@ private struct ModelCatalogToolbar: View {
     @Binding var sort: ModelCatalogSort
     @Binding var format: ModelArtifactFormat?
     @Binding var precision: ModelArtifactPrecision?
-    let resultCount: Int
-    let totalCount: Int
     let onReset: () -> Void
+    let onVerify: () -> Void
+    let onImport: () -> Void
+    let isImportDisabled: Bool
 
     var body: some View {
-        HStack(spacing: 10) {
-            Label("\(resultCount) of \(totalCount)", systemImage: "line.3.horizontal.decrease")
-                .font(.system(.callout, design: .rounded, weight: .semibold))
-                .foregroundStyle(hasFilters ? TextifyVisualIdentity.voiceViolet : .secondary)
-                .accessibilityLabel("Showing \(resultCount) of \(totalCount) models")
-
-            Divider()
-                .frame(height: 20)
-
-            Text("SORT")
-                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .tracking(0.75)
-                .foregroundStyle(.tertiary)
-
+        HStack(spacing: 8) {
             Picker("Sort models", selection: $sort) {
                 ForEach(ModelCatalogSort.allCases) { option in
                     Text(option.title).tag(option)
@@ -991,47 +966,41 @@ private struct ModelCatalogToolbar: View {
             }
             .labelsHidden()
             .pickerStyle(.segmented)
-            .frame(width: 218)
-
-            Spacer(minLength: 8)
+            .frame(width: 210)
 
             Menu {
-                Picker("Format", selection: $format) {
-                    Text("All formats").tag(ModelArtifactFormat?.none)
-                    ForEach(ModelArtifactFormat.filterOptions) { option in
-                        Text(option.title).tag(Optional(option))
+                Menu("Format") {
+                    Picker("Format", selection: $format) {
+                        Text("All formats").tag(ModelArtifactFormat?.none)
+                        ForEach(ModelArtifactFormat.filterOptions) { option in
+                            Text(option.title).tag(Optional(option))
+                        }
                     }
                 }
-            } label: {
-                Label("Format: \(format?.title ?? "All")", systemImage: "shippingbox")
-                    .foregroundStyle(format == nil ? Color.secondary : TextifyVisualIdentity.voiceViolet)
-            }
-
-            Menu {
-                Picker("Precision", selection: $precision) {
-                    Text("All precision").tag(ModelArtifactPrecision?.none)
-                    ForEach(ModelArtifactPrecision.filterOptions) { option in
-                        Text(option.title).tag(Optional(option))
+                Menu("Precision") {
+                    Picker("Precision", selection: $precision) {
+                        Text("All precision").tag(ModelArtifactPrecision?.none)
+                        ForEach(ModelArtifactPrecision.filterOptions) { option in
+                            Text(option.title).tag(Optional(option))
+                        }
                     }
                 }
+                if hasChanges {
+                    Button("Reset Filters", systemImage: "arrow.counterclockwise", action: onReset)
+                }
+                Divider()
+                Button("Verify Installed", systemImage: "checkmark.seal", action: onVerify)
+                Button("Import Whisper Model…", systemImage: "square.and.arrow.down", action: onImport)
+                    .disabled(isImportDisabled)
             } label: {
-                Label("Precision: \(precision?.title ?? "All")", systemImage: "memorychip")
-                    .foregroundStyle(precision == nil ? Color.secondary : TextifyVisualIdentity.voiceViolet)
+                Image(systemName: hasFilters ? "ellipsis.circle.fill" : "ellipsis.circle")
+                    .font(.system(size: 15, weight: .medium))
             }
-
-            if hasChanges {
-                Button("Reset", action: onReset)
-                    .foregroundStyle(.secondary)
-            }
+            .menuStyle(.borderlessButton)
+            .frame(width: 24)
         }
-        .font(.callout)
-        .buttonStyle(.borderless)
         .controlSize(.small)
-        .padding(.horizontal, 4)
-        .padding(.bottom, 12)
-        .overlay(alignment: .bottom) {
-            Divider()
-        }
+        .accessibilityElement(children: .contain)
     }
 
     private var hasFilters: Bool {
@@ -1072,11 +1041,11 @@ private struct ModelCatalogSurface<Row: View>: View {
                 }
             }
         }
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(TextifyVisualIdentity.cardSurface)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.primary.opacity(0.13), lineWidth: 1)
+                .stroke(TextifyVisualIdentity.separator, lineWidth: 1)
         }
     }
 }
@@ -1118,10 +1087,10 @@ private struct ModelCatalogColumnHeader: View {
         .font(.system(size: 10, weight: .bold, design: .monospaced))
         .tracking(0.9)
         .foregroundStyle(.secondary)
-        .padding(.leading, 108)
-        .padding(.trailing, 18)
-        .frame(height: 46)
-        .background(Color.primary.opacity(0.018))
+        .padding(.leading, 94)
+        .padding(.trailing, 14)
+        .frame(height: 38)
+        .background(Color.white.opacity(0.015))
         .accessibilityHidden(true)
     }
 }
@@ -1145,51 +1114,26 @@ private struct TextifyModelCard: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 12) {
-                ModelSelectionIndicator(isInstalled: isInstalled, isActive: isActive)
+                ModelSelectionIndicator(isInstalled: isInstalled, isActive: showsSelectedTreatment)
 
-                ModelProviderTile(provider: model.provider, isActive: isActive)
+                ModelProviderTile(provider: model.provider, isActive: showsSelectedTreatment)
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 7) {
                         Text(model.catalogDisplayName)
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(size: 15, weight: .semibold))
                             .lineLimit(1)
+                        TextifyStatusBadge(title: model.supportTier.uppercased(), tone: tierTone)
                         if !model.isCurated {
                             TextifyStatusBadge(title: "NO LONGER CURATED", tone: .warning)
                         }
                     }
                     Text(model.description)
-                        .font(.callout)
+                        .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
-
-                    HStack(spacing: 6) {
-                        Text(model.provider.name.uppercased())
-                            .font(.system(size: 9, weight: .bold, design: .monospaced))
-                            .tracking(0.7)
-                            .foregroundStyle(model.provider.accent)
-                        Text("•")
-                            .foregroundStyle(.tertiary)
-                        Text(model.engineName)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text("•")
-                            .foregroundStyle(.tertiary)
-                        Text(model.supportTier.uppercased())
-                            .font(.system(size: 9, weight: .bold, design: .monospaced))
-                            .tracking(0.6)
-                            .foregroundStyle(tierTone.color)
-                        if model.purpose == .voiceCleaning {
-                            Text("• VOICE CLEANING")
-                                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                .tracking(0.6)
-                                .foregroundStyle(TextifyVisualIdentity.voiceViolet)
-                        }
-                    }
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -1203,7 +1147,7 @@ private struct TextifyModelCard: View {
 
             HStack(spacing: 10) {
                 Spacer()
-                    .frame(width: 92)
+                    .frame(width: 76)
 
                 if isActivating {
                     ProgressView()
@@ -1256,30 +1200,23 @@ private struct TextifyModelCard: View {
                     onCancel: onCancelInstall,
                     onRetry: onRetryInstall
                 )
-                .padding(.leading, 104)
+                .padding(.leading, 76)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
             if showsDetails {
                 ModelDetailGrid(model: model)
-                    .padding(.leading, 104)
+                    .padding(.leading, 76)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 16)
-        .frame(minHeight: 120, alignment: .topLeading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .frame(minHeight: 102, alignment: .topLeading)
         .background(activeBackground)
-        .overlay(alignment: .leading) {
-            if isActive {
-                Rectangle()
-                    .fill(TextifyVisualIdentity.voiceViolet)
-                    .frame(width: 3)
-            }
-        }
         .overlay(alignment: .bottom) {
             Divider()
-                .padding(.leading, 108)
+                .padding(.leading, 94)
         }
         .accessibilityElement(children: .contain)
     }
@@ -1294,12 +1231,16 @@ private struct TextifyModelCard: View {
     }
 
     private var activeBackground: Color {
-        guard isActive else {
+        guard showsSelectedTreatment else {
             return .clear
         }
         return colorScheme == .dark
-            ? TextifyVisualIdentity.consoleSelection.opacity(0.66)
+            ? TextifyVisualIdentity.consoleSelection
             : TextifyVisualIdentity.voiceViolet.opacity(0.075)
+    }
+
+    private var showsSelectedTreatment: Bool {
+        isActive && model.purpose == .transcription
     }
 }
 
@@ -1429,7 +1370,7 @@ private struct ModelSelectionIndicator: View {
                     .padding(4)
             }
         }
-        .frame(width: 18, height: 18)
+        .frame(width: 16, height: 16)
         .accessibilityHidden(true)
     }
 
@@ -1443,26 +1384,34 @@ private struct ModelProviderTile: View {
     let isActive: Bool
 
     var body: some View {
-        Group {
-            if let systemImage = provider.systemImage {
+        ZStack {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.white.opacity(isActive ? 0.12 : 0.055))
+
+            if let logoAssetName = provider.logoAssetName {
+                Image(logoAssetName)
+                    .resizable()
+                    .interpolation(.high)
+                    .antialiased(true)
+                    .scaledToFit()
+                    .padding(provider.logoInset)
+            } else if let systemImage = provider.systemImage {
                 Image(systemName: systemImage)
-                    .font(.system(size: 21, weight: .semibold))
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(provider.accent)
             } else {
                 Text(provider.mark)
-                    .font(.system(size: provider.mark.count > 1 ? 11 : 18, weight: .bold, design: .rounded))
+                    .font(.system(size: provider.mark.count > 1 ? 10 : 16, weight: .bold))
+                    .foregroundStyle(provider.accent)
             }
         }
-            .foregroundStyle(provider.accent)
-            .frame(width: 46, height: 46)
-            .background(
-                provider.accent.opacity(isActive ? 0.18 : 0.12),
-                in: RoundedRectangle(cornerRadius: 11, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .stroke(provider.accent.opacity(isActive ? 0.42 : 0.22), lineWidth: 1)
-            }
-            .accessibilityLabel(provider.name)
+        .frame(width: 36, height: 36)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(provider.accent.opacity(isActive ? 0.48 : 0.24), lineWidth: 1)
+        }
+        .accessibilityLabel(provider.name)
     }
 }
 
@@ -1480,12 +1429,12 @@ private struct ModelSignalMetric: View {
                 }
             }
             Text(label)
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(label), \(level) of 5")
+        .accessibilityLabel(level == 0 ? label : "\(label), \(level) of 5")
     }
 
     private var signalColor: Color {
@@ -1502,7 +1451,7 @@ private struct ModelFeaturesMetric: View {
             Label(model.languageDescription, systemImage: "character.bubble")
             Label(model.acceleratorName, systemImage: "cpu")
         }
-        .font(.system(size: 10, weight: .medium, design: .rounded))
+        .font(.system(size: 10, weight: .medium))
         .foregroundStyle(.secondary)
         .lineLimit(1)
         .accessibilityElement(children: .combine)
@@ -1522,6 +1471,19 @@ private struct ModelDetailGrid: View {
                     ModelFactRow(label: "Finalization", value: model.expectedFinalization)
                     ModelFactRow(label: "Accuracy", value: model.accuracyTradeoff)
                     ModelFactRow(label: "Requires", value: model.requirements)
+                    if let qualityEvidence = model.qualityEvidenceDescription {
+                        ModelFactRow(label: "Quality test", value: qualityEvidence)
+                        ModelFactRow(label: "WER", value: model.wordErrorRateDescription)
+                        ModelFactRow(
+                            label: "No-speech",
+                            value: model.noSpeechEvidenceDescription
+                        )
+                    } else {
+                        ModelFactRow(
+                            label: "Ratings",
+                            value: "Unrated — no signed comparable benchmark evidence"
+                        )
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
@@ -1531,6 +1493,20 @@ private struct ModelDetailGrid: View {
                         ModelFactRow(label: "SHA-256", value: checksum)
                             .lineLimit(1)
                             .textSelection(.enabled)
+                    }
+                    if let speedEvidence = model.speedEvidenceDescription {
+                        ModelFactRow(label: "Speed test", value: speedEvidence)
+                    }
+                    if let provenance = model.benchmarkProvenanceDescription {
+                        ModelFactRow(
+                            label: "Test runtime",
+                            value: model.benchmarkRuntimeDescription
+                        )
+                        ModelFactRow(label: "Measured", value: provenance)
+                        ModelFactRow(
+                            label: "Policy",
+                            value: model.benchmarkPolicyDescription
+                        )
                     }
                     if let sourceURL = model.sourceURL {
                         Link(destination: sourceURL) {
@@ -1578,6 +1554,8 @@ private struct PrivacySettingsPane: View {
                     }
                 }
 
+                Divider()
+
                 PermissionRow(
                     name: "Accessibility",
                     status: services.dictation.readiness.permissions.accessibility.settingsStatusLabel,
@@ -1589,6 +1567,11 @@ private struct PrivacySettingsPane: View {
                         permissionMessage = services.dictation.readiness.permissions.accessibility
                             .permissionRequestMessage(for: "Accessibility")
                     }
+                }
+
+                if services.dictation.readiness.permissions.accessibility != .granted {
+                    Divider()
+                    AccessibilityAppDragSource()
                 }
 
                 if let permissionMessage {
@@ -1603,11 +1586,13 @@ private struct PrivacySettingsPane: View {
                     title: "Audio stays in memory",
                     detail: "Recordings are processed for dictation and are not saved."
                 )
+                Divider()
                 PrivacyPromiseRow(
                     icon: "clock.arrow.circlepath",
                     title: "No dictation history",
                     detail: "Textify does not keep a searchable record of what you say."
                 )
+                Divider()
                 PrivacyPromiseRow(
                     icon: "network.slash",
                     title: "Offline after setup",
@@ -1676,8 +1661,33 @@ private struct PrivacySettingsPane: View {
             }
         }
         .task {
-            _ = await services.dictation.refreshReadiness()
+            await monitorAccessibilityPermission()
         }
+    }
+
+    private func monitorAccessibilityPermission() async {
+        var displayedState = await refreshPermissionState()
+
+        while !Task.isCancelled {
+            do {
+                _ = try await AccessibilityPermissionMonitor.live.nextChange(from: displayedState)
+            } catch {
+                return
+            }
+            displayedState = await refreshPermissionState()
+        }
+    }
+
+    private func refreshPermissionState() async -> RuntimePermissionState {
+        let previousState = services.dictation.readiness.permissions.accessibility
+        let snapshot = await services.dictation.refreshReadiness()
+        let updatedState = snapshot.permissions.accessibility
+
+        if previousState != updatedState,
+           permissionMessage?.hasPrefix("Accessibility") == true {
+            permissionMessage = updatedState.permissionRequestMessage(for: "Accessibility")
+        }
+        return updatedState
     }
 
     private func addExcludedApp(_ candidate: ExcludedAppCandidate) {
@@ -1715,6 +1725,149 @@ private struct PrivacySettingsPane: View {
             return
         }
         addExcludedApp(candidate)
+    }
+}
+
+private struct AccessibilityAppDragSource: View {
+    private let appURL = Bundle.main.bundleURL
+
+    var body: some View {
+        HStack(spacing: 12) {
+            TextifyDraggableAppIcon(size: 44)
+                .shadow(color: .black.opacity(0.28), radius: 5, y: 2)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Add Textify directly")
+                    .font(.system(size: 14, weight: .semibold))
+                Text("Drag this app icon into the Accessibility list, then turn Textify on.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 12)
+
+            Label("Drag app", systemImage: "hand.draw")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(TextifyVisualIdentity.voiceViolet)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(
+                    TextifyVisualIdentity.voiceViolet.opacity(0.09),
+                    in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                )
+        }
+        .padding(.vertical, 2)
+        .contentShape(Rectangle())
+        .overlay {
+            AppBundleDragSurface(appURL: appURL)
+                .accessibilityHidden(true)
+        }
+        .help("Drag Textify into the Accessibility apps list")
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Drag Textify into the Accessibility apps list")
+        .accessibilityHint("Drop Textify in System Settings, then turn it on.")
+    }
+}
+
+private struct TextifyDraggableAppIcon: View {
+    let size: CGFloat
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: size * 0.22, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.07, green: 0.08, blue: 0.24),
+                            Color(red: 0.035, green: 0.04, blue: 0.13)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            HStack(spacing: size * 0.07) {
+                TextifyVoiceMark(state: .processing, height: size * 0.45)
+
+                Text("I")
+                    .font(.system(size: size * 0.48, weight: .medium, design: .serif))
+                    .foregroundStyle(.white)
+            }
+        }
+        .frame(width: size, height: size)
+        .overlay {
+            RoundedRectangle(cornerRadius: size * 0.22, style: .continuous)
+                .stroke(.white.opacity(0.12), lineWidth: 1)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct AppBundleDragSurface: NSViewRepresentable {
+    let appURL: URL
+
+    func makeNSView(context: Context) -> AppBundleDragSourceView {
+        AppBundleDragSourceView(appURL: appURL)
+    }
+
+    func updateNSView(_ nsView: AppBundleDragSourceView, context: Context) {
+        nsView.appURL = appURL
+    }
+}
+
+@MainActor
+private final class AppBundleDragSourceView: NSView, NSDraggingSource {
+    var appURL: URL
+
+    init(appURL: URL) {
+        self.appURL = appURL
+        super.init(frame: .zero)
+        setAccessibilityElement(false)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        true
+    }
+
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: .openHand)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        let item = NSDraggingItem(
+            pasteboardWriter: TextifyAppDragSource.pasteboardItem(for: appURL)
+        )
+        let location = convert(event.locationInWindow, from: nil)
+        let previewSize = NSSize(width: 64, height: 64)
+        let previewFrame = NSRect(
+            x: location.x - (previewSize.width / 2),
+            y: location.y - (previewSize.height / 2),
+            width: previewSize.width,
+            height: previewSize.height
+        )
+        item.setDraggingFrame(
+            previewFrame,
+            contents: NSWorkspace.shared.icon(forFile: appURL.path)
+        )
+
+        let session = beginDraggingSession(with: [item], event: event, source: self)
+        session.animatesToStartingPositionsOnCancelOrFail = true
+    }
+
+    func draggingSession(
+        _ session: NSDraggingSession,
+        sourceOperationMaskFor context: NSDraggingContext
+    ) -> NSDragOperation {
+        .copy
+    }
+
+    func ignoreModifierKeys(for session: NSDraggingSession) -> Bool {
+        true
     }
 }
 
@@ -1872,23 +2025,57 @@ private struct ExcludedAppIcon: View {
     }
 }
 
-private struct AdvancedSettingsPane: View {
+private struct LogsSettingsPane: View {
     @Environment(AppServices.self) private var services
+    @State private var entries: [DiagnosticsLogEntry] = []
     @State private var diagnosticsMessage: String?
     @State private var isWorking = false
 
     var body: some View {
-        SettingsPaneLayout(title: "Advanced") {
-            SettingsSection("Diagnostics") {
-                HStack(spacing: 12) {
-                    Button("Export Diagnostics...") {
+        SettingsPaneLayout(title: "Logs", maxContentWidth: .infinity) {
+            SettingsSection("Privacy Guard") {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "shield.checkered")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(TextifyVisualIdentity.readyMint)
+                        .frame(width: 28)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Technical metadata only")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Logs never include dictated text, audio, clipboard contents, vocabulary, or target-app identifiers.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            SettingsSection("Recent Activity") {
+                HStack(spacing: 10) {
+                    Text(entries.isEmpty ? "No events" : "\(entries.count) recent events")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+
+                    Spacer()
+
+                    Button("Refresh") {
+                        refreshLogs()
+                    }
+                    .disabled(isWorking)
+
+                    Button("Export...") {
                         Task {
                             await exportDiagnostics()
                         }
                     }
                     .disabled(isWorking)
 
-                    Button("Clear Diagnostics Log") {
+                    Button("Open Folder") {
+                        NSWorkspace.shared.open(services.diagnosticsLogger.directory)
+                    }
+                    .disabled(isWorking)
+
+                    Button("Clear") {
                         Task {
                             await clearDiagnostics()
                         }
@@ -1898,41 +2085,32 @@ private struct AdvancedSettingsPane: View {
 
                 if let diagnosticsMessage {
                     Text(diagnosticsMessage)
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
-            }
 
-            SettingsSection("Runtime Status") {
-                RuntimeStatusRow(
-                    title: "Dictation",
-                    value: services.dictation.status.menuStatusTitle,
-                    isHealthy: services.dictation.status == .idle
-                )
-                RuntimeStatusRow(
-                    title: "Model",
-                    value: services.dictation.readiness.model.settingsModelStatus,
-                    isHealthy: services.dictation.readiness.model.isReady
-                )
-                RuntimeStatusRow(
-                    title: "Microphone",
-                    value: services.dictation.readiness.permissions.microphone.settingsStatusLabel,
-                    isHealthy: services.dictation.readiness.permissions.microphone == .granted
-                )
-                RuntimeStatusRow(
-                    title: "Accessibility",
-                    value: services.dictation.readiness.permissions.accessibility.settingsStatusLabel,
-                    isHealthy: services.dictation.readiness.permissions.accessibility == .granted
-                )
-            }
-
-            SettingsSection("Timing") {
-                Text("Diagnostics use redacted duration values and length buckets only.")
-                    .foregroundStyle(.secondary)
+                if entries.isEmpty {
+                    ContentUnavailableView {
+                        Label("No diagnostic events", systemImage: "doc.text")
+                    } description: {
+                        Text("Use Textify, then refresh to inspect runtime activity.")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 30)
+                } else {
+                    LazyVStack(spacing: 0) {
+                        ForEach(entries) { entry in
+                            DiagnosticsLogEntryRow(entry: entry)
+                            if entry.id != entries.last?.id {
+                                Divider()
+                                    .padding(.leading, 15)
+                            }
+                        }
+                    }
+                }
             }
         }
-        .task {
-            _ = await services.dictation.refreshReadiness()
-        }
+        .task { refreshLogs() }
     }
 
     @MainActor
@@ -1961,7 +2139,7 @@ private struct AdvancedSettingsPane: View {
             try data.write(to: url, options: [.atomic])
             diagnosticsMessage = "Diagnostics exported."
         } catch {
-            diagnosticsMessage = "Diagnostics export failed: \(String(describing: error))"
+            diagnosticsMessage = "Diagnostics export failed."
         }
     }
 
@@ -1975,8 +2153,142 @@ private struct AdvancedSettingsPane: View {
         do {
             try await services.diagnosticsLogger.clear()
             diagnosticsMessage = "Diagnostics log cleared."
+            refreshLogs()
         } catch {
-            diagnosticsMessage = "Diagnostics clear failed: \(String(describing: error))"
+            diagnosticsMessage = "Diagnostics could not be cleared."
+        }
+    }
+
+    @MainActor
+    private func refreshLogs() {
+        do {
+            entries = try DiagnosticsLogReader().recentEntries(
+                from: services.diagnosticsLogger.directory
+            )
+            if diagnosticsMessage == "Diagnostics could not be loaded." {
+                diagnosticsMessage = nil
+            }
+        } catch {
+            entries = []
+            diagnosticsMessage = "Diagnostics could not be loaded."
+        }
+    }
+}
+
+private struct DiagnosticsLogEntryRow: View {
+    let entry: DiagnosticsLogEntry
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                .fill(tone)
+                .frame(width: 3)
+
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(title)
+                        .font(.system(size: 13, weight: .semibold))
+                    if let modelID = entry.modelID {
+                        Text(modelID)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 12)
+                    Text(entry.timestamp ?? "Earlier log")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                }
+
+                if let reasonCode = entry.reasonCode {
+                    Text(reasonCode.replacingOccurrences(of: "_", with: " "))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(tone)
+                }
+
+                Text(entry.json)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(Color.white.opacity(0.55))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.vertical, 10)
+    }
+
+    private var title: String {
+        switch entry.event {
+        case "app_started":
+            return "App started"
+        case "dictation_blocked_excluded_app":
+            return "Dictation blocked"
+        case "insertion_attempt":
+            return "Insertion attempt"
+        case "model_load":
+            return "Model preparation"
+        case "runtime_failure":
+            return "Runtime failure"
+        case "speech_recognition_completed":
+            return "Transcription completed"
+        case "speech_recognition_discarded":
+            return "Transcription discarded"
+        case "voice_cleaning":
+            return "Voice cleaning"
+        default:
+            return entry.event.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+    }
+
+    private var tone: Color {
+        switch entry.event {
+        case "runtime_failure":
+            return TextifyVisualIdentity.warmWarning
+        case "speech_recognition_completed":
+            return TextifyVisualIdentity.readyMint
+        default:
+            return TextifyVisualIdentity.voiceViolet
+        }
+    }
+}
+
+private struct AdvancedSettingsPane: View {
+    @Environment(AppServices.self) private var services
+
+    var body: some View {
+        SettingsPaneLayout(title: "Advanced") {
+            SettingsSection("Runtime Status") {
+                RuntimeStatusRow(
+                    title: "Dictation",
+                    value: services.dictation.status.menuStatusTitle,
+                    isHealthy: services.dictation.status == .idle
+                )
+                Divider()
+                RuntimeStatusRow(
+                    title: "Model",
+                    value: services.dictation.readiness.model.settingsModelStatus,
+                    isHealthy: services.dictation.readiness.model.isReady
+                )
+                Divider()
+                RuntimeStatusRow(
+                    title: "Microphone",
+                    value: services.dictation.readiness.permissions.microphone.settingsStatusLabel,
+                    isHealthy: services.dictation.readiness.permissions.microphone == .granted
+                )
+                Divider()
+                RuntimeStatusRow(
+                    title: "Accessibility",
+                    value: services.dictation.readiness.permissions.accessibility.settingsStatusLabel,
+                    isHealthy: services.dictation.readiness.permissions.accessibility == .granted
+                )
+            }
+
+            SettingsSection("Timing") {
+                Text("Diagnostics use redacted duration values and length buckets only.")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .task {
+            _ = await services.dictation.refreshReadiness()
         }
     }
 }
@@ -2076,16 +2388,18 @@ struct ModelCatalogQuery: Equatable {
             return matches.map(\.element)
         case .quality:
             return matches.sorted { lhs, rhs in
-                if lhs.element.qualitySignalLevel != rhs.element.qualitySignalLevel {
-                    return lhs.element.qualitySignalLevel > rhs.element.qualitySignalLevel
+                if lhs.element.qualityScore != rhs.element.qualityScore {
+                    return (lhs.element.qualityScore ?? -1)
+                        > (rhs.element.qualityScore ?? -1)
                 }
                 return lhs.offset < rhs.offset
             }
             .map(\.element)
         case .speed:
             return matches.sorted { lhs, rhs in
-                if lhs.element.speedSignalLevel != rhs.element.speedSignalLevel {
-                    return lhs.element.speedSignalLevel > rhs.element.speedSignalLevel
+                if lhs.element.speedScore != rhs.element.speedScore {
+                    return (lhs.element.speedScore ?? -1)
+                        > (rhs.element.speedScore ?? -1)
                 }
                 return lhs.offset < rhs.offset
             }
@@ -2098,6 +2412,7 @@ enum ModelProviderIdentity: String, Equatable {
     case openAI
     case nvidia
     case cohere
+    case qwen
     case alibaba
     case apple
     case mlx
@@ -2110,12 +2425,33 @@ enum ModelProviderIdentity: String, Equatable {
         case .openAI: "OpenAI"
         case .nvidia: "NVIDIA"
         case .cohere: "Cohere"
-        case .alibaba: "Alibaba"
+        case .qwen: "Qwen by Alibaba Cloud"
+        case .alibaba: "Alibaba Cloud"
         case .apple: "Apple"
-        case .mlx: "MLX Community"
-        case .reazon: "Reazon"
-        case .mossFormer: "MossFormer"
+        case .mlx: "Apple MLX"
+        case .reazon: "Reazon Human Interaction Lab"
+        case .mossFormer: "Alibaba Speech Lab"
         case .community: "Open model"
+        }
+    }
+
+    var logoAssetName: String? {
+        switch self {
+        case .openAI: "VendorOpenAI"
+        case .nvidia: "VendorNVIDIA"
+        case .cohere: "VendorCohere"
+        case .qwen: "VendorQwen"
+        case .alibaba, .mossFormer: "VendorAlibabaCloud"
+        case .reazon: "VendorReazon"
+        case .apple, .mlx, .community: nil
+        }
+    }
+
+    var logoInset: CGFloat {
+        switch self {
+        case .nvidia: 2
+        case .qwen: 4
+        default: 5
         }
     }
 
@@ -2124,6 +2460,7 @@ enum ModelProviderIdentity: String, Equatable {
         case .openAI: "AI"
         case .nvidia: "N"
         case .cohere: "C"
+        case .qwen: "Q"
         case .alibaba: "Q"
         case .apple: "A"
         case .mlx: "MLX"
@@ -2135,7 +2472,7 @@ enum ModelProviderIdentity: String, Equatable {
 
     var systemImage: String? {
         switch self {
-        case .apple: "apple.logo"
+        case .apple, .mlx: "apple.logo"
         case .community: "cube.transparent"
         default: nil
         }
@@ -2146,6 +2483,7 @@ enum ModelProviderIdentity: String, Equatable {
         case .openAI: Color(red: 0.063, green: 0.639, blue: 0.498)
         case .nvidia: Color(red: 0.463, green: 0.725, blue: 0.000)
         case .cohere: Color(red: 0.875, green: 0.478, blue: 0.443)
+        case .qwen: Color(red: 0.337, green: 0.251, blue: 0.941)
         case .alibaba: Color(red: 0.980, green: 0.455, blue: 0.173)
         case .apple: Color.primary
         case .mlx: TextifyVisualIdentity.voiceViolet
@@ -2179,6 +2517,7 @@ struct ProductionModelPresentation: Equatable, Identifiable {
     let artifactName: String
     let checksum: String?
     let purpose: ModelPurpose
+    let benchmark: ModelBenchmarkRating?
 
     init(
         id: String,
@@ -2202,7 +2541,8 @@ struct ProductionModelPresentation: Equatable, Identifiable {
         sourceURL: URL? = nil,
         artifactName: String = "Local model",
         checksum: String? = nil,
-        purpose: ModelPurpose = .transcription
+        purpose: ModelPurpose = .transcription,
+        benchmark: ModelBenchmarkRating? = nil
     ) {
         self.id = id
         self.displayName = displayName
@@ -2226,6 +2566,7 @@ struct ProductionModelPresentation: Equatable, Identifiable {
         self.artifactName = artifactName
         self.checksum = checksum
         self.purpose = purpose
+        self.benchmark = benchmark
     }
 
     static let v1_1 = ProductionModelPresentation(
@@ -2290,15 +2631,11 @@ struct ProductionModelPresentation: Equatable, Identifiable {
             ?? Self.fallbackFinalization(for: model.tier)
         accuracyTradeoff = model.presentation?.accuracyTradeoff ?? model.description
         requirements = model.presentation?.requirements ?? "Apple Silicon • \(acceleratorName)"
+        benchmark = model.benchmark
     }
 
     var qualitySignalLevel: Int {
-        switch supportTier {
-        case "Accurate": 5
-        case "Recommended", "Specialist": 4
-        case "Fast", "Experimental": 3
-        default: 2
-        }
+        benchmark?.quality.level ?? 0
     }
 
     var catalogDisplayName: String {
@@ -2323,14 +2660,14 @@ struct ProductionModelPresentation: Equatable, Identifiable {
         if identity.contains("whisper") {
             return .openAI
         }
-        if identity.contains("qwen") || identity.contains("paraformer") || identity.contains("sensevoice") {
+        if identity.contains("qwen") {
+            return .qwen
+        }
+        if identity.contains("paraformer") || identity.contains("sensevoice") || identity.contains("mossformer") {
             return .alibaba
         }
         if identity.contains("reazon") {
             return .reazon
-        }
-        if identity.contains("mossformer") {
-            return .mossFormer
         }
         if identity.contains("apple") {
             return .apple
@@ -2360,31 +2697,74 @@ struct ProductionModelPresentation: Equatable, Identifiable {
     }
 
     var speedSignalLevel: Int {
-        switch supportTier {
-        case "Fast": 5
-        case "Recommended": 4
-        case "Specialist", "Experimental": 3
-        case "Accurate": 2
-        default: 2
-        }
+        benchmark?.speed?.level ?? 0
     }
 
     var qualityLabel: String {
-        switch qualitySignalLevel {
-        case 5: "Highest"
-        case 4: "High"
-        case 3: "Balanced"
-        default: "Variable"
-        }
+        benchmark?.quality.label ?? "Unrated"
     }
 
     var speedLabel: String {
-        switch speedSignalLevel {
-        case 5: "Fastest"
-        case 4: "Fast"
-        case 3: "Balanced"
-        default: "Measured"
+        benchmark?.speed?.label ?? "Unrated"
+    }
+
+    var qualityScore: Int? {
+        benchmark?.quality.score
+    }
+
+    var speedScore: Int? {
+        benchmark?.speed?.score
+    }
+
+    var qualityEvidenceDescription: String? {
+        guard let quality = benchmark?.quality else {
+            return nil
         }
+        return "\(quality.score)/100 • \(quality.label) • \(quality.speechItems) speech cases"
+    }
+
+    var wordErrorRateDescription: String {
+        benchmark?.quality.components.map {
+            "\(Self.benchmarkComponentName($0.id)) \(Self.percent($0.wordErrorRate))"
+        }.joined(separator: " • ") ?? "Unrated"
+    }
+
+    var noSpeechEvidenceDescription: String {
+        guard let quality = benchmark?.quality else {
+            return "Unrated"
+        }
+        return "\(quality.noSpeechItems) cases • \(Self.percent(quality.noSpeechFalsePositiveRate)) false positives"
+    }
+
+    var speedEvidenceDescription: String? {
+        guard let speed = benchmark?.speed else {
+            if benchmark?.speedUnratedReason != nil {
+                return "Unrated — repeated-run p95 was unstable"
+            }
+            return nil
+        }
+        return "\(speed.score)/100 • p50 \(speed.p50ReleaseToFinalMs) ms • p95 \(speed.p95ReleaseToFinalMs) ms • p95 RTF \(String(format: "%.3f", speed.p95RealTimeFactor))"
+    }
+
+    var benchmarkProvenanceDescription: String? {
+        guard let benchmark else {
+            return nil
+        }
+        return "\(benchmark.measuredAt) • \(benchmark.referenceHost.chip) • \(benchmark.referenceHost.operatingSystem)"
+    }
+
+    var benchmarkPolicyDescription: String {
+        guard let benchmark else {
+            return "Unrated"
+        }
+        return "\(benchmark.policyID) • \(benchmark.runCount) runs • suite \(benchmark.suiteIndexSHA256.prefix(12)) • source \(benchmark.sourceRevision.prefix(12))"
+    }
+
+    var benchmarkRuntimeDescription: String {
+        guard let benchmark else {
+            return "Unrated"
+        }
+        return "\(benchmark.engine) • \(benchmark.engineVersion) • \(benchmark.computeBackend)"
     }
 
     private static func supportTier(for tier: String) -> String {
@@ -2397,6 +2777,19 @@ struct ProductionModelPresentation: Equatable, Identifiable {
         case "custom": "Custom"
         default: "Experimental"
         }
+    }
+
+    private static func benchmarkComponentName(_ id: String) -> String {
+        switch id {
+        case "open-asr-english-nightly-v1": "Open ASR"
+        case "edacc-english-nightly-v1": "EdAcc"
+        case "berst-english-nightly-v1": "BERSt"
+        default: id
+        }
+    }
+
+    private static func percent(_ value: Double) -> String {
+        String(format: "%.1f%%", value * 100)
     }
 
     private static func fallbackFinalization(for tier: String) -> String {
@@ -2505,6 +2898,41 @@ enum ProductionPermissionRequester {
         ] as CFDictionary
         AXIsProcessTrustedWithOptions(options)
     }
+
+    static func accessibilityState() -> RuntimePermissionState {
+        AXIsProcessTrusted() ? .granted : .denied
+    }
+}
+
+struct AccessibilityPermissionMonitor {
+    let wait: () async throws -> Void
+    let currentState: () -> RuntimePermissionState
+
+    static let live = AccessibilityPermissionMonitor(
+        wait: {
+            try await Task.sleep(for: .seconds(1))
+        },
+        currentState: ProductionPermissionRequester.accessibilityState
+    )
+
+    func nextChange(from displayedState: RuntimePermissionState) async throws -> RuntimePermissionState {
+        while true {
+            try Task.checkCancellation()
+            try await wait()
+            let observedState = currentState()
+            if observedState != displayedState {
+                return observedState
+            }
+        }
+    }
+}
+
+enum TextifyAppDragSource {
+    static func pasteboardItem(for appURL: URL = Bundle.main.bundleURL) -> NSPasteboardItem {
+        let item = NSPasteboardItem()
+        item.setData(appURL.dataRepresentation, forType: .fileURL)
+        return item
+    }
 }
 
 extension RuntimeModelReadiness {
@@ -2599,29 +3027,20 @@ private struct SettingsPaneLayout<Content: View>: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 18) {
                 TextifyPaneHeader(title: title, subtitle: subtitle)
-                    .padding(.bottom, 4)
+                    .padding(.bottom, 6)
 
                 content
             }
             .frame(maxWidth: maxContentWidth, alignment: .leading)
-            .padding(.horizontal, 32)
-            .padding(.vertical, 30)
+            .padding(.horizontal, 24)
+            .padding(.top, 19)
+            .padding(.bottom, 28)
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .scrollContentBackground(.hidden)
-        .background {
-            LinearGradient(
-                colors: [
-                    Color(nsColor: .windowBackgroundColor),
-                    TextifyVisualIdentity.voiceViolet.opacity(0.022),
-                    Color(nsColor: .windowBackgroundColor)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        }
+        .background(TextifyVisualIdentity.windowSurface)
     }
 
     private var subtitle: String {
@@ -2641,16 +3060,18 @@ private struct SettingsSection<Content: View>: View {
     }
 
     var body: some View {
-        TextifyCard {
-            VStack(alignment: .leading, spacing: 14) {
-                TextifySectionLabel(title: title)
-                Divider()
-                VStack(alignment: .leading, spacing: 13) {
+        VStack(alignment: .leading, spacing: 22) {
+            TextifySectionLabel(title: title)
+                .padding(.leading, 10)
+
+            TextifyCard(padding: 12) {
+                VStack(alignment: .leading, spacing: 12) {
                     content
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+        .padding(.horizontal, 12)
     }
 }
 

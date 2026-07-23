@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import BenchmarkMetrics
 
 struct BenchmarkResult: Codable {
     let schemaVersion: Int
@@ -13,6 +14,7 @@ struct BenchmarkResult: Codable {
     let audio: AudioSnapshot
     let timing: TimingSnapshot
     let accuracy: AccuracySnapshot?
+    let production: EvaluationProductionSnapshot?
     let resources: ResourceSnapshot
     let targets: TargetSnapshot
 }

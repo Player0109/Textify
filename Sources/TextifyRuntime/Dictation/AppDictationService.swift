@@ -94,6 +94,11 @@ public final class AppDictationService {
                         result: "failed"
                     )
                 )
+                await logRuntimeFailure(
+                    error,
+                    model: activeModel,
+                    stage: "model_prepare"
+                )
             }
         }
 
@@ -369,7 +374,16 @@ public final class AppDictationService {
                 return
             }
 
-            try await dependencies.transcriber.prepare(model: activeModel)
+            do {
+                try await dependencies.transcriber.prepare(model: activeModel)
+            } catch {
+                await logRuntimeFailure(
+                    error,
+                    model: activeModel,
+                    stage: "model_prepare"
+                )
+                throw error
+            }
             guard activeSessionID == sessionID else {
                 return
             }
@@ -384,7 +398,17 @@ public final class AppDictationService {
                 preferences: preferences
             )
             let inferenceStartedAt = dependencies.clock.nowMilliseconds()
-            let result = try await dependencies.transcriber.transcribe(preparedAudio)
+            let result: TranscriptionResult
+            do {
+                result = try await dependencies.transcriber.transcribe(preparedAudio)
+            } catch {
+                await logRuntimeFailure(
+                    error,
+                    model: activeModel,
+                    stage: "inference"
+                )
+                throw error
+            }
             let inferenceDurationMs = max(
                 0,
                 dependencies.clock.nowMilliseconds() - inferenceStartedAt
@@ -581,6 +605,22 @@ public final class AppDictationService {
             )
             return audio
         }
+    }
+
+    private func logRuntimeFailure(
+        _ error: Error,
+        model: RuntimeActiveModel,
+        stage: String
+    ) async {
+        await dependencies.diagnostics.log(
+            .runtimeFailure(
+                modelID: model.id,
+                engine: model.engine.rawValue,
+                accelerator: model.accelerator.rawValue,
+                stage: stage,
+                reasonCode: RuntimeFailureClassifier.code(for: error).rawValue
+            )
+        )
     }
 
     private var canStartActivation: Bool {

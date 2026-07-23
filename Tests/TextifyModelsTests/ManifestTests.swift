@@ -225,6 +225,127 @@ final class ManifestTests: XCTestCase {
         XCTAssertThrowsError(try ModelManifest.decode(data))
     }
 
+    func testProductionPolicyAcceptsValidV2BenchmarkRating() throws {
+        let manifest = try v2BenchmarkManifest()
+        let benchmark = try XCTUnwrap(manifest.models.first?.benchmark)
+
+        XCTAssertEqual(benchmark.quality.score, 93)
+        XCTAssertEqual(benchmark.quality.level, 5)
+        XCTAssertEqual(benchmark.speed?.score, 92)
+        XCTAssertNoThrow(try ProductionModelPolicy.validateProductionManifest(manifest))
+    }
+
+    func testProductionPolicyRejectsNoSpeechCappedV2QualityLevel() throws {
+        var json = try v2BenchmarkJSON()
+        var models = try XCTUnwrap(json["models"] as? [[String: Any]])
+        var benchmark = try XCTUnwrap(models[0]["benchmark"] as? [String: Any])
+        var quality = try XCTUnwrap(benchmark["quality"] as? [String: Any])
+        quality["level"] = 3
+        quality["label"] = "Balanced"
+        benchmark["quality"] = quality
+        models[0]["benchmark"] = benchmark
+        json["models"] = models
+        let manifest = try ModelManifest.decode(
+            JSONSerialization.data(withJSONObject: json)
+        )
+
+        XCTAssertThrowsError(
+            try ProductionModelPolicy.validateProductionManifest(manifest)
+        ) { error in
+            XCTAssertEqual(
+                error as? ProductionModelPolicyError,
+                .invalidBenchmark(modelID: ProductionModelPolicy.requiredModelID)
+            )
+        }
+    }
+
+    func testProductionPolicyRejectsBenchmarkArtifactMismatch() throws {
+        let manifest = try v2BenchmarkManifest(
+            artifactFingerprint: String(repeating: "a", count: 64)
+        )
+
+        XCTAssertThrowsError(
+            try ProductionModelPolicy.validateProductionManifest(manifest)
+        ) { error in
+            XCTAssertEqual(
+                error as? ProductionModelPolicyError,
+                .benchmarkArtifactMismatch(modelID: ProductionModelPolicy.requiredModelID)
+            )
+        }
+    }
+
+    func testProductionPolicyRejectsBenchmarkSuiteHashMismatch() throws {
+        var json = try v2BenchmarkJSON()
+        var models = try XCTUnwrap(json["models"] as? [[String: Any]])
+        var benchmark = try XCTUnwrap(models[0]["benchmark"] as? [String: Any])
+        benchmark["suiteIndexSHA256"] = String(repeating: "a", count: 64)
+        models[0]["benchmark"] = benchmark
+        json["models"] = models
+        let manifest = try ModelManifest.decode(
+            JSONSerialization.data(withJSONObject: json)
+        )
+
+        XCTAssertThrowsError(
+            try ProductionModelPolicy.validateProductionManifest(manifest)
+        ) { error in
+            XCTAssertEqual(
+                error as? ProductionModelPolicyError,
+                .invalidBenchmark(modelID: ProductionModelPolicy.requiredModelID)
+            )
+        }
+    }
+
+    func testProductionPolicyRejectsUnpinnedBenchmarkSourceRevision() throws {
+        var json = try v2BenchmarkJSON()
+        var models = try XCTUnwrap(json["models"] as? [[String: Any]])
+        var benchmark = try XCTUnwrap(models[0]["benchmark"] as? [String: Any])
+        benchmark["sourceRevision"] = "main"
+        models[0]["benchmark"] = benchmark
+        json["models"] = models
+        let manifest = try ModelManifest.decode(
+            JSONSerialization.data(withJSONObject: json)
+        )
+
+        XCTAssertThrowsError(
+            try ProductionModelPolicy.validateProductionManifest(manifest)
+        ) { error in
+            XCTAssertEqual(
+                error as? ProductionModelPolicyError,
+                .invalidBenchmark(modelID: ProductionModelPolicy.requiredModelID)
+            )
+        }
+    }
+
+    func testProductionPolicyRejectsBenchmarkMetadataInV1() throws {
+        var json = try v2BenchmarkJSON()
+        json["manifestVersion"] = 1
+        let manifest = try ModelManifest.decode(
+            JSONSerialization.data(withJSONObject: json)
+        )
+
+        XCTAssertThrowsError(
+            try ProductionModelPolicy.validateProductionManifest(manifest)
+        ) { error in
+            XCTAssertEqual(
+                error as? ProductionModelPolicyError,
+                .benchmarkNotAllowedInV1(modelID: ProductionModelPolicy.requiredModelID)
+            )
+        }
+    }
+
+    func testUnknownNestedBenchmarkFieldIsRejected() throws {
+        var json = try v2BenchmarkJSON()
+        var models = try XCTUnwrap(json["models"] as? [[String: Any]])
+        var benchmark = try XCTUnwrap(models[0]["benchmark"] as? [String: Any])
+        benchmark["untrusted"] = true
+        models[0]["benchmark"] = benchmark
+        json["models"] = models
+
+        XCTAssertThrowsError(
+            try ModelManifest.decode(JSONSerialization.data(withJSONObject: json))
+        )
+    }
+
     func testMinimumAppVersionComparisonUsesSemanticComponents() {
         XCTAssertTrue(ProductionModelPolicy.appVersion("1.2.0", satisfiesMinimum: "1.1.9"))
         XCTAssertTrue(ProductionModelPolicy.appVersion("1.1.0", satisfiesMinimum: "1.1.0"))
@@ -304,5 +425,90 @@ final class ManifestTests: XCTestCase {
         }
         json["models"] = models
         return try ModelManifest.decode(JSONSerialization.data(withJSONObject: json))
+    }
+
+    private func v2BenchmarkManifest(
+        artifactFingerprint: String? = nil
+    ) throws -> ModelManifest {
+        var json = try v2BenchmarkJSON()
+        if let artifactFingerprint {
+            var models = try XCTUnwrap(json["models"] as? [[String: Any]])
+            var benchmark = try XCTUnwrap(models[0]["benchmark"] as? [String: Any])
+            benchmark["artifactFingerprint"] = artifactFingerprint
+            models[0]["benchmark"] = benchmark
+            json["models"] = models
+        }
+        return try ModelManifest.decode(JSONSerialization.data(withJSONObject: json))
+    }
+
+    private func v2BenchmarkJSON() throws -> [String: Any] {
+        var json = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Self.validManifestData) as? [String: Any]
+        )
+        let baseManifest = try ModelManifest.decode(Self.validManifestData)
+        let fingerprint = try XCTUnwrap(baseManifest.models.first).artifactFingerprint()
+        json["manifestVersion"] = 2
+        var models = try XCTUnwrap(json["models"] as? [[String: Any]])
+        models[0]["benchmark"] = [
+            "schemaVersion": 1,
+            "policyID": "english-catalog-rating-v2",
+            "suiteID": "english-catalog-rating-v1",
+            "suiteIndexSHA256":
+                "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8",
+            "modelID": ProductionModelPolicy.requiredModelID,
+            "engine": "whisper",
+            "engineVersion": "whisper.cpp 1.8.2",
+            "modelLicense": "MIT",
+            "computeBackend": "Whisper.cpp Metal",
+            "artifactFingerprint": fingerprint,
+            "sourceRevision": String(repeating: "c", count: 40),
+            "language": "en",
+            "measuredAt": "2026-07-22T00:00:00Z",
+            "referenceHost": [
+                "chip": "Apple M4 Max",
+                "operatingSystem": "macOS 26.5.2 (25F84)",
+                "architecture": "arm64",
+            ],
+            "runCount": 3,
+            "quality": [
+                "score": 93,
+                "level": 5,
+                "label": "Highest",
+                "speechItems": 732,
+                "noSpeechItems": 200,
+                "noSpeechFalsePositiveRate": 0.095,
+                "components": [
+                    [
+                        "id": "open-asr-english-nightly-v1",
+                        "wordErrorRate": 0.0745,
+                        "score": 93.0,
+                        "weight": 0.5,
+                    ],
+                    [
+                        "id": "edacc-english-nightly-v1",
+                        "wordErrorRate": 0.1501,
+                        "score": 93.0,
+                        "weight": 0.3,
+                    ],
+                    [
+                        "id": "berst-english-nightly-v1",
+                        "wordErrorRate": 0.2164,
+                        "score": 93.0,
+                        "weight": 0.2,
+                    ],
+                ],
+            ],
+            "speed": [
+                "score": 92,
+                "level": 5,
+                "label": "Fastest",
+                "p50ReleaseToFinalMs": 180,
+                "p95ReleaseToFinalMs": 205,
+                "p95RealTimeFactor": 0.05,
+                "relativeP95Spread": 0.05,
+            ],
+        ]
+        json["models"] = models
+        return json
     }
 }

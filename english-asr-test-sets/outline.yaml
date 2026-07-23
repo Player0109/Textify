@@ -1,0 +1,44 @@
+topic: English ASR test sets for Textify quality and speed benchmarking
+items:
+  - name: Textify private rotating dictation holdout
+    benchmark_role: core-release-gate
+  - name: Hugging Face Open ASR Leaderboard
+    benchmark_role: core-public-comparability
+  - name: EdAcc v1.0
+    benchmark_role: core-spontaneous-accent
+  - name: Common Voice Spontaneous Speech 4.0 English
+    benchmark_role: core-spontaneous-short-form
+  - name: VoiceCodeBench
+    benchmark_role: product-structured-dictation
+  - name: BERSt
+    benchmark_role: stress-real-devices-distance-emotion
+  - name: Treble10-Speech speech_mono
+    benchmark_role: stress-controlled-reverberation
+  - name: VoiceBank-DEMAND-16k
+    benchmark_role: enhancement-paired-clean-noisy
+  - name: MUSAN and speech-free negative controls
+    benchmark_role: hallucination-and-vad-negative-control
+  - name: Meta Fair-Speech
+    benchmark_role: extended-product-fairness
+  - name: FLEURS en_us
+    benchmark_role: smoke-read-speech
+  - name: MInDS-14 English AU GB US
+    benchmark_role: extended-short-telephony-intent
+  - name: MLCommons People's Speech test
+    benchmark_role: extended-domain-breadth
+  - name: CORAAL
+    benchmark_role: research-only-dialect-fairness
+  - name: Speak and Improve Corpus 2025
+    benchmark_role: research-only-spontaneous-l2-english
+  - name: L2-ARCTIC
+    benchmark_role: research-only-scripted-l2-english
+  - name: Speech Robust Bench
+    benchmark_role: synthetic-corruption-diagnostic
+  - name: URGENT 2024 official evaluation set
+    benchmark_role: research-only-enhancement-diagnostic
+  - name: SLUE-VoxPopuli ASR and NER test
+    benchmark_role: future-entity-diagnostic
+execution:
+  batch_size: 1
+  items_per_agent: 4
+  output_dir: ./results

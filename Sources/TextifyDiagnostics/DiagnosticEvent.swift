@@ -44,6 +44,13 @@ public enum DiagnosticEvent: Encodable, Sendable {
         durationMs: Int,
         result: String
     )
+    case runtimeFailure(
+        modelID: String,
+        engine: String,
+        accelerator: String,
+        stage: String,
+        reasonCode: String
+    )
     case voiceCleaning(
         modelID: String,
         durationMs: Int,
@@ -79,6 +86,8 @@ public enum DiagnosticEvent: Encodable, Sendable {
         case backendReadiness
         case tier
         case result
+        case stage
+        case reasonCode
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -167,6 +176,14 @@ public enum DiagnosticEvent: Encodable, Sendable {
             try container.encode(sanitize(accelerator, forKey: .accelerator), forKey: .accelerator)
             try container.encode(durationMs, forKey: .durationMs)
             try container.encode(sanitize(result, forKey: .result), forKey: .result)
+
+        case let .runtimeFailure(modelID, engine, accelerator, stage, reasonCode):
+            try container.encode("runtime_failure", forKey: .event)
+            try container.encode(sanitize(modelID, forKey: .modelID), forKey: .modelID)
+            try container.encode(sanitize(engine, forKey: .engine), forKey: .engine)
+            try container.encode(sanitize(accelerator, forKey: .accelerator), forKey: .accelerator)
+            try container.encode(sanitize(stage, forKey: .stage), forKey: .stage)
+            try container.encode(sanitize(reasonCode, forKey: .reasonCode), forKey: .reasonCode)
 
         case let .voiceCleaning(modelID, durationMs, result):
             try container.encode("voice_cleaning", forKey: .event)

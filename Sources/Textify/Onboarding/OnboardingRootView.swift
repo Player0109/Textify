@@ -37,8 +37,8 @@ struct OnboardingRootView: View {
                         .tracking(1.1)
                         .foregroundStyle(TextifyVisualIdentity.voiceViolet)
                     Text(currentStepTitle)
-                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                        .tracking(-0.5)
+                        .font(.system(size: 26, weight: .semibold))
+                        .tracking(-0.35)
                 }
                 .padding(.horizontal, 34)
                 .padding(.top, 32)
@@ -80,7 +80,9 @@ struct OnboardingRootView: View {
             }
         }
         .tint(TextifyVisualIdentity.voiceViolet)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .preferredColorScheme(.dark)
+        .background(TextifyVisualIdentity.windowSurface)
+        .ignoresSafeArea(.container, edges: .top)
         .frame(width: TextifyWindowMetrics.onboardingWidth, height: TextifyWindowMetrics.onboardingHeight)
         .disabled(services.startupIssue != nil)
         .overlay {
@@ -117,24 +119,19 @@ struct OnboardingRootView: View {
     private var onboardingSidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 11) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(TextifyVisualIdentity.voiceViolet.opacity(0.14))
-                    TextifyVoiceMark(state: .processing, height: 22)
-                }
-                .frame(width: 38, height: 38)
+                TextifyVoiceMark(state: .processing, height: 22)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Textify")
-                        .font(.system(.title3, design: .rounded, weight: .bold))
+                        .font(.system(size: 16, weight: .semibold))
                     Text("First-time setup")
-                        .font(.caption)
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 26)
-            .padding(.bottom, 28)
+            .padding(.horizontal, 24)
+            .padding(.top, 45)
+            .padding(.bottom, 22)
 
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(Array(OnboardingStep.productionFlow.enumerated()), id: \.element) { index, step in
@@ -156,8 +153,8 @@ struct OnboardingRootView: View {
                 .foregroundStyle(.secondary)
                 .padding(20)
         }
-        .frame(width: 224)
-        .background(Color(nsColor: .underPageBackgroundColor).opacity(0.72))
+        .frame(width: TextifyWindowMetrics.sidebarWidth)
+        .background(TextifyVisualIdentity.sidebarSurface)
     }
 
     @ViewBuilder

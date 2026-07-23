@@ -1,0 +1,353 @@
+{
+  "schemaVersion": 1,
+  "id": "open-asr-english-pr-v1",
+  "name": "Open ASR English pull request anchor",
+  "language": "en",
+  "dataset": {
+    "id": "hf-audio/open-asr-leaderboard",
+    "revision": "b6bdcd0beb34f8975dc659796176d88f43aff502",
+    "viewerBaseURL": "https://datasets-server.huggingface.co"
+  },
+  "durationLanes": [
+    {
+      "id": "universal",
+      "maxAudioSeconds": 29
+    },
+    {
+      "id": "extended-40",
+      "maxAudioSeconds": 40
+    },
+    {
+      "id": "full-60",
+      "maxAudioSeconds": 60
+    }
+  ],
+  "requiredDurationBuckets": [
+    "1-3",
+    "3-10",
+    "10-20",
+    "20-29"
+  ],
+  "subsets": [
+    {
+      "id": "librispeech-clean",
+      "config": "librispeech",
+      "split": "test.clean",
+      "role": "public-quality",
+      "speechOrigin": "human-read",
+      "license": "CC-BY-4.0",
+      "sourceURL": "https://www.openslr.org/12"
+    },
+    {
+      "id": "librispeech-other",
+      "config": "librispeech",
+      "split": "test.other",
+      "role": "public-quality",
+      "speechOrigin": "human-read",
+      "license": "CC-BY-4.0",
+      "sourceURL": "https://www.openslr.org/12"
+    },
+    {
+      "id": "common-voice",
+      "config": "common_voice",
+      "split": "test",
+      "role": "public-quality",
+      "speechOrigin": "human-read",
+      "license": "CC0-1.0",
+      "sourceURL": "https://commonvoice.mozilla.org/en/datasets"
+    },
+    {
+      "id": "ami",
+      "config": "ami",
+      "split": "test",
+      "role": "public-quality",
+      "speechOrigin": "human-natural",
+      "license": "CC-BY-4.0",
+      "sourceURL": "https://groups.inf.ed.ac.uk/ami/corpus/"
+    },
+    {
+      "id": "gigaspeech",
+      "config": "gigaspeech",
+      "split": "test",
+      "role": "public-quality",
+      "speechOrigin": "human-mixed",
+      "license": "Apache-2.0",
+      "sourceURL": "https://github.com/SpeechColab/GigaSpeech"
+    },
+    {
+      "id": "voxpopuli",
+      "config": "voxpopuli",
+      "split": "test",
+      "role": "public-quality",
+      "speechOrigin": "human-natural",
+      "license": "CC0-1.0",
+      "sourceURL": "https://github.com/facebookresearch/voxpopuli"
+    }
+  ],
+  "items": [
+    {
+      "id": "librispeech-clean-1-3-4446-2275-0027",
+      "subsetID": "librispeech-clean",
+      "row": 2229,
+      "audio": "librispeech-clean/2229.flac",
+      "reference": "he moved uneasily and his chair creaked",
+      "durationMs": 2995,
+      "durationBucket": "1-3",
+      "sizeBytes": 61314,
+      "sha256": "2716d6032451bbfdb055c8d828b3c7749f813154d189a5d28c49f3e04c4489c2"
+    },
+    {
+      "id": "librispeech-clean-3-10-260-123288-0010",
+      "subsetID": "librispeech-clean",
+      "row": 614,
+      "audio": "librispeech-clean/614.flac",
+      "reference": "on the mast already i see the light play of a lambent saint elmo's fire the outstretched sail catches not a breath of wind and hangs like a sheet of lead",
+      "durationMs": 9995,
+      "durationBucket": "3-10",
+      "sizeBytes": 183043,
+      "sha256": "111ae1c61b4de9049778deefe099b7d19f817c9586643e8cafc33d018ffc0acf"
+    },
+    {
+      "id": "librispeech-clean-10-20-2961-961-0002",
+      "subsetID": "librispeech-clean",
+      "row": 92,
+      "audio": "librispeech-clean/92.flac",
+      "reference": "and therefore to you i turn timaeus citizen of locris who are at once a philosopher and a statesman and to you critias whom all athenians know to be similarly accomplished and to hermocrates who is also fitted by nature and education to share in our discourse",
+      "durationMs": 19990,
+      "durationBucket": "10-20",
+      "sizeBytes": 352997,
+      "sha256": "259665417449214a7b93558085a20e5cb4ed37f8ffa45082f7dbbae605c0dcd9"
+    },
+    {
+      "id": "librispeech-clean-20-29-3729-6852-0033",
+      "subsetID": "librispeech-clean",
+      "row": 11,
+      "audio": "librispeech-clean/11.flac",
+      "reference": "you are now in the only country in the world where wit can make a fortune by selling either a genuine or a false article in the first case it receives the welcome of intelligent and talented people and in the second fools are always ready to reward it for silliness is truly a characteristic of the people here and however wonderful it may appear silliness is the daughter of wit",
+      "durationMs": 28575,
+      "durationBucket": "20-29",
+      "sizeBytes": 508549,
+      "sha256": "878434891cc3c5bd827200fbc9dba4301ace44b39e9e48d23754f29554134beb"
+    },
+    {
+      "id": "librispeech-other-1-3-3331-159605-0042",
+      "subsetID": "librispeech-other",
+      "row": 2427,
+      "audio": "librispeech-other/2427.flac",
+      "reference": "i just gave him a hint and he took it",
+      "durationMs": 2990,
+      "durationBucket": "1-3",
+      "sizeBytes": 61911,
+      "sha256": "8f4bfa41972e5b382b331e9d9c9ccb28603def823e6bd079347399ef7ab0ae74"
+    },
+    {
+      "id": "librispeech-other-3-10-3080-5032-0002",
+      "subsetID": "librispeech-other",
+      "row": 489,
+      "audio": "librispeech-other/489.flac",
+      "reference": "her conversation has more charms than can be in mere beauty and her humour and disposition would make a deformed person appear lovely",
+      "durationMs": 9995,
+      "durationBucket": "3-10",
+      "sizeBytes": 191544,
+      "sha256": "70240e7b911567a3cf23b376b918db36a9f00e53f1e24dd9456c1e33e49820f9"
+    },
+    {
+      "id": "librispeech-other-10-20-6070-86744-0022",
+      "subsetID": "librispeech-other",
+      "row": 46,
+      "audio": "librispeech-other/46.flac",
+      "reference": "talking of countries replied franz of what country is the count what is his native tongue whence does he derive his immense fortune and what were those events of his early life a life as marvellous as unknown that have tinctured his succeeding years with so dark and gloomy a misanthropy",
+      "durationMs": 19999,
+      "durationBucket": "10-20",
+      "sizeBytes": 373173,
+      "sha256": "ff339f5fd4e9e627c6c29001beb51c838fa52e55e297c920795272d09af0993c"
+    },
+    {
+      "id": "librispeech-other-20-29-3331-159609-0014",
+      "subsetID": "librispeech-other",
+      "row": 9,
+      "audio": "librispeech-other/9.flac",
+      "reference": "it was so tender earnest and defiant that fanny forgot the defence of her own lover in admiration of polly's loyalty to hers for this faithful all absorbing love was a new revelation to fanny who was used to hearing her friends boast of two or three lovers a year and calculate their respective values with almost as much coolness as the young men discussed the fortunes of the girls they wished for but could not afford to marry",
+      "durationMs": 28370,
+      "durationBucket": "20-29",
+      "sizeBytes": 477296,
+      "sha256": "f03bf1ab8447cb1dacd29d74bc46ffa3946d2a939de36ce790ff95cd9fe25a97"
+    },
+    {
+      "id": "common-voice-1-3-58cadfc6ba2eb6e1d2aae777a095c86edd2ff662cb2d0a217494b418c177a1323a74095f40ca3d2a29fa0d8b1b3727731932f358f5bed31ac4c0cd9c9763cc36",
+      "subsetID": "common-voice",
+      "row": 16000,
+      "audio": "common-voice/16000.flac",
+      "reference": "They both spoke the same language.",
+      "durationMs": 2496,
+      "durationBucket": "1-3",
+      "sizeBytes": 20001,
+      "sha256": "538e7d4c52494e69f6419f185cfb621cd1cb0906601beda8741c5f753e7b0aec"
+    },
+    {
+      "id": "common-voice-3-10-bbe114b9161a0b345c45eecca0cf228181f3fdc33b6cb9852129095f6a63c659e4ce76c6d46a3ccaa28c2351cb9b161367cd85ac709ceb4ef9cfe9b485f73e20",
+      "subsetID": "common-voice",
+      "row": 500,
+      "audio": "common-voice/500.flac",
+      "reference": "Kotero could also be seen on E!",
+      "durationMs": 9828,
+      "durationBucket": "3-10",
+      "sizeBytes": 59110,
+      "sha256": "907ea0f19dd8919970c9b693edcccef35de90bb776e2b0dba9e56a0fa6f4ef74"
+    },
+    {
+      "id": "common-voice-10-20-f4fa7e931e7cb39ea3de35ea41f284e5ed12d54276380d8dcfe6477626901fc0672cd3d672eaee400ea20c4b5d02a7b52f45a4701fe78f0a7e3997879fcfa2dd",
+      "subsetID": "common-voice",
+      "row": 50,
+      "audio": "common-voice/50.flac",
+      "reference": "Instead, the stranger lowered it slowly, until the point touched the boy's forehead.",
+      "durationMs": 15216,
+      "durationBucket": "10-20",
+      "sizeBytes": 121761,
+      "sha256": "b9d9d094b9ae4ee9db5844e370705daff2c93e63cd3c5e868506f17dcf0a304e"
+    },
+    {
+      "id": "common-voice-20-29-fefc91c95119cabe5cc6e8fd6433c58a02a6d2c68b2dc9fb3168ac98262bfc6864001980abf6552070f915a7c4c9566d015f9b0783fde79bad613dc20ae8eeef",
+      "subsetID": "common-voice",
+      "row": 20,
+      "audio": "common-voice/20.flac",
+      "reference": "There were really, I think, two or three hundred people elbowing one another.",
+      "durationMs": 20040,
+      "durationBucket": "20-29",
+      "sizeBytes": 160353,
+      "sha256": "451b727903565887b4f6e92f6fda81caa13e5a2d09a89f5b03c8e439d6b107d7"
+    },
+    {
+      "id": "ami-1-3-AMI_EN2002d_H01_FEO072_0178969_0179185",
+      "subsetID": "ami",
+      "row": 5000,
+      "audio": "ami/5000.wav",
+      "reference": "Um yeah.",
+      "durationMs": 2160,
+      "durationBucket": "1-3",
+      "sizeBytes": 138298,
+      "sha256": "cf8424ac164048a23b2a85bacee22aeb84d058df348a8b3767894ad98bb3c7fe"
+    },
+    {
+      "id": "ami-3-10-AMI_IS1009a_H03_FIO089_0049614_0050276",
+      "subsetID": "ami",
+      "row": 1000,
+      "audio": "ami/1000.wav",
+      "reference": "At um twelve fifty Euros per",
+      "durationMs": 6620,
+      "durationBucket": "3-10",
+      "sizeBytes": 423738,
+      "sha256": "f1c2eb58aa1af15cf04c2bf30ed15c3d4229416a64b540fd3597ccba844f9744"
+    },
+    {
+      "id": "ami-10-20-AMI_ES2004b_H01_FEE013_0162580_0163755",
+      "subsetID": "ami",
+      "row": 100,
+      "audio": "ami/100.wav",
+      "reference": "We could use that as an alternative to programming in times, things like that, is that I always found that really easy when I discovered it, um",
+      "durationMs": 11750,
+      "durationBucket": "10-20",
+      "sizeBytes": 752058,
+      "sha256": "f9487046e1bf9352ae28ee091ba1961046b0c86cee0520a9cfd3d5ff5c209d93"
+    },
+    {
+      "id": "ami-20-29-AMI_IS1009b_H03_FIO089_0023485_0026102",
+      "subsetID": "ami",
+      "row": 0,
+      "audio": "ami/0.wav",
+      "reference": "Um and then I'll be coming to you as the User Interface person to try to tell me from your point of view what are the most friendly features that we could put on it and try to prior help me with that prioritising of uh of the features and of the the look and the colour and I'll be coming back to you to help weed out those suggestions from that point of view.",
+      "durationMs": 26169,
+      "durationBucket": "20-29",
+      "sizeBytes": 1674934,
+      "sha256": "e96e6b7ce284b3ca6b828386c7f9e9b0090ed98747028d84daf8d8cbd9999d9f"
+    },
+    {
+      "id": "gigaspeech-1-3-POD1000000028_S0000143",
+      "subsetID": "gigaspeech",
+      "row": 17000,
+      "audio": "gigaspeech/17000.wav",
+      "reference": "i just got a call at home.",
+      "durationMs": 2037,
+      "durationBucket": "1-3",
+      "sizeBytes": 65262,
+      "sha256": "bc2c23862c8d96b1c1af428d4f0ecdaf06bc5bcf22b5c087b0eb6ff397c4798d"
+    },
+    {
+      "id": "gigaspeech-3-10-YOU1000000108_S0000306",
+      "subsetID": "gigaspeech",
+      "row": 15000,
+      "audio": "gigaspeech/15000.wav",
+      "reference": "that it is infuriating to me.",
+      "durationMs": 3300,
+      "durationBucket": "3-10",
+      "sizeBytes": 105678,
+      "sha256": "ed9ca16e61008e1fb889dbfc40f6a7a5c3e994b5124a7df28c53c3a9df70a55f"
+    },
+    {
+      "id": "gigaspeech-10-20-YOU1000000140_S0000119",
+      "subsetID": "gigaspeech",
+      "row": 500,
+      "audio": "gigaspeech/500.wav",
+      "reference": "i'm never got out of zoo so fast in my life. i mean like duh i was whole assing out the zoo. but i you know when you're running you think somebody about to catch you and you feel it all ye neck like i was running. but i felt some of those oh shit.",
+      "durationMs": 14089,
+      "durationBucket": "10-20",
+      "sizeBytes": 450926,
+      "sha256": "d96049028a74e58fa34a0b5b2d3fbfab48bce11bf451b254e6304c67735f4efe"
+    },
+    {
+      "id": "gigaspeech-20-29-POD1000000005_S0000339",
+      "subsetID": "gigaspeech",
+      "row": 0,
+      "audio": "gigaspeech/0.wav",
+      "reference": "and you know, those stores look at trend reports and they look at what's on the runway and part of their great ah skill in both marketing and manufacturing is being able to take those ideas and turn them around at just a rapid fire pace and get them into stores.",
+      "durationMs": 22025,
+      "durationBucket": "20-29",
+      "sizeBytes": 704878,
+      "sha256": "94fbdfce014780ef4cc9da6494b9f309d2c22d0eed484fa434715f10a350007e"
+    },
+    {
+      "id": "voxpopuli-1-3-20131022-0900-PLENARY-4-en_20131022-09-13-33_7",
+      "subsetID": "voxpopuli",
+      "row": 1800,
+      "audio": "voxpopuli/1800.wav",
+      "reference": "who picks up the pieces?",
+      "durationMs": 1539,
+      "durationBucket": "1-3",
+      "sizeBytes": 98606,
+      "sha256": "54b8f6c633db0372c9c18034dcecb1ab6f6307b018a0eb24478360f355e83f7b"
+    },
+    {
+      "id": "voxpopuli-3-10-20131022-0900-PLENARY-14-en_20131022-15-50-19_17",
+      "subsetID": "voxpopuli",
+      "row": 800,
+      "audio": "voxpopuli/800.wav",
+      "reference": "in the american constitution there is a famous phrase in which the president has to take action when he sees a clear and present danger.",
+      "durationMs": 9198,
+      "durationBucket": "3-10",
+      "sizeBytes": 588790,
+      "sha256": "8abd9735f91500f0f2c757f9f5127888972899769018f7da3195e857d4e62c29"
+    },
+    {
+      "id": "voxpopuli-10-20-20130116-0900-PLENARY-17-en_20130116-22-16-26_4",
+      "subsetID": "voxpopuli",
+      "row": 600,
+      "audio": "voxpopuli/600.wav",
+      "reference": "this is all the more important as business and customs officials fear the rise of new bureaucratic burdens if these rules for the determination of the origin were to be changed.",
+      "durationMs": 11040,
+      "durationBucket": "10-20",
+      "sizeBytes": 706618,
+      "sha256": "6943cbec66b97d7f35bf21ef6b2bcf37f1cd9cc61d1a2210b26f6c54100089f2"
+    },
+    {
+      "id": "voxpopuli-20-29-20131023-0900-PLENARY-8-en_20131023-12-14-28_11",
+      "subsetID": "voxpopuli",
+      "row": 100,
+      "audio": "voxpopuli/100.wav",
+      "reference": "ninety six amendment one thousand and sixty three concerning a new line on the actual and desired state of the economic potential in regions outside the greek capital athens this amendment refers to a new preparatory action and not a pilot project.",
+      "durationMs": 21099,
+      "durationBucket": "20-29",
+      "sizeBytes": 1350454,
+      "sha256": "a73764291315fe0867e2ff7d703053c6a64d83a2bb23cdc1049c92f8960aa022"
+    }
+  ]
+}

@@ -99,6 +99,34 @@ final class TranscribeCppRuntimeAdapterTests: XCTestCase {
         }
     }
 
+    func testAdapterPreparesArticleModelVariantsWithAutomaticLanguageDetection() async throws {
+        let candidates: [(String, TranscribeCppModelVariant)] = [
+            ("granite-speech-4.1-2b-q5-k-m", .graniteSpeech4_1_2B),
+            ("granite-speech-4.1-2b-nar-q5-k-m", .graniteSpeech4_1_2BNAR),
+            ("voxtral-mini-4b-realtime-2602-q4-k-m", .voxtralMini4BRealtime2602),
+            ("moss-transcribe-diarize-0.9b-q5-k-m", .mossTranscribeDiarize0_9B),
+        ]
+        for (id, variant) in candidates {
+            let runtime = FakeTranscribeCppRuntime()
+            let adapter = TranscribeCppRuntimeTranscribingAdapter(runtime: runtime)
+
+            try await adapter.prepare(
+                model: Self.activeModel(
+                    id: id,
+                    modelPath: "/tmp/\(id).gguf",
+                    variant: variant,
+                    language: "auto",
+                    detectLanguage: true
+                )
+            )
+
+            let load = await runtime.loadSnapshot()
+            XCTAssertEqual(load?.modelID, id)
+            XCTAssertEqual(load?.variant, variant)
+            XCTAssertEqual(load?.languageCode, "auto")
+        }
+    }
+
     func testAdapterPreparesExactCanaryEnglishVariant() async throws {
         let runtime = FakeTranscribeCppRuntime()
         let adapter = TranscribeCppRuntimeTranscribingAdapter(runtime: runtime)

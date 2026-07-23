@@ -13,75 +13,176 @@ enum SherpaOnnxBenchmark {
         reference: String?,
         feedMode: FeedMode
     ) async throws -> BenchmarkResult {
+        try await runSingleResidentBenchmark(
+            session: makeSession(
+                engine: engine,
+                runtimeDirectoryURL: runtimeDirectoryURL,
+                modelDirectoryURL: modelDirectoryURL,
+                provider: provider,
+                threadCount: threadCount,
+                languageCode: languageCode,
+                feedMode: feedMode
+            ),
+            audio: audio,
+            reference: reference
+        )
+    }
+
+    static func makeSession(
+        engine: BenchmarkEngine,
+        runtimeDirectoryURL: URL,
+        modelDirectoryURL: URL,
+        provider: String,
+        threadCount: Int,
+        languageCode: String,
+        feedMode: FeedMode
+    ) throws -> any ResidentBenchmarkSession {
         guard let computeRoute = SherpaOnnxComputeRoute(rawValue: provider) else {
             throw BenchmarkCLIError.invalidArguments("Unknown sherpa-onnx provider: \(provider)")
         }
-        let variant: SherpaOnnxModelVariant
-        let modelID: String
-        let modelName: String
+        return SherpaOnnxBenchmarkSession(
+            engine: engine,
+            configuration: try configuration(for: engine),
+            runtimeDirectoryURL: runtimeDirectoryURL,
+            modelDirectoryURL: modelDirectoryURL,
+            computeRoute: computeRoute,
+            provider: provider,
+            threadCount: threadCount,
+            languageCode: languageCode,
+            feedMode: feedMode
+        )
+    }
+
+    private static func configuration(for engine: BenchmarkEngine) throws -> Configuration {
         switch engine {
         case .reazonSpeechK2V2:
-            variant = .reazonSpeechK2V2
-            modelID = "reazonspeech-k2-v2-int8"
-            modelName = "ReazonSpeech K2 V2 int8"
+            return Configuration(
+                variant: .reazonSpeechK2V2,
+                modelID: "reazonspeech-k2-v2-int8",
+                license: "Apache-2.0"
+            )
         case .qwen3ASR0_6B:
-            variant = .qwen3ASR0_6B
-            modelID = "qwen3-asr-0.6b-int8"
-            modelName = "Qwen3-ASR 0.6B int8"
+            return Configuration(
+                variant: .qwen3ASR0_6B,
+                modelID: "qwen3-asr-0.6b-int8",
+                license: "Apache-2.0"
+            )
         case .omnilingualASR300M:
-            variant = .omnilingualASR300M
-            modelID = "omnilingual-asr-300m-ctc-int8"
-            modelName = "Omnilingual ASR CTC 300M int8"
+            return Configuration(
+                variant: .omnilingualASR300M,
+                modelID: "omnilingual-asr-300m-ctc-int8",
+                license: "Apache-2.0"
+            )
         case .dolphinSmall:
-            variant = .dolphinSmall
-            modelID = "dolphin-small-ctc-multi-lang-int8"
-            modelName = "Dolphin Small CTC multilingual int8"
+            return Configuration(
+                variant: .dolphinSmall,
+                modelID: "dolphin-small-ctc-multi-lang-int8",
+                license: "Apache-2.0"
+            )
         case .senseVoiceSmall:
-            variant = .senseVoiceSmall
-            modelID = "sensevoice-small-int8-2024-07-17"
-            modelName = "SenseVoiceSmall int8 2024-07-17"
+            return Configuration(
+                variant: .senseVoiceSmall,
+                modelID: "sensevoice-small-int8-2024-07-17",
+                license: "FunASR Model License 1.1"
+            )
         default:
             throw BenchmarkCLIError.invalidArguments("Unsupported sherpa-onnx engine")
         }
-        let runtime = SherpaOnnxRuntime(runtimeDirectory: runtimeDirectoryURL.path)
+    }
 
+    fileprivate struct Configuration {
+        let variant: SherpaOnnxModelVariant
+        let modelID: String
+        let license: String
+    }
+}
+
+private final class SherpaOnnxBenchmarkSession: ResidentBenchmarkSession {
+    let engine: BenchmarkEngine
+    let modelName: String
+    private(set) var modelLoadMs = 0
+    private(set) var warmupMs = 0
+
+    private let runtime: SherpaOnnxRuntime
+    private let configuration: SherpaOnnxBenchmark.Configuration
+    private let modelDirectoryURL: URL
+    private let computeRoute: SherpaOnnxComputeRoute
+    private let provider: String
+    private let threadCount: Int
+    private let languageCode: String
+    private let feedMode: FeedMode
+    private var loaded = false
+
+    init(
+        engine: BenchmarkEngine,
+        configuration: SherpaOnnxBenchmark.Configuration,
+        runtimeDirectoryURL: URL,
+        modelDirectoryURL: URL,
+        computeRoute: SherpaOnnxComputeRoute,
+        provider: String,
+        threadCount: Int,
+        languageCode: String,
+        feedMode: FeedMode
+    ) {
+        self.engine = engine
+        self.configuration = configuration
+        self.modelName = configuration.modelID
+        self.runtime = SherpaOnnxRuntime(runtimeDirectory: runtimeDirectoryURL.path)
+        self.modelDirectoryURL = modelDirectoryURL
+        self.computeRoute = computeRoute
+        self.provider = provider
+        self.threadCount = threadCount
+        self.languageCode = languageCode
+        self.feedMode = feedMode
+    }
+
+    func load() async throws {
+        guard !loaded else {
+            throw BenchmarkCLIError.benchmarkFailed("sherpa-onnx benchmark session is already loaded")
+        }
         let loadStart = uptimeNanoseconds()
         try await runtime.load(
-            modelID: modelID,
+            modelID: modelName,
             modelDirectory: modelDirectoryURL.path,
-            variant: variant,
+            variant: configuration.variant,
             languageCode: languageCode,
             computeRoute: computeRoute,
             threadCount: threadCount,
             warmup: false
         )
-        let loadMs = elapsedMilliseconds(from: loadStart)
+        modelLoadMs = elapsedMilliseconds(from: loadStart)
 
         let warmupStart = uptimeNanoseconds()
         _ = try await runtime.transcribe(
             TranscriptionAudioBuffer(samples: Array(repeating: 0, count: 6_400))
         )
-        let warmupMs = elapsedMilliseconds(from: warmupStart)
+        warmupMs = elapsedMilliseconds(from: warmupStart)
+        loaded = true
+    }
 
+    func transcribe(
+        audio: CanonicalBenchmarkAudio,
+        reference: String?
+    ) async throws -> BenchmarkResult {
+        guard loaded else {
+            throw BenchmarkCLIError.benchmarkFailed("sherpa-onnx benchmark session is not loaded")
+        }
         let resourceStart = ResourceUsage.current()
         let inferenceStart = uptimeNanoseconds()
         let transcript = try await runtime.transcribe(
             TranscriptionAudioBuffer(samples: audio.samples)
         )
-        let finalTimestamp = uptimeNanoseconds()
+        let inferenceMs = elapsedMilliseconds(from: inferenceStart)
         let resources = ResourceUsage.current().delta(from: resourceStart)
-        await runtime.unload()
-        let inferenceMs = elapsedMilliseconds(from: inferenceStart, to: finalTimestamp)
-
         return makeResult(
             engine: engine,
             engineVersion: "sherpa-onnx 1.13.2 / ONNX Runtime 1.24.4",
             model: modelName,
-            modelLicense: engine == .senseVoiceSmall ? "FunASR Model License 1.1" : "Apache-2.0",
+            modelLicense: configuration.license,
             computeBackend: "ONNX Runtime \(provider) (\(threadCount) threads)",
             feedMode: feedMode,
             audio: audio,
-            modelLoadMs: loadMs,
+            modelLoadMs: modelLoadMs,
             warmupMs: warmupMs,
             firstPartialMs: nil,
             partialIntervalsMs: [],
@@ -90,7 +191,14 @@ enum SherpaOnnxBenchmark {
             maximumFeedLagMs: 0,
             transcript: transcript.text,
             reference: reference,
-            resources: resources
+            resources: resources,
+            productionMetadata: transcript
         )
+    }
+
+    func unload() async {
+        guard loaded else { return }
+        await runtime.unload()
+        loaded = false
     }
 }

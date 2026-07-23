@@ -15,6 +15,7 @@ APP_FRAMEWORKS="$APP_CONTENTS/Frameworks"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
 RESOURCE_INFO_PLIST="$ROOT_DIR/Resources/Info.plist"
+ASSET_CATALOG="$ROOT_DIR/Resources/Assets.xcassets"
 LOCAL_ENTITLEMENTS="$ROOT_DIR/Textify.Local.entitlements"
 WHISPER_RESOURCE_BUNDLE_NAME="Textify_WhisperCppVendor.bundle"
 METAL_LIBRARY="$APP_RESOURCES/default.metallib"
@@ -53,7 +54,18 @@ stage_fast_app() {
   rm -rf "$APP_BUNDLE"
   mkdir -p "$APP_MACOS" "$APP_RESOURCES" "$APP_FRAMEWORKS" "$MODEL_CATALOG_DIRECTORY"
   cp "$BUILD_BINARY" "$APP_BINARY"
+  if ! otool -l "$APP_BINARY" | /usr/bin/grep -Fq '@executable_path/../Frameworks'; then
+    /usr/bin/install_name_tool -add_rpath '@executable_path/../Frameworks' "$APP_BINARY"
+  fi
   cp "$RESOURCE_INFO_PLIST" "$INFO_PLIST"
+  xcrun actool "$ASSET_CATALOG" \
+    --compile "$APP_RESOURCES" \
+    --platform macosx \
+    --minimum-deployment-target 14.0 \
+    --app-icon AppIcon \
+    --output-partial-info-plist "$DIST_DIR/assetcatalog-info.plist" \
+    --warnings \
+    --notices >/dev/null
   cp "$ROOT_DIR/ACKNOWLEDGMENTS.md" "$APP_RESOURCES/ACKNOWLEDGMENTS.md"
   cp "$ROOT_DIR/THIRD_PARTY_NOTICES.md" "$APP_RESOURCES/THIRD_PARTY_NOTICES.md"
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/FluidAudio.txt" "$APP_RESOURCES/FluidAudio.txt"
@@ -78,6 +90,9 @@ stage_fast_app() {
 
   codesign --force --sign - "$APP_BUNDLE" >/dev/null
   verify_staged_app
+  if [[ "$BUILD_CONFIGURATION" == "release" ]]; then
+    verify_staged_app_launch
+  fi
 }
 
 verify_staged_app() {
@@ -92,6 +107,7 @@ verify_staged_app() {
   codesign --verify --strict "$MLX_METAL_LIBRARY"
 
   codesign --verify --deep --strict "$APP_BUNDLE"
+  [[ -s "$APP_RESOURCES/Assets.car" ]]
   [[ -s "$APP_RESOURCES/ACKNOWLEDGMENTS.md" ]]
   [[ -s "$APP_RESOURCES/THIRD_PARTY_NOTICES.md" ]]
   [[ -s "$APP_RESOURCES/FluidAudio.txt" ]]

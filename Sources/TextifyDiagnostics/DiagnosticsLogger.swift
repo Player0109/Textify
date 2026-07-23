@@ -72,7 +72,12 @@ public actor DiagnosticsLogger {
             _ = fileManager.createFile(atPath: currentLogFileURL.path, contents: nil)
         }
 
-        var data = try encoder.encode(event)
+        let eventData = try encoder.encode(event)
+        guard var object = try JSONSerialization.jsonObject(with: eventData) as? [String: Any] else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        object["timestamp"] = Self.timestampString(for: currentDate)
+        var data = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
         data.append(0x0A)
 
         let handle = try FileHandle(forWritingTo: currentLogFileURL)
@@ -119,6 +124,12 @@ public actor DiagnosticsLogger {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd"
         return "log-\(formatter.string(from: date)).jsonl"
+    }
+
+    private static func timestampString(for date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.string(from: date)
     }
 
     private func diagnosticLogFiles() throws -> [DiagnosticLogFile] {

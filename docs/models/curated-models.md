@@ -1,7 +1,7 @@
 # Textify Curated Models
 
-The signed catalog shipped with the current app contains 38 curated choices:
-35 transcription models and three independent voice-cleaning models. The ASR
+The signed catalog shipped with the current app contains 43 curated choices:
+40 transcription models and three independent voice-cleaning models. The ASR
 choices are Whisper small.en; Experimental Whisper Large V2 and V3 q5_0; Whisper
 Large V3 Turbo q5_0 and a separate MLX Turbo entry; Accurate Canary-Qwen 2.5B;
 Parakeet TDT 0.6B V3, V2, and TDT-CTC 110M; Parakeet RNNT 1.1B; Cohere
@@ -10,8 +10,9 @@ K2 V2 Japanese; and SenseVoiceSmall for English, Mandarin, Cantonese,
 Japanese, and Korean; plus Experimental Qwen3-ASR 0.6B and 1.7B entries in MLX
 8-bit and GGUF BF16, Q8_0, and Q5_K_M formats; plus Experimental Parakeet TDT
 V2, Parakeet TDT V3, and Nemotron 3.5 ASR entries in MLX and GGUF F16, Q8_0,
-and Q5_K_M formats. The catalog and signature are
-bundled; model weights
+and Q5_K_M formats; plus Granite Speech 4.1 2B AR and NAR, Voxtral Mini 4B
+Realtime 2602, MOSS Transcribe-Diarize 0.9B, and Omnilingual ASR 300M CTC.
+The catalog and signature are bundled; model weights
 remain external and are downloaded only after the user chooses a model.
 
 ## MossFormer2 SE voice cleaning

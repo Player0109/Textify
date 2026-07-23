@@ -1,9 +1,73 @@
+@testable import Textify
 import Foundation
 import TextifyModels
 import TextifyTranscription
 import XCTest
 
 final class BenchmarkModelCatalogTests: XCTestCase {
+    func testSignedCatalogPublishesDirectScoreRatingsForModelPage() throws {
+        let manifest = try verifiedManifest()
+        let ratedModels = manifest.models.filter { $0.benchmark != nil }
+        let unratedModelIDs = Set(
+            manifest.models.filter { $0.benchmark == nil }.map(\.id)
+        )
+
+        XCTAssertEqual(manifest.manifestVersion, 2)
+        XCTAssertEqual(ratedModels.count, 31)
+        XCTAssertEqual(
+            unratedModelIDs,
+            [
+                "canary-qwen-2.5b-q4-k-m",
+                "parakeet-ja",
+                "paraformer-large-zh-int8",
+                "reazonspeech-k2-v2-int8",
+                "mossformer2-se-fp32",
+                "mossformer2-se-fp16",
+                "mossformer2-se-int8",
+                "granite-speech-4.1-2b-q5-k-m",
+                "granite-speech-4.1-2b-nar-q5-k-m",
+                "voxtral-mini-4b-realtime-2602-q4-k-m",
+                "moss-transcribe-diarize-0.9b-q5-k-m",
+                "omnilingual-asr-300m-ctc-int8",
+            ]
+        )
+
+        for model in manifest.models {
+            let presentation = ProductionModelPresentation(model: model)
+            guard let benchmark = model.benchmark else {
+                XCTAssertNil(presentation.qualityScore)
+                XCTAssertNil(presentation.speedScore)
+                XCTAssertEqual(presentation.qualityLabel, "Unrated")
+                XCTAssertEqual(presentation.speedLabel, "Unrated")
+                continue
+            }
+
+            let expectedQualityLevel = switch benchmark.quality.score {
+            case 90...: 5
+            case 75...: 4
+            case 60...: 3
+            case 40...: 2
+            default: 1
+            }
+            XCTAssertEqual(benchmark.quality.level, expectedQualityLevel, model.id)
+            XCTAssertEqual(presentation.qualityScore, benchmark.quality.score, model.id)
+            XCTAssertEqual(presentation.qualitySignalLevel, expectedQualityLevel, model.id)
+            XCTAssertEqual(presentation.speedScore, benchmark.speed?.score, model.id)
+            XCTAssertEqual(presentation.speedSignalLevel, benchmark.speed?.level ?? 0, model.id)
+        }
+
+        let parakeet = try XCTUnwrap(
+            manifest.models.first { $0.id == "parakeet-tdt-0.6b-v3-mlx" }
+        )
+        let presentation = ProductionModelPresentation(model: parakeet)
+        XCTAssertEqual(presentation.qualityScore, 93)
+        XCTAssertEqual(presentation.qualityLabel, "Highest")
+        XCTAssertEqual(presentation.qualitySignalLevel, 5)
+        XCTAssertEqual(presentation.speedScore, 100)
+        XCTAssertEqual(presentation.speedLabel, "Fastest")
+        XCTAssertEqual(presentation.speedSignalLevel, 5)
+    }
+
     func testRequestedWhisperLargeModelsUsePinnedLocalMetalArtifacts() throws {
         let manifest = try verifiedManifest()
 
@@ -93,6 +157,94 @@ final class BenchmarkModelCatalogTests: XCTestCase {
         let presentation = try XCTUnwrap(model.presentation)
         XCTAssertTrue(presentation.expectedFinalization.contains("ms median"))
         XCTAssertFalse(presentation.expectedFinalization.contains("pending"))
+    }
+
+    func testArticleModelsUsePinnedNativeArtifacts() throws {
+        let manifest = try verifiedManifest()
+        let transcribeModels: [String: (
+            variant: TranscribeCppModelVariant,
+            revision: String,
+            filename: String,
+            sizeBytes: Int64,
+            sha256: String
+        )] = [
+            "granite-speech-4.1-2b-q5-k-m": (
+                .graniteSpeech4_1_2B,
+                "58e7710fd7039ded5a185668eef5f71ca5d9d919",
+                "granite-speech-4.1-2b-Q5_K_M.gguf",
+                1_829_704_544,
+                "63e0d3a82fa6f0f4688af0b7d7ee784864d271b7be820f4ea43c8298c59b0ac5"
+            ),
+            "granite-speech-4.1-2b-nar-q5-k-m": (
+                .graniteSpeech4_1_2BNAR,
+                "ca53e8273416eb7e888f19bcebbcb9b6ab3edc17",
+                "granite-speech-4.1-2b-nar-Q5_K_M.gguf",
+                1_782_089_344,
+                "88d7c7b5b8b59c95bb6580a1e7d5d81cae63943cef71405ff477527b0bb69fca"
+            ),
+            "voxtral-mini-4b-realtime-2602-q4-k-m": (
+                .voxtralMini4BRealtime2602,
+                "b3e1c979e3775cbd0a49a65878a0ec7f06789ed7",
+                "Voxtral-Mini-4B-Realtime-2602-Q4_K_M.gguf",
+                2_830_493_984,
+                "39dc1f65539373a406edea7490505822d77c12edff521744678717eef4da4723"
+            ),
+            "moss-transcribe-diarize-0.9b-q5-k-m": (
+                .mossTranscribeDiarize0_9B,
+                "6fdfa33aed776bbb0ac11a1a9835634fe6d75dd7",
+                "MOSS-Transcribe-Diarize-Q5_K_M.gguf",
+                700_313_760,
+                "52deaeff931272f3d49eb437f0f4916e42fce9f42e68db250047408241cf473c"
+            ),
+        ]
+
+        for (modelID, artifact) in transcribeModels {
+            let model = try XCTUnwrap(manifest.models.first { $0.id == modelID })
+            let file = try XCTUnwrap(model.files.first)
+            XCTAssertEqual(model.runtime.engine, .transcribeCpp)
+            XCTAssertEqual(model.runtime.variant, artifact.variant.rawValue)
+            XCTAssertEqual(model.runtime.accelerator, .metalGPU)
+            XCTAssertEqual(model.runtime.artifactLayout, .singleFile)
+            XCTAssertEqual(model.runtimeParameters.language, "auto")
+            XCTAssertTrue(model.runtimeParameters.detectLanguage)
+            XCTAssertEqual(model.runtimeParameters.maxAudioSeconds, 60)
+            XCTAssertEqual(model.sizeBytes, artifact.sizeBytes)
+            XCTAssertEqual(file.filename, artifact.filename)
+            XCTAssertEqual(file.sizeBytes, artifact.sizeBytes)
+            XCTAssertEqual(file.sha256, artifact.sha256)
+            XCTAssertTrue(file.url.contains("/resolve/\(artifact.revision)/"))
+            XCTAssertNil(model.benchmark)
+        }
+
+        let omnilingual = try XCTUnwrap(
+            manifest.models.first { $0.id == "omnilingual-asr-300m-ctc-int8" }
+        )
+        XCTAssertEqual(omnilingual.runtime.engine, .sherpaOnnx)
+        XCTAssertEqual(
+            omnilingual.runtime.variant,
+            SherpaOnnxModelVariant.omnilingualASR300M.rawValue
+        )
+        XCTAssertEqual(omnilingual.runtime.accelerator, .cpu)
+        XCTAssertEqual(omnilingual.runtime.artifactLayout, .modelDirectory)
+        XCTAssertEqual(omnilingual.runtimeParameters.language, "auto")
+        XCTAssertTrue(omnilingual.runtimeParameters.detectLanguage)
+        XCTAssertEqual(omnilingual.runtimeParameters.maxAudioSeconds, 40)
+        XCTAssertEqual(omnilingual.files.count, 2)
+        XCTAssertEqual(omnilingual.sizeBytes, 365_438_543)
+        let weights = try XCTUnwrap(
+            omnilingual.files.first { $0.filename == "model.int8.onnx" }
+        )
+        XCTAssertEqual(weights.sizeBytes, 365_352_120)
+        XCTAssertEqual(
+            weights.sha256,
+            "e7c4e54ee4c4c47829cc6667d5d00ed8ea7bef1dcfeef0fce766f77752a2726c"
+        )
+        XCTAssertTrue(
+            omnilingual.files.allSatisfy {
+                $0.url.contains("/resolve/6abf1ece20cd2308bdb7d13cd78ec1c44fa4c094/")
+            }
+        )
+        XCTAssertNil(omnilingual.benchmark)
     }
 
     func testCohereTranscribeUsesPinnedLocalMLXMetalArtifacts() throws {

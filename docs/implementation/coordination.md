@@ -616,3 +616,160 @@ Task 1 must merge before parallel Wave 1 work begins.
   keeps Textify alive beyond five seconds with normal AppKit/Metal startup, all
   436 tests pass with 9 native opt-in skips, and release validation confirms the
   default Release configuration still uses `Textify.entitlements`.
+
+## SwiftPM Release Staging Launch Handoff - 2026-07-21
+
+- The current build request owns the minimum Task 14 fast-staging correction in
+  `script/build_and_run.sh` needed for the arm64 SwiftPM Release executable to
+  locate native runtimes embedded under `Contents/Frameworks`.
+- Preserve the full Xcode staging, local-entitlement, runtime, catalog, and all
+  concurrently uncommitted work. Add an artifact-level launch regression check
+  so a successful compile and code-sign verification cannot hide an immediate
+  `dyld` exit from the staged app.
+- Completed verification: the arm64 SwiftPM Release bundle contains
+  `@executable_path/../Frameworks`, passes the direct launch smoke and strict
+  code-sign verification, validates the signed 38-model catalog, and remains
+  running after Launch Services opens it. `swift test` passes 437 tests with 9
+  opt-in native integration tests skipped and zero failures.
+
+## Spokenly-Inspired UI Redesign Handoff - 2026-07-21
+
+- The active UI redesign owns the existing Task 11 surfaces under
+  `Sources/Textify/App/`, `Sources/Textify/UI/`, `Sources/Textify/Onboarding/`,
+  `Sources/Textify/Overlay/`, and `Sources/Textify/SettingsUI/`.
+- It also owns the narrow visual-token assertions in
+  `Tests/TextifyAppTests/ProductionUITests.swift` so the tests describe the new
+  blue, compact, dark macOS visual system captured from the Spokenly reference.
+- Runtime behavior, model policy, settings persistence, native engines, build
+  scripts, and release staging remain outside this handoff.
+
+## Model Provider Logo Asset Handoff - 2026-07-21
+
+- The user-directed model catalog polish owns only the provider logo image sets
+  added under `Resources/Assets.xcassets/` and their use by the Task 11 model
+  rows in `Sources/Textify/SettingsUI/SettingsRootView.swift`.
+- It also owns the minimum `script/build_and_run.sh` staging step that compiles
+  the existing asset catalog into `Assets.car` and verifies that resource. This
+  keeps vendor logos and the pre-existing app icon available in the fast
+  SwiftPM app bundle as well as the Xcode build.
+- Preserve the app icon and every packaging, signing, runtime, model-catalog,
+  and concurrently uncommitted resource change. Vendor marks must remain local
+  bundled assets so the model page continues to work fully offline.
+
+## Benchmark-Derived Model Ratings Handoff - 2026-07-22
+
+- The user-directed rating workstream owns the benchmark-to-catalog pipeline
+  under `Benchmarks/RealtimeASR/`, the minimum strict model-manifest and
+  verification changes under `Sources/TextifyModels/`, the corresponding
+  signing helpers and focused tests, and the model rating presentation in
+  `Sources/Textify/SettingsUI/SettingsRootView.swift`.
+- Quality and speed signals must be derived from a versioned, checksum-pinned,
+  English comparison profile and exact model artifacts. Catalog tiers remain
+  curator labels and must not be used as measured-rating fallbacks; models
+  without complete comparable evidence display `Unrated`.
+- The universal catalog profile is capped at 29 seconds so every current
+  English transcription model can run the same cases. Longer VoiceCodeBench
+  recordings remain supplemental structured-dictation evidence and do not
+  affect the universal rating.
+- Benchmark quality must reflect Textify's production hallucination decision,
+  while retaining raw engine output for diagnostics. Speed excludes load and
+  warmup and is publishable only from stable repeated runs on the declared
+  reference host.
+- Automated workflows may generate candidate rating records and regression
+  reports, but may not edit, publish, or sign the production catalog. Existing
+  signed manifest V1 verification must remain valid; production V2 signing is
+  a manual maintainer operation.
+- Preserve every unrelated UI, runtime, model, resource, packaging, and build
+  change in the dirty worktree.
+- Calibration froze suite-index SHA-256
+  `77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8`
+  after three complete Apple M4 Max runs each for whisper.cpp small.en and
+  FluidAudio Parakeet v3. The resulting unsigned candidates remain ignored
+  evidence; `models/manifest.json` and its signature are byte-for-byte
+  unchanged.
+
+## Direct-Score Quality Rating V2 Handoff - 2026-07-23
+
+- The user-directed rating simplification continues the benchmark-derived
+  rating workstream across `Benchmarks/RealtimeASR/`, the strict benchmark
+  validation under `Sources/TextifyModels/`, focused tests, and rating
+  documentation.
+- Preserve the frozen `english-catalog-rating-v1` policy and its historical
+  capped results. Introduce `english-catalog-rating-v2` as a scoring policy
+  over the unchanged, checksum-pinned v1 suite so existing complete raw runs
+  can be rescored without rerunning inference.
+- In v2, the quality level and label derive only from the rounded weighted
+  quality score. Keep the 200-case no-speech false-positive rate as separately
+  signed evidence and a regression signal, but do not let it modify the
+  quality level.
+- Generated v2 candidates remain unsigned review artifacts. Do not edit or
+  sign `models/manifest.json` or `models/manifest.json.sig` as part of this
+  handoff.
+
+## Signed Model-Page Rating Promotion Handoff - 2026-07-23
+
+- A follow-up user request explicitly authorized promoting the reviewed v2
+  ratings onto the model page. The repository production catalog is now
+  manifest v2 with 31 exact `english-catalog-rating-v2` benchmark objects; the
+  Canary runtime failure and six language/purpose-inapplicable models remain
+  `Unrated`.
+- The exact manifest was signed with the configured
+  `textify-model-manifest-2026-huggingface` Keychain key and passed the
+  standalone release verifier. Manifest SHA-256 is
+  `ba2cf26665eb096de1be19279014c8f36ff5132305d5881db677805752c388a1`;
+  signature SHA-256 is
+  `6e11f8d477f6c4f6652ae895a82d611210112cdc9124320d32673589a0461e9f`.
+- This handoff updates the bundled/repository production inputs only. External
+  GitHub Pages publication remains a separate release operation.
+
+## Qwen Runtime Diagnostics Handoff - 2026-07-23
+
+- The user-directed Qwen failure investigation owns the narrow cross-task fix
+  in `TextifyRuntime` that preserves a catalog runtime's required automatic
+  language mode instead of replacing it with the global language preference.
+- The same slice owns privacy-safe failure codes and timestamps in
+  `TextifyDiagnostics`, plus a dedicated read-only Logs pane under the existing
+  Task 11 settings UI. Logs must remain closed-schema technical metadata:
+  never audio, transcripts, clipboard contents, target-app identifiers,
+  vocabulary, or raw library error strings.
+- Preserve all benchmark, catalog-rating, manifest, asset, packaging, and
+  concurrently uncommitted UI work. Verification must cover the exact
+  Qwen3-ASR resolver/adapter mismatch, recent-log redaction, and the existing
+  full Swift test gate.
+- Completed verification: the installed Qwen3-ASR 1.7B BF16 artifact
+  transcribes the pinned sample through the Metal runtime, the resolver
+  regression preserves its required `auto` language mode, all 455 Swift tests
+  pass with 9 native opt-in skips, and the staged app renders the privacy-safe
+  Logs pane with current timestamps and redacted JSONL events.
+
+## 2026 Open-ASR Article Model Expansion Handoff - 2026-07-23
+
+- The user-directed model expansion owns the narrow runtime exposure, catalog
+  entries, license notices, focused tests, and model-support documentation
+  needed for the sixteen models named in the linked MarkTechPost comparison.
+- Preserve every unrelated benchmark, rating, UI, diagnostics, packaging, and
+  concurrently uncommitted change. Reuse the pinned native runtimes already in
+  the repository; do not claim production support for an architecture that
+  cannot execute through Textify's offline runtime boundary.
+- The existing transcribe.cpp 0.1.3 binary already contains exact handlers for
+  Granite Speech 4.1 2B, Granite Speech 4.1 2B-NAR, Voxtral Mini 4B Realtime
+  2602, and MOSS-Transcribe-Diarize. The existing sherpa-onnx 1.13.2 boundary
+  contains Omnilingual ASR 300M CTC support. This workstream may expose those
+  variants, pin exact immutable artifacts, and add install-shaped verification
+  without modifying the native binaries.
+- MOSS-Transcribe-preview-2B, ARK-ASR-3B, both Kyutai STT checkpoints, and
+  diffusion-gemma-asr-small require native architecture work outside the
+  current runtime binaries. Record those gaps explicitly rather than adding
+  inert catalog rows or introducing a Python/cloud fallback.
+- The signed production manifest may be updated only after exact file sizes,
+  SHA-256 values, license/provenance, runtime compatibility, and focused tests
+  are verified. Preserve the benchmark-derived ratings policy: new models
+  remain unrated until comparable signed evidence exists.
+- Completed verification: the signed 43-model manifest passes its standalone
+  verifier; all 462 Swift tests pass with 11 native opt-in skips; Omnilingual
+  ASR 300M CTC transcribes the pinned sample through the installed sherpa-onnx
+  runtime; and the full release validator passes the production build,
+  resources, native libraries, headers, symbols, patches, and license notices.
+  The four newly exposed transcribe.cpp families have catalog, resolver,
+  adapter, and runtime coverage; their multi-gigabyte native artifact smokes
+  remain explicit opt-in tests and were not run in this checkout.

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "qualityMaximumScoreDrop": 3,
+  "maximumComponentWERAbsoluteIncrease": 0.02,
+  "maximumComponentWERRelativeIncrease": 0.1,
+  "maximumNoSpeechFalsePositiveRateIncrease": 0.02,
+  "speedMaximumScoreDrop": 5,
+  "maximumP95LatencyRelativeIncrease": 0.15,
+  "maximumP95RealTimeFactorRelativeIncrease": 0.15
+}

@@ -1,5 +1,7 @@
 import BenchmarkMetrics
 import Foundation
+import TextifyCore
+import TextifyTranscription
 
 func makeResult(
     engine: BenchmarkEngine,
@@ -18,7 +20,8 @@ func makeResult(
     maximumFeedLagMs: Int,
     transcript: String,
     reference: String?,
-    resources: ResourceSnapshot
+    resources: ResourceSnapshot,
+    productionMetadata: TranscriptionResult? = nil
 ) -> BenchmarkResult {
     let median = medianValue(partialIntervalsMs)
     let accuracy = reference.map { reference in
@@ -46,9 +49,24 @@ func makeResult(
     let realTimeFactor = audio.durationMilliseconds > 0
         ? Double(inferenceWorkMs) / Double(audio.durationMilliseconds)
         : 0
+    let production = productionMetadata.map { metadata in
+        let discarded = HallucinationFilter().shouldDiscard(
+            text: metadata.text,
+            noSpeechProbability: metadata.noSpeechProbability,
+            averageLogProbability: metadata.averageLogProbability,
+            compressionRatio: metadata.compressionRatio
+        )
+        return EvaluationProductionSnapshot(
+            applicationText: discarded ? "" : metadata.text,
+            discarded: discarded,
+            noSpeechProbability: metadata.noSpeechProbability,
+            averageLogProbability: metadata.averageLogProbability,
+            compressionRatio: metadata.compressionRatio
+        )
+    }
 
     return BenchmarkResult(
-        schemaVersion: 1,
+        schemaVersion: production == nil ? 1 : 2,
         engine: engine,
         engineVersion: engineVersion,
         model: model,
@@ -73,6 +91,7 @@ func makeResult(
             maximumFeedLagMs: maximumFeedLagMs
         ),
         accuracy: accuracy,
+        production: production,
         resources: resources,
         targets: TargetSnapshot(
             firstPartialUnder500Ms: firstPartialMs.map { $0 < 500 },

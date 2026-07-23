@@ -25,6 +25,9 @@ public enum ProductionModelPolicyError: Error, Equatable {
     case invalidRuntimeParameters(modelID: String)
     case invalidModelFileURL(modelID: String, url: String)
     case invalidGeneratedAt(String)
+    case benchmarkNotAllowedInV1(modelID: String)
+    case invalidBenchmark(modelID: String)
+    case benchmarkArtifactMismatch(modelID: String)
 }
 
 public enum ProductionModelPolicy {
@@ -57,7 +60,7 @@ public enum ProductionModelPolicy {
     }
 
     public static func validateProductionManifest(_ manifest: ModelManifest) throws {
-        guard manifest.manifestVersion == 1 else {
+        guard manifest.manifestVersion == 1 || manifest.manifestVersion == 2 else {
             throw ProductionModelPolicyError.unsupportedManifestVersion(manifest.manifestVersion)
         }
         guard ISO8601DateFormatter().date(from: manifest.generatedAt) != nil else {
@@ -69,6 +72,9 @@ public enum ProductionModelPolicy {
 
         var modelIDs = Set<String>()
         for model in manifest.models {
+            if manifest.manifestVersion == 1, model.benchmark != nil {
+                throw ProductionModelPolicyError.benchmarkNotAllowedInV1(modelID: model.id)
+            }
             guard modelIDs.insert(model.id).inserted else {
                 throw ProductionModelPolicyError.duplicateModelID(model.id)
             }
@@ -179,7 +185,7 @@ public enum ProductionModelPolicy {
                 totalFileSize = nextTotal.partialValue
                 guard file.sha256.count == 64,
                       file.sha256.unicodeScalars.allSatisfy({
-                          CharacterSet(charactersIn: "0123456789abcdefABCDEF").contains($0)
+                          CharacterSet(charactersIn: "0123456789abcdef").contains($0)
                       })
                 else {
                     throw ProductionModelPolicyError.invalidChecksum(
@@ -219,6 +225,10 @@ public enum ProductionModelPolicy {
             if model.runtime.artifactLayout == .singleFile, model.files.count != 1 {
                 throw ProductionModelPolicyError.expectedSingleFile(count: model.files.count)
             }
+
+            if let benchmark = model.benchmark {
+                try validateBenchmark(benchmark, for: model)
+            }
         }
     }
 
@@ -246,5 +256,149 @@ public enum ProductionModelPolicy {
             return Int(component)
         }
         return numbers.count == 3 ? numbers : nil
+    }
+
+    private static func validateBenchmark(
+        _ benchmark: ModelBenchmarkRating,
+        for model: ModelEntry
+    ) throws {
+        let frozenSuiteIndexSHA256 =
+            "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+        guard model.purpose == .transcription,
+              benchmark.schemaVersion == 1,
+              benchmark.policyID == "english-catalog-rating-v2",
+              benchmark.suiteID == "english-catalog-rating-v1",
+              benchmark.suiteIndexSHA256 == frozenSuiteIndexSHA256,
+              benchmark.modelID == model.id,
+              !benchmark.engine.isEmpty,
+              !benchmark.engineVersion.isEmpty,
+              !benchmark.modelLicense.isEmpty,
+              !benchmark.computeBackend.isEmpty,
+              isGitRevision(benchmark.sourceRevision),
+              benchmark.language == "en",
+              model.capabilities.languages.contains("en"),
+              ISO8601DateFormatter().date(from: benchmark.measuredAt) != nil,
+              benchmark.referenceHost.chip == "Apple M4 Max",
+              benchmark.referenceHost.architecture == "arm64",
+              !benchmark.referenceHost.operatingSystem.isEmpty,
+              benchmark.runCount == 3,
+              benchmark.quality.speechItems == 732,
+              benchmark.quality.noSpeechItems == 200,
+              (0 ... 1).contains(benchmark.quality.noSpeechFalsePositiveRate),
+              benchmark.quality.components.map(\.id) == [
+                  "open-asr-english-nightly-v1",
+                  "edacc-english-nightly-v1",
+                  "berst-english-nightly-v1",
+              ],
+              benchmark.quality.components.map(\.weight) == [0.5, 0.3, 0.2]
+        else {
+            throw ProductionModelPolicyError.invalidBenchmark(modelID: model.id)
+        }
+        guard benchmark.artifactFingerprint == model.artifactFingerprint() else {
+            throw ProductionModelPolicyError.benchmarkArtifactMismatch(modelID: model.id)
+        }
+
+        let anchors: [(excellent: Double, unacceptable: Double)] = [
+            (0.05, 0.40),
+            (0.12, 0.55),
+            (0.18, 0.70),
+        ]
+        for (component, anchor) in zip(benchmark.quality.components, anchors) {
+            let expected = lowerIsBetterBenchmarkScore(
+                value: component.wordErrorRate,
+                excellent: anchor.excellent,
+                unacceptable: anchor.unacceptable
+            )
+            guard component.wordErrorRate >= 0,
+                  (0 ... 100).contains(component.score),
+                  abs(component.score - expected) < 0.000_001
+            else {
+                throw ProductionModelPolicyError.invalidBenchmark(modelID: model.id)
+            }
+        }
+        let expectedQualityScore = Int(
+            benchmark.quality.components.reduce(0) {
+                $0 + $1.score * $1.weight
+            }.rounded()
+        )
+        let expectedQualityLevel = benchmarkLevel(for: expectedQualityScore)
+        guard benchmark.quality.score == expectedQualityScore,
+              benchmark.quality.level == expectedQualityLevel,
+              benchmark.quality.label == qualityLabel(for: expectedQualityLevel)
+        else {
+            throw ProductionModelPolicyError.invalidBenchmark(modelID: model.id)
+        }
+
+        if let speed = benchmark.speed {
+            let expectedSpeedScore = Int((
+                lowerIsBetterBenchmarkScore(
+                    value: Double(speed.p95ReleaseToFinalMs),
+                    excellent: 150,
+                    unacceptable: 1_200
+                ) * 0.7
+                    + lowerIsBetterBenchmarkScore(
+                        value: speed.p95RealTimeFactor,
+                        excellent: 0.02,
+                        unacceptable: 0.25
+                    ) * 0.3
+            ).rounded())
+            let expectedSpeedLevel = benchmarkLevel(for: expectedSpeedScore)
+            guard benchmark.speedUnratedReason == nil,
+                  speed.p50ReleaseToFinalMs >= 0,
+                  speed.p95ReleaseToFinalMs >= speed.p50ReleaseToFinalMs,
+                  speed.p95RealTimeFactor >= 0,
+                  (0 ... 0.15).contains(speed.relativeP95Spread),
+                  speed.score == expectedSpeedScore,
+                  speed.level == expectedSpeedLevel,
+                  speed.label == speedLabel(for: expectedSpeedLevel)
+            else {
+                throw ProductionModelPolicyError.invalidBenchmark(modelID: model.id)
+            }
+        } else {
+            guard benchmark.speedUnratedReason == "unstable-p95" else {
+                throw ProductionModelPolicyError.invalidBenchmark(modelID: model.id)
+            }
+        }
+    }
+
+    private static func isLowercaseSHA256(_ value: String) -> Bool {
+        value.count == 64
+            && value.allSatisfy(Set("0123456789abcdef").contains)
+    }
+
+    private static func isGitRevision(_ value: String) -> Bool {
+        (value.count == 40 || value.count == 64)
+            && value.allSatisfy(Set("0123456789abcdef").contains)
+    }
+
+    private static func lowerIsBetterBenchmarkScore(
+        value: Double,
+        excellent: Double,
+        unacceptable: Double
+    ) -> Double {
+        min(100, max(0, (unacceptable - value) / (unacceptable - excellent) * 100))
+    }
+
+    private static func benchmarkLevel(for score: Int) -> Int {
+        switch score {
+        case 90...:
+            return 5
+        case 75...:
+            return 4
+        case 60...:
+            return 3
+        case 40...:
+            return 2
+        default:
+            return 1
+        }
+    }
+
+    private static func qualityLabel(for level: Int) -> String {
+        [1: "Limited", 2: "Basic", 3: "Balanced", 4: "High", 5: "Highest"][level]!
+    }
+
+    private static func speedLabel(for level: Int) -> String {
+        [1: "Slow", 2: "Measured", 3: "Balanced", 4: "Fast", 5: "Fastest"][level]!
     }
 }

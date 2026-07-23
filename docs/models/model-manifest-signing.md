@@ -1,6 +1,6 @@
 # Model Manifest Signing
 
-Textify V1.1 model manifests use a detached JSON signature envelope at
+Textify model-manifest versions 1 and 2 use a detached JSON signature envelope at
 `manifest.json.sig`. The envelope records the SHA-256 of the exact raw manifest
 bytes, and the Ed25519 signature covers the canonical UTF-8 payload defined in
 `docs/SPEC.md` section 22.2. Do not reformat or rewrite the manifest between
@@ -43,7 +43,7 @@ The script writes `path/to/manifest.json.sig` with this envelope shape:
 {
   "algorithm": "Ed25519",
   "contentSHA256": "<lowercase SHA-256 of the exact manifest bytes>",
-  "contentType": "application/vnd.textify.model-manifest+json;version=1",
+  "contentType": "application/vnd.textify.model-manifest+json;version=2",
   "keyId": "textify-model-manifest-2026-huggingface",
   "manifestFile": "manifest.json",
   "signature": "<unpadded base64url Ed25519 signature>",
@@ -57,6 +57,11 @@ four-field raw-byte signature envelope so existing V1.1 installs can still
 download the production model. The signing helper emits only the canonical
 SPEC envelope; republish the live signature in that format at the next
 maintainer signing opportunity.
+
+The signing helper reads `manifestVersion` from the exact input bytes and
+emits the matching content type. Versions 1 and 2 are the only accepted values,
+and verification rejects a correctly signed envelope when its content-type
+version differs from the parsed manifest version.
 
 ## Verify Before Publishing
 
@@ -86,6 +91,26 @@ Verification checks the detached signature and the production catalog policy:
 - non-empty language capabilities for new catalog entries
 - optional picker metadata for finalization speed, accuracy tradeoff, and
   hardware/runtime requirements; when present, every field must be non-empty
+- optional manifest-v2 benchmark metadata with strict nested fields, the
+  direct-score `english-catalog-rating-v2` policy, exact 932-case v1
+  suite-index hash, three Apple M4 Max runs, exact runtime identity, source Git
+  revision, internally consistent absolute score math, and an artifact
+  fingerprint recomputed from the signed file paths, hashes, and sizes
+
+Manifest v1 remains valid and cannot contain `benchmark`. Manifest v2 may
+leave a model without `benchmark`; the app then shows quality and speed as
+`Unrated`. An eligible candidate is generated under
+`Benchmarks/RealtimeASR` and reviewed manually:
+
+```bash
+./generate_english_catalog_rating.sh \
+  MODEL_ID MEASURED_AT RUN_ID_1 RUN_ID_2 RUN_ID_3 candidate.json
+```
+
+Copy the complete candidate object into that model entry's `benchmark`
+field, change the document to `manifestVersion: 2`, run the verification
+tests, and only then sign with the maintainer key. Nightly workflows never
+modify the catalog and never receive a manifest private key.
 
 The production runtime tuples are deliberately closed:
 
@@ -94,6 +119,10 @@ The production runtime tuples are deliberately closed:
 | `whisper_cpp` | `metal_gpu` | `single_file` |
 | `fluid_audio_parakeet` | `coreml_neural_engine` | `model_directory` |
 | `fluid_audio_paraformer` | `coreml_neural_engine` | `model_directory` |
+| `sherpa_onnx` | `cpu` | `model_directory` |
+| `transcribe_cpp` | `metal_gpu` | `single_file` |
+| `mlx_audio` | `metal_gpu` | `model_directory` |
+| `litert_lm` | `metal_gpu` | `single_file` |
 
 Every Core ML leaf file must have a safe unique `relativePath`. The signed
 catalog may advertise only a released variant implemented by the pinned

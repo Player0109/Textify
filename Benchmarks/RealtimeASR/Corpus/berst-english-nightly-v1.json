@@ -1,0 +1,2934 @@
+{
+  "schemaVersion": 2,
+  "id": "berst-english-nightly-v1",
+  "name": "BERSt English nightly stress evaluation",
+  "language": "en",
+  "dataset": {
+    "id": "Rosie-Lab/BERSt",
+    "revision": "fed35c477427cff44206464b7f85e68d1fc99062",
+    "viewerBaseURL": "https://datasets-server.huggingface.co"
+  },
+  "selection": {
+    "seed": "textify-berst-english-nightly-v1",
+    "rule": "four distinct speakers per phonePosition x shoutLevel cell; shout and no-shout only"
+  },
+  "durationLanes": [
+    {
+      "id": "short-10",
+      "maxAudioSeconds": 10
+    },
+    {
+      "id": "universal",
+      "maxAudioSeconds": 29
+    },
+    {
+      "id": "full-60",
+      "maxAudioSeconds": 60
+    }
+  ],
+  "requiredDurationBuckets": [
+    "1-3",
+    "3-10"
+  ],
+  "subsets": [
+    {
+      "id": "berst-test",
+      "config": "default",
+      "split": "test",
+      "role": "stress",
+      "speechOrigin": "human-read",
+      "license": "CC-BY-4.0",
+      "sourceURL": "https://huggingface.co/datasets/Rosie-Lab/BERSt"
+    }
+  ],
+  "items": [
+    {
+      "id": "berst-test-000001",
+      "subsetID": "berst-test",
+      "row": 1,
+      "audio": "berst-test/1.wav",
+      "reference": "hungry action hippos fruit",
+      "durationMs": 2745,
+      "durationBucket": "1-3",
+      "sizeBytes": 263564,
+      "sha256": "39ea21871fbcf30bb5471194d70feced1452f4a85dccc6ca317b836408df5c10",
+      "speakerID": "user_79a0d5bf-888e-4ea6-bc56-a96c59ab9c57",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face up on any surface 8/19",
+        "shoutLevel": "shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000007",
+      "subsetID": "berst-test",
+      "row": 7,
+      "audio": "berst-test/7.wav",
+      "reference": "five special guest treasures",
+      "durationMs": 3023,
+      "durationBucket": "3-10",
+      "sizeBytes": 290252,
+      "sha256": "faa75314043e47e4295e80f9d739686fc0511f289df7fb6a5c965c6b4ec5dda5",
+      "speakerID": "user_8f04825c-dcf5-4df5-81fa-34219039884b",
+      "slices": {
+        "phonePosition": "Place your phone in a bag and hold it next to your hip 7/19",
+        "shoutLevel": "shout",
+        "affect": "neutral",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000014",
+      "subsetID": "berst-test",
+      "row": 14,
+      "audio": "berst-test/14.wav",
+      "reference": "snow meteor down the chimney",
+      "durationMs": 4023,
+      "durationBucket": "3-10",
+      "sizeBytes": 386356,
+      "sha256": "9b7743429e2c725d6596803744951ab2c4dca492abc4799ac59c454b346eca3c",
+      "speakerID": "user_6ad54616-b536-4d82-9f15-2e78afeaa12d",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you in a bag 19/19",
+        "shoutLevel": "shout",
+        "affect": "disgust",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Galaxy A32"
+      }
+    },
+    {
+      "id": "berst-test-000016",
+      "subsetID": "berst-test",
+      "row": 16,
+      "audio": "berst-test/16.wav",
+      "reference": "zebra cats walking on lamps",
+      "durationMs": 2976,
+      "durationBucket": "1-3",
+      "sizeBytes": 285740,
+      "sha256": "3b92796a58efcf14a2a87f749f98501961a27f96cd45d94ffb4651600feaaca8",
+      "speakerID": "user_8f04825c-dcf5-4df5-81fa-34219039884b",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face down on a soft surface 10/19",
+        "shoutLevel": "shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000020",
+      "subsetID": "berst-test",
+      "row": 20,
+      "audio": "berst-test/20.wav",
+      "reference": "the thunder break craze",
+      "durationMs": 2519,
+      "durationBucket": "1-3",
+      "sizeBytes": 241868,
+      "sha256": "6ad95dcb6b34c9b42cd705a3054b534134b43195e1afe4966189931d5da63e92",
+      "speakerID": "user_8df227ec-8e51-4111-b3ee-ac2c5fc90500",
+      "slices": {
+        "phonePosition": "Hold your phone next to your hip with the back of phone on your palm 4/19",
+        "shoutLevel": "shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000025",
+      "subsetID": "berst-test",
+      "row": 25,
+      "audio": "berst-test/25.wav",
+      "reference": "snow meteor down the chimney",
+      "durationMs": 2853,
+      "durationBucket": "1-3",
+      "sizeBytes": 273938,
+      "sha256": "7b489d6cd2965003b800c05954d8f3b5a552631749b742271b8a615d9c6f6203",
+      "speakerID": "user_ea623111-8a10-45da-a7cc-7fbf32b1e454",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face up on any surface 16/19",
+        "shoutLevel": "no-shout",
+        "affect": "fear",
+        "firstLanguage": "Hindi",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000027",
+      "subsetID": "berst-test",
+      "row": 27,
+      "audio": "berst-test/27.wav",
+      "reference": "ripped ocean jumper",
+      "durationMs": 1663,
+      "durationBucket": "1-3",
+      "sizeBytes": 159698,
+      "sha256": "0526053224360e54dcd785fc397fac9b95cc5a8ef0df1b77dae543acfe0a640d",
+      "speakerID": "user_ab2aa238-b678-4daa-9a03-0510fc20b4ca",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face with your hand covering the mic 3/19",
+        "shoutLevel": "no-shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Z-Fold 2"
+      }
+    },
+    {
+      "id": "berst-test-000033",
+      "subsetID": "berst-test",
+      "row": 33,
+      "audio": "berst-test/33.wav",
+      "reference": "hungry action hippos fruit",
+      "durationMs": 3090,
+      "durationBucket": "3-10",
+      "sizeBytes": 296684,
+      "sha256": "471edede9ab20afb13cabd11dbf955ddef7492b76bdcbe882237cb8151463a48",
+      "speakerID": "user_79a0d5bf-888e-4ea6-bc56-a96c59ab9c57",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face with the mic facing your mouth as you would in a phone conversation 1/19",
+        "shoutLevel": "no-shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000038",
+      "subsetID": "berst-test",
+      "row": 38,
+      "audio": "berst-test/38.wav",
+      "reference": "five special guest treasures",
+      "durationMs": 2597,
+      "durationBucket": "1-3",
+      "sizeBytes": 229098,
+      "sha256": "1fc25c0ad6b96fc51252c19978541290c3ddaf78b404734d8d9b04953a71442a",
+      "speakerID": "user_f39f7456-112f-4b99-ad53-9ac2b4dd3204",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away in a bag 11/19",
+        "shoutLevel": "no-shout",
+        "affect": "surprise",
+        "firstLanguage": "Tagalog",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000039",
+      "subsetID": "berst-test",
+      "row": 39,
+      "audio": "berst-test/39.wav",
+      "reference": "wolf ring lights are fantastic",
+      "durationMs": 2479,
+      "durationBucket": "1-3",
+      "sizeBytes": 238072,
+      "sha256": "f53fccfa05ef2f456797bc1ea960f92720c688b48d717f65e5b926d4fea93001",
+      "speakerID": "user_6ad54616-b536-4d82-9f15-2e78afeaa12d",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face down on a soft surface 18/19",
+        "shoutLevel": "no-shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Galaxy A32"
+      }
+    },
+    {
+      "id": "berst-test-000043",
+      "subsetID": "berst-test",
+      "row": 43,
+      "audio": "berst-test/43.wav",
+      "reference": "ripped ocean jumper",
+      "durationMs": 1858,
+      "durationBucket": "1-3",
+      "sizeBytes": 163920,
+      "sha256": "4c434f05718879dceb4bd93186c9535d068aedfcb5173e5e29fb66884ba73519",
+      "speakerID": "user_8f04825c-dcf5-4df5-81fa-34219039884b",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face up on any surface 16/19",
+        "shoutLevel": "no-shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000048",
+      "subsetID": "berst-test",
+      "row": 48,
+      "audio": "berst-test/48.wav",
+      "reference": "hungry action hippos fruit",
+      "durationMs": 1642,
+      "durationBucket": "1-3",
+      "sizeBytes": 144934,
+      "sha256": "59e730126c4e2a590f013785d92a538162d37140c5f096cca8a0faa3d6616127",
+      "speakerID": "user_ab2aa238-b678-4daa-9a03-0510fc20b4ca",
+      "slices": {
+        "phonePosition": "Hold your phone next to your hip with your hand covering the mic 5/19",
+        "shoutLevel": "shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Z-Fold 2"
+      }
+    },
+    {
+      "id": "berst-test-000050",
+      "subsetID": "berst-test",
+      "row": 50,
+      "audio": "berst-test/50.wav",
+      "reference": "join the Ear Look club",
+      "durationMs": 1500,
+      "durationBucket": "1-3",
+      "sizeBytes": 144086,
+      "sha256": "64b5f81fd65153849821d2ccdf05aaf71f17c51b6471217cd22a06306c1a0d47",
+      "speakerID": "user_ab2aa238-b678-4daa-9a03-0510fc20b4ca",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away in a bag 11/19",
+        "shoutLevel": "shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Z-Fold 2"
+      }
+    },
+    {
+      "id": "berst-test-000052",
+      "subsetID": "berst-test",
+      "row": 52,
+      "audio": "berst-test/52.wav",
+      "reference": "birds make new jingles",
+      "durationMs": 2890,
+      "durationBucket": "1-3",
+      "sizeBytes": 277484,
+      "sha256": "0fbd2c22851b16cb7090b4a463fc7c151355e10f5da74798af13c9e7ee36b684",
+      "speakerID": "user_8f04825c-dcf5-4df5-81fa-34219039884b",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away in a bag 11/19",
+        "shoutLevel": "no-shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000059",
+      "subsetID": "berst-test",
+      "row": 59,
+      "audio": "berst-test/59.wav",
+      "reference": "the thunder break craze",
+      "durationMs": 2345,
+      "durationBucket": "1-3",
+      "sizeBytes": 225164,
+      "sha256": "853589bf1e877d56a3c7ebe96cf87691ac44fa38e9d62c791b312d3fb338c460",
+      "speakerID": "user_8f04825c-dcf5-4df5-81fa-34219039884b",
+      "slices": {
+        "phonePosition": "Place your phone in your pocket 6/19",
+        "shoutLevel": "shout",
+        "affect": "surprise",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000061",
+      "subsetID": "berst-test",
+      "row": 61,
+      "audio": "berst-test/61.wav",
+      "reference": "wolf ring lights are fantastic",
+      "durationMs": 2047,
+      "durationBucket": "1-3",
+      "sizeBytes": 196556,
+      "sha256": "72ae7e5bcc2c74ee48ac86d9db50d79e0de1ba6f8c3b4f06d0174c53bf47598d",
+      "speakerID": "user_ab2aa238-b678-4daa-9a03-0510fc20b4ca",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face up on any surface 8/19",
+        "shoutLevel": "no-shout",
+        "affect": "disgust",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Z-Fold 2"
+      }
+    },
+    {
+      "id": "berst-test-000064",
+      "subsetID": "berst-test",
+      "row": 64,
+      "audio": "berst-test/64.wav",
+      "reference": "five dollar slaw onion cure",
+      "durationMs": 2458,
+      "durationBucket": "1-3",
+      "sizeBytes": 235974,
+      "sha256": "373fb4813f32ae83840d233543d29bb9f78ee168aa88da4d2e73de3a66ae6e8a",
+      "speakerID": "user_8df227ec-8e51-4111-b3ee-ac2c5fc90500",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face down on a soft surface 14/19",
+        "shoutLevel": "shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000066",
+      "subsetID": "berst-test",
+      "row": 66,
+      "audio": "berst-test/66.wav",
+      "reference": "heavy undersea birthday pumpkins",
+      "durationMs": 3994,
+      "durationBucket": "3-10",
+      "sizeBytes": 383468,
+      "sha256": "4849f306721163858db86c3fab5eb4a39d3e7f91f0977be6e64dc1b58cb08e74",
+      "speakerID": "user_ea623111-8a10-45da-a7cc-7fbf32b1e454",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face down on a hard surface 13/19",
+        "shoutLevel": "shout",
+        "affect": "anger",
+        "firstLanguage": "Hindi",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000068",
+      "subsetID": "berst-test",
+      "row": 68,
+      "audio": "berst-test/68.wav",
+      "reference": "five dollar slaw onion cure",
+      "durationMs": 2367,
+      "durationBucket": "1-3",
+      "sizeBytes": 227256,
+      "sha256": "61f0f369ba0d2d96f5c7d264d10e402d91699e02c6f1fee4ebc4a2294fc5a16b",
+      "speakerID": "user_79a0d5bf-888e-4ea6-bc56-a96c59ab9c57",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face down on a hard surface 17/19",
+        "shoutLevel": "no-shout",
+        "affect": "neutral",
+        "firstLanguage": "English",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000079",
+      "subsetID": "berst-test",
+      "row": 79,
+      "audio": "berst-test/79.wav",
+      "reference": "five dollar slaw onion cure",
+      "durationMs": 2955,
+      "durationBucket": "1-3",
+      "sizeBytes": 283724,
+      "sha256": "4ebcab2d94cc31bd4560b4b2d89a7ae795c6ea3e702c0897dd037bf8cd6f9a9b",
+      "speakerID": "user_8df227ec-8e51-4111-b3ee-ac2c5fc90500",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face but with the mic/phone facing away from your face 2/19",
+        "shoutLevel": "no-shout",
+        "affect": "surprise",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000081",
+      "subsetID": "berst-test",
+      "row": 81,
+      "audio": "berst-test/81.wav",
+      "reference": "thunder break craze",
+      "durationMs": 1715,
+      "durationBucket": "1-3",
+      "sizeBytes": 164656,
+      "sha256": "25141ae7a9cfb6027697c18438fe765adb44e381e3327cfbd8f003bab1d675de",
+      "speakerID": "user_8df227ec-8e51-4111-b3ee-ac2c5fc90500",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face down on a hard surface 17/19",
+        "shoutLevel": "no-shout",
+        "affect": "neutral",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000089",
+      "subsetID": "berst-test",
+      "row": 89,
+      "audio": "berst-test/89.wav",
+      "reference": "five special guest treasures",
+      "durationMs": 2761,
+      "durationBucket": "1-3",
+      "sizeBytes": 265052,
+      "sha256": "2c037cc6c3c6ed68a8135f9677e2bc4232c85da2da6fc06651e621e3eef0c441",
+      "speakerID": "user_e4cb5b6a-8f7c-4ae7-9235-97b458c73d9e",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face up on any surface 8/19",
+        "shoutLevel": "no-shout",
+        "affect": "sadness",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 12"
+      }
+    },
+    {
+      "id": "berst-test-000091",
+      "subsetID": "berst-test",
+      "row": 91,
+      "audio": "berst-test/91.wav",
+      "reference": "the thunder break craze",
+      "durationMs": 2494,
+      "durationBucket": "1-3",
+      "sizeBytes": 239468,
+      "sha256": "21bb8c38c9176c07dc9eedd9af7906169807dc7ad482e9d383328e94ed631e44",
+      "speakerID": "user_8f04825c-dcf5-4df5-81fa-34219039884b",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face but with the mic/phone facing away from your face 2/19",
+        "shoutLevel": "no-shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000092",
+      "subsetID": "berst-test",
+      "row": 92,
+      "audio": "berst-test/92.wav",
+      "reference": "the thunder break craze",
+      "durationMs": 3087,
+      "durationBucket": "3-10",
+      "sizeBytes": 296396,
+      "sha256": "c216345bd9a988f1f924e87fa62223c4fb01455fe6be25ef634d18061f061a0e",
+      "speakerID": "user_8f04825c-dcf5-4df5-81fa-34219039884b",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face but with the mic/phone facing away from your face 2/19",
+        "shoutLevel": "shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000094",
+      "subsetID": "berst-test",
+      "row": 94,
+      "audio": "berst-test/94.wav",
+      "reference": "banana and mustard sandwiches",
+      "durationMs": 1891,
+      "durationBucket": "1-3",
+      "sizeBytes": 181608,
+      "sha256": "f2a2131c73e3c582cc7a6f9d0667ba2482573fafe64c6fb93ff084868b7550d1",
+      "speakerID": "user_ab2aa238-b678-4daa-9a03-0510fc20b4ca",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face down on a hard surface 17/19",
+        "shoutLevel": "no-shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Z-Fold 2"
+      }
+    },
+    {
+      "id": "berst-test-000096",
+      "subsetID": "berst-test",
+      "row": 96,
+      "audio": "berst-test/96.wav",
+      "reference": "banana and mustard sandwiches",
+      "durationMs": 1991,
+      "durationBucket": "1-3",
+      "sizeBytes": 191220,
+      "sha256": "e3a45172aee99da9f5c30fb35f11ed5f6503f7fd7a5af98a44941fad3e547c13",
+      "speakerID": "user_ab2aa238-b678-4daa-9a03-0510fc20b4ca",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face down on a hard surface 17/19",
+        "shoutLevel": "shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Z-Fold 2"
+      }
+    },
+    {
+      "id": "berst-test-000098",
+      "subsetID": "berst-test",
+      "row": 98,
+      "audio": "berst-test/98.wav",
+      "reference": "snowing meteor down the chimney",
+      "durationMs": 2613,
+      "durationBucket": "1-3",
+      "sizeBytes": 250888,
+      "sha256": "72c2c6f75029fd59bc11eed40856a5b0f9321ca3be330316217a29544728d049",
+      "speakerID": "user_79a0d5bf-888e-4ea6-bc56-a96c59ab9c57",
+      "slices": {
+        "phonePosition": "Hold your phone next to your hip with the back of phone on your palm 4/19",
+        "shoutLevel": "shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000100",
+      "subsetID": "berst-test",
+      "row": 100,
+      "audio": "berst-test/100.wav",
+      "reference": "the thunder break craze",
+      "durationMs": 2486,
+      "durationBucket": "1-3",
+      "sizeBytes": 238700,
+      "sha256": "670fe566753626fe3898f9b48fd6da0b9beb9f5b7e220b22ed4b5e2d8226dfeb",
+      "speakerID": "user_e4cb5b6a-8f7c-4ae7-9235-97b458c73d9e",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room in a bag 15/19",
+        "shoutLevel": "no-shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 12"
+      }
+    },
+    {
+      "id": "berst-test-000101",
+      "subsetID": "berst-test",
+      "row": 101,
+      "audio": "berst-test/101.wav",
+      "reference": "the thunder break craze",
+      "durationMs": 2566,
+      "durationBucket": "1-3",
+      "sizeBytes": 246380,
+      "sha256": "dede66e4540edbcf66f8656f479cdab1e62f806d6690a8cf9481fb5e75535f81",
+      "speakerID": "user_e4cb5b6a-8f7c-4ae7-9235-97b458c73d9e",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room in a bag 15/19",
+        "shoutLevel": "shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 12"
+      }
+    },
+    {
+      "id": "berst-test-000103",
+      "subsetID": "berst-test",
+      "row": 103,
+      "audio": "berst-test/103.wav",
+      "reference": "snow meteor down the chimney",
+      "durationMs": 2831,
+      "durationBucket": "1-3",
+      "sizeBytes": 271820,
+      "sha256": "1f63912a126a20fbb7521ca0c3dc3c79865c806df587fdbf3cfdc5fe52856adb",
+      "speakerID": "user_e4cb5b6a-8f7c-4ae7-9235-97b458c73d9e",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face down on a hard surface 9/19",
+        "shoutLevel": "shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 12"
+      }
+    },
+    {
+      "id": "berst-test-000106",
+      "subsetID": "berst-test",
+      "row": 106,
+      "audio": "berst-test/106.wav",
+      "reference": "snow meteor down the chimney",
+      "durationMs": 2557,
+      "durationBucket": "1-3",
+      "sizeBytes": 245516,
+      "sha256": "3441882fc9b72931dcc91403a06cfb8fe3a791506cff28f6814d5bca7b4c1489",
+      "speakerID": "user_e4cb5b6a-8f7c-4ae7-9235-97b458c73d9e",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face down on a hard surface 9/19",
+        "shoutLevel": "no-shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 12"
+      }
+    },
+    {
+      "id": "berst-test-000107",
+      "subsetID": "berst-test",
+      "row": 107,
+      "audio": "berst-test/107.wav",
+      "reference": "five dollar slaw onion cure",
+      "durationMs": 2680,
+      "durationBucket": "1-3",
+      "sizeBytes": 257320,
+      "sha256": "77ed5e595e2cca0e8f634d91f0dbc9803f3d6b8880a3a3f8c4a40b486433c36d",
+      "speakerID": "user_ab2aa238-b678-4daa-9a03-0510fc20b4ca",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face up on any surface 12/19",
+        "shoutLevel": "shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Z-Fold 2"
+      }
+    },
+    {
+      "id": "berst-test-000109",
+      "subsetID": "berst-test",
+      "row": 109,
+      "audio": "berst-test/109.wav",
+      "reference": "snow meteor down the chimney",
+      "durationMs": 2260,
+      "durationBucket": "1-3",
+      "sizeBytes": 216990,
+      "sha256": "cfa48e0a7c94898c2ee236887e0543aaa53b4623716a285cb5ea83e80763bdd9",
+      "speakerID": "user_ea623111-8a10-45da-a7cc-7fbf32b1e454",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face down on a soft surface 18/19",
+        "shoutLevel": "no-shout",
+        "affect": "anger",
+        "firstLanguage": "Hindi",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000113",
+      "subsetID": "berst-test",
+      "row": 113,
+      "audio": "berst-test/113.wav",
+      "reference": "hungry action hippos fruit",
+      "durationMs": 2262,
+      "durationBucket": "1-3",
+      "sizeBytes": 217202,
+      "sha256": "388bf0ff3b8bb99acffa815018a2531b774eb1e558a1d367dfc1c80406d23701",
+      "speakerID": "user_79a0d5bf-888e-4ea6-bc56-a96c59ab9c57",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face with the mic facing your mouth as you would in a phone conversation 1/19",
+        "shoutLevel": "shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000115",
+      "subsetID": "berst-test",
+      "row": 115,
+      "audio": "berst-test/115.wav",
+      "reference": "hungry action hippos fruit",
+      "durationMs": 4568,
+      "durationBucket": "3-10",
+      "sizeBytes": 438576,
+      "sha256": "52a485bd32d72039c7e60bbe7fd29f9cbb30ed70cf117bab8751403fa6010924",
+      "speakerID": "user_f39f7456-112f-4b99-ad53-9ac2b4dd3204",
+      "slices": {
+        "phonePosition": "Hold your phone next to your hip with your hand covering the mic 5/19",
+        "shoutLevel": "no-shout",
+        "affect": "anger",
+        "firstLanguage": "Tagalog",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000121",
+      "subsetID": "berst-test",
+      "row": 121,
+      "audio": "berst-test/121.wav",
+      "reference": "hungry action hippos fruit",
+      "durationMs": 2270,
+      "durationBucket": "1-3",
+      "sizeBytes": 217958,
+      "sha256": "7dab653caa3cac243ce160a2fbb1560efbcaacddbefecfad7089b49bcdd7dc89",
+      "speakerID": "user_efe48b66-95ef-4586-b7b3-243fd6293b07",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face down on a hard surface 17/19",
+        "shoutLevel": "no-shout",
+        "affect": "disgust",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000125",
+      "subsetID": "berst-test",
+      "row": 125,
+      "audio": "berst-test/125.wav",
+      "reference": "fluffy baseboard yogurt division",
+      "durationMs": 2539,
+      "durationBucket": "1-3",
+      "sizeBytes": 243786,
+      "sha256": "3b34cd235ea1a59db0255ed5dd9e7687cf49f52f64d87e0aae90a4daebfd8831",
+      "speakerID": "user_79a0d5bf-888e-4ea6-bc56-a96c59ab9c57",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face up on any surface 16/19",
+        "shoutLevel": "shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000140",
+      "subsetID": "berst-test",
+      "row": 140,
+      "audio": "berst-test/140.wav",
+      "reference": "zebra cats walking on lamps",
+      "durationMs": 3557,
+      "durationBucket": "3-10",
+      "sizeBytes": 341516,
+      "sha256": "4ada9f4c67a843f7ad40e9e3e90caba34ba805cf6399a3e876a4914e1339a3ee",
+      "speakerID": "user_ea623111-8a10-45da-a7cc-7fbf32b1e454",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face down on a soft surface 10/19",
+        "shoutLevel": "no-shout",
+        "affect": "disgust",
+        "firstLanguage": "Hindi",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000145",
+      "subsetID": "berst-test",
+      "row": 145,
+      "audio": "berst-test/145.wav",
+      "reference": "fluffy baseboard yogurt division",
+      "durationMs": 2846,
+      "durationBucket": "1-3",
+      "sizeBytes": 273282,
+      "sha256": "18ff47e8f24ee5d24f0461c18e6142f608b2b15a3e1decd338b70202b9b498d4",
+      "speakerID": "user_f39f7456-112f-4b99-ad53-9ac2b4dd3204",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face down on a soft surface 18/19",
+        "shoutLevel": "no-shout",
+        "affect": "joy",
+        "firstLanguage": "Tagalog",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000146",
+      "subsetID": "berst-test",
+      "row": 146,
+      "audio": "berst-test/146.wav",
+      "reference": "fluffy baseboard yogurt division",
+      "durationMs": 3242,
+      "durationBucket": "3-10",
+      "sizeBytes": 311232,
+      "sha256": "e87aae7daead8ebb5ac04ed3726d1e807de3d47deb77cd2117b3824aefbcbec1",
+      "speakerID": "user_f39f7456-112f-4b99-ad53-9ac2b4dd3204",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face down on a soft surface 18/19",
+        "shoutLevel": "shout",
+        "affect": "joy",
+        "firstLanguage": "Tagalog",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000148",
+      "subsetID": "berst-test",
+      "row": 148,
+      "audio": "berst-test/148.wav",
+      "reference": "five special guest treasures",
+      "durationMs": 3769,
+      "durationBucket": "3-10",
+      "sizeBytes": 361868,
+      "sha256": "90f4508085319fb2b1d113e0f15dbe6ea6e43007c5a7edc6b344992ee56038bf",
+      "speakerID": "user_ea623111-8a10-45da-a7cc-7fbf32b1e454",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face up on any surface 8/19",
+        "shoutLevel": "shout",
+        "affect": "anger",
+        "firstLanguage": "Hindi",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000157",
+      "subsetID": "berst-test",
+      "row": 157,
+      "audio": "berst-test/157.wav",
+      "reference": "snow meteor down the chimney",
+      "durationMs": 3292,
+      "durationBucket": "3-10",
+      "sizeBytes": 316076,
+      "sha256": "ba5dfb37c8e73ceaa1321d9a08e3cb53cbb46c82314b643183f90a5f40035c6b",
+      "speakerID": "user_8f04825c-dcf5-4df5-81fa-34219039884b",
+      "slices": {
+        "phonePosition": "Hold your phone next to your hip with your hand covering the mic 5/19",
+        "shoutLevel": "shout",
+        "affect": "disgust",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000160",
+      "subsetID": "berst-test",
+      "row": 160,
+      "audio": "berst-test/160.wav",
+      "reference": "five special guest treasures",
+      "durationMs": 3670,
+      "durationBucket": "3-10",
+      "sizeBytes": 352390,
+      "sha256": "f1399eb18ee0d922a15392507256956c50b619c9bc211d10174129c50b2f539c",
+      "speakerID": "user_6ad54616-b536-4d82-9f15-2e78afeaa12d",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face down on a hard surface 13/19",
+        "shoutLevel": "shout",
+        "affect": "disgust",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Galaxy A32"
+      }
+    },
+    {
+      "id": "berst-test-000161",
+      "subsetID": "berst-test",
+      "row": 161,
+      "audio": "berst-test/161.wav",
+      "reference": "snow meteor down the chimney",
+      "durationMs": 3593,
+      "durationBucket": "3-10",
+      "sizeBytes": 344972,
+      "sha256": "6bd47c07533f742415381d167926b296f5c92d6131c12cf27b29e869a0ac5217",
+      "speakerID": "user_8f04825c-dcf5-4df5-81fa-34219039884b",
+      "slices": {
+        "phonePosition": "Hold your phone next to your hip with your hand covering the mic 5/19",
+        "shoutLevel": "no-shout",
+        "affect": "disgust",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000163",
+      "subsetID": "berst-test",
+      "row": 163,
+      "audio": "berst-test/163.wav",
+      "reference": "snow meteor down the chimney",
+      "durationMs": 3221,
+      "durationBucket": "3-10",
+      "sizeBytes": 309260,
+      "sha256": "2cb7bb3366a9660f80d5384666a2128a85667b088008679c0d4e7d1a0886c0eb",
+      "speakerID": "user_6ad54616-b536-4d82-9f15-2e78afeaa12d",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room in a bag 15/19",
+        "shoutLevel": "no-shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Galaxy A32"
+      }
+    },
+    {
+      "id": "berst-test-000171",
+      "subsetID": "berst-test",
+      "row": 171,
+      "audio": "berst-test/171.wav",
+      "reference": "five dollar slaw onion cure",
+      "durationMs": 3426,
+      "durationBucket": "3-10",
+      "sizeBytes": 328926,
+      "sha256": "10177ce1914aa5cb42034e62d57c2f496b77f82735bb6590eaebb659260151ea",
+      "speakerID": "user_6ad54616-b536-4d82-9f15-2e78afeaa12d",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face with the mic facing your mouth as you would in a phone conversation 1/19",
+        "shoutLevel": "shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Galaxy A32"
+      }
+    },
+    {
+      "id": "berst-test-000174",
+      "subsetID": "berst-test",
+      "row": 174,
+      "audio": "berst-test/174.wav",
+      "reference": "snow meteor down the chimney",
+      "durationMs": 3215,
+      "durationBucket": "3-10",
+      "sizeBytes": 308712,
+      "sha256": "b4c2255fbfb905e191aeeee6eff57a9714d243d758004e430b0a47424a03dafd",
+      "speakerID": "user_f39f7456-112f-4b99-ad53-9ac2b4dd3204",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face with your hand covering the mic 3/19",
+        "shoutLevel": "shout",
+        "affect": "surprise",
+        "firstLanguage": "Tagalog",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000177",
+      "subsetID": "berst-test",
+      "row": 177,
+      "audio": "berst-test/177.wav",
+      "reference": "hungry action hippos fruit",
+      "durationMs": 2477,
+      "durationBucket": "1-3",
+      "sizeBytes": 237826,
+      "sha256": "501499b34f0c37ea00a1d206a51dc965765860b5de87359801fa53bf00f29200",
+      "speakerID": "user_e4cb5b6a-8f7c-4ae7-9235-97b458c73d9e",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face down on a soft surface 14/19",
+        "shoutLevel": "shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 12"
+      }
+    },
+    {
+      "id": "berst-test-000181",
+      "subsetID": "berst-test",
+      "row": 181,
+      "audio": "berst-test/181.wav",
+      "reference": "heavy undersea birthday pumpkins",
+      "durationMs": 2889,
+      "durationBucket": "1-3",
+      "sizeBytes": 277388,
+      "sha256": "50372878754401e2547c49205219b6e0ba483e1cc9b0493dbf2a654348545e79",
+      "speakerID": "user_ea623111-8a10-45da-a7cc-7fbf32b1e454",
+      "slices": {
+        "phonePosition": "Place your phone in your pocket 6/19",
+        "shoutLevel": "no-shout",
+        "affect": "neutral",
+        "firstLanguage": "Hindi",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000184",
+      "subsetID": "berst-test",
+      "row": 184,
+      "audio": "berst-test/184.wav",
+      "reference": "wool ring lights are fantastic",
+      "durationMs": 2886,
+      "durationBucket": "1-3",
+      "sizeBytes": 277062,
+      "sha256": "8da3f355b937fc2b1874e6a98028677d1a49c96547e5ca3ae28f62bf273ce486",
+      "speakerID": "user_f39f7456-112f-4b99-ad53-9ac2b4dd3204",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you in a bag 19/19",
+        "shoutLevel": "no-shout",
+        "affect": "neutral",
+        "firstLanguage": "Tagalog",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000188",
+      "subsetID": "berst-test",
+      "row": 188,
+      "audio": "berst-test/188.wav",
+      "reference": "join the Ear Look club",
+      "durationMs": 2587,
+      "durationBucket": "1-3",
+      "sizeBytes": 248438,
+      "sha256": "a9f610768a96b8081f2c6301e76c9d70e13c5fe8e856b5a893d3ea13fe4af1ef",
+      "speakerID": "user_f39f7456-112f-4b99-ad53-9ac2b4dd3204",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face down on a hard surface 9/19",
+        "shoutLevel": "shout",
+        "affect": "anger",
+        "firstLanguage": "Tagalog",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000195",
+      "subsetID": "berst-test",
+      "row": 195,
+      "audio": "berst-test/195.wav",
+      "reference": "banana and mustard sandwiches",
+      "durationMs": 2473,
+      "durationBucket": "1-3",
+      "sizeBytes": 218282,
+      "sha256": "dba334cd0c4c3237a96e7d48b58015a98d2c5eb216198aafef4527a681c39b84",
+      "speakerID": "user_8df227ec-8e51-4111-b3ee-ac2c5fc90500",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face with your hand covering the mic 3/19",
+        "shoutLevel": "shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000196",
+      "subsetID": "berst-test",
+      "row": 196,
+      "audio": "berst-test/196.wav",
+      "reference": "five dollar slaw onion cure",
+      "durationMs": 2173,
+      "durationBucket": "1-3",
+      "sizeBytes": 191792,
+      "sha256": "15638bd7e7207c70f08fcbf9dd221d977384e78cce80e12b7246debdeb8dbff1",
+      "speakerID": "user_efe48b66-95ef-4586-b7b3-243fd6293b07",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face with your hand covering the mic 3/19",
+        "shoutLevel": "no-shout",
+        "affect": "neutral",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000202",
+      "subsetID": "berst-test",
+      "row": 202,
+      "audio": "berst-test/202.wav",
+      "reference": "banana and mustard sandwiches",
+      "durationMs": 2445,
+      "durationBucket": "1-3",
+      "sizeBytes": 234764,
+      "sha256": "70257ae612180c7a058a3ddb5f1f0ef6e512b920effa736282e579ddc62d1f6e",
+      "speakerID": "user_efe48b66-95ef-4586-b7b3-243fd6293b07",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face down on a hard surface 13/19",
+        "shoutLevel": "no-shout",
+        "affect": "neutral",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000215",
+      "subsetID": "berst-test",
+      "row": 215,
+      "audio": "berst-test/215.wav",
+      "reference": "zebra cats walking on lamps",
+      "durationMs": 2382,
+      "durationBucket": "1-3",
+      "sizeBytes": 210232,
+      "sha256": "53d2ce85ea4318678b080cdcfba1fd9bcefca3cec304b198b01a81060a5b9a78",
+      "speakerID": "user_ea623111-8a10-45da-a7cc-7fbf32b1e454",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face down on a soft surface 14/19",
+        "shoutLevel": "no-shout",
+        "affect": "surprise",
+        "firstLanguage": "Hindi",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000216",
+      "subsetID": "berst-test",
+      "row": 216,
+      "audio": "berst-test/216.wav",
+      "reference": "zebra cats walking on lamps",
+      "durationMs": 2566,
+      "durationBucket": "1-3",
+      "sizeBytes": 226474,
+      "sha256": "c0ca7438aed10c2e87cd9be347f2dea1ba2cddd9897d7b081d8e70393c207102",
+      "speakerID": "user_ea623111-8a10-45da-a7cc-7fbf32b1e454",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face down on a soft surface 14/19",
+        "shoutLevel": "shout",
+        "affect": "surprise",
+        "firstLanguage": "Hindi",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000217",
+      "subsetID": "berst-test",
+      "row": 217,
+      "audio": "berst-test/217.wav",
+      "reference": "the thunder break craze",
+      "durationMs": 3174,
+      "durationBucket": "3-10",
+      "sizeBytes": 280092,
+      "sha256": "77b6290e874800734d9d0b341b4c29ae25f1827f29e73ba73df072dac0ec9970",
+      "speakerID": "user_8df227ec-8e51-4111-b3ee-ac2c5fc90500",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you in a bag 19/19",
+        "shoutLevel": "no-shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000219",
+      "subsetID": "berst-test",
+      "row": 219,
+      "audio": "berst-test/219.wav",
+      "reference": "the thunder break craze",
+      "durationMs": 2052,
+      "durationBucket": "1-3",
+      "sizeBytes": 181078,
+      "sha256": "965f7b689a59a392ab2939726ca8eddfea22d0c0eeb86d5280390539d53aaa56",
+      "speakerID": "user_8df227ec-8e51-4111-b3ee-ac2c5fc90500",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you in a bag 19/19",
+        "shoutLevel": "shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000220",
+      "subsetID": "berst-test",
+      "row": 220,
+      "audio": "berst-test/220.wav",
+      "reference": "join the Ear Look club",
+      "durationMs": 1742,
+      "durationBucket": "1-3",
+      "sizeBytes": 153804,
+      "sha256": "7e60b81023762d4e8b949423c47091f24f3cb453b0c6702ffbbd67c72a060187",
+      "speakerID": "user_8df227ec-8e51-4111-b3ee-ac2c5fc90500",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face down on a soft surface 18/19",
+        "shoutLevel": "no-shout",
+        "affect": "disgust",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000221",
+      "subsetID": "berst-test",
+      "row": 221,
+      "audio": "berst-test/221.wav",
+      "reference": "join the Ear Look club",
+      "durationMs": 2103,
+      "durationBucket": "1-3",
+      "sizeBytes": 185638,
+      "sha256": "54be791707fca50a1a4c9298b951912d47f4fac8e0d3dd04f5110db1593b4679",
+      "speakerID": "user_8df227ec-8e51-4111-b3ee-ac2c5fc90500",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face down on a soft surface 18/19",
+        "shoutLevel": "shout",
+        "affect": "disgust",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000224",
+      "subsetID": "berst-test",
+      "row": 224,
+      "audio": "berst-test/224.wav",
+      "reference": "hungry action hippos fruit",
+      "durationMs": 1595,
+      "durationBucket": "1-3",
+      "sizeBytes": 140800,
+      "sha256": "c4bb7db9a2900e6c4ec1beb9df5a5b5a190bb8df64c2f1db29debfb36a884093",
+      "speakerID": "user_efe48b66-95ef-4586-b7b3-243fd6293b07",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face down on a soft surface 18/19",
+        "shoutLevel": "shout",
+        "affect": "neutral",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000230",
+      "subsetID": "berst-test",
+      "row": 230,
+      "audio": "berst-test/230.wav",
+      "reference": "five dollar slaw onion cure",
+      "durationMs": 3401,
+      "durationBucket": "3-10",
+      "sizeBytes": 326540,
+      "sha256": "1f5af58f8f13897cf409f47eb67c17e2cc2f1a180677c6dbd268b8f489dd7ed8",
+      "speakerID": "user_ea623111-8a10-45da-a7cc-7fbf32b1e454",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away in a bag 11/19",
+        "shoutLevel": "no-shout",
+        "affect": "surprise",
+        "firstLanguage": "Hindi",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000238",
+      "subsetID": "berst-test",
+      "row": 238,
+      "audio": "berst-test/238.wav",
+      "reference": "zebra cats walking on lamps",
+      "durationMs": 3744,
+      "durationBucket": "3-10",
+      "sizeBytes": 359468,
+      "sha256": "d529b47146ea97c6ae728ba0d39143a4c5c4ad31c5c65b5f5139cfa6d6d6a4ca",
+      "speakerID": "user_e4cb5b6a-8f7c-4ae7-9235-97b458c73d9e",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face down on a hard surface 17/19",
+        "shoutLevel": "shout",
+        "affect": "neutral",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 12"
+      }
+    },
+    {
+      "id": "berst-test-000239",
+      "subsetID": "berst-test",
+      "row": 239,
+      "audio": "berst-test/239.wav",
+      "reference": "another dog secretary show",
+      "durationMs": 2285,
+      "durationBucket": "1-3",
+      "sizeBytes": 219404,
+      "sha256": "f6ddf105daf195ff993bb62636fb02107728e0c0ef641fb4044fef102265a1cb",
+      "speakerID": "user_e4cb5b6a-8f7c-4ae7-9235-97b458c73d9e",
+      "slices": {
+        "phonePosition": "Place your phone in a bag and hold it next to your hip 7/19",
+        "shoutLevel": "shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 12"
+      }
+    },
+    {
+      "id": "berst-test-000240",
+      "subsetID": "berst-test",
+      "row": 240,
+      "audio": "berst-test/240.wav",
+      "reference": "another dog secretary show",
+      "durationMs": 2549,
+      "durationBucket": "1-3",
+      "sizeBytes": 244748,
+      "sha256": "05dc376833959105c1050a5633b587b8408cb690d802dff52d75c36e21e8ee5f",
+      "speakerID": "user_e4cb5b6a-8f7c-4ae7-9235-97b458c73d9e",
+      "slices": {
+        "phonePosition": "Place your phone in a bag and hold it next to your hip 7/19",
+        "shoutLevel": "no-shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 12"
+      }
+    },
+    {
+      "id": "berst-test-000241",
+      "subsetID": "berst-test",
+      "row": 241,
+      "audio": "berst-test/241.wav",
+      "reference": "zebra cats walking on lamps",
+      "durationMs": 8620,
+      "durationBucket": "3-10",
+      "sizeBytes": 760412,
+      "sha256": "c50df8975ac8e93a63b78f0aa945e33e0ea1ba077277a883e773a2af2700c264",
+      "speakerID": "user_ea623111-8a10-45da-a7cc-7fbf32b1e454",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face with your hand covering the mic 3/19",
+        "shoutLevel": "no-shout",
+        "affect": "surprise",
+        "firstLanguage": "Hindi",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000245",
+      "subsetID": "berst-test",
+      "row": 245,
+      "audio": "berst-test/245.wav",
+      "reference": "snow meteor down the chimney",
+      "durationMs": 8620,
+      "durationBucket": "3-10",
+      "sizeBytes": 760412,
+      "sha256": "3249a648db9d17714ae2c019833196b01d07044dabf1ca4929e22a1c7c547fad",
+      "speakerID": "user_79a0d5bf-888e-4ea6-bc56-a96c59ab9c57",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you in a bag 19/19",
+        "shoutLevel": "no-shout",
+        "affect": "neutral",
+        "firstLanguage": "English",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000247",
+      "subsetID": "berst-test",
+      "row": 247,
+      "audio": "berst-test/247.wav",
+      "reference": "snow meteor down the chimney",
+      "durationMs": 2332,
+      "durationBucket": "1-3",
+      "sizeBytes": 205806,
+      "sha256": "6d29e471c1ad3dc6df21fdfb142be62b6ad20ccd99c0ede9ed5b575e4ba4f969",
+      "speakerID": "user_79a0d5bf-888e-4ea6-bc56-a96c59ab9c57",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you in a bag 19/19",
+        "shoutLevel": "shout",
+        "affect": "neutral",
+        "firstLanguage": "English",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000250",
+      "subsetID": "berst-test",
+      "row": 250,
+      "audio": "berst-test/250.wav",
+      "reference": "the thunder break craze",
+      "durationMs": 2064,
+      "durationBucket": "1-3",
+      "sizeBytes": 182152,
+      "sha256": "2f8db71a2a751c37fa92decc3365e3690510c97df98afc23c5336d0c66d828e9",
+      "speakerID": "user_79a0d5bf-888e-4ea6-bc56-a96c59ab9c57",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away in a bag 11/19",
+        "shoutLevel": "shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000256",
+      "subsetID": "berst-test",
+      "row": 256,
+      "audio": "berst-test/256.wav",
+      "reference": "five special guest treasures",
+      "durationMs": 2232,
+      "durationBucket": "1-3",
+      "sizeBytes": 214316,
+      "sha256": "7f2ecb68a6846fb7e8cced41a6be27e387c0277d75c9380411201906f65c6c67",
+      "speakerID": "user_8df227ec-8e51-4111-b3ee-ac2c5fc90500",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face down on a soft surface 10/19",
+        "shoutLevel": "no-shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000257",
+      "subsetID": "berst-test",
+      "row": 257,
+      "audio": "berst-test/257.wav",
+      "reference": "five special guest treasures",
+      "durationMs": 3050,
+      "durationBucket": "3-10",
+      "sizeBytes": 292844,
+      "sha256": "25456d983dd51dd90bc4cf229fc45c817e7c0ca9f34b4a507ca5711a5d655bb6",
+      "speakerID": "user_8df227ec-8e51-4111-b3ee-ac2c5fc90500",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face down on a soft surface 10/19",
+        "shoutLevel": "shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000265",
+      "subsetID": "berst-test",
+      "row": 265,
+      "audio": "berst-test/265.wav",
+      "reference": "zebra cats walking on lamps",
+      "durationMs": 2187,
+      "durationBucket": "1-3",
+      "sizeBytes": 193060,
+      "sha256": "4c44deeef13ef53f612ee9846feeebcf9024daa044336e93d52f339456d59bea",
+      "speakerID": "user_79a0d5bf-888e-4ea6-bc56-a96c59ab9c57",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face with your hand covering the mic 3/19",
+        "shoutLevel": "shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000269",
+      "subsetID": "berst-test",
+      "row": 269,
+      "audio": "berst-test/269.wav",
+      "reference": "banana and mustard sandwiches",
+      "durationMs": 8620,
+      "durationBucket": "3-10",
+      "sizeBytes": 760412,
+      "sha256": "db30402ec6e885686cb78790cb15bb11779518e1d38c05e76aa7fd8e32b7f2f4",
+      "speakerID": "user_8f04825c-dcf5-4df5-81fa-34219039884b",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face up on any surface 12/19",
+        "shoutLevel": "no-shout",
+        "affect": "surprise",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000270",
+      "subsetID": "berst-test",
+      "row": 270,
+      "audio": "berst-test/270.wav",
+      "reference": "banana and mustard sandwiches",
+      "durationMs": 1974,
+      "durationBucket": "1-3",
+      "sizeBytes": 174252,
+      "sha256": "a5c5bbb3368cb997007f287871018fca3b6f1f6625e1a1dd2476007ded161e16",
+      "speakerID": "user_8f04825c-dcf5-4df5-81fa-34219039884b",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face up on any surface 12/19",
+        "shoutLevel": "shout",
+        "affect": "surprise",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000273",
+      "subsetID": "berst-test",
+      "row": 273,
+      "audio": "berst-test/273.wav",
+      "reference": "wolf ring lights are fantastic",
+      "durationMs": 3653,
+      "durationBucket": "3-10",
+      "sizeBytes": 350732,
+      "sha256": "e374f97942287a8219f59cd7fa4a06ce4ac51652eb5012615279835f6e89f69b",
+      "speakerID": "user_6ad54616-b536-4d82-9f15-2e78afeaa12d",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face with your hand covering the mic 3/19",
+        "shoutLevel": "no-shout",
+        "affect": "neutral",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Galaxy A32"
+      }
+    },
+    {
+      "id": "berst-test-000277",
+      "subsetID": "berst-test",
+      "row": 277,
+      "audio": "berst-test/277.wav",
+      "reference": "ripped ocean jumper",
+      "durationMs": 1684,
+      "durationBucket": "1-3",
+      "sizeBytes": 148638,
+      "sha256": "c397eca087282cb4877f7f5360326a310bb91798a4632ee36007aa686aeff80c",
+      "speakerID": "user_79a0d5bf-888e-4ea6-bc56-a96c59ab9c57",
+      "slices": {
+        "phonePosition": "Hold your phone next to your hip with your hand covering the mic 5/19",
+        "shoutLevel": "shout",
+        "affect": "neutral",
+        "firstLanguage": "English",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000278",
+      "subsetID": "berst-test",
+      "row": 278,
+      "audio": "berst-test/278.wav",
+      "reference": "fluffy baseboard yogurt division",
+      "durationMs": 8620,
+      "durationBucket": "3-10",
+      "sizeBytes": 760412,
+      "sha256": "1e6a0748f1a36bf4b0ad8bc938494d45b51a56c857c4dd12b16094bebd3091b7",
+      "speakerID": "user_ea623111-8a10-45da-a7cc-7fbf32b1e454",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room in a bag 15/19",
+        "shoutLevel": "no-shout",
+        "affect": "joy",
+        "firstLanguage": "Hindi",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000281",
+      "subsetID": "berst-test",
+      "row": 281,
+      "audio": "berst-test/281.wav",
+      "reference": "the thunder break craze",
+      "durationMs": 2167,
+      "durationBucket": "1-3",
+      "sizeBytes": 208076,
+      "sha256": "8e285427c4086d5599b03c2580c7dcc5065b3f786d1daa83070dba73b22b1e55",
+      "speakerID": "user_79a0d5bf-888e-4ea6-bc56-a96c59ab9c57",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face down on a soft surface 14/19",
+        "shoutLevel": "no-shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000290",
+      "subsetID": "berst-test",
+      "row": 290,
+      "audio": "berst-test/290.wav",
+      "reference": "wolf ring lights are fantastic",
+      "durationMs": 2655,
+      "durationBucket": "1-3",
+      "sizeBytes": 254892,
+      "sha256": "28d1c4a0bb7b1f3477baca843e44f8c3f252f7191be5400dbec498c1040eff13",
+      "speakerID": "user_e4cb5b6a-8f7c-4ae7-9235-97b458c73d9e",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you in a bag 19/19",
+        "shoutLevel": "no-shout",
+        "affect": "neutral",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 12"
+      }
+    },
+    {
+      "id": "berst-test-000298",
+      "subsetID": "berst-test",
+      "row": 298,
+      "audio": "berst-test/298.wav",
+      "reference": "banana and mustard sandwiches",
+      "durationMs": 3112,
+      "durationBucket": "3-10",
+      "sizeBytes": 298786,
+      "sha256": "62b35301660c7c948917f0452557ff0b4c283e7001857255eccad0b72bbe65d5",
+      "speakerID": "user_8f04825c-dcf5-4df5-81fa-34219039884b",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face down on a soft surface 14/19",
+        "shoutLevel": "shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000303",
+      "subsetID": "berst-test",
+      "row": 303,
+      "audio": "berst-test/303.wav",
+      "reference": "five dollar slaw onion cure",
+      "durationMs": 3548,
+      "durationBucket": "3-10",
+      "sizeBytes": 340652,
+      "sha256": "caa2feebd226eb81c5cf348ddf72dbba79ba157272003d082cd5cb40691dad1d",
+      "speakerID": "user_8f04825c-dcf5-4df5-81fa-34219039884b",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face with the mic facing your mouth as you would in a phone conversation 1/19",
+        "shoutLevel": "no-shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000306",
+      "subsetID": "berst-test",
+      "row": 306,
+      "audio": "berst-test/306.wav",
+      "reference": "birds make new jingles",
+      "durationMs": 1469,
+      "durationBucket": "1-3",
+      "sizeBytes": 141066,
+      "sha256": "d50d4dfb097e20b724ecd9d79d31b849fc0482cae4892cd4b9926a496029b2b8",
+      "speakerID": "user_ab2aa238-b678-4daa-9a03-0510fc20b4ca",
+      "slices": {
+        "phonePosition": "Hold your phone next to your hip with the back of phone on your palm 4/19",
+        "shoutLevel": "no-shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Z-Fold 2"
+      }
+    },
+    {
+      "id": "berst-test-000307",
+      "subsetID": "berst-test",
+      "row": 307,
+      "audio": "berst-test/307.wav",
+      "reference": "five dollar slaw onion cure",
+      "durationMs": 3682,
+      "durationBucket": "3-10",
+      "sizeBytes": 353516,
+      "sha256": "7bb305d4574f496ff4e60fbd9ea164d951ef2ee5b36405de80d9e1749a3fa92e",
+      "speakerID": "user_8f04825c-dcf5-4df5-81fa-34219039884b",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face with the mic facing your mouth as you would in a phone conversation 1/19",
+        "shoutLevel": "shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000309",
+      "subsetID": "berst-test",
+      "row": 309,
+      "audio": "berst-test/309.wav",
+      "reference": "five special guest treasures",
+      "durationMs": 2685,
+      "durationBucket": "1-3",
+      "sizeBytes": 257778,
+      "sha256": "0fa1be5890c42973eacc9c1802f435eb3044a79643a15cf780225efe069e94f7",
+      "speakerID": "user_f39f7456-112f-4b99-ad53-9ac2b4dd3204",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room in a bag 15/19",
+        "shoutLevel": "shout",
+        "affect": "joy",
+        "firstLanguage": "Tagalog",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000311",
+      "subsetID": "berst-test",
+      "row": 311,
+      "audio": "berst-test/311.wav",
+      "reference": "fluffy baseboard yogurt division",
+      "durationMs": 2843,
+      "durationBucket": "1-3",
+      "sizeBytes": 272972,
+      "sha256": "0bd89a1bd722d1d623451c7c49d3fa99ab834d03beb22036f7437a8bd15b40b9",
+      "speakerID": "user_e4cb5b6a-8f7c-4ae7-9235-97b458c73d9e",
+      "slices": {
+        "phonePosition": "Place your phone in your pocket 6/19",
+        "shoutLevel": "no-shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 12"
+      }
+    },
+    {
+      "id": "berst-test-000312",
+      "subsetID": "berst-test",
+      "row": 312,
+      "audio": "berst-test/312.wav",
+      "reference": "snow meteor down from the chimney",
+      "durationMs": 1921,
+      "durationBucket": "1-3",
+      "sizeBytes": 184420,
+      "sha256": "fc45fe0c88b0e784edd1b1bb15ae14d10882b2aa63467bdf093475f934e463b7",
+      "speakerID": "user_8df227ec-8e51-4111-b3ee-ac2c5fc90500",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face up on any surface 8/19",
+        "shoutLevel": "no-shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000313",
+      "subsetID": "berst-test",
+      "row": 313,
+      "audio": "berst-test/313.wav",
+      "reference": "snow meteor down from the chimney",
+      "durationMs": 1909,
+      "durationBucket": "1-3",
+      "sizeBytes": 183316,
+      "sha256": "d3275e41c0261a93bc3f1cb501846da20bb3e4696c9b56ff74e006c80c8d30b9",
+      "speakerID": "user_8df227ec-8e51-4111-b3ee-ac2c5fc90500",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face up on any surface 8/19",
+        "shoutLevel": "shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000318",
+      "subsetID": "berst-test",
+      "row": 318,
+      "audio": "berst-test/318.wav",
+      "reference": "hungry action hippos fruit",
+      "durationMs": 2810,
+      "durationBucket": "1-3",
+      "sizeBytes": 269804,
+      "sha256": "362c0e921b7d0ffb691f1d18b726b31a607f0f20d5f7af2fb53ab299c589ae27",
+      "speakerID": "user_efe48b66-95ef-4586-b7b3-243fd6293b07",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face down on a hard surface 9/19",
+        "shoutLevel": "no-shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000320",
+      "subsetID": "berst-test",
+      "row": 320,
+      "audio": "berst-test/320.wav",
+      "reference": "five special guest treasures",
+      "durationMs": 2486,
+      "durationBucket": "1-3",
+      "sizeBytes": 219314,
+      "sha256": "8be5f165095b1c131a06d5df2997ec8a78144efd50c9044f281b962407dfe874",
+      "speakerID": "user_f39f7456-112f-4b99-ad53-9ac2b4dd3204",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face down on a hard surface 13/19",
+        "shoutLevel": "no-shout",
+        "affect": "neutral",
+        "firstLanguage": "Tagalog",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000323",
+      "subsetID": "berst-test",
+      "row": 323,
+      "audio": "berst-test/323.wav",
+      "reference": "another dog secretary show",
+      "durationMs": 2011,
+      "durationBucket": "1-3",
+      "sizeBytes": 193120,
+      "sha256": "5b2901dc3c6fb9231e41fe2c5d7c26bc7f2c967e193dcf7117417a06aed3c5b6",
+      "speakerID": "user_79a0d5bf-888e-4ea6-bc56-a96c59ab9c57",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face down on a hard surface 9/19",
+        "shoutLevel": "no-shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000325",
+      "subsetID": "berst-test",
+      "row": 325,
+      "audio": "berst-test/325.wav",
+      "reference": "another dog secretary show",
+      "durationMs": 2211,
+      "durationBucket": "1-3",
+      "sizeBytes": 212306,
+      "sha256": "08c661a28e8770040decf977204673881c00810bd00608de3b310f7f779a8663",
+      "speakerID": "user_79a0d5bf-888e-4ea6-bc56-a96c59ab9c57",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face down on a hard surface 9/19",
+        "shoutLevel": "shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000326",
+      "subsetID": "berst-test",
+      "row": 326,
+      "audio": "berst-test/326.wav",
+      "reference": "join the Ear Look club",
+      "durationMs": 1745,
+      "durationBucket": "1-3",
+      "sizeBytes": 167548,
+      "sha256": "6f00bb6a3e6792ec4ccb735482064d5f223c3d8d69443f660559a92883a4a354",
+      "speakerID": "user_8f04825c-dcf5-4df5-81fa-34219039884b",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face up on any surface 8/19",
+        "shoutLevel": "no-shout",
+        "affect": "disgust",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000333",
+      "subsetID": "berst-test",
+      "row": 333,
+      "audio": "berst-test/333.wav",
+      "reference": "the thunder break craze",
+      "durationMs": 2540,
+      "durationBucket": "1-3",
+      "sizeBytes": 243884,
+      "sha256": "5b0ac8f617ccf6e5bb3085f880ac06cf7aeeaefc819e3e70b320b422b91a4dad",
+      "speakerID": "user_e4cb5b6a-8f7c-4ae7-9235-97b458c73d9e",
+      "slices": {
+        "phonePosition": "Hold your phone next to your hip with your hand covering the mic 5/19",
+        "shoutLevel": "no-shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 12"
+      }
+    },
+    {
+      "id": "berst-test-000336",
+      "subsetID": "berst-test",
+      "row": 336,
+      "audio": "berst-test/336.wav",
+      "reference": "birds make new jingles",
+      "durationMs": 1471,
+      "durationBucket": "1-3",
+      "sizeBytes": 141274,
+      "sha256": "392ec655ba98c202fe862fdfb391f83ca63107d26a1811d19499d1c1a4142e59",
+      "speakerID": "user_8df227ec-8e51-4111-b3ee-ac2c5fc90500",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face down on a hard surface 13/19",
+        "shoutLevel": "no-shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000338",
+      "subsetID": "berst-test",
+      "row": 338,
+      "audio": "berst-test/338.wav",
+      "reference": "five special guest treasures",
+      "durationMs": 3277,
+      "durationBucket": "3-10",
+      "sizeBytes": 314636,
+      "sha256": "3ca03ad60076d9536b1ce3929d6080ca3c09669e1e858883049998a1cf00b891",
+      "speakerID": "user_ea623111-8a10-45da-a7cc-7fbf32b1e454",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face up on any surface 12/19",
+        "shoutLevel": "no-shout",
+        "affect": "surprise",
+        "firstLanguage": "Hindi",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000340",
+      "subsetID": "berst-test",
+      "row": 340,
+      "audio": "berst-test/340.wav",
+      "reference": "five special guest treasures",
+      "durationMs": 2331,
+      "durationBucket": "1-3",
+      "sizeBytes": 223826,
+      "sha256": "9dec5ba216c9f78c754d5167c1e2da4800ee41d6b2cf07e7e106f7b9e6112fe2",
+      "speakerID": "user_ea623111-8a10-45da-a7cc-7fbf32b1e454",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face up on any surface 12/19",
+        "shoutLevel": "shout",
+        "affect": "surprise",
+        "firstLanguage": "Hindi",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000341",
+      "subsetID": "berst-test",
+      "row": 341,
+      "audio": "berst-test/341.wav",
+      "reference": "join the Ear Look club",
+      "durationMs": 2281,
+      "durationBucket": "1-3",
+      "sizeBytes": 219020,
+      "sha256": "bac12f259bca3a212505521c48443d75bfa9cadff6a4d92916ada1129c9c9ad1",
+      "speakerID": "user_79a0d5bf-888e-4ea6-bc56-a96c59ab9c57",
+      "slices": {
+        "phonePosition": "Place your phone in a bag and hold it next to your hip 7/19",
+        "shoutLevel": "no-shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000344",
+      "subsetID": "berst-test",
+      "row": 344,
+      "audio": "berst-test/344.wav",
+      "reference": "wolf ring lights are fantastic",
+      "durationMs": 2488,
+      "durationBucket": "1-3",
+      "sizeBytes": 219484,
+      "sha256": "0ed5cd5ac6574f76e794ee5cd64fc1b09ba5b00063dc248a85bbd658ba2186e5",
+      "speakerID": "user_f39f7456-112f-4b99-ad53-9ac2b4dd3204",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face with the mic facing your mouth as you would in a phone conversation 1/19",
+        "shoutLevel": "no-shout",
+        "affect": "neutral",
+        "firstLanguage": "Tagalog",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000350",
+      "subsetID": "berst-test",
+      "row": 350,
+      "audio": "berst-test/350.wav",
+      "reference": "join the Ear Look club",
+      "durationMs": 2732,
+      "durationBucket": "1-3",
+      "sizeBytes": 262316,
+      "sha256": "7f548faeab556d7fd81201ceb6051b4f126487d6031ab8bf64ee04d09e413f1a",
+      "speakerID": "user_ea623111-8a10-45da-a7cc-7fbf32b1e454",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face but with the mic/phone facing away from your face 2/19",
+        "shoutLevel": "no-shout",
+        "affect": "neutral",
+        "firstLanguage": "Hindi",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000365",
+      "subsetID": "berst-test",
+      "row": 365,
+      "audio": "berst-test/365.wav",
+      "reference": "five special guest treasures",
+      "durationMs": 2363,
+      "durationBucket": "1-3",
+      "sizeBytes": 226892,
+      "sha256": "8ef910aa59c5dad5c7162fa020d065192a3ae8a51b76e952c2a6012671cdc42c",
+      "speakerID": "user_efe48b66-95ef-4586-b7b3-243fd6293b07",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face up on any surface 16/19",
+        "shoutLevel": "shout",
+        "affect": "neutral",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000366",
+      "subsetID": "berst-test",
+      "row": 366,
+      "audio": "berst-test/366.wav",
+      "reference": "five special guest treasures",
+      "durationMs": 2632,
+      "durationBucket": "1-3",
+      "sizeBytes": 252716,
+      "sha256": "143251d48b9da45e8e2782d30cc9adf241e1b6a4c2623b0284fe530c65faa909",
+      "speakerID": "user_efe48b66-95ef-4586-b7b3-243fd6293b07",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face up on any surface 16/19",
+        "shoutLevel": "no-shout",
+        "affect": "neutral",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000369",
+      "subsetID": "berst-test",
+      "row": 369,
+      "audio": "berst-test/369.wav",
+      "reference": "thunder break craze",
+      "durationMs": 1262,
+      "durationBucket": "1-3",
+      "sizeBytes": 121164,
+      "sha256": "d4771fcef6b59e885d3f97208eb635b40c03d8c9c04835b9872f8e8b0e655317",
+      "speakerID": "user_e4cb5b6a-8f7c-4ae7-9235-97b458c73d9e",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face up on any surface 16/19",
+        "shoutLevel": "shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 12"
+      }
+    },
+    {
+      "id": "berst-test-000371",
+      "subsetID": "berst-test",
+      "row": 371,
+      "audio": "berst-test/371.wav",
+      "reference": "wolf ring lights are fantastic",
+      "durationMs": 2898,
+      "durationBucket": "1-3",
+      "sizeBytes": 278252,
+      "sha256": "53d20931933d8018b9a4c05fd5708e1319a023bf179836185130be15bc83db2c",
+      "speakerID": "user_efe48b66-95ef-4586-b7b3-243fd6293b07",
+      "slices": {
+        "phonePosition": "Place your phone in your pocket 6/19",
+        "shoutLevel": "shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000377",
+      "subsetID": "berst-test",
+      "row": 377,
+      "audio": "berst-test/377.wav",
+      "reference": "join the fear Look club",
+      "durationMs": 1412,
+      "durationBucket": "1-3",
+      "sizeBytes": 135550,
+      "sha256": "f470609d537218d6b789d881fd9cc489fe5acf1d09e5ca85aa3f58258c4603e9",
+      "speakerID": "user_efe48b66-95ef-4586-b7b3-243fd6293b07",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away in a bag 11/19",
+        "shoutLevel": "no-shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000384",
+      "subsetID": "berst-test",
+      "row": 384,
+      "audio": "berst-test/384.wav",
+      "reference": "fluffy baseboard yogurt division",
+      "durationMs": 3089,
+      "durationBucket": "3-10",
+      "sizeBytes": 296588,
+      "sha256": "73a28ac0291b877cbdf332b7d43c7e642f9acf5b7bc98934672c6733611e794e",
+      "speakerID": "user_79a0d5bf-888e-4ea6-bc56-a96c59ab9c57",
+      "slices": {
+        "phonePosition": "Place your phone in your pocket 6/19",
+        "shoutLevel": "shout",
+        "affect": "disgust",
+        "firstLanguage": "English",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000388",
+      "subsetID": "berst-test",
+      "row": 388,
+      "audio": "berst-test/388.wav",
+      "reference": "snow meteor down the chimney",
+      "durationMs": 2331,
+      "durationBucket": "1-3",
+      "sizeBytes": 223820,
+      "sha256": "5294a4200ed303a688d0fd72e6157c9b1a49cb7f38950a948fc7502d5d9954dd",
+      "speakerID": "user_efe48b66-95ef-4586-b7b3-243fd6293b07",
+      "slices": {
+        "phonePosition": "Place your phone in a bag and hold it next to your hip 7/19",
+        "shoutLevel": "no-shout",
+        "affect": "disgust",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000390",
+      "subsetID": "berst-test",
+      "row": 390,
+      "audio": "berst-test/390.wav",
+      "reference": "snow meteor down the chimney",
+      "durationMs": 3162,
+      "durationBucket": "3-10",
+      "sizeBytes": 303596,
+      "sha256": "406f58242582b529f2e3a963032897e926f1e2e38fdb081529bcf69caa05ddbb",
+      "speakerID": "user_efe48b66-95ef-4586-b7b3-243fd6293b07",
+      "slices": {
+        "phonePosition": "Place your phone in a bag and hold it next to your hip 7/19",
+        "shoutLevel": "shout",
+        "affect": "disgust",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000391",
+      "subsetID": "berst-test",
+      "row": 391,
+      "audio": "berst-test/391.wav",
+      "reference": "ripped ocean jumper",
+      "durationMs": 2271,
+      "durationBucket": "1-3",
+      "sizeBytes": 218060,
+      "sha256": "032119cce0ade197fb60f0f2798ea4a091b06b52735b9a605e10e168b8140ac2",
+      "speakerID": "user_ab2aa238-b678-4daa-9a03-0510fc20b4ca",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face down on a soft surface 10/19",
+        "shoutLevel": "no-shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Z-Fold 2"
+      }
+    },
+    {
+      "id": "berst-test-000397",
+      "subsetID": "berst-test",
+      "row": 397,
+      "audio": "berst-test/397.wav",
+      "reference": "banana and mustard sandwiches",
+      "durationMs": 4014,
+      "durationBucket": "3-10",
+      "sizeBytes": 385388,
+      "sha256": "10ea65478e0c4f7d1f3957a111f3924cd51f156a6dfa8c74bef4fb3ab9c67ebf",
+      "speakerID": "user_00d07fbe-37f7-47ab-8989-47d398a30c96",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face but with the mic/phone facing away from your face 2/19",
+        "shoutLevel": "shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone se"
+      }
+    },
+    {
+      "id": "berst-test-000398",
+      "subsetID": "berst-test",
+      "row": 398,
+      "audio": "berst-test/398.wav",
+      "reference": "the thunder breeze craze",
+      "durationMs": 2918,
+      "durationBucket": "1-3",
+      "sizeBytes": 280172,
+      "sha256": "2828a05d08b6b4ca120bdd03b54eebb41706c9aed727c44454192980e56a31e0",
+      "speakerID": "user_efe48b66-95ef-4586-b7b3-243fd6293b07",
+      "slices": {
+        "phonePosition": "Hold your phone next to your hip with your hand covering the mic 5/19",
+        "shoutLevel": "no-shout",
+        "affect": "sadness",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000401",
+      "subsetID": "berst-test",
+      "row": 401,
+      "audio": "berst-test/401.wav",
+      "reference": "heavy undersea b-birthday pumpkins",
+      "durationMs": 3898,
+      "durationBucket": "3-10",
+      "sizeBytes": 374252,
+      "sha256": "585c503247dafabf6d16fd7ccee64dc9939e08fb3212181dfa96ebe4151bfbad",
+      "speakerID": "user_6ad54616-b536-4d82-9f15-2e78afeaa12d",
+      "slices": {
+        "phonePosition": "Place your phone in a bag and hold it next to your hip 7/19",
+        "shoutLevel": "no-shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Galaxy A32"
+      }
+    },
+    {
+      "id": "berst-test-000404",
+      "subsetID": "berst-test",
+      "row": 404,
+      "audio": "berst-test/404.wav",
+      "reference": "join the Ear Look club",
+      "durationMs": 1934,
+      "durationBucket": "1-3",
+      "sizeBytes": 185668,
+      "sha256": "1768fcdd0fe008166704951f13acf03981db5b14b1afd27eb51f245e6dd54130",
+      "speakerID": "user_6ad54616-b536-4d82-9f15-2e78afeaa12d",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face up on any surface 16/19",
+        "shoutLevel": "no-shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Galaxy A32"
+      }
+    },
+    {
+      "id": "berst-test-000407",
+      "subsetID": "berst-test",
+      "row": 407,
+      "audio": "berst-test/407.wav",
+      "reference": "heavy undersea birthday pumpkins",
+      "durationMs": 3691,
+      "durationBucket": "3-10",
+      "sizeBytes": 354380,
+      "sha256": "92790bb22d8529a70b61f671648a9a64fbea33660dca0d4f7067685dda5f6143",
+      "speakerID": "user_8f04825c-dcf5-4df5-81fa-34219039884b",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face down on a hard surface 9/19",
+        "shoutLevel": "shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000409",
+      "subsetID": "berst-test",
+      "row": 409,
+      "audio": "berst-test/409.wav",
+      "reference": "heavy undersea birthday pumpkins",
+      "durationMs": 3373,
+      "durationBucket": "3-10",
+      "sizeBytes": 323852,
+      "sha256": "b609cc7a82b18550ea39c728f22c1c17967607e197f99f4e9010d0bcaa6f5127",
+      "speakerID": "user_8f04825c-dcf5-4df5-81fa-34219039884b",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face down on a hard surface 9/19",
+        "shoutLevel": "no-shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000410",
+      "subsetID": "berst-test",
+      "row": 410,
+      "audio": "berst-test/410.wav",
+      "reference": "wolf ring lights are fantastic",
+      "durationMs": 3964,
+      "durationBucket": "3-10",
+      "sizeBytes": 380588,
+      "sha256": "a0486fe4489b8e8a657642c5ef9e32eba5633809b37aa7f41ce07335f6cde381",
+      "speakerID": "user_e4cb5b6a-8f7c-4ae7-9235-97b458c73d9e",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face with your hand covering the mic 3/19",
+        "shoutLevel": "shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 12"
+      }
+    },
+    {
+      "id": "berst-test-000415",
+      "subsetID": "berst-test",
+      "row": 415,
+      "audio": "berst-test/415.wav",
+      "reference": "another dog secretary show",
+      "durationMs": 3504,
+      "durationBucket": "3-10",
+      "sizeBytes": 336428,
+      "sha256": "0526b22cf80445f430645ceac634f13b831364ada1fec9e1f20747800a109067",
+      "speakerID": "user_6ad54616-b536-4d82-9f15-2e78afeaa12d",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face up on any surface 8/19",
+        "shoutLevel": "shout",
+        "affect": "surprise",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Galaxy A32"
+      }
+    },
+    {
+      "id": "berst-test-000417",
+      "subsetID": "berst-test",
+      "row": 417,
+      "audio": "berst-test/417.wav",
+      "reference": "ripped open jumper",
+      "durationMs": 2082,
+      "durationBucket": "1-3",
+      "sizeBytes": 199916,
+      "sha256": "ef6588578b200ea8d61afe7a6cb607f333922e3f7faa90259993c0ca58550a08",
+      "speakerID": "user_efe48b66-95ef-4586-b7b3-243fd6293b07",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face but with the mic/phone facing away from your face 2/19",
+        "shoutLevel": "shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000420",
+      "subsetID": "berst-test",
+      "row": 420,
+      "audio": "berst-test/420.wav",
+      "reference": "another dog secretary show",
+      "durationMs": 3143,
+      "durationBucket": "3-10",
+      "sizeBytes": 301770,
+      "sha256": "c8a0e8e8a0326fca0ac05a4b8b19e55056aee0a9b33345e7c1cdba619824af0d",
+      "speakerID": "user_e4cb5b6a-8f7c-4ae7-9235-97b458c73d9e",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face up on any surface 12/19",
+        "shoutLevel": "no-shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 12"
+      }
+    },
+    {
+      "id": "berst-test-000425",
+      "subsetID": "berst-test",
+      "row": 425,
+      "audio": "berst-test/425.wav",
+      "reference": "fluffy baseboard yogurt division",
+      "durationMs": 2520,
+      "durationBucket": "1-3",
+      "sizeBytes": 241964,
+      "sha256": "96e9b0c35eafcf0d9430a749fe2d4063885b2247577a661674c8942e51194d4f",
+      "speakerID": "user_79a0d5bf-888e-4ea6-bc56-a96c59ab9c57",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face but with the mic/phone facing away from your face 2/19",
+        "shoutLevel": "no-shout",
+        "affect": "disgust",
+        "firstLanguage": "English",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000426",
+      "subsetID": "berst-test",
+      "row": 426,
+      "audio": "berst-test/426.wav",
+      "reference": "fluffy baseboard yogurt division",
+      "durationMs": 2632,
+      "durationBucket": "1-3",
+      "sizeBytes": 252716,
+      "sha256": "709e362215f4b1acb600d5fa0c2b0d9fd6b151634c469072f9c5790bf75b9995",
+      "speakerID": "user_79a0d5bf-888e-4ea6-bc56-a96c59ab9c57",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face but with the mic/phone facing away from your face 2/19",
+        "shoutLevel": "shout",
+        "affect": "disgust",
+        "firstLanguage": "English",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000428",
+      "subsetID": "berst-test",
+      "row": 428,
+      "audio": "berst-test/428.wav",
+      "reference": "five special guest treasures",
+      "durationMs": 2767,
+      "durationBucket": "1-3",
+      "sizeBytes": 265676,
+      "sha256": "71392c77b905879f12a43f239405d3fbc1a2bc15a95a6518284ce24bb690fc3c",
+      "speakerID": "user_efe48b66-95ef-4586-b7b3-243fd6293b07",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face down on a soft surface 10/19",
+        "shoutLevel": "shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000430",
+      "subsetID": "berst-test",
+      "row": 430,
+      "audio": "berst-test/430.wav",
+      "reference": "five special guest treasures",
+      "durationMs": 2335,
+      "durationBucket": "1-3",
+      "sizeBytes": 224204,
+      "sha256": "564b03b4535ea877a16c702a5e06e90a34a1f5777255a7e3c13ae0068d30a3a7",
+      "speakerID": "user_efe48b66-95ef-4586-b7b3-243fd6293b07",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face down on a soft surface 10/19",
+        "shoutLevel": "no-shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000437",
+      "subsetID": "berst-test",
+      "row": 437,
+      "audio": "berst-test/437.wav",
+      "reference": "another dog secretary show",
+      "durationMs": 2285,
+      "durationBucket": "1-3",
+      "sizeBytes": 219404,
+      "sha256": "b1a625be33a736d6518721e0b47b3b6685b8def32d0cb778165fe448375cdc4a",
+      "speakerID": "user_efe48b66-95ef-4586-b7b3-243fd6293b07",
+      "slices": {
+        "phonePosition": "Hold your phone next to your hip with the back of phone on your palm 4/19",
+        "shoutLevel": "no-shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000439",
+      "subsetID": "berst-test",
+      "row": 439,
+      "audio": "berst-test/439.wav",
+      "reference": "another dog secretary show",
+      "durationMs": 1709,
+      "durationBucket": "1-3",
+      "sizeBytes": 164150,
+      "sha256": "68dea94b69649134c8a1acc760f7d1e0c6b315966322b02f0298b8c990857db0",
+      "speakerID": "user_efe48b66-95ef-4586-b7b3-243fd6293b07",
+      "slices": {
+        "phonePosition": "Hold your phone next to your hip with the back of phone on your palm 4/19",
+        "shoutLevel": "shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000442",
+      "subsetID": "berst-test",
+      "row": 442,
+      "audio": "berst-test/442.wav",
+      "reference": "five special guest treasures",
+      "durationMs": 3144,
+      "durationBucket": "3-10",
+      "sizeBytes": 277322,
+      "sha256": "fb5739aaff13f3d35e19353b0e27942ae7e44242419e547f27ff8a1cea59e180",
+      "speakerID": "user_f39f7456-112f-4b99-ad53-9ac2b4dd3204",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face down on a hard surface 13/19",
+        "shoutLevel": "shout",
+        "affect": "neutral",
+        "firstLanguage": "Tagalog",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000447",
+      "subsetID": "berst-test",
+      "row": 447,
+      "audio": "berst-test/447.wav",
+      "reference": "another dog secretary show",
+      "durationMs": 2922,
+      "durationBucket": "1-3",
+      "sizeBytes": 280556,
+      "sha256": "36a8830b3480d5be28839d13f2b13bbfcb6c43d5d304842b942f08858a59d573",
+      "speakerID": "user_efe48b66-95ef-4586-b7b3-243fd6293b07",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face up on any surface 12/19",
+        "shoutLevel": "no-shout",
+        "affect": "disgust",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000448",
+      "subsetID": "berst-test",
+      "row": 448,
+      "audio": "berst-test/448.wav",
+      "reference": "another dog secretary show",
+      "durationMs": 2877,
+      "durationBucket": "1-3",
+      "sizeBytes": 276236,
+      "sha256": "12681b4dffc2024c0130fadca6fcd639793463964f45d3218ffa77d37fddb53a",
+      "speakerID": "user_efe48b66-95ef-4586-b7b3-243fd6293b07",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face up on any surface 12/19",
+        "shoutLevel": "shout",
+        "affect": "disgust",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000451",
+      "subsetID": "berst-test",
+      "row": 451,
+      "audio": "berst-test/451.wav",
+      "reference": "the thunder break craze",
+      "durationMs": 3435,
+      "durationBucket": "3-10",
+      "sizeBytes": 329804,
+      "sha256": "3ff1ab9e3956f8642ae31ba9e1ca19a219bd88622ab3d6c756ea1f943bb62a5c",
+      "speakerID": "user_ea623111-8a10-45da-a7cc-7fbf32b1e454",
+      "slices": {
+        "phonePosition": "Hold your phone next to your hip with your hand covering the mic 5/19",
+        "shoutLevel": "shout",
+        "affect": "sadness",
+        "firstLanguage": "Hindi",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000456",
+      "subsetID": "berst-test",
+      "row": 456,
+      "audio": "berst-test/456.wav",
+      "reference": "the thunder break craze",
+      "durationMs": 2951,
+      "durationBucket": "1-3",
+      "sizeBytes": 283340,
+      "sha256": "0b65ab8ebeef7d33025bdd03f2cee311ece61b5e0db5630eddadf3b2a391d324",
+      "speakerID": "user_efe48b66-95ef-4586-b7b3-243fd6293b07",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face down on a soft surface 14/19",
+        "shoutLevel": "no-shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000468",
+      "subsetID": "berst-test",
+      "row": 468,
+      "audio": "berst-test/468.wav",
+      "reference": "banana and mustard sandwiches",
+      "durationMs": 2654,
+      "durationBucket": "1-3",
+      "sizeBytes": 254798,
+      "sha256": "eacd46d428e39e0e6962d5f07a64b5bc5a6fbb2d8418659bd34be5edfe38e0de",
+      "speakerID": "user_8df227ec-8e51-4111-b3ee-ac2c5fc90500",
+      "slices": {
+        "phonePosition": "Place your phone in your pocket 6/19",
+        "shoutLevel": "no-shout",
+        "affect": "surprise",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000469",
+      "subsetID": "berst-test",
+      "row": 469,
+      "audio": "berst-test/469.wav",
+      "reference": "banana and mustard sandwiches",
+      "durationMs": 2519,
+      "durationBucket": "1-3",
+      "sizeBytes": 241846,
+      "sha256": "7035cb8272e1a5ec4cef95110e0a9f8ce87dfc5df0ffdadb7e35995791ed9583",
+      "speakerID": "user_8df227ec-8e51-4111-b3ee-ac2c5fc90500",
+      "slices": {
+        "phonePosition": "Place your phone in your pocket 6/19",
+        "shoutLevel": "shout",
+        "affect": "surprise",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000475",
+      "subsetID": "berst-test",
+      "row": 475,
+      "audio": "berst-test/475.wav",
+      "reference": "birds make new jingles",
+      "durationMs": 2404,
+      "durationBucket": "1-3",
+      "sizeBytes": 230828,
+      "sha256": "1c59042fb02ef9e79d984166d067b1fe39f4ca8f824393307aca63b2bb308124",
+      "speakerID": "user_e4cb5b6a-8f7c-4ae7-9235-97b458c73d9e",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away face down on a soft surface 10/19",
+        "shoutLevel": "shout",
+        "affect": "surprise",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 12"
+      }
+    },
+    {
+      "id": "berst-test-000483",
+      "subsetID": "berst-test",
+      "row": 483,
+      "audio": "berst-test/483.wav",
+      "reference": "five dollar slaw onion cure",
+      "durationMs": 2175,
+      "durationBucket": "1-3",
+      "sizeBytes": 208874,
+      "sha256": "7fa45b1f349e723d6014b9583ddae0b15d28ae98d76095a0153159459a17fd4f",
+      "speakerID": "user_e4cb5b6a-8f7c-4ae7-9235-97b458c73d9e",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face down on a soft surface 18/19",
+        "shoutLevel": "shout",
+        "affect": "surprise",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 12"
+      }
+    },
+    {
+      "id": "berst-test-000484",
+      "subsetID": "berst-test",
+      "row": 484,
+      "audio": "berst-test/484.wav",
+      "reference": "another dog secretary show",
+      "durationMs": 2025,
+      "durationBucket": "1-3",
+      "sizeBytes": 194434,
+      "sha256": "1c526bf5ab2a30cea1fa2c988e11537a6d0a39c9cb3eafeee0dde3dbef6e223e",
+      "speakerID": "user_ab2aa238-b678-4daa-9a03-0510fc20b4ca",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room in a bag 15/19",
+        "shoutLevel": "no-shout",
+        "affect": "sadness",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Z-Fold 2"
+      }
+    },
+    {
+      "id": "berst-test-000486",
+      "subsetID": "berst-test",
+      "row": 486,
+      "audio": "berst-test/486.wav",
+      "reference": "another dog secretary show",
+      "durationMs": 2321,
+      "durationBucket": "1-3",
+      "sizeBytes": 222844,
+      "sha256": "e329cc464f363284a066ef5f3e8a06389bd5faf844857d0ce975cb4b4a2cc7d8",
+      "speakerID": "user_ab2aa238-b678-4daa-9a03-0510fc20b4ca",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room in a bag 15/19",
+        "shoutLevel": "shout",
+        "affect": "sadness",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Z-Fold 2"
+      }
+    },
+    {
+      "id": "berst-test-000490",
+      "subsetID": "berst-test",
+      "row": 490,
+      "audio": "berst-test/490.wav",
+      "reference": "fluffy baseboard yogurt division",
+      "durationMs": 1880,
+      "durationBucket": "1-3",
+      "sizeBytes": 180512,
+      "sha256": "8b947682e23f800d004b9243a9476cb1f908f3ada45e1b83b4f0625931399708",
+      "speakerID": "user_8f04825c-dcf5-4df5-81fa-34219039884b",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face down on a hard surface 13/19",
+        "shoutLevel": "no-shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000492",
+      "subsetID": "berst-test",
+      "row": 492,
+      "audio": "berst-test/492.wav",
+      "reference": "fluffy baseboard yogurt division",
+      "durationMs": 2722,
+      "durationBucket": "1-3",
+      "sizeBytes": 261364,
+      "sha256": "de325f42924401befcd4e6eed154ddf4df62889215b1e4bb1099d3c286b2f670",
+      "speakerID": "user_8f04825c-dcf5-4df5-81fa-34219039884b",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face down on a hard surface 13/19",
+        "shoutLevel": "shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000494",
+      "subsetID": "berst-test",
+      "row": 494,
+      "audio": "berst-test/494.wav",
+      "reference": "the thunder break craze",
+      "durationMs": 1443,
+      "durationBucket": "1-3",
+      "sizeBytes": 138618,
+      "sha256": "f37d4496a245dca1c73305c02d507660c55c00b55772783cca6a4f339df93a6f",
+      "speakerID": "user_ea623111-8a10-45da-a7cc-7fbf32b1e454",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face with the mic facing your mouth as you would in a phone conversation 1/19",
+        "shoutLevel": "no-shout",
+        "affect": "anger",
+        "firstLanguage": "Hindi",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000495",
+      "subsetID": "berst-test",
+      "row": 495,
+      "audio": "berst-test/495.wav",
+      "reference": "the thunder break craze",
+      "durationMs": 1871,
+      "durationBucket": "1-3",
+      "sizeBytes": 179638,
+      "sha256": "9b822642962dd93712a6142476940beda3b3a161c2ac879573acef2c05bb2f85",
+      "speakerID": "user_ea623111-8a10-45da-a7cc-7fbf32b1e454",
+      "slices": {
+        "phonePosition": "Hold your phone next to your face with the mic facing your mouth as you would in a phone conversation 1/19",
+        "shoutLevel": "shout",
+        "affect": "anger",
+        "firstLanguage": "Hindi",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000499",
+      "subsetID": "berst-test",
+      "row": 499,
+      "audio": "berst-test/499.wav",
+      "reference": "another dog secretary show",
+      "durationMs": 1439,
+      "durationBucket": "1-3",
+      "sizeBytes": 138180,
+      "sha256": "e0d66046d0253cbf6dd4bb839a1b3cf55616245e1616fa3873a510f1f759395e",
+      "speakerID": "user_ea623111-8a10-45da-a7cc-7fbf32b1e454",
+      "slices": {
+        "phonePosition": "Hold your phone next to your hip with the back of phone on your palm 4/19",
+        "shoutLevel": "no-shout",
+        "affect": "neutral",
+        "firstLanguage": "Hindi",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000501",
+      "subsetID": "berst-test",
+      "row": 501,
+      "audio": "berst-test/501.wav",
+      "reference": "another dog secretary show",
+      "durationMs": 1805,
+      "durationBucket": "1-3",
+      "sizeBytes": 173320,
+      "sha256": "20f18747c2404e202572812f0e3fa663449bc681bf5875158b59944b7bb7a48a",
+      "speakerID": "user_ea623111-8a10-45da-a7cc-7fbf32b1e454",
+      "slices": {
+        "phonePosition": "Hold your phone next to your hip with the back of phone on your palm 4/19",
+        "shoutLevel": "shout",
+        "affect": "neutral",
+        "firstLanguage": "Hindi",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000502",
+      "subsetID": "berst-test",
+      "row": 502,
+      "audio": "berst-test/502.wav",
+      "reference": "zebra cats walking on lamps",
+      "durationMs": 1929,
+      "durationBucket": "1-3",
+      "sizeBytes": 185206,
+      "sha256": "f1382a470b2453eec444af4e123f9d0a6ce5d734394591ffac178a42d2a58eba",
+      "speakerID": "user_ab2aa238-b678-4daa-9a03-0510fc20b4ca",
+      "slices": {
+        "phonePosition": "Place your phone in your pocket 6/19",
+        "shoutLevel": "no-shout",
+        "affect": "sadness",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Z-Fold 2"
+      }
+    },
+    {
+      "id": "berst-test-000507",
+      "subsetID": "berst-test",
+      "row": 507,
+      "audio": "berst-test/507.wav",
+      "reference": "birds make new jingles",
+      "durationMs": 2553,
+      "durationBucket": "1-3",
+      "sizeBytes": 245132,
+      "sha256": "303dd3e47bdff62de335b256d252df82f208693058c10b5ff95351b0e4728fb0",
+      "speakerID": "user_efe48b66-95ef-4586-b7b3-243fd6293b07",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room in a bag 15/19",
+        "shoutLevel": "shout",
+        "affect": "surprise",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000509",
+      "subsetID": "berst-test",
+      "row": 509,
+      "audio": "berst-test/509.wav",
+      "reference": "snow meteor down the chimney",
+      "durationMs": 1700,
+      "durationBucket": "1-3",
+      "sizeBytes": 163216,
+      "sha256": "8596ff669807259ba2c348ad80935d95b7d8cdc85a591eefdcf3e7aef7687748",
+      "speakerID": "user_8df227ec-8e51-4111-b3ee-ac2c5fc90500",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away in a bag 11/19",
+        "shoutLevel": "shout",
+        "affect": "surprise",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000512",
+      "subsetID": "berst-test",
+      "row": 512,
+      "audio": "berst-test/512.wav",
+      "reference": "ripped ocean jumper",
+      "durationMs": 1709,
+      "durationBucket": "1-3",
+      "sizeBytes": 164106,
+      "sha256": "d119a01a8e12f21f138a9f8cab717f82c634ab8a7e0c65fe83e8c284f3599670",
+      "speakerID": "user_8f04825c-dcf5-4df5-81fa-34219039884b",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you in a bag 19/19",
+        "shoutLevel": "shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000514",
+      "subsetID": "berst-test",
+      "row": 514,
+      "audio": "berst-test/514.wav",
+      "reference": "another dog secretary show",
+      "durationMs": 1894,
+      "durationBucket": "1-3",
+      "sizeBytes": 181890,
+      "sha256": "8ed60fdc7bf2859fed7759a0bc76ab571ed1fefce0f9cc3996236fa3eb54cd65",
+      "speakerID": "user_ab2aa238-b678-4daa-9a03-0510fc20b4ca",
+      "slices": {
+        "phonePosition": "Place phone on the opposite side of the room face down on a soft surface 14/19",
+        "shoutLevel": "no-shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Z-Fold 2"
+      }
+    },
+    {
+      "id": "berst-test-000518",
+      "subsetID": "berst-test",
+      "row": 518,
+      "audio": "berst-test/518.wav",
+      "reference": "the thunder break craze",
+      "durationMs": 2843,
+      "durationBucket": "1-3",
+      "sizeBytes": 272972,
+      "sha256": "a6ec3acc60e3ffc3ac3b1ba680eb5d684efda0ec62e5c8f4d0095d89efb8c463",
+      "speakerID": "user_8df227ec-8e51-4111-b3ee-ac2c5fc90500",
+      "slices": {
+        "phonePosition": "Hold your phone next to your hip with the back of phone on your palm 4/19",
+        "shoutLevel": "no-shout",
+        "affect": "anger",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone 11"
+      }
+    },
+    {
+      "id": "berst-test-000520",
+      "subsetID": "berst-test",
+      "row": 520,
+      "audio": "berst-test/520.wav",
+      "reference": "birds make new jingles",
+      "durationMs": 3420,
+      "durationBucket": "3-10",
+      "sizeBytes": 301688,
+      "sha256": "0412a154072da3e890c1d087864a8724666ecafc212d4a70ecd7fa02ae367ba5",
+      "speakerID": "user_f39f7456-112f-4b99-ad53-9ac2b4dd3204",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face down on a hard surface 17/19",
+        "shoutLevel": "shout",
+        "affect": "disgust",
+        "firstLanguage": "Tagalog",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000521",
+      "subsetID": "berst-test",
+      "row": 521,
+      "audio": "berst-test/521.wav",
+      "reference": "banana and mustard sandwiches",
+      "durationMs": 3225,
+      "durationBucket": "3-10",
+      "sizeBytes": 284488,
+      "sha256": "61c0fd92536cb20823af5564b1271c31dc5a4f350e12a69b4cafd4b112d43e9a",
+      "speakerID": "user_f39f7456-112f-4b99-ad53-9ac2b4dd3204",
+      "slices": {
+        "phonePosition": "Place your phone in a bag and hold it next to your hip 7/19",
+        "shoutLevel": "shout",
+        "affect": "fear",
+        "firstLanguage": "Tagalog",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000527",
+      "subsetID": "berst-test",
+      "row": 527,
+      "audio": "berst-test/527.wav",
+      "reference": "five special guest treasures",
+      "durationMs": 2998,
+      "durationBucket": "1-3",
+      "sizeBytes": 287830,
+      "sha256": "f2f07a4cfa9fe662b4c05926cb4f75d2088384d5eca1ee466ebb422dedb9cc69",
+      "speakerID": "user_f39f7456-112f-4b99-ad53-9ac2b4dd3204",
+      "slices": {
+        "phonePosition": "Place phone 1-2 meters away in a bag 11/19",
+        "shoutLevel": "shout",
+        "affect": "surprise",
+        "firstLanguage": "Tagalog",
+        "phoneModel": "Iphone11"
+      }
+    },
+    {
+      "id": "berst-test-000528",
+      "subsetID": "berst-test",
+      "row": 528,
+      "audio": "berst-test/528.wav",
+      "reference": "ripped ocean jumper",
+      "durationMs": 2677,
+      "durationBucket": "1-3",
+      "sizeBytes": 257036,
+      "sha256": "d8ce49e7fc3581fe0bddf517db03874007a40254b64a0541770f5b2af0cb076d",
+      "speakerID": "user_8f04825c-dcf5-4df5-81fa-34219039884b",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face up on any surface 16/19",
+        "shoutLevel": "shout",
+        "affect": "joy",
+        "firstLanguage": "English",
+        "phoneModel": "iPhone XR"
+      }
+    },
+    {
+      "id": "berst-test-000531",
+      "subsetID": "berst-test",
+      "row": 531,
+      "audio": "berst-test/531.wav",
+      "reference": "five special guest treasures",
+      "durationMs": 3588,
+      "durationBucket": "3-10",
+      "sizeBytes": 344492,
+      "sha256": "0f4284cee6bff317c5877c6ce2b266206d747fa6840656042ca2736d9a541d3a",
+      "speakerID": "user_6ad54616-b536-4d82-9f15-2e78afeaa12d",
+      "slices": {
+        "phonePosition": "Place phone as far away as possible while on on the opposite side of a wall from you face down on a hard surface 17/19",
+        "shoutLevel": "shout",
+        "affect": "fear",
+        "firstLanguage": "English",
+        "phoneModel": "Samsung Galaxy A32"
+      }
+    }
+  ]
+}
