@@ -5,6 +5,7 @@ import TextifyCore
 import TextifyDiagnostics
 import TextifyHotkeys
 import TextifyInsertion
+import TextifyModels
 import TextifySettings
 import TextifyTranscription
 
@@ -22,7 +23,12 @@ public final class AppDictationService {
     private var activationTarget: InsertionTargetIdentity?
     private var excludedTriggerIsHeld = false
     private var activeSessionID: UUID?
+    private var activeSessionPreferences:
+        (sessionID: UUID, preferences: AppPreferences)?
     private var insertionSessionID: UUID?
+    private var modelTransactionInProgress = false
+    private var modelTransactionWaiters:
+        [CheckedContinuation<Void, Never>] = []
 
     public init(
         dependencies: RuntimeDependencies,
@@ -46,6 +52,16 @@ public final class AppDictationService {
         triggerStateMachine.trigger
     }
 
+    public var allowsModelTransactions: Bool {
+        if modelTransactionInProgress {
+            return false
+        }
+        if case .processing = status {
+            return false
+        }
+        return true
+    }
+
     @discardableResult
     public func updateConfiguredTrigger(_ trigger: TextifyHotkeys.TriggerPreference) -> Bool {
         guard !hasActiveDictationWork, status != .waitingForActivation else {
@@ -65,6 +81,11 @@ public final class AppDictationService {
 
     @discardableResult
     public func prepareActiveModelIfAvailable() async -> ReadinessSnapshot {
+        guard allowsModelTransactions else {
+            return readiness
+        }
+        modelTransactionInProgress = true
+        defer { finishModelTransaction() }
         let preferences = await dependencies.settings.loadPreferences()
         let activeModel = await dependencies.models.resolveActiveModel(preferences: preferences)
         let installedReadiness = await dependencies.models.readiness(for: activeModel)
@@ -105,6 +126,88 @@ public final class AppDictationService {
         await prepareVoiceCleaner(preferences: preferences)
 
         return await refreshReadiness()
+    }
+
+    public func prepareModelSelection(
+        modelID: String,
+        purpose: ModelPurpose,
+        preferences: AppPreferences
+    ) async -> RuntimeModelPreparationResult {
+        guard allowsModelTransactions else {
+            return .busy(modelID: modelID)
+        }
+        modelTransactionInProgress = true
+        defer { finishModelTransaction() }
+        guard let model = await resolvedModelSelection(
+            purpose: purpose,
+            preferences: preferences
+        ),
+              model.id == modelID,
+              model.purpose == purpose
+        else {
+            return .needsRepair(
+                modelID: modelID,
+                readiness: .missing(modelID: modelID)
+            )
+        }
+
+        let installedReadiness = await dependencies.models.readiness(for: model)
+        guard case .ready(modelID: modelID) = installedReadiness else {
+            return .needsRepair(
+                modelID: modelID,
+                readiness: installedReadiness
+            )
+        }
+
+        do {
+            switch purpose {
+            case .transcription:
+                try await dependencies.transcriber.prepare(model: model)
+                guard case .ready(modelID: modelID) =
+                    await dependencies.transcriber.readiness
+                else {
+                    return .failed(modelID: modelID)
+                }
+            case .voiceCleaning:
+                try await dependencies.voiceCleaner.prepare(model: model)
+            }
+            return .ready(modelID: modelID)
+        } catch {
+            return .failed(modelID: modelID)
+        }
+    }
+
+    public func modelReadiness(
+        modelID: String,
+        purpose: ModelPurpose,
+        preferences: AppPreferences
+    ) async -> RuntimeModelReadiness {
+        guard let model = await resolvedModelSelection(
+            purpose: purpose,
+            preferences: preferences
+        ),
+              model.id == modelID,
+              model.purpose == purpose
+        else {
+            return .missing(modelID: modelID)
+        }
+        return await dependencies.models.readiness(for: model)
+    }
+
+    private func resolvedModelSelection(
+        purpose: ModelPurpose,
+        preferences: AppPreferences
+    ) async -> RuntimeActiveModel? {
+        switch purpose {
+        case .transcription:
+            return await dependencies.models.resolveActiveModel(
+                preferences: preferences
+            )
+        case .voiceCleaning:
+            return await dependencies.models.resolveActiveVoiceCleaningModel(
+                preferences: preferences
+            )
+        }
     }
 
     @discardableResult
@@ -191,6 +294,7 @@ public final class AppDictationService {
             targetCaptureToken = nil
             activationTarget = nil
             activeSessionID = nil
+            activeSessionPreferences = nil
             resetTriggerStateMachine()
             await dependencies.audio.discardRecording()
             status = .cancelled(.noSpeechDetected)
@@ -210,6 +314,7 @@ public final class AppDictationService {
         }
 
         activeSessionID = nil
+        activeSessionPreferences = nil
         resetTriggerStateMachine()
         await dependencies.audio.discardRecording()
         status = .cancelled(reason)
@@ -265,6 +370,7 @@ public final class AppDictationService {
 
         let sessionID = UUID()
         activeSessionID = sessionID
+        activeSessionPreferences = nil
         activationTimerToken = nil
         let snapshot = await refreshReadiness()
         guard activeSessionID == sessionID else {
@@ -297,6 +403,10 @@ public final class AppDictationService {
             status = .blocked(.readinessBlocked(.noActiveModel))
             return
         }
+        activeSessionPreferences = (
+            sessionID: sessionID,
+            preferences: preferences
+        )
 
         do {
             try await dependencies.audio.startRecording(
@@ -333,6 +443,7 @@ public final class AppDictationService {
                 return
             }
             activeSessionID = nil
+            activeSessionPreferences = nil
             activationTarget = nil
             resetTriggerStateMachine()
             status = .failed(.audioStartFailed)
@@ -347,6 +458,28 @@ public final class AppDictationService {
         guard case .recording = status else {
             return
         }
+        if modelTransactionInProgress {
+            await waitForModelTransaction()
+            guard activeSessionID == sessionID,
+                  case .recording = status
+            else {
+                return
+            }
+        }
+        guard let sessionPreferences = activeSessionPreferences,
+              sessionPreferences.sessionID == sessionID
+        else {
+            activeSessionID = nil
+            activationTarget = nil
+            status = .failed(.transcriptionFailed)
+            return
+        }
+        defer {
+            if activeSessionPreferences?.sessionID == sessionID {
+                activeSessionPreferences = nil
+            }
+        }
+        let preferences = sessionPreferences.preferences
 
         activationTimerToken = nil
         status = .processing
@@ -363,10 +496,6 @@ public final class AppDictationService {
                 return
             }
 
-            let preferences = await dependencies.settings.loadPreferences()
-            guard activeSessionID == sessionID else {
-                return
-            }
             guard let activeModel = await dependencies.models.resolveActiveModel(preferences: preferences) else {
                 activeSessionID = nil
                 activationTarget = nil
@@ -682,6 +811,21 @@ public final class AppDictationService {
         case .idle, .waitingForActivation, .completed, .cancelled, .blocked, .failed:
             return false
         }
+    }
+
+    private func waitForModelTransaction() async {
+        while modelTransactionInProgress {
+            await withCheckedContinuation { continuation in
+                modelTransactionWaiters.append(continuation)
+            }
+        }
+    }
+
+    private func finishModelTransaction() {
+        modelTransactionInProgress = false
+        let waiters = modelTransactionWaiters
+        modelTransactionWaiters.removeAll()
+        waiters.forEach { $0.resume() }
     }
 
     private func effectiveModelReadiness(

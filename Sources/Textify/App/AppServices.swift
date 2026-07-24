@@ -44,7 +44,7 @@ final class AppServices {
                     forInfoDictionaryKey: "CFBundleShortVersionString"
                 ) as? String ?? "1.1.0"
             )
-            _ = try await installer.install(
+            let installedRecord = try await installer.install(
                 modelID: modelID,
                 from: manifest
             ) { state in
@@ -53,24 +53,10 @@ final class AppServices {
                 }
                 onStateChange(state)
             }
-            self.refreshInstalledModels()
-            try Task.checkCancellation()
-            guard let installedModel = manifest.models.first(where: { $0.id == modelID }) else {
-                throw ModelInstallCoordinatorError.modelPreparationFailed
-            }
-            if self.isModelActive(modelID) {
-                _ = await self.dictation.prepareActiveModelIfAvailable()
-            }
-            try Task.checkCancellation()
-            onStateChange(DownloadState(
-                modelID: modelID,
-                phase: .installed,
-                bytesDownloaded: installedModel.sizeBytes,
-                totalBytes: installedModel.sizeBytes,
-                message: installedModel.purpose == .voiceCleaning
-                    ? "Voice cleaner installed. Enable it when you are ready."
-                    : "Model installed. Select Use Model to activate it."
-            ))
+            try await self.completeModelInstall(
+                installedRecord.model,
+                onStateChange: onStateChange
+            )
         }
     )
 
@@ -101,6 +87,8 @@ final class AppServices {
     @ObservationIgnored private var processingOverlayTask: Task<Void, Never>?
     @ObservationIgnored private var terminalStatusTask: Task<Void, Never>?
     @ObservationIgnored private var overlayUpdateGeneration = 0
+    private var managedReadinessByModelID:
+        [String: ModelCatalogManagedReadiness] = [:]
 
     static func production() -> AppServices {
         production(
@@ -166,11 +154,20 @@ final class AppServices {
         self.waitBeforeTerminalStatusDismissal = waitBeforeTerminalStatusDismissal
         self.startupIssue = startupIssue
         self.runtimeIssue = startupIssue == nil ? nil : .persistentStorageUnavailable
-        self.installedModelsStore = Self.loadInstalledModelsStore(paths: paths)
+        let installedModelsStore = Self.loadInstalledModelsStore(paths: paths)
+        self.installedModelsStore = installedModelsStore
+        self.managedReadinessByModelID = Dictionary(
+            uniqueKeysWithValues: installedModelsStore.records.map {
+                ($0.model.id, .installed)
+            }
+        )
         self.preferences = settingsStore.load()
         self.launchAtLoginStatus = launchAtLoginLocation.isSupported ? launchAtLogin.status() : .unsupportedLocation
         updateOverlay()
         observeDictationStatus()
+        Task { @MainActor [weak self] in
+            await self?.refreshManagedModelReadiness()
+        }
     }
 
     func startRuntime() {
@@ -392,12 +389,43 @@ final class AppServices {
                 voiceCleaningModelID: preferences.activeVoiceCleaningModelID
             ),
             transferState: modelInstallCoordinator.state,
+            managedReadinessByModelID: managedReadinessByModelID,
             query: scopedQuery
         )
     }
 
     func refreshInstalledModels() {
         installedModelsStore = Self.loadInstalledModelsStore(paths: paths)
+        managedReadinessByModelID = Dictionary(
+            uniqueKeysWithValues: installedModelsStore.records.map {
+                ($0.model.id, .installed)
+            }
+        )
+        Task { @MainActor [weak self] in
+            await self?.refreshManagedModelReadiness()
+        }
+    }
+
+    func completeModelInstall(
+        _ installedModel: ModelEntry,
+        onStateChange: @escaping @Sendable (DownloadState) -> Void
+    ) async throws {
+        refreshInstalledModels()
+        managedReadinessByModelID[installedModel.id] = .ready
+        try Task.checkCancellation()
+        if isModelActive(installedModel.id) {
+            _ = await dictation.prepareActiveModelIfAvailable()
+        }
+        try Task.checkCancellation()
+        onStateChange(DownloadState(
+            modelID: installedModel.id,
+            phase: .installed,
+            bytesDownloaded: installedModel.sizeBytes,
+            totalBytes: installedModel.sizeBytes,
+            message: installedModel.purpose == .voiceCleaning
+                ? "Voice cleaner installed. Enable it when you are ready."
+                : "Model installed. Select Use Model to activate it."
+        ))
     }
 
     var availableTranscriptionLanguages: [TranscriptionLanguage] {
@@ -406,6 +434,12 @@ final class AppServices {
         else {
             return [.english]
         }
+        return availableTranscriptionLanguages(for: model)
+    }
+
+    private func availableTranscriptionLanguages(
+        for model: ModelEntry
+    ) -> [TranscriptionLanguage] {
         if model.capabilities.languages.contains("*") {
             return TranscriptionLanguage.allCases
         }
@@ -427,38 +461,55 @@ final class AppServices {
     }
 
     @discardableResult
-    func activateInstalledModel(_ modelID: String) async -> Bool {
+    func activateInstalledModel(
+        _ modelID: String
+    ) async -> AppModelActivationResult {
+        guard dictation.allowsModelTransactions else {
+            return .dictationInProgress
+        }
         guard let model = installedModel(modelID)?.model else {
-            return false
+            return .notInstalled
         }
-        if model.purpose == .voiceCleaning {
-            preferences.activeVoiceCleaningModelID = modelID
+        let compatibility = activationCompatibility(for: modelID)
+        guard compatibility == .compatible else {
+            return .incompatible(compatibility)
+        }
+
+        let candidatePreferences = preferencesSelecting(model)
+
+        let preparation = await dictation.prepareModelSelection(
+            modelID: modelID,
+            purpose: model.purpose,
+            preferences: candidatePreferences
+        )
+        switch preparation {
+        case .ready:
+            managedReadinessByModelID[modelID] = .ready
+            preferences = candidatePreferences
             savePreferences()
             _ = await dictation.prepareActiveModelIfAvailable()
-            return true
-        }
-        let previousModelID = preferences.activeModelID
-        let previousLanguage = preferences.transcriptionLanguage
-        preferences.activeModelID = modelID
-        if !availableTranscriptionLanguages.contains(preferences.transcriptionLanguage) {
-            preferences.transcriptionLanguage = availableTranscriptionLanguages.first ?? .english
-        }
-        savePreferences()
-        let snapshot = await dictation.prepareActiveModelIfAvailable()
-        guard case .ready(modelID: modelID) = snapshot.model else {
-            preferences.activeModelID = previousModelID
-            preferences.transcriptionLanguage = previousLanguage
-            savePreferences()
+            return .activated
+        case .needsRepair:
+            managedReadinessByModelID[modelID] = .needsRepair
             _ = await dictation.prepareActiveModelIfAvailable()
-            return false
+            return .needsRepair
+        case .failed:
+            _ = await dictation.prepareActiveModelIfAvailable()
+            return .preparationFailed
+        case .busy:
+            return .dictationInProgress
         }
-        return true
     }
 
-    func disableVoiceCleaning() async {
+    @discardableResult
+    func disableVoiceCleaning() async -> Bool {
+        guard dictation.allowsModelTransactions else {
+            return false
+        }
         preferences.activeVoiceCleaningModelID = nil
         savePreferences()
         _ = await dictation.prepareActiveModelIfAvailable()
+        return true
     }
 
     func importCustomWhisperModel(
@@ -476,7 +527,7 @@ final class AppServices {
             )
         )
         refreshInstalledModels()
-        guard await activateInstalledModel(record.model.id) else {
+        guard await activateInstalledModel(record.model.id) == .activated else {
             try? importer.removeImportedModel(modelID: record.model.id)
             refreshInstalledModels()
             throw ModelInstallCoordinatorError.modelPreparationFailed
@@ -496,11 +547,64 @@ final class AppServices {
             try manager.remove(modelID: modelID)
         }.value
         refreshInstalledModels()
+        managedReadinessByModelID[modelID] = nil
         _ = await dictation.refreshReadiness()
     }
 
     private func installedModel(_ modelID: String) -> InstalledModelRecord? {
         installedModelsStore.record(forModelID: modelID)
+    }
+
+    func refreshManagedModelReadiness() async {
+        let records = installedModelsStore.records
+        for record in records {
+            let model = record.model
+            let readiness = await dictation.modelReadiness(
+                modelID: model.id,
+                purpose: model.purpose,
+                preferences: preferencesSelecting(model)
+            )
+            guard isModelInstalled(model.id) else {
+                continue
+            }
+            switch readiness {
+            case .ready:
+                managedReadinessByModelID[model.id] = .ready
+            case .loading, .warming:
+                managedReadinessByModelID[model.id] = .installed
+            case .noActiveModel, .missing, .failed:
+                managedReadinessByModelID[model.id] = .needsRepair
+            }
+        }
+    }
+
+    private func preferencesSelecting(_ model: ModelEntry) -> AppPreferences {
+        var candidate = preferences
+        switch model.purpose {
+        case .transcription:
+            candidate.activeModelID = model.id
+            let languages = availableTranscriptionLanguages(for: model)
+            if !languages.contains(candidate.transcriptionLanguage) {
+                candidate.transcriptionLanguage = languages.first ?? .english
+            }
+        case .voiceCleaning:
+            candidate.activeVoiceCleaningModelID = model.id
+        }
+        return candidate
+    }
+
+    private func activationCompatibility(
+        for modelID: String
+    ) -> ModelCatalogCompatibility {
+        guard let manifest = modelCatalogCoordinator.manifest,
+              manifest.models.contains(where: { $0.id == modelID })
+        else {
+            return .compatible
+        }
+        return modelCatalogCompatibilityResolver.compatibility(
+            for: modelID,
+            in: manifest
+        )
     }
 
     private static func loadInstalledModelsStore(paths: AppPaths) -> InstalledModelsStore {
@@ -694,6 +798,32 @@ enum ModelInstallCoordinatorError: Error {
     case storageOrConfigurationUnavailable
     case modelPreparationFailed
     case bundledCatalogIncomplete
+}
+
+enum AppModelActivationResult: Equatable {
+    case activated
+    case dictationInProgress
+    case notInstalled
+    case incompatible(ModelCatalogCompatibility)
+    case needsRepair
+    case preparationFailed
+
+    func message(for model: ProductionModelPresentation) -> String {
+        switch self {
+        case .activated:
+            return model.activationMessage
+        case .dictationInProgress:
+            return "Wait for the current dictation to finish, then try again."
+        case .notInstalled:
+            return "Install \(model.displayName) before \(model.useLabel.lowercased())."
+        case let .incompatible(compatibility):
+            return compatibility.catalogExplanation
+        case .needsRepair:
+            return "\(model.displayName) needs repair. Reinstall it and try again."
+        case .preparationFailed:
+            return "Textify kept the previous model because \(model.displayName) could not be prepared."
+        }
+    }
 }
 
 enum AppModelRemovalError: Error, LocalizedError {

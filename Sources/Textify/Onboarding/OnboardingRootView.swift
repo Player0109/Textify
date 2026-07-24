@@ -471,6 +471,15 @@ struct OnboardingRootView: View {
                 services.modelInstallCoordinator.isActive
                     || ProductionModelInstallConfiguration.current == nil
             )
+        case .reinstall:
+            Button("Reinstall Model") {
+                selectedOnboardingModelID = row.id
+                services.modelInstallCoordinator.start(modelID: row.id)
+            }
+            .disabled(
+                services.modelInstallCoordinator.isActive
+                    || ProductionModelInstallConfiguration.current == nil
+            )
         case .cancelInstall:
             Button("Cancel") {
                 services.modelInstallCoordinator.cancel()
@@ -484,14 +493,15 @@ struct OnboardingRootView: View {
             Button("Use Model") {
                 selectedOnboardingModelID = row.id
                 Task {
-                    let activated = await services.activateInstalledModel(row.id)
-                    modelMessage = activated
-                        ? row.model.activationMessage
-                        : "Textify kept the previous model because this model could not be prepared."
+                    let result = await services.activateInstalledModel(row.id)
+                    modelMessage = result.message(for: row.model)
                     _ = await services.dictation.refreshReadiness()
                 }
             }
-            .disabled(services.modelInstallCoordinator.isActive)
+            .disabled(
+                services.modelInstallCoordinator.isActive
+                    || !services.dictation.allowsModelTransactions
+            )
         case .active:
             Label("Active", systemImage: "checkmark.circle.fill")
                 .foregroundStyle(TextifyVisualIdentity.readyMint)

@@ -5,6 +5,91 @@ import XCTest
 import TextifyModels
 
 final class ModelCatalogExperienceTests: XCTestCase {
+    func testStateTokensPreserveInstalledReadyActiveAndNeedsRepairDimensions() throws {
+        let active = model(id: "active")
+        let installedOnly = model(id: "installed-only")
+        let needsRepair = model(id: "needs-repair")
+        let experience = ModelCatalogExperience(
+            trustedModels: [active, installedOnly, needsRepair],
+            installedRecords: [
+                installed(active),
+                installed(installedOnly),
+                installed(needsRepair),
+            ],
+            activePreferences: ModelCatalogActivePreferences(
+                transcriptionModelID: active.id,
+                voiceCleaningModelID: nil
+            ),
+            transferState: nil,
+            managedReadinessByModelID: [
+                active.id: .ready,
+                installedOnly.id: .installed,
+                needsRepair.id: .needsRepair,
+            ]
+        )
+
+        XCTAssertEqual(
+            experience.rows.first { $0.id == active.id }?.stateTokens,
+            [.installed, .ready, .active]
+        )
+        XCTAssertEqual(
+            experience.rows.first { $0.id == installedOnly.id }?.stateTokens,
+            [.installed]
+        )
+        XCTAssertEqual(
+            experience.rows.first { $0.id == needsRepair.id }?.stateTokens,
+            [.installed, .needsRepair]
+        )
+        XCTAssertFalse(
+            try XCTUnwrap(
+                experience.rows.first { $0.id == installedOnly.id }
+            ).actions.contains(.use)
+        )
+        XCTAssertFalse(
+            try XCTUnwrap(
+                experience.rows.first { $0.id == needsRepair.id }
+            ).actions.contains(.use)
+        )
+        let onboarding = OnboardingModelCatalog(
+            experience: experience,
+            selectedModelID: needsRepair.id
+        )
+        XCTAssertEqual(onboarding.action(for: needsRepair.id), .reinstall)
+    }
+
+    func testInstalledIncompatibleArtifactKeepsReadinessAndCompatibilityTokens() throws {
+        let manifest = try v3FixtureManifest(
+            recommendedMinimumMemoryBytes: 17_179_869_184
+        )
+        let resolver = ModelCatalogCompatibilityResolver(
+            context: ModelCatalogCompatibilityContext(
+                appVersion: "1.1.0",
+                macOSVersion: "14.0.0",
+                architecture: .arm64,
+                physicalMemoryBytes: 8_589_934_592
+            )
+        )
+        let model = try XCTUnwrap(
+            manifest.models.first { $0.id == "whisper-small-q5_1" }
+        )
+        let experience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            compatibilityResolver: resolver,
+            installedRecords: [installed(model)],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            managedReadinessByModelID: [model.id: .ready]
+        )
+
+        let row = try XCTUnwrap(experience.rows.first { $0.id == model.id })
+        XCTAssertEqual(
+            row.stateTokens,
+            [.installed, .ready, .incompatible]
+        )
+        XCTAssertTrue(row.actions.contains(.use))
+        XCTAssertFalse(row.compatibility.allowsModelOperations)
+    }
+
     func testCombinesTrustedInstalledActiveAndTransferStateIntoRows() throws {
         let downloadable = model(id: "downloadable")
         let active = model(id: "active")
@@ -709,7 +794,12 @@ final class ModelCatalogExperienceTests: XCTestCase {
             activePreferences: ModelCatalogActivePreferences(
                 transcriptionModelID: installedModel.id
             ),
-            transferState: nil
+            transferState: DownloadState(
+                modelID: installedModel.id,
+                phase: .downloading,
+                bytesDownloaded: 10,
+                totalBytes: 100
+            )
         )
 
         let inspector = try XCTUnwrap(
@@ -733,7 +823,20 @@ final class ModelCatalogExperienceTests: XCTestCase {
             "Textify 1.1.0+ • macOS 14.0.0+ • arm64 • 1 GB memory"
         )
         XCTAssertEqual(artifact.transferSize, "33 bytes")
-        XCTAssertEqual(artifact.localState, "Active • Installed")
+        XCTAssertEqual(
+            artifact.localState,
+            "Installed • Ready • Active • Downloading model"
+        )
+        let comparison = try XCTUnwrap(
+            experience.families
+                .flatMap(\.checkpoints)
+                .flatMap(\.variantComparisons)
+                .first(where: { $0.id == installedModel.id })
+        )
+        XCTAssertEqual(
+            comparison.state,
+            "Installed • Ready • Active • Downloading model"
+        )
         XCTAssertEqual(artifact.qualityEvidence, "Unrated")
         XCTAssertEqual(artifact.speedEvidence, "Unrated")
         XCTAssertEqual(

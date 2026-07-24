@@ -264,16 +264,17 @@ extension ModelCatalogCheckpointPresentation {
     }
 
     private static func state(for row: ModelCatalogRowPresentation) -> String {
-        if row.isActive {
-            return "Active"
-        }
-        guard row.compatibility == .compatible else {
-            return row.compatibility.catalogTitle
+        var titles = row.stateTokens.map(\.title)
+        if row.compatibility != .compatible,
+           !row.stateTokens.contains(.incompatible) {
+            titles.append(row.compatibility.catalogTitle)
         }
         if let install = row.install {
-            return install.title
+            titles.append(install.title)
         }
-        return row.isInstalled ? "Installed" : "Not installed"
+        return titles.isEmpty
+            ? "Not installed"
+            : titles.joined(separator: " • ")
     }
 
     private static func primaryAction(

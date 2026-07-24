@@ -730,17 +730,17 @@ private struct ModelsSettingsPane: View {
         let onUse: () -> Void = {
             activatingModelID = row.id
             Task {
-                let activated = await services.activateInstalledModel(row.id)
-                modelMessage = activated
-                    ? row.model.activationMessage
-                    : "Textify kept the previous model because \(row.model.displayName) could not be prepared."
+                let result = await services.activateInstalledModel(row.id)
+                modelMessage = result.message(for: row.model)
                 activatingModelID = nil
             }
         }
         let onDisable: () -> Void = {
             Task {
-                await services.disableVoiceCleaning()
-                modelMessage = "Voice cleaning is off."
+                let disabled = await services.disableVoiceCleaning()
+                modelMessage = disabled
+                    ? "Voice cleaning is off."
+                    : "Wait for the current dictation to finish, then try again."
             }
         }
         let onInstall: () -> Void = {
@@ -762,7 +762,10 @@ private struct ModelsSettingsPane: View {
                 presentation: comparison,
                 isSelected: context.isSelected,
                 isActivating: activatingModelID == row.id,
-                isBusy: activatingModelID != nil || isInstalling || isImporting,
+                isBusy: activatingModelID != nil
+                    || isInstalling
+                    || isImporting
+                    || !services.dictation.allowsModelTransactions,
                 install: row.install,
                 actions: row.actions,
                 onSelect: context.onSelect,
@@ -781,7 +784,10 @@ private struct ModelsSettingsPane: View {
                 isInstalled: row.isInstalled,
                 isActive: row.isActive,
                 isActivating: activatingModelID == row.id,
-                isBusy: activatingModelID != nil || isInstalling || isImporting,
+                isBusy: activatingModelID != nil
+                    || isInstalling
+                    || isImporting
+                    || !services.dictation.allowsModelTransactions,
                 install: row.install,
                 actions: row.actions,
                 onUse: onUse,

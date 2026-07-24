@@ -88,6 +88,13 @@ public enum RuntimeModelReadiness: Equatable, Sendable {
     case failed(modelID: String, reason: RuntimeModelFailure)
 }
 
+public enum RuntimeModelPreparationResult: Equatable, Sendable {
+    case ready(modelID: String)
+    case needsRepair(modelID: String, readiness: RuntimeModelReadiness)
+    case failed(modelID: String)
+    case busy(modelID: String)
+}
+
 public enum RuntimeModelFailure: Equatable, Sendable {
     case missingFile
     case checksumFailed

@@ -206,6 +206,7 @@ enum ModelCatalogPurposeDestination: Equatable {
 
 enum OnboardingModelAction: Equatable {
     case install
+    case reinstall
     case cancelInstall
     case retryInstall
     case activate
@@ -261,7 +262,10 @@ struct OnboardingModelCatalog: Equatable {
         if row.actions.contains(.retryInstall) {
             return .retryInstall
         }
-        return row.isInstalled ? .activate : .install
+        if row.isInstalled {
+            return row.actions.contains(.use) ? .activate : .reinstall
+        }
+        return .install
     }
 
     func transferState(for modelID: String?) -> DownloadState? {
@@ -408,6 +412,35 @@ enum ModelCatalogRowAction: Equatable, Hashable {
     case details
 }
 
+enum ModelCatalogManagedReadiness: Equatable {
+    case installed
+    case ready
+    case needsRepair
+}
+
+enum ModelCatalogStateToken: Equatable {
+    case installed
+    case ready
+    case active
+    case incompatible
+    case needsRepair
+
+    var title: String {
+        switch self {
+        case .installed:
+            return "Installed"
+        case .ready:
+            return "Ready"
+        case .active:
+            return "Active"
+        case .incompatible:
+            return "Incompatible"
+        case .needsRepair:
+            return "Needs Repair"
+        }
+    }
+}
+
 struct ModelCatalogRowPresentation: Equatable, Identifiable {
     let model: ProductionModelPresentation
     let operationalModel: ModelEntry?
@@ -416,6 +449,7 @@ struct ModelCatalogRowPresentation: Equatable, Identifiable {
     let isInstalled: Bool
     let isActive: Bool
     let install: ModelCatalogInstallPresentation?
+    let stateTokens: [ModelCatalogStateToken]
     let actions: Set<ModelCatalogRowAction>
 
     var id: String {
@@ -639,6 +673,7 @@ struct ModelCatalogExperience: Equatable {
         installedRecords: [InstalledModelRecord],
         activePreferences: ModelCatalogActivePreferences,
         transferState: DownloadState?,
+        managedReadinessByModelID: [String: ModelCatalogManagedReadiness] = [:],
         query: ModelCatalogQuery = ModelCatalogQuery()
     ) {
         self.init(
@@ -647,6 +682,7 @@ struct ModelCatalogExperience: Equatable {
             installedRecords: installedRecords,
             activePreferences: activePreferences,
             transferState: transferState,
+            managedReadinessByModelID: managedReadinessByModelID,
             query: query
         )
     }
@@ -657,6 +693,7 @@ struct ModelCatalogExperience: Equatable {
         installedRecords: [InstalledModelRecord],
         activePreferences: ModelCatalogActivePreferences,
         transferState: DownloadState?,
+        managedReadinessByModelID: [String: ModelCatalogManagedReadiness] = [:],
         query: ModelCatalogQuery = ModelCatalogQuery()
     ) {
         let compatibilityByModelID = compatibilityResolver?
@@ -671,6 +708,7 @@ struct ModelCatalogExperience: Equatable {
             installedRecords: installedRecords,
             activePreferences: activePreferences,
             transferState: transferState,
+            managedReadinessByModelID: managedReadinessByModelID,
             query: query
         )
     }
@@ -683,6 +721,7 @@ struct ModelCatalogExperience: Equatable {
         installedRecords: [InstalledModelRecord],
         activePreferences: ModelCatalogActivePreferences,
         transferState: DownloadState?,
+        managedReadinessByModelID: [String: ModelCatalogManagedReadiness],
         query: ModelCatalogQuery
     ) {
         let signedArtifactsByID = presentationGraph?.artifacts.reduce(
@@ -726,6 +765,9 @@ struct ModelCatalogExperience: Equatable {
         let allRows = orderedCatalog.map { model in
             let installedModel = installedByID[model.id]
             let isInstalled = installedIDs.contains(model.id)
+            let managedReadiness = isInstalled
+                ? managedReadinessByModelID[model.id] ?? .ready
+                : nil
             let activePurpose = installedModel?.purpose ?? model.purpose
             let isActive = isInstalled
                 && activePreferences.contains(modelID: model.id, purpose: activePurpose)
@@ -741,10 +783,17 @@ struct ModelCatalogExperience: Equatable {
                 isInstalled: isInstalled,
                 isActive: isActive,
                 install: installState.map(ModelCatalogInstallPresentation.init),
+                stateTokens: Self.stateTokens(
+                    isInstalled: isInstalled,
+                    isActive: isActive,
+                    managedReadiness: managedReadiness,
+                    compatibility: compatibilityByModelID[model.id] ?? .compatible
+                ),
                 actions: Self.actions(
                     for: model,
                     isInstalled: isInstalled,
                     isActive: isActive,
+                    managedReadiness: managedReadiness,
                     installState: installState
                 )
             )
@@ -979,16 +1028,13 @@ struct ModelCatalogExperience: Equatable {
     }
 
     private static func localState(for row: ModelCatalogRowPresentation) -> String {
-        if row.isActive {
-            return "Active • Installed"
-        }
-        if row.isInstalled {
-            return "Installed"
-        }
+        var titles = row.stateTokens.map(\.title)
         if let install = row.install {
-            return install.title
+            titles.append(install.title)
         }
-        return "Not installed"
+        return titles.isEmpty
+            ? "Not installed"
+            : titles.joined(separator: " • ")
     }
 
     private static func checkpointLanguageDescription(
@@ -1026,6 +1072,7 @@ struct ModelCatalogExperience: Equatable {
         for model: ProductionModelPresentation,
         isInstalled: Bool,
         isActive: Bool,
+        managedReadiness: ModelCatalogManagedReadiness?,
         installState: DownloadState?
     ) -> Set<ModelCatalogRowAction> {
         var actions: Set<ModelCatalogRowAction> = [.details]
@@ -1034,7 +1081,7 @@ struct ModelCatalogExperience: Equatable {
             if model.purpose == .voiceCleaning {
                 actions.insert(.disable)
             }
-        } else if isInstalled {
+        } else if isInstalled, managedReadiness == .ready {
             actions.insert(.use)
         }
 
@@ -1054,6 +1101,33 @@ struct ModelCatalogExperience: Equatable {
         }
 
         return actions
+    }
+
+    private static func stateTokens(
+        isInstalled: Bool,
+        isActive: Bool,
+        managedReadiness: ModelCatalogManagedReadiness?,
+        compatibility: ModelCatalogCompatibility
+    ) -> [ModelCatalogStateToken] {
+        var tokens: [ModelCatalogStateToken] = []
+        if isInstalled {
+            tokens.append(.installed)
+        }
+        switch managedReadiness {
+        case .ready:
+            tokens.append(.ready)
+        case .needsRepair:
+            tokens.append(.needsRepair)
+        case .installed, nil:
+            break
+        }
+        if isActive {
+            tokens.append(.active)
+        }
+        if case .incompatible = compatibility {
+            tokens.append(.incompatible)
+        }
+        return tokens
     }
 
     private static func makeFamilyPresentations(
@@ -1474,7 +1548,7 @@ struct ProductionModelPresentation: Equatable, Identifiable {
 
     var activationMessage: String {
         purpose == .voiceCleaning
-            ? "\(displayName) is enabled before dictation."
+            ? "\(displayName) is enabled for future dictation."
             : "\(displayName) is active and ready."
     }
 
@@ -1483,7 +1557,7 @@ struct ProductionModelPresentation: Equatable, Identifiable {
     }
 
     var useLabel: String {
-        purpose == .voiceCleaning ? "Use Cleaner" : "Use Model"
+        purpose == .voiceCleaning ? "Enable" : "Use Model"
     }
 
     var installLabel: String {

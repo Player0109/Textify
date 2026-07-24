@@ -11,6 +11,269 @@ import XCTest
 
 @MainActor
 final class AppDictationServiceTests: XCTestCase {
+    func testPreparingCandidateTranscriptionModelDoesNotMutateStoredSelection() async {
+        var storedPreferences = AppPreferences.defaults
+        storedPreferences.activeModelID = "previous-model"
+        let fakes = RuntimeFakes.ready(preferences: storedPreferences)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        var candidatePreferences = storedPreferences
+        candidatePreferences.activeModelID = RuntimeActiveModel.fixture.id
+
+        let result = await service.prepareModelSelection(
+            modelID: RuntimeActiveModel.fixture.id,
+            purpose: .transcription,
+            preferences: candidatePreferences
+        )
+        let persistedModelID = await fakes.settings.loadPreferences().activeModelID
+        let prepareCount = await fakes.transcriber.prepareCount()
+
+        XCTAssertEqual(
+            result,
+            .ready(modelID: RuntimeActiveModel.fixture.id)
+        )
+        XCTAssertEqual(persistedModelID, "previous-model")
+        XCTAssertEqual(prepareCount, 1)
+    }
+
+    func testPreparingUnavailableCandidateReportsNeedsRepairWithoutLoadingRuntime() async {
+        let fakes = RuntimeFakes.blocked(
+            blocker: .activeModelMissing(modelID: RuntimeActiveModel.fixture.id)
+        )
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        var candidatePreferences = AppPreferences.defaults
+        candidatePreferences.activeModelID = RuntimeActiveModel.fixture.id
+
+        let result = await service.prepareModelSelection(
+            modelID: RuntimeActiveModel.fixture.id,
+            purpose: .transcription,
+            preferences: candidatePreferences
+        )
+        let prepareCount = await fakes.transcriber.prepareCount()
+
+        XCTAssertEqual(
+            result,
+            .needsRepair(
+                modelID: RuntimeActiveModel.fixture.id,
+                readiness: .missing(modelID: RuntimeActiveModel.fixture.id)
+            )
+        )
+        XCTAssertEqual(prepareCount, 0)
+    }
+
+    func testCandidateReadinessUsesResolverWithoutPreparingOrPersisting() async {
+        let modelID = RuntimeActiveModel.fixture.id
+        let fakes = RuntimeFakes.blocked(
+            blocker: .transcriptionRuntimeFailed(modelID: modelID)
+        )
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        var candidatePreferences = AppPreferences.defaults
+        candidatePreferences.activeModelID = modelID
+
+        let readiness = await service.modelReadiness(
+            modelID: modelID,
+            purpose: .transcription,
+            preferences: candidatePreferences
+        )
+        let prepareCount = await fakes.transcriber.prepareCount()
+        let persistedModelID = await fakes.settings.loadPreferences()
+            .activeModelID
+
+        XCTAssertEqual(
+            readiness,
+            .failed(modelID: modelID, reason: .loadFailed)
+        )
+        XCTAssertEqual(prepareCount, 0)
+        XCTAssertEqual(persistedModelID, AppPreferences.defaults.activeModelID)
+    }
+
+    func testUseDuringRecordingAppliesToTheNextSegment() async {
+        var initialPreferences = AppPreferences.defaults
+        initialPreferences.activeModelID = RuntimeActiveModel.fixture.id
+        let fakes = RuntimeFakes.ready(preferences: initialPreferences)
+        let candidate = RuntimeActiveModel.alternateFixture
+        await fakes.models.setSelectableModels([
+            .fixture,
+            candidate,
+        ])
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+        var futurePreferences = initialPreferences
+        futurePreferences.activeModelID = candidate.id
+        let preparation = await service.prepareModelSelection(
+            modelID: candidate.id,
+            purpose: .transcription,
+            preferences: futurePreferences
+        )
+        await fakes.settings.savePreferences(futurePreferences)
+        await service.handleTriggerAction(.finishRecording)
+        let preparedModelIDs = await fakes.transcriber.preparedModelIDs()
+
+        XCTAssertEqual(preparation, .ready(modelID: candidate.id))
+        XCTAssertEqual(
+            preparedModelIDs,
+            [candidate.id, RuntimeActiveModel.fixture.id]
+        )
+        XCTAssertEqual(
+            service.status,
+            .completed(textLengthBucket: "1-50")
+        )
+    }
+
+    func testEnableDuringRecordingAppliesToTheNextSegment() async {
+        let initialPreferences = AppPreferences.defaults
+        let fakes = RuntimeFakes.ready(preferences: initialPreferences)
+        let cleaner = RuntimeActiveModel.voiceCleanerFixture
+        await fakes.models.setSelectableVoiceCleaningModels([cleaner])
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+        var futurePreferences = initialPreferences
+        futurePreferences.activeVoiceCleaningModelID = cleaner.id
+        let preparation = await service.prepareModelSelection(
+            modelID: cleaner.id,
+            purpose: .voiceCleaning,
+            preferences: futurePreferences
+        )
+        await fakes.settings.savePreferences(futurePreferences)
+        await service.handleTriggerAction(.finishRecording)
+        let cleanCount = await fakes.voiceCleaner.cleanCallCount()
+
+        XCTAssertEqual(preparation, .ready(modelID: cleaner.id))
+        XCTAssertEqual(cleanCount, 0)
+    }
+
+    func testDisableDuringRecordingAppliesToTheNextSegment() async {
+        var initialPreferences = AppPreferences.defaults
+        let cleaner = RuntimeActiveModel.voiceCleanerFixture
+        initialPreferences.activeVoiceCleaningModelID = cleaner.id
+        let fakes = RuntimeFakes.ready(preferences: initialPreferences)
+        await fakes.models.setSelectableVoiceCleaningModels([cleaner])
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+        var futurePreferences = initialPreferences
+        futurePreferences.activeVoiceCleaningModelID = nil
+        await fakes.settings.savePreferences(futurePreferences)
+        _ = await service.prepareActiveModelIfAvailable()
+        await service.handleTriggerAction(.finishRecording)
+        let preparedModelIDs = await fakes.voiceCleaner.preparedModelIDs()
+        let cleanCount = await fakes.voiceCleaner.cleanCallCount()
+
+        XCTAssertEqual(preparedModelIDs, [cleaner.id])
+        XCTAssertEqual(cleanCount, 1)
+    }
+
+    func testModelTransactionsDoNotTouchSharedBackendsDuringProcessing() async {
+        let fakes = RuntimeFakes.ready()
+        let candidate = RuntimeActiveModel.alternateFixture
+        await fakes.models.setSelectableModels([
+            .fixture,
+            candidate,
+        ])
+        await fakes.transcriber.setSuspendUntilReleased(true)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+        let finishTask = Task {
+            await service.handleTriggerAction(.finishRecording)
+        }
+        await waitUntil { await fakes.transcriber.isSuspended() }
+        var futurePreferences = AppPreferences.defaults
+        futurePreferences.activeModelID = candidate.id
+
+        let preparation = await service.prepareModelSelection(
+            modelID: candidate.id,
+            purpose: .transcription,
+            preferences: futurePreferences
+        )
+        _ = await service.prepareActiveModelIfAvailable()
+        let preparedModelIDs = await fakes.transcriber.preparedModelIDs()
+
+        XCTAssertFalse(service.allowsModelTransactions)
+        XCTAssertEqual(preparation, .busy(modelID: candidate.id))
+        XCTAssertEqual(
+            preparedModelIDs,
+            [RuntimeActiveModel.fixture.id]
+        )
+
+        await fakes.transcriber.release()
+        await finishTask.value
+        XCTAssertTrue(service.allowsModelTransactions)
+    }
+
+    func testRecordingCompletionWaitsForInFlightModelTransaction() async {
+        let fakes = RuntimeFakes.ready()
+        let candidate = RuntimeActiveModel.alternateFixture
+        await fakes.models.setSelectableModels([
+            .fixture,
+            candidate,
+        ])
+        await fakes.transcriber.setSuspendPrepareUntilReleased(true)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        var futurePreferences = AppPreferences.defaults
+        futurePreferences.activeModelID = candidate.id
+
+        await service.handleTriggerAction(.beginRecording)
+        let activationTask = Task {
+            await service.prepareModelSelection(
+                modelID: candidate.id,
+                purpose: .transcription,
+                preferences: futurePreferences
+            )
+        }
+        await waitUntil { await fakes.transcriber.isPrepareSuspended() }
+        let finishTask = Task {
+            await service.handleTriggerAction(.finishRecording)
+        }
+        await settle()
+
+        let finishCountBeforeActivation = await fakes.audio.finishCount()
+        XCTAssertEqual(service.status, .recording(speechDetected: false))
+        XCTAssertEqual(finishCountBeforeActivation, 0)
+
+        await fakes.transcriber.setSuspendPrepareUntilReleased(false)
+        await fakes.transcriber.releasePrepare()
+        let preparation = await activationTask.value
+        await finishTask.value
+        let preparedModelIDs = await fakes.transcriber.preparedModelIDs()
+
+        XCTAssertEqual(preparation, .ready(modelID: candidate.id))
+        XCTAssertEqual(
+            preparedModelIDs,
+            [candidate.id, RuntimeActiveModel.fixture.id]
+        )
+        XCTAssertEqual(
+            service.status,
+            .completed(textLengthBucket: "1-50")
+        )
+    }
+
+    func testPreparingVoiceCleanerReportsFailureWithoutChangingStoredSelection() async {
+        var storedPreferences = AppPreferences.defaults
+        storedPreferences.activeVoiceCleaningModelID = "previous-cleaner"
+        let fakes = RuntimeFakes.ready(preferences: storedPreferences)
+        let candidate = RuntimeActiveModel.voiceCleanerFixture
+        await fakes.models.setVoiceCleaningModel(candidate)
+        await fakes.voiceCleaner.setPrepareError(FakeVoiceCleaningError.failed)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        var candidatePreferences = storedPreferences
+        candidatePreferences.activeVoiceCleaningModelID = candidate.id
+
+        let result = await service.prepareModelSelection(
+            modelID: candidate.id,
+            purpose: .voiceCleaning,
+            preferences: candidatePreferences
+        )
+        let persistedCleanerID = await fakes.settings.loadPreferences()
+            .activeVoiceCleaningModelID
+        let prepareCount = await fakes.voiceCleaner.prepareCallCount()
+
+        XCTAssertEqual(result, .failed(modelID: candidate.id))
+        XCTAssertEqual(persistedCleanerID, "previous-cleaner")
+        XCTAssertEqual(prepareCount, 1)
+    }
+
     func testPrepareActiveModelLoadsInstalledModelBeforeFirstDictation() async {
         let fakes = RuntimeFakes.ready()
         let service = AppDictationService(dependencies: fakes.dependencies)
@@ -1028,6 +1291,9 @@ private actor FakeRuntimePermissions: RuntimePermissionChecking {
 private actor FakeRuntimeModels: RuntimeModelResolving {
     private var activeModel: RuntimeActiveModel?
     private var voiceCleaningModel: RuntimeActiveModel?
+    private var selectableModelsByID: [String: RuntimeActiveModel] = [:]
+    private var selectableVoiceCleaningModelsByID:
+        [String: RuntimeActiveModel] = [:]
     private var readinessOverride: RuntimeModelReadiness?
 
     init(activeModel: RuntimeActiveModel?, readiness: RuntimeModelReadiness? = nil) {
@@ -1036,7 +1302,11 @@ private actor FakeRuntimeModels: RuntimeModelResolving {
     }
 
     func resolveActiveModel(preferences: AppPreferences) async -> RuntimeActiveModel? {
-        activeModel
+        if let modelID = preferences.activeModelID,
+           let selectableModel = selectableModelsByID[modelID] {
+            return selectableModel
+        }
+        return activeModel
     }
 
     func readiness(for model: RuntimeActiveModel?) async -> RuntimeModelReadiness {
@@ -1050,7 +1320,11 @@ private actor FakeRuntimeModels: RuntimeModelResolving {
     }
 
     func resolveActiveVoiceCleaningModel(preferences: AppPreferences) async -> RuntimeActiveModel? {
-        voiceCleaningModel
+        if let modelID = preferences.activeVoiceCleaningModelID,
+           let selectableModel = selectableVoiceCleaningModelsByID[modelID] {
+            return selectableModel
+        }
+        return voiceCleaningModel
     }
 
     func setActiveModel(_ activeModel: RuntimeActiveModel?) {
@@ -1060,6 +1334,18 @@ private actor FakeRuntimeModels: RuntimeModelResolving {
 
     func setVoiceCleaningModel(_ model: RuntimeActiveModel?) {
         voiceCleaningModel = model
+    }
+
+    func setSelectableModels(_ models: [RuntimeActiveModel]) {
+        selectableModelsByID = Dictionary(
+            uniqueKeysWithValues: models.map { ($0.id, $0) }
+        )
+    }
+
+    func setSelectableVoiceCleaningModels(_ models: [RuntimeActiveModel]) {
+        selectableVoiceCleaningModelsByID = Dictionary(
+            uniqueKeysWithValues: models.map { ($0.id, $0) }
+        )
     }
 
 }
@@ -1189,6 +1475,7 @@ private actor FakeRuntimeTranscriber: RuntimeTranscribing {
     private let result: TranscriptionResult
     private var readinessValue: RuntimeModelReadiness
     private var prepareCountValue = 0
+    private var preparedModelIDValues: [String] = []
     private var transcribeCountValue = 0
     private var prepareError: Error?
     private var transcribeError: Error?
@@ -1206,6 +1493,10 @@ private actor FakeRuntimeTranscriber: RuntimeTranscribing {
 
     func prepareCount() -> Int {
         prepareCountValue
+    }
+
+    func preparedModelIDs() -> [String] {
+        preparedModelIDValues
     }
 
     func transcribeCount() -> Int {
@@ -1237,6 +1528,7 @@ private actor FakeRuntimeTranscriber: RuntimeTranscribing {
 
     func prepare(model: RuntimeActiveModel) async throws {
         prepareCountValue += 1
+        preparedModelIDValues.append(model.id)
         if suspendPrepareUntilReleased {
             await withCheckedContinuation { continuation in
                 prepareSuspensionContinuation = continuation
@@ -1305,10 +1597,19 @@ private enum FakeVoiceCleaningError: Error {
 
 private actor FakeRuntimeVoiceCleaner: RuntimeVoiceCleaning {
     private var output: TranscriptionAudioBuffer?
+    private var prepareError: Error?
+    private var prepareCalls = 0
+    private var preparedModelIDValues: [String] = []
     private var cleanError: Error?
     private var cleanCalls = 0
 
-    func prepare(model: RuntimeActiveModel) async throws {}
+    func prepare(model: RuntimeActiveModel) async throws {
+        prepareCalls += 1
+        preparedModelIDValues.append(model.id)
+        if let prepareError {
+            throw prepareError
+        }
+    }
 
     func clean(_ audio: TranscriptionAudioBuffer) async throws -> TranscriptionAudioBuffer {
         cleanCalls += 1
@@ -1322,6 +1623,18 @@ private actor FakeRuntimeVoiceCleaner: RuntimeVoiceCleaning {
 
     func setOutput(_ output: TranscriptionAudioBuffer?) {
         self.output = output
+    }
+
+    func setPrepareError(_ error: Error?) {
+        prepareError = error
+    }
+
+    func prepareCallCount() -> Int {
+        prepareCalls
+    }
+
+    func preparedModelIDs() -> [String] {
+        preparedModelIDValues
     }
 
     func setCleanError(_ error: Error?) {
@@ -1495,6 +1808,15 @@ private extension RuntimeActiveModel {
         displayName: "Balanced - Whisper small.en",
         tier: "balanced",
         localModelPath: "/tmp/ggml-small.en-q5_1.bin",
+        useGPU: true,
+        threadCount: 1
+    )
+
+    static let alternateFixture = RuntimeActiveModel(
+        id: "whisper-large-v2-q5_0",
+        displayName: "Whisper large-v2 Q5_0",
+        tier: "experimental",
+        localModelPath: "/tmp/whisper-large-v2-q5_0.bin",
         useGPU: true,
         threadCount: 1
     )

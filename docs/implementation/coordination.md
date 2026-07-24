@@ -922,3 +922,29 @@ Task 1 must merge before parallel Wave 1 work begins.
   signed app-bundle launch, a native macOS grouped-variant visual smoke, clean
   Standards and Spec reviews, and the full 519-test suite (11 opt-in native
   smokes skipped, zero failures).
+
+## Explicit Install And Activation Transactions Handoff - 2026-07-24
+
+- GitHub issue #10 owns the narrow Task 11 app, Settings, onboarding, and
+  focused integration-test changes needed to keep model selection, managed-byte
+  installation, transcription Use, Voice Cleaning Enable, and Voice Cleaning
+  Disable as separate operations.
+- This slice may add the minimum `AppDictationService` preparation seam needed
+  to prove one installed candidate Ready before committing its purpose-specific
+  active preference. Failed preparation must leave the previous persisted
+  identity unchanged and restore its runtime preparation when necessary.
+- Catalog presentation may add orthogonal state tokens for Installed, Ready,
+  Active, incompatible, and Needs Repair so one status does not erase another.
+  Existing exact artifact IDs and signed compatibility decisions remain
+  authoritative.
+- Persistent download queues, storage inventory, revocation, deletion
+  transactions, and generalized runtime switching remain owned by later
+  tickets.
+- Verification covers the explicit install/readiness and purpose-specific
+  activation transactions, processing-safe backend reservation, and
+  recording-time preference snapshots through focused app, catalog, and
+  runtime integration tests.
+- Final verification completed with the staged signed app bundle and its
+  43-model manifest, a native macOS grouped-variant visual smoke, clean
+  Standards and Spec reviews, and the full 537-test suite (11 opt-in native
+  smokes skipped, zero failures).

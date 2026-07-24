@@ -150,10 +150,16 @@ final class AppCompositionTests: XCTestCase {
             paths: paths,
             modelCatalogCompatibilityResolver: resolver
         )
+        await services.refreshManagedModelReadiness()
 
         let unavailableCatalog = services.modelCatalogExperience(for: .transcription)
         XCTAssertEqual(unavailableCatalog.rows.map(\.id), [removedModel.id])
         XCTAssertTrue(unavailableCatalog.rows[0].isInstalled)
+        XCTAssertEqual(
+            unavailableCatalog.rows[0].stateTokens,
+            [.installed, .needsRepair]
+        )
+        XCTAssertFalse(unavailableCatalog.rows[0].actions.contains(.use))
         XCTAssertTrue(
             ModelCatalogHierarchyState()
                 .visibleRows(in: unavailableCatalog)
@@ -190,6 +196,54 @@ final class AppCompositionTests: XCTestCase {
                     return artifact.id == removedModel.id && artifact.row.isInstalled
                 }
         )
+    }
+
+    @MainActor
+    func testManagedReadinessRevalidatesChecksumFailureAcrossRelaunch() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let model = try Self.catalogModel(id: "whisper-large-v2-q5_0")
+        try Self.writeInstalledStore(models: [model], to: paths)
+        let failedReadiness = RuntimeModelReadiness.failed(
+            modelID: model.id,
+            reason: .checksumFailed
+        )
+        let runtimeModel = Self.runtimeModel(model)
+        let services = try Self.makeServices(
+            paths: paths,
+            models: CandidateRuntimeModelResolver(
+                models: [runtimeModel],
+                readinessByModelID: [model.id: failedReadiness]
+            )
+        )
+
+        await services.refreshManagedModelReadiness()
+
+        let firstRow = try XCTUnwrap(
+            services.modelCatalogExperience(for: .transcription)
+                .rows.first(where: { $0.id == model.id })
+        )
+        XCTAssertEqual(firstRow.stateTokens, [.installed, .needsRepair])
+        XCTAssertFalse(firstRow.actions.contains(.use))
+
+        let relaunched = try Self.makeServices(
+            preferences: nil,
+            paths: paths,
+            models: CandidateRuntimeModelResolver(
+                models: [runtimeModel],
+                readinessByModelID: [model.id: failedReadiness]
+            )
+        )
+        await relaunched.refreshManagedModelReadiness()
+
+        let relaunchedRow = try XCTUnwrap(
+            relaunched.modelCatalogExperience(for: .transcription)
+                .rows.first(where: { $0.id == model.id })
+        )
+        XCTAssertEqual(
+            relaunchedRow.stateTokens,
+            [.installed, .needsRepair]
+        )
+        XCTAssertFalse(relaunchedRow.actions.contains(.use))
     }
 
     @MainActor
@@ -243,17 +297,285 @@ final class AppCompositionTests: XCTestCase {
         try JSONEncoder().encode(installedStore).write(to: storeURL, options: .atomic)
         var preferences = AppPreferences.defaults
         preferences.activeModelID = transcriptionModel.id
-        let services = try Self.makeServices(preferences: preferences, paths: paths)
+        let resolver = CandidateRuntimeModelResolver(models: [
+            Self.runtimeModel(transcriptionModel),
+            Self.runtimeModel(cleaner),
+        ])
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths,
+            models: resolver
+        )
 
         let activated = await services.activateInstalledModel(cleaner.id)
 
-        XCTAssertTrue(activated)
+        XCTAssertEqual(activated, .activated)
         XCTAssertEqual(services.preferences.activeModelID, transcriptionModel.id)
         XCTAssertEqual(services.preferences.activeVoiceCleaningModelID, cleaner.id)
         XCTAssertTrue(services.isModelActive(cleaner.id))
         await services.disableVoiceCleaning()
         XCTAssertNil(services.preferences.activeVoiceCleaningModelID)
         XCTAssertEqual(services.settingsStore.load().activeModelID, transcriptionModel.id)
+    }
+
+    @MainActor
+    func testUseCommitsReadyTranscriptionArtifactAndPersistsAcrossRelaunch() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let previous = try Self.catalogModel(id: ProductionModelPolicy.requiredModelID)
+        let candidate = try Self.catalogModel(id: "whisper-large-v2-q5_0")
+        try Self.writeInstalledStore(
+            models: [previous, candidate],
+            to: paths
+        )
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = previous.id
+        let resolver = CandidateRuntimeModelResolver(models: [
+            Self.runtimeModel(previous),
+            Self.runtimeModel(candidate),
+        ])
+        let transcriber = ActivationTranscriberSpy()
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths,
+            models: resolver,
+            transcriber: transcriber
+        )
+
+        let result = await services.activateInstalledModel(candidate.id)
+
+        XCTAssertEqual(result, .activated)
+        XCTAssertEqual(services.preferences.activeModelID, candidate.id)
+        XCTAssertEqual(services.settingsStore.load().activeModelID, candidate.id)
+        let relaunched = try Self.makeServices(
+            preferences: nil,
+            paths: paths
+        )
+        XCTAssertEqual(relaunched.preferences.activeModelID, candidate.id)
+    }
+
+    @MainActor
+    func testFailedUseKeepsPersistedIdentityAndRestoresPreviousRuntime() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let previous = try Self.catalogModel(id: ProductionModelPolicy.requiredModelID)
+        let candidate = try Self.catalogModel(id: "whisper-large-v2-q5_0")
+        try Self.writeInstalledStore(
+            models: [previous, candidate],
+            to: paths
+        )
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = previous.id
+        let resolver = CandidateRuntimeModelResolver(models: [
+            Self.runtimeModel(previous),
+            Self.runtimeModel(candidate),
+        ])
+        let transcriber = ActivationTranscriberSpy(failingModelIDs: [candidate.id])
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths,
+            models: resolver,
+            transcriber: transcriber
+        )
+
+        let result = await services.activateInstalledModel(candidate.id)
+        let preparedModelIDs = await transcriber.preparedModelIDs()
+
+        XCTAssertEqual(result, .preparationFailed)
+        XCTAssertEqual(services.preferences.activeModelID, previous.id)
+        XCTAssertEqual(services.settingsStore.load().activeModelID, previous.id)
+        XCTAssertEqual(preparedModelIDs, [candidate.id, previous.id])
+    }
+
+    @MainActor
+    func testUseRejectsInstalledArtifactWhenSignedCompatibilityIsNotCompatible() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let previous = try Self.catalogModel(id: ProductionModelPolicy.requiredModelID)
+        let candidate = try Self.catalogModel(id: "parakeet-rnnt-1.1b")
+        try Self.writeInstalledStore(
+            models: [previous, candidate],
+            to: paths
+        )
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = previous.id
+        let compatibilityResolver = ModelCatalogCompatibilityResolver(
+            context: ModelCatalogCompatibilityContext(
+                appVersion: "1.1.0",
+                macOSVersion: "14.0.0",
+                architecture: .arm64,
+                physicalMemoryBytes: 8_589_934_592
+            )
+        )
+        let transcriber = ActivationTranscriberSpy()
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths,
+            modelCatalogCompatibilityResolver: compatibilityResolver,
+            models: CandidateRuntimeModelResolver(models: [
+                Self.runtimeModel(previous),
+                Self.runtimeModel(candidate),
+            ]),
+            transcriber: transcriber
+        )
+        let manifest = try ModelManifest.decode(
+            Data(
+                contentsOf: URL(fileURLWithPath: #filePath)
+                    .deletingLastPathComponent()
+                    .deletingLastPathComponent()
+                    .deletingLastPathComponent()
+                    .appendingPathComponent("models/manifest.json")
+            )
+        )
+        services.modelCatalogCoordinator = ModelCatalogCoordinator {
+            manifest
+        }
+        await services.modelCatalogCoordinator.refresh()
+
+        let result = await services.activateInstalledModel(candidate.id)
+        let preparedModelIDs = await transcriber.preparedModelIDs()
+
+        XCTAssertEqual(
+            result,
+            .incompatible(
+                .incompatible(
+                    .insufficientMemory(
+                        requiredBytes: 17_179_869_184,
+                        availableBytes: 8_589_934_592
+                    )
+                )
+            )
+        )
+        XCTAssertEqual(services.preferences.activeModelID, previous.id)
+        XCTAssertEqual(services.settingsStore.load().activeModelID, previous.id)
+        XCTAssertTrue(preparedModelIDs.isEmpty)
+    }
+
+    @MainActor
+    func testFailedEnableKeepsPreviousCleanerAndRestoresItsRuntime() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let previous = try Self.catalogModel(id: "mossformer2-se-fp16")
+        let candidate = try Self.catalogModel(id: "mossformer2-se-int8")
+        try Self.writeInstalledStore(
+            models: [previous, candidate],
+            to: paths
+        )
+        var preferences = AppPreferences.defaults
+        preferences.activeVoiceCleaningModelID = previous.id
+        let resolver = CandidateRuntimeModelResolver(models: [
+            Self.runtimeModel(previous),
+            Self.runtimeModel(candidate),
+        ])
+        let voiceCleaner = ActivationVoiceCleanerSpy(
+            failingModelIDs: [candidate.id]
+        )
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths,
+            models: resolver,
+            voiceCleaner: voiceCleaner
+        )
+
+        let result = await services.activateInstalledModel(candidate.id)
+        let preparedModelIDs = await voiceCleaner.preparedModelIDs()
+
+        XCTAssertEqual(result, .preparationFailed)
+        XCTAssertEqual(
+            services.preferences.activeVoiceCleaningModelID,
+            previous.id
+        )
+        XCTAssertEqual(
+            services.settingsStore.load().activeVoiceCleaningModelID,
+            previous.id
+        )
+        XCTAssertEqual(preparedModelIDs, [candidate.id, previous.id])
+    }
+
+    @MainActor
+    func testDisableVoiceCleaningPersistsWithoutDeletingInstalledBytes() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let cleaner = try Self.catalogModel(id: "mossformer2-se-fp16")
+        try Self.writeInstalledStore(models: [cleaner], to: paths)
+        var preferences = AppPreferences.defaults
+        preferences.activeVoiceCleaningModelID = cleaner.id
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths,
+            models: CandidateRuntimeModelResolver(
+                models: [Self.runtimeModel(cleaner)]
+            )
+        )
+
+        await services.disableVoiceCleaning()
+
+        XCTAssertNil(services.preferences.activeVoiceCleaningModelID)
+        XCTAssertNil(services.settingsStore.load().activeVoiceCleaningModelID)
+        XCTAssertTrue(services.isModelInstalled(cleaner.id))
+        XCTAssertNotNil(
+            InstalledModelsStore(
+                records: services.installedModelRecords
+            ).record(forModelID: cleaner.id)
+        )
+    }
+
+    @MainActor
+    func testSuccessfulAndFailedInstallTransactionsNeverChangeCommittedActiveIdentity() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let active = try Self.catalogModel(
+            id: ProductionModelPolicy.requiredModelID
+        )
+        let secondVariant = try Self.catalogModel(
+            id: "whisper-large-v2-q5_0"
+        )
+        try Self.writeInstalledStore(models: [active], to: paths)
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = active.id
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths
+        )
+        services.modelInstallCoordinator = ModelInstallCoordinator {
+            [weak services] _, onStateChange in
+            try Self.writeInstalledStore(
+                models: [active, secondVariant],
+                to: paths
+            )
+            guard let services else {
+                throw ModelInstallCoordinatorError.modelPreparationFailed
+            }
+            try await services.completeModelInstall(
+                secondVariant,
+                onStateChange: onStateChange
+            )
+        }
+
+        services.modelInstallCoordinator.start(modelID: secondVariant.id)
+        for _ in 0..<1_000 {
+            if services.modelInstallCoordinator.state?.phase == .installed {
+                break
+            }
+            await Task.yield()
+        }
+
+        XCTAssertEqual(
+            services.modelInstallCoordinator.state?.phase,
+            .installed
+        )
+        XCTAssertTrue(services.isModelInstalled(secondVariant.id))
+        XCTAssertEqual(services.preferences.activeModelID, active.id)
+        XCTAssertEqual(services.settingsStore.load().activeModelID, active.id)
+
+        services.modelInstallCoordinator = ModelInstallCoordinator { _, _ in
+            throw ModelInstallCoordinatorError.modelPreparationFailed
+        }
+        services.modelInstallCoordinator.start(modelID: "failed-variant")
+        for _ in 0..<1_000 {
+            if services.modelInstallCoordinator.state?.phase == .failed {
+                break
+            }
+            await Task.yield()
+        }
+
+        XCTAssertEqual(services.modelInstallCoordinator.state?.phase, .failed)
+        XCTAssertEqual(services.preferences.activeModelID, active.id)
+        XCTAssertEqual(services.settingsStore.load().activeModelID, active.id)
     }
 
     func testAppPathsFactoryUsesTextifySupportLocationsWithoutUserLibrarySideEffects() throws {
@@ -901,19 +1223,23 @@ final class AppCompositionTests: XCTestCase {
 
     @MainActor
     private static func makeServices(
-        preferences: AppPreferences = .defaults,
+        preferences: AppPreferences? = .defaults,
         paths providedPaths: AppPaths? = nil,
         hotkeyMonitor: GlobalHotkeyMonitor? = nil,
         launchAtLogin: FakeLaunchAtLoginManager? = nil,
         launchAtLoginLocation: any LaunchAtLoginLocationChecking = FixedLaunchAtLoginLocation(isSupported: true),
         modelCatalogCompatibilityResolver: ModelCatalogCompatibilityResolver = .current(),
         models: any RuntimeModelResolving = FakeRuntimeModelResolver(),
+        transcriber: any RuntimeTranscribing = FakeRuntimeTranscriber(),
+        voiceCleaner: any RuntimeVoiceCleaning = DisabledRuntimeVoiceCleaning(),
         overlayPresenter: (any RecordingOverlayPresenting)? = nil,
         waitBeforeProcessingIndicator: @escaping @Sendable () async -> Void = {}
     ) throws -> AppServices {
         let paths = try providedPaths ?? makeTemporaryPaths()
         let settingsStore = SettingsStore(storage: .file(paths.settingsFileURL))
-        settingsStore.save(preferences)
+        if let preferences {
+            settingsStore.save(preferences)
+        }
         let diagnosticsLogger = DiagnosticsLogger(directory: paths.logsDirectory)
         let launchAtLogin = launchAtLogin ?? FakeLaunchAtLoginManager(status: .disabled)
         let hotkeyMonitor = hotkeyMonitor ?? GlobalHotkeyMonitor(
@@ -932,7 +1258,8 @@ final class AppCompositionTests: XCTestCase {
                 permissions: FakeRuntimePermissionChecker(),
                 models: models,
                 audio: FakeRuntimeAudioRecorder(),
-                transcriber: FakeRuntimeTranscriber(),
+                transcriber: transcriber,
+                voiceCleaner: voiceCleaner,
                 targetCapturer: FakeInsertionTargetCapturer(),
                 inserter: FakeInsertionService(),
                 diagnostics: RuntimeDiagnosticsLoggerAdapter(logger: diagnosticsLogger),
@@ -945,6 +1272,49 @@ final class AppCompositionTests: XCTestCase {
             modelCatalogCompatibilityResolver: modelCatalogCompatibilityResolver,
             overlayPresenter: overlayPresenter,
             waitBeforeProcessingIndicator: waitBeforeProcessingIndicator
+        )
+    }
+
+    private static func writeInstalledStore(
+        models: [ModelEntry],
+        to paths: AppPaths
+    ) throws {
+        let records = models.map { model in
+            InstalledModelRecord(
+                model: model,
+                installedAt: "2026-07-24T00:00:00Z",
+                localFilesByManifestFilename: Dictionary(
+                    uniqueKeysWithValues: model.files.map { file in
+                        (
+                            file.filename,
+                            "/tmp/\(model.id)/\(file.relativePath ?? file.filename)"
+                        )
+                    }
+                )
+            )
+        }
+        let storeURL = ModelStorageLayout(
+            rootDirectory: paths.modelsDirectory
+        ).installedStoreURL
+        try JSONEncoder().encode(
+            InstalledModelsStore(records: records)
+        ).write(to: storeURL, options: .atomic)
+    }
+
+    private static func runtimeModel(_ model: ModelEntry) -> RuntimeActiveModel {
+        RuntimeActiveModel(
+            id: model.id,
+            displayName: model.displayName,
+            tier: model.tier,
+            localModelPath: "/tmp/\(model.id)",
+            useGPU: model.runtime.accelerator == .metalGPU,
+            threadCount: 1,
+            engine: model.runtime.engine,
+            variant: model.runtime.variant,
+            accelerator: model.runtime.accelerator,
+            artifactLayout: model.runtime.artifactLayout,
+            runtimeParameters: model.runtimeParameters,
+            purpose: model.purpose
         )
     }
 
@@ -1057,6 +1427,48 @@ private struct FakeRuntimeModelResolver: RuntimeModelResolving {
     }
 }
 
+private actor CandidateRuntimeModelResolver: RuntimeModelResolving {
+    private let modelsByID: [String: RuntimeActiveModel]
+    private let readinessByModelID: [String: RuntimeModelReadiness]
+
+    init(
+        models: [RuntimeActiveModel],
+        readinessByModelID: [String: RuntimeModelReadiness] = [:]
+    ) {
+        self.modelsByID = Dictionary(
+            uniqueKeysWithValues: models.map { ($0.id, $0) }
+        )
+        self.readinessByModelID = readinessByModelID
+    }
+
+    func resolveActiveModel(
+        preferences: AppPreferences
+    ) async -> RuntimeActiveModel? {
+        guard let modelID = preferences.activeModelID else {
+            return nil
+        }
+        return modelsByID[modelID]
+    }
+
+    func resolveActiveVoiceCleaningModel(
+        preferences: AppPreferences
+    ) async -> RuntimeActiveModel? {
+        guard let modelID = preferences.activeVoiceCleaningModelID else {
+            return nil
+        }
+        return modelsByID[modelID]
+    }
+
+    func readiness(
+        for model: RuntimeActiveModel?
+    ) async -> RuntimeModelReadiness {
+        guard let model else {
+            return .noActiveModel
+        }
+        return readinessByModelID[model.id] ?? .ready(modelID: model.id)
+    }
+}
+
 private struct ReadyRuntimeModelResolver: RuntimeModelResolving {
     private let model = RuntimeActiveModel(
         id: "ggml-small.en-q5_1",
@@ -1073,6 +1485,78 @@ private struct ReadyRuntimeModelResolver: RuntimeModelResolving {
 
     func readiness(for model: RuntimeActiveModel?) async -> RuntimeModelReadiness {
         .ready(modelID: self.model.id)
+    }
+}
+
+private enum ActivationPreparationError: Error {
+    case rejected
+}
+
+private actor ActivationTranscriberSpy: RuntimeTranscribing {
+    private let failingModelIDs: Set<String>
+    private var preparedIDs: [String] = []
+
+    init(failingModelIDs: Set<String> = []) {
+        self.failingModelIDs = failingModelIDs
+    }
+
+    var readiness: RuntimeModelReadiness {
+        get async {
+            guard let modelID = preparedIDs.last else {
+                return .noActiveModel
+            }
+            return .ready(modelID: modelID)
+        }
+    }
+
+    func prepare(model: RuntimeActiveModel) async throws {
+        preparedIDs.append(model.id)
+        if failingModelIDs.contains(model.id) {
+            throw ActivationPreparationError.rejected
+        }
+    }
+
+    func transcribe(
+        _ audio: TranscriptionAudioBuffer
+    ) async throws -> TranscriptionResult {
+        TranscriptionResult(
+            text: "",
+            noSpeechProbability: 1,
+            averageLogProbability: -2,
+            compressionRatio: 1
+        )
+    }
+
+    func preparedModelIDs() -> [String] {
+        preparedIDs
+    }
+}
+
+private actor ActivationVoiceCleanerSpy: RuntimeVoiceCleaning {
+    private let failingModelIDs: Set<String>
+    private var preparedIDs: [String] = []
+
+    init(failingModelIDs: Set<String> = []) {
+        self.failingModelIDs = failingModelIDs
+    }
+
+    func prepare(model: RuntimeActiveModel) async throws {
+        preparedIDs.append(model.id)
+        if failingModelIDs.contains(model.id) {
+            throw ActivationPreparationError.rejected
+        }
+    }
+
+    func clean(
+        _ audio: TranscriptionAudioBuffer
+    ) async throws -> TranscriptionAudioBuffer {
+        audio
+    }
+
+    func unload() async {}
+
+    func preparedModelIDs() -> [String] {
+        preparedIDs
     }
 }
 
