@@ -818,3 +818,18 @@ Task 1 must merge before parallel Wave 1 work begins.
 - Runtime behavior, installer semantics, active-preference mutation, native
   hierarchy rendering, queues, storage inventory, and revocation remain owned
   by later tickets.
+
+## Native Model Catalog Hierarchy Handoff - 2026-07-24
+
+- GitHub issue #5 owns the Task 11 Models-pane presentation changes under
+  `Sources/Textify/SettingsUI/`, the catalog-experience selection/disclosure
+  state needed to render the signed v3 Family → Checkpoint → Exact Artifact
+  graph, and focused semantic coverage in `Tests/TextifyAppTests/`.
+- This slice preserves exact artifact installation, activation, deletion,
+  download, receipt, and runtime identities. Selection is UI context only and
+  never mutates active preferences.
+- The existing flat operational rows remain the compatibility fallback when no
+  signed v3 presentation graph is available. Virtualization profiling, the
+  adaptive inspector, comparison columns, purpose destinations, expanded query
+  behavior, queues, storage, revocation, and runtime transactions remain owned
+  by later tickets.

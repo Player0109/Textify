@@ -169,28 +169,7 @@ final class ModelCatalogExperienceTests: XCTestCase {
 
     @MainActor
     func testSignedV3FixtureReachesFamilyCheckpointAndExactArtifactPresentation() async throws {
-        let fixtureDirectory = repositoryRoot
-            .appendingPathComponent("Tests/TextifyModelsTests/Fixtures/Models")
-        let manifestData = try Data(
-            contentsOf: fixtureDirectory.appendingPathComponent("manifest_v3.json")
-        )
-        let publicKey = try String(
-            contentsOf: fixtureDirectory
-                .appendingPathComponent("manifest_v3.fixture-public-key.base64"),
-            encoding: .utf8
-        ).trimmingCharacters(in: .whitespacesAndNewlines)
-        let verifier = ManifestVerifier(trustedKeys: [
-            TrustedModelManifestKey(
-                keyId: "fixture-v3-key",
-                publicKeyBase64: publicKey
-            )
-        ])
-        let manifest = try verifier.verify(
-            manifestData: manifestData,
-            signatureData: Data(
-                contentsOf: fixtureDirectory.appendingPathComponent("manifest_v3.json.sig")
-            )
-        )
+        let manifest = try signedV3FixtureManifest()
         try ProductionModelPolicy.validateProductionManifest(manifest)
         let coordinator = ModelCatalogCoordinator(loadOperation: { manifest })
         await coordinator.refresh()
@@ -222,6 +201,157 @@ final class ModelCatalogExperienceTests: XCTestCase {
         let singleVariant = family.checkpoints[1]
         XCTAssertEqual(singleVariant.artifacts.map(\.id), ["whisper-tiny-f16"])
         XCTAssertEqual(singleVariant.artifacts[0].metadata.numericFormat, .f16)
+    }
+
+    func testCollapsedHierarchyShowsNonselectableFamilyMultiVariantCheckpointAndSingleLeaf() throws {
+        let experience = ModelCatalogExperience(
+            trustedManifest: try signedV3FixtureManifest(),
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        let state = ModelCatalogHierarchyState()
+
+        let rows = state.visibleRows(in: experience)
+
+        XCTAssertEqual(
+            rows.map(\.id),
+            [
+                .family("family.whisper"),
+                .checkpoint("checkpoint.whisper.small"),
+                .exactArtifact("whisper-tiny-f16"),
+            ]
+        )
+        guard case .family = rows[0].content else {
+            return XCTFail("The first row should be a nonselectable family heading.")
+        }
+        guard case .checkpoint = rows[1].content else {
+            return XCTFail("The multi-variant checkpoint should remain a parent row.")
+        }
+        guard case let .exactArtifact(_, artifact, isSingleVariant) = rows[2].content else {
+            return XCTFail("The single-variant checkpoint should render as an exact leaf.")
+        }
+        XCTAssertTrue(isSingleVariant)
+        XCTAssertEqual(artifact.row.actions, [.install, .details])
+    }
+
+    func testDisclosureDoesNotSelectAndExpandedChildrenExposeExactSelection() throws {
+        let experience = ModelCatalogExperience(
+            trustedManifest: try signedV3FixtureManifest(),
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        let checkpoint = try XCTUnwrap(experience.families.first?.checkpoints.first)
+        var state = ModelCatalogHierarchyState()
+        state.select(.checkpoint(checkpoint.id))
+
+        state.toggleExpansion(of: checkpoint)
+
+        XCTAssertEqual(state.selection, .checkpoint(checkpoint.id))
+        XCTAssertEqual(
+            state.visibleRows(in: experience).map(\.id),
+            [
+                .family("family.whisper"),
+                .checkpoint("checkpoint.whisper.small"),
+                .exactArtifact("whisper-small-q5_1"),
+                .exactArtifact("whisper-small-q8_0"),
+                .exactArtifact("whisper-tiny-f16"),
+            ]
+        )
+    }
+
+    func testFilteringToOneVisibleArtifactKeepsAnIntrinsicallyMultiVariantCheckpoint() throws {
+        let experience = ModelCatalogExperience(
+            trustedManifest: try signedV3FixtureManifest(),
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            query: ModelCatalogQuery(precision: .fiveBit)
+        )
+        let checkpoint = try XCTUnwrap(experience.families.first?.checkpoints.first)
+        var state = ModelCatalogHierarchyState()
+
+        XCTAssertEqual(checkpoint.metadata.artifactIDs.count, 2)
+        XCTAssertEqual(checkpoint.artifacts.map(\.id), ["whisper-small-q5_1"])
+        XCTAssertEqual(
+            state.visibleRows(in: experience).map(\.id),
+            [
+                .family("family.whisper"),
+                .checkpoint("checkpoint.whisper.small"),
+            ]
+        )
+
+        state.toggleExpansion(of: checkpoint)
+
+        XCTAssertEqual(
+            state.visibleRows(in: experience).map(\.id),
+            [
+                .family("family.whisper"),
+                .checkpoint("checkpoint.whisper.small"),
+                .exactArtifact("whisper-small-q5_1"),
+            ]
+        )
+    }
+
+    func testCollapsingSelectedChildPromotesSelectionToCheckpoint() throws {
+        let experience = ModelCatalogExperience(
+            trustedManifest: try signedV3FixtureManifest(),
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        let checkpoint = try XCTUnwrap(experience.families.first?.checkpoints.first)
+        var state = ModelCatalogHierarchyState()
+        state.toggleExpansion(of: checkpoint)
+        state.select(.exactArtifact("whisper-small-q8_0"))
+
+        state.toggleExpansion(of: checkpoint)
+
+        XCTAssertEqual(state.selection, .checkpoint(checkpoint.id))
+        XCTAssertFalse(
+            state.visibleRows(in: experience)
+                .contains { $0.id == .exactArtifact("whisper-small-q8_0") }
+        )
+    }
+
+    func testSelectionIsSingleAndSurvivesOrdinaryArtifactStateUpdates() throws {
+        let manifest = try signedV3FixtureManifest()
+        let initialExperience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        let checkpoint = try XCTUnwrap(
+            initialExperience.families.first?.checkpoints.first
+        )
+        var state = ModelCatalogHierarchyState()
+        state.toggleExpansion(of: checkpoint)
+        state.select(.checkpoint(checkpoint.id))
+        state.select(.exactArtifact("whisper-small-q5_1"))
+
+        let installedModel = try XCTUnwrap(
+            manifest.models.first { $0.id == "whisper-small-q5_1" }
+        )
+        let updatedExperience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [installed(installedModel)],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        state.reconcile(with: updatedExperience)
+
+        XCTAssertEqual(state.selection, .exactArtifact("whisper-small-q5_1"))
+        XCTAssertTrue(state.expandedCheckpointIDs.contains(checkpoint.id))
+        let installedRow = try XCTUnwrap(
+            state.visibleRows(in: updatedExperience)
+                .first { $0.id == .exactArtifact("whisper-small-q5_1") }
+        )
+        guard case let .exactArtifact(_, artifact, _) = installedRow.content else {
+            return XCTFail("The selected exact artifact row should remain visible.")
+        }
+        XCTAssertTrue(artifact.row.isInstalled)
     }
 
     func testProductionV3ResolvesV2ReceiptAndActivePreferenceToSameExactArtifact() throws {
@@ -275,6 +405,30 @@ final class ModelCatalogExperienceTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+    }
+
+    private func signedV3FixtureManifest() throws -> ModelManifest {
+        let fixtureDirectory = repositoryRoot
+            .appendingPathComponent("Tests/TextifyModelsTests/Fixtures/Models")
+        let publicKey = try String(
+            contentsOf: fixtureDirectory
+                .appendingPathComponent("manifest_v3.fixture-public-key.base64"),
+            encoding: .utf8
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
+        let verifier = ManifestVerifier(trustedKeys: [
+            TrustedModelManifestKey(
+                keyId: "fixture-v3-key",
+                publicKeyBase64: publicKey
+            ),
+        ])
+        return try verifier.verify(
+            manifestData: Data(
+                contentsOf: fixtureDirectory.appendingPathComponent("manifest_v3.json")
+            ),
+            signatureData: Data(
+                contentsOf: fixtureDirectory.appendingPathComponent("manifest_v3.json.sig")
+            )
+        )
     }
 
     private func installed(_ model: ModelEntry) -> InstalledModelRecord {

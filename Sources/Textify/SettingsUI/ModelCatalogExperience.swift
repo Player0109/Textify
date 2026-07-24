@@ -113,6 +113,41 @@ enum ModelProviderIdentity: String, Equatable {
     case mossFormer
     case community
 
+    static func resolve(from components: String...) -> ModelProviderIdentity {
+        let identity = components.joined(separator: " ").lowercased()
+        if identity.contains("cohere") {
+            return .cohere
+        }
+        if identity.contains("nvidia")
+            || identity.contains("parakeet")
+            || identity.contains("canary")
+            || identity.contains("nemotron") {
+            return .nvidia
+        }
+        if identity.contains("openai") || identity.contains("whisper") {
+            return .openAI
+        }
+        if identity.contains("qwen") {
+            return .qwen
+        }
+        if identity.contains("alibaba")
+            || identity.contains("paraformer")
+            || identity.contains("sensevoice")
+            || identity.contains("mossformer") {
+            return .alibaba
+        }
+        if identity.contains("reazon") {
+            return .reazon
+        }
+        if identity.contains("apple") {
+            return .apple
+        }
+        if identity.contains("mlx") {
+            return .mlx
+        }
+        return .community
+    }
+
     var name: String {
         switch self {
         case .openAI: "OpenAI"
@@ -206,6 +241,143 @@ struct ModelCatalogExactArtifactPresentation: Equatable, Identifiable {
 
     var id: String {
         metadata.id
+    }
+}
+
+enum ModelCatalogHierarchyRowID: Equatable, Hashable {
+    case family(String)
+    case checkpoint(String)
+    case exactArtifact(String)
+}
+
+enum ModelCatalogHierarchySelection: Equatable, Hashable {
+    case checkpoint(String)
+    case exactArtifact(String)
+}
+
+struct ModelCatalogHierarchyRow: Equatable, Identifiable {
+    enum Content: Equatable {
+        case family(ModelCatalogFamilyPresentation)
+        case checkpoint(ModelCatalogCheckpointPresentation)
+        case exactArtifact(
+            checkpoint: ModelCatalogCheckpointPresentation,
+            artifact: ModelCatalogExactArtifactPresentation,
+            isSingleVariant: Bool
+        )
+    }
+
+    let content: Content
+    let isExpanded: Bool
+
+    var id: ModelCatalogHierarchyRowID {
+        switch content {
+        case let .family(family):
+            .family(family.id)
+        case let .checkpoint(checkpoint):
+            .checkpoint(checkpoint.id)
+        case let .exactArtifact(_, artifact, _):
+            .exactArtifact(artifact.id)
+        }
+    }
+}
+
+struct ModelCatalogHierarchyState: Equatable {
+    private(set) var selection: ModelCatalogHierarchySelection?
+    private(set) var expandedCheckpointIDs: Set<String>
+
+    init(
+        selection: ModelCatalogHierarchySelection? = nil,
+        expandedCheckpointIDs: Set<String> = []
+    ) {
+        self.selection = selection
+        self.expandedCheckpointIDs = expandedCheckpointIDs
+    }
+
+    mutating func select(_ selection: ModelCatalogHierarchySelection) {
+        self.selection = selection
+    }
+
+    mutating func toggleExpansion(of checkpoint: ModelCatalogCheckpointPresentation) {
+        if expandedCheckpointIDs.remove(checkpoint.id) != nil {
+            if case let .exactArtifact(selectedArtifactID) = selection,
+               checkpoint.artifacts.contains(where: { $0.id == selectedArtifactID }) {
+                selection = .checkpoint(checkpoint.id)
+            }
+        } else {
+            expandedCheckpointIDs.insert(checkpoint.id)
+        }
+    }
+
+    mutating func reconcile(with experience: ModelCatalogExperience) {
+        let checkpoints = experience.families.flatMap(\.checkpoints)
+        let validCheckpointIDs = Set(checkpoints.map(\.id))
+        let validArtifactIDs = Set(checkpoints.flatMap(\.artifacts).map(\.id))
+
+        expandedCheckpointIDs.formIntersection(
+            checkpoints
+                .filter { $0.metadata.artifactIDs.count > 1 }
+                .map(\.id)
+        )
+
+        switch selection {
+        case let .checkpoint(id) where !validCheckpointIDs.contains(id),
+             let .exactArtifact(id) where !validArtifactIDs.contains(id):
+            selection = nil
+        case .checkpoint, .exactArtifact, nil:
+            break
+        }
+    }
+
+    func visibleRows(in experience: ModelCatalogExperience) -> [ModelCatalogHierarchyRow] {
+        experience.families.flatMap { family in
+            var rows = [
+                ModelCatalogHierarchyRow(
+                    content: .family(family),
+                    isExpanded: true
+                ),
+            ]
+
+            for checkpoint in family.checkpoints {
+                if checkpoint.metadata.artifactIDs.count == 1,
+                   let artifact = checkpoint.artifacts.first {
+                    rows.append(
+                        ModelCatalogHierarchyRow(
+                            content: .exactArtifact(
+                                checkpoint: checkpoint,
+                                artifact: artifact,
+                                isSingleVariant: true
+                            ),
+                            isExpanded: false
+                        )
+                    )
+                    continue
+                }
+
+                let isExpanded = expandedCheckpointIDs.contains(checkpoint.id)
+                rows.append(
+                    ModelCatalogHierarchyRow(
+                        content: .checkpoint(checkpoint),
+                        isExpanded: isExpanded
+                    )
+                )
+                guard isExpanded else {
+                    continue
+                }
+                rows.append(
+                    contentsOf: checkpoint.artifacts.map {
+                        ModelCatalogHierarchyRow(
+                            content: .exactArtifact(
+                                checkpoint: checkpoint,
+                                artifact: $0,
+                                isSingleVariant: false
+                            ),
+                            isExpanded: false
+                        )
+                    }
+                )
+            }
+            return rows
+        }
     }
 }
 
@@ -661,32 +833,7 @@ struct ProductionModelPresentation: Equatable, Identifiable {
     }
 
     var provider: ModelProviderIdentity {
-        let identity = "\(displayName) \(sourceName) \(engineName)".lowercased()
-        if identity.contains("cohere") {
-            return .cohere
-        }
-        if identity.contains("parakeet") || identity.contains("canary") || identity.contains("nemotron") {
-            return .nvidia
-        }
-        if identity.contains("whisper") {
-            return .openAI
-        }
-        if identity.contains("qwen") {
-            return .qwen
-        }
-        if identity.contains("paraformer") || identity.contains("sensevoice") || identity.contains("mossformer") {
-            return .alibaba
-        }
-        if identity.contains("reazon") {
-            return .reazon
-        }
-        if identity.contains("apple") {
-            return .apple
-        }
-        if identity.contains("mlx") {
-            return .mlx
-        }
-        return .community
+        .resolve(from: displayName, sourceName, engineName)
     }
 
     var activationMessage: String {

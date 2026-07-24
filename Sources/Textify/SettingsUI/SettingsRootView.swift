@@ -538,6 +538,7 @@ private struct ModelsSettingsPane: View {
     @State private var catalogSort: ModelCatalogSort = .catalog
     @State private var catalogFormat: ModelArtifactFormat?
     @State private var catalogPrecision: ModelArtifactPrecision?
+    @State private var hierarchyState = ModelCatalogHierarchyState()
 
     var body: some View {
         let catalogExperience = ModelCatalogExperience(
@@ -577,10 +578,19 @@ private struct ModelsSettingsPane: View {
 
             ModelCatalogSurface(
                 rows: catalogExperience.rows,
+                hierarchyRows: hierarchyState.visibleRows(in: catalogExperience),
+                selection: hierarchyState.selection,
+                onSelect: { selection in
+                    hierarchyState.select(selection)
+                },
+                onToggleCheckpoint: { checkpoint in
+                    hierarchyState.toggleExpansion(of: checkpoint)
+                },
                 onReset: resetCatalogQuery
-            ) { row in
+            ) { row, context in
                 TextifyModelCard(
                     model: row.model,
+                    hierarchyContext: context,
                     isInstalled: row.isInstalled,
                     isActive: row.isActive,
                     isActivating: activatingModelID == row.id,
@@ -640,6 +650,9 @@ private struct ModelsSettingsPane: View {
         .task {
             _ = await services.dictation.refreshReadiness()
             await services.modelCatalogCoordinator.refresh()
+        }
+        .onChange(of: catalogExperience) { _, updatedExperience in
+            hierarchyState.reconcile(with: updatedExperience)
         }
         .alert("Import local Whisper model?", isPresented: $showsImportConfirmation) {
             Button("Cancel", role: .cancel) {
@@ -992,17 +1005,44 @@ private struct ModelCatalogToolbar: View {
     }
 }
 
+private struct ModelCatalogArtifactRowContext {
+    let title: String
+    let description: String
+    let variantLabel: String?
+    let isRecommended: Bool
+    let isSelected: Bool
+    let indentation: CGFloat
+    let onSelect: () -> Void
+}
+
 private struct ModelCatalogSurface<Row: View>: View {
     let rows: [ModelCatalogRowPresentation]
+    let hierarchyRows: [ModelCatalogHierarchyRow]
+    let selection: ModelCatalogHierarchySelection?
+    let onSelect: (ModelCatalogHierarchySelection) -> Void
+    let onToggleCheckpoint: (ModelCatalogCheckpointPresentation) -> Void
     let onReset: () -> Void
-    let row: (ModelCatalogRowPresentation) -> Row
+    let row: (ModelCatalogRowPresentation, ModelCatalogArtifactRowContext?) -> Row
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(
         rows: [ModelCatalogRowPresentation],
+        hierarchyRows: [ModelCatalogHierarchyRow],
+        selection: ModelCatalogHierarchySelection?,
+        onSelect: @escaping (ModelCatalogHierarchySelection) -> Void,
+        onToggleCheckpoint: @escaping (ModelCatalogCheckpointPresentation) -> Void,
         onReset: @escaping () -> Void,
-        @ViewBuilder row: @escaping (ModelCatalogRowPresentation) -> Row
+        @ViewBuilder row: @escaping (
+            ModelCatalogRowPresentation,
+            ModelCatalogArtifactRowContext?
+        ) -> Row
     ) {
         self.rows = rows
+        self.hierarchyRows = hierarchyRows
+        self.selection = selection
+        self.onSelect = onSelect
+        self.onToggleCheckpoint = onToggleCheckpoint
         self.onReset = onReset
         self.row = row
     }
@@ -1015,8 +1055,56 @@ private struct ModelCatalogSurface<Row: View>: View {
                 ModelCatalogEmptyState(onReset: onReset)
             } else {
                 LazyVStack(spacing: 0) {
-                    ForEach(rows) { catalogRow in
-                        row(catalogRow)
+                    if hierarchyRows.isEmpty {
+                        ForEach(rows) { catalogRow in
+                            row(catalogRow, nil)
+                        }
+                    } else {
+                        ForEach(hierarchyRows) { hierarchyRow in
+                            switch hierarchyRow.content {
+                            case let .family(family):
+                                ModelCatalogFamilyHeading(family: family)
+                            case let .checkpoint(checkpoint):
+                                ModelCatalogCheckpointRow(
+                                    checkpoint: checkpoint,
+                                    isExpanded: hierarchyRow.isExpanded,
+                                    isSelected: selection == .checkpoint(checkpoint.id),
+                                    onSelect: {
+                                        onSelect(.checkpoint(checkpoint.id))
+                                    },
+                                    onToggle: {
+                                        withAnimation(
+                                            reduceMotion ? nil : .easeInOut(duration: 0.16)
+                                        ) {
+                                            onToggleCheckpoint(checkpoint)
+                                        }
+                                    }
+                                )
+                            case let .exactArtifact(checkpoint, artifact, isSingleVariant):
+                                row(
+                                    artifact.row,
+                                    ModelCatalogArtifactRowContext(
+                                        title: isSingleVariant
+                                            ? checkpoint.metadata.presentation.displayName
+                                            : artifact.metadata.presentation.displayName,
+                                        description: isSingleVariant
+                                            ? checkpoint.metadata.presentation.description
+                                            : "\(checkpoint.metadata.presentation.displayName) • \(artifact.row.model.engineName) • \(artifact.row.model.acceleratorName)",
+                                        variantLabel: isSingleVariant
+                                            ? artifact.metadata.presentation.displayName
+                                            : nil,
+                                        isRecommended: !isSingleVariant
+                                            && checkpoint.metadata
+                                                .recommendedArtifactID == artifact.id,
+                                        isSelected: selection == .exactArtifact(artifact.id),
+                                        indentation: isSingleVariant ? 0 : 30,
+                                        onSelect: {
+                                            onSelect(.exactArtifact(artifact.id))
+                                        }
+                                    )
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -1027,6 +1115,165 @@ private struct ModelCatalogSurface<Row: View>: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(TextifyVisualIdentity.separator, lineWidth: 1)
         }
+    }
+}
+
+private struct ModelCatalogFamilyHeading: View {
+    let family: ModelCatalogFamilyPresentation
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ModelProviderTile(provider: provider, isActive: false)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 7) {
+                    Text(family.metadata.presentation.displayName)
+                        .font(.system(.headline, design: .rounded, weight: .bold))
+                    Text(family.metadata.presentation.provider.displayName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Text(family.metadata.presentation.description)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 12)
+
+            Text(
+                "\(family.checkpoints.count) "
+                    + (family.checkpoints.count == 1 ? "checkpoint" : "checkpoints")
+            )
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 14)
+        .frame(minHeight: 62)
+        .background(Color.primary.opacity(0.035))
+        .overlay(alignment: .bottom) {
+            Divider()
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    private var provider: ModelProviderIdentity {
+        .resolve(
+            from: family.metadata.presentation.provider.id,
+            family.metadata.presentation.provider.displayName
+        )
+    }
+}
+
+private struct ModelCatalogCheckpointRow: View {
+    let checkpoint: ModelCatalogCheckpointPresentation
+    let isExpanded: Bool
+    let isSelected: Bool
+    let onSelect: () -> Void
+    let onToggle: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button(action: onToggle) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .frame(width: 18, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                "\(isExpanded ? "Collapse" : "Expand") \(checkpoint.metadata.presentation.displayName)"
+            )
+
+            Button(action: onSelect) {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 7) {
+                            Text(checkpoint.metadata.presentation.displayName)
+                                .font(.system(size: 15, weight: .semibold))
+                                .lineLimit(1)
+                            Text("\(checkpoint.metadata.artifactIDs.count) VARIANTS")
+                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .tracking(0.6)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(checkpoint.metadata.presentation.description)
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    if let reference = recommendedArtifact {
+                        ModelSignalMetric(
+                            level: reference.row.model.qualitySignalLevel,
+                            label: reference.row.model.qualityLabel
+                        )
+                        .frame(width: 86, alignment: .leading)
+                        ModelSignalMetric(
+                            level: reference.row.model.speedSignalLevel,
+                            label: reference.row.model.speedLabel
+                        )
+                        .frame(width: 86, alignment: .leading)
+                        checkpointState
+                            .frame(width: 138, alignment: .leading)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(checkpoint.metadata.presentation.displayName)
+            .accessibilityValue(
+                "\(checkpoint.metadata.artifactIDs.count) variants, "
+                    + "\(isExpanded ? "expanded" : "collapsed")"
+            )
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
+        }
+        .padding(.horizontal, 14)
+        .frame(minHeight: 78)
+        .background(rowBackground)
+        .overlay(alignment: .bottom) {
+            Divider()
+                .padding(.leading, 40)
+        }
+    }
+
+    private var recommendedArtifact: ModelCatalogExactArtifactPresentation? {
+        checkpoint.artifacts.first {
+            $0.id == checkpoint.metadata.recommendedArtifactID
+        }
+    }
+
+    private var checkpointState: some View {
+        let installedCount = checkpoint.artifacts.filter(\.row.isInstalled).count
+        let activeArtifact = checkpoint.artifacts.first(where: \.row.isActive)
+        return VStack(alignment: .leading, spacing: 4) {
+            if let activeArtifact {
+                Label("Active", systemImage: "waveform.badge.checkmark")
+                    .foregroundStyle(TextifyVisualIdentity.readyMint)
+                Text(activeArtifact.metadata.presentation.displayName)
+            } else if installedCount > 0 {
+                Label("\(installedCount) installed", systemImage: "internaldrive")
+            } else {
+                Label("Not installed", systemImage: "arrow.down.circle")
+            }
+        }
+        .font(.system(size: 10, weight: .medium))
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+    }
+
+    private var rowBackground: Color {
+        guard isSelected else {
+            return .clear
+        }
+        return colorScheme == .dark
+            ? TextifyVisualIdentity.consoleSelection
+            : TextifyVisualIdentity.voiceViolet.opacity(0.075)
     }
 }
 
@@ -1077,6 +1324,7 @@ private struct ModelCatalogColumnHeader: View {
 
 private struct TextifyModelCard: View {
     let model: ProductionModelPresentation
+    let hierarchyContext: ModelCatalogArtifactRowContext?
     let isInstalled: Bool
     let isActive: Bool
     let isActivating: Bool
@@ -1099,19 +1347,30 @@ private struct TextifyModelCard: View {
             HStack(alignment: .center, spacing: 12) {
                 ModelSelectionIndicator(isInstalled: isInstalled, isActive: showsSelectedTreatment)
 
-                ModelProviderTile(provider: model.provider, isActive: showsSelectedTreatment)
+                if hierarchyContext == nil {
+                    ModelProviderTile(provider: model.provider, isActive: showsSelectedTreatment)
+                }
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 7) {
-                        Text(model.catalogDisplayName)
+                        Text(hierarchyContext?.title ?? model.catalogDisplayName)
                             .font(.system(size: 15, weight: .semibold))
                             .lineLimit(1)
+                        if let variantLabel = hierarchyContext?.variantLabel {
+                            Text(variantLabel.uppercased())
+                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .tracking(0.5)
+                                .foregroundStyle(.secondary)
+                        }
+                        if hierarchyContext?.isRecommended == true {
+                            TextifyStatusBadge(title: "RECOMMENDED", tone: .accent)
+                        }
                         TextifyStatusBadge(title: model.supportTier.uppercased(), tone: tierTone)
                         if !model.isCurated {
                             TextifyStatusBadge(title: "NO LONGER CURATED", tone: .warning)
                         }
                     }
-                    Text(model.description)
+                    Text(hierarchyContext?.description ?? model.description)
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
@@ -1128,7 +1387,7 @@ private struct TextifyModelCard: View {
 
             HStack(spacing: 10) {
                 Spacer()
-                    .frame(width: 76)
+                    .frame(width: hierarchyContext == nil ? 76 : 28)
 
                 if isActivating {
                     ProgressView()
@@ -1194,13 +1453,21 @@ private struct TextifyModelCard: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
+        .padding(.leading, hierarchyContext?.indentation ?? 0)
         .frame(minHeight: 102, alignment: .topLeading)
         .background(activeBackground)
         .overlay(alignment: .bottom) {
             Divider()
                 .padding(.leading, 94)
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            hierarchyContext?.onSelect()
+        }
         .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(
+            hierarchyContext?.isSelected == true ? .isSelected : []
+        )
     }
 
     private var tierTone: TextifyStatusBadge.Tone {
@@ -1213,6 +1480,11 @@ private struct TextifyModelCard: View {
     }
 
     private var activeBackground: Color {
+        if hierarchyContext?.isSelected == true {
+            return colorScheme == .dark
+                ? TextifyVisualIdentity.consoleSelection
+                : TextifyVisualIdentity.voiceViolet.opacity(0.075)
+        }
         guard showsSelectedTreatment else {
             return .clear
         }
