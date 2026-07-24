@@ -2,6 +2,38 @@
 
 This file records cross-agent handoffs during implementation.
 
+## Installed Storage Inventory Handoff - 2026-07-24
+
+- GitHub issue #15 owns the narrow cross-task changes needed to replace signed
+  transfer-size assumptions and selection-driven filesystem reads with one
+  asynchronous installed-storage inventory.
+- This slice may update Task 4 storage records/layout, Task 12 resumable-download
+  validation, Task 11 app lifecycle/catalog presentation, and their focused
+  tests. It must preserve the explicit install/activation transactions,
+  persistent FIFO queue, trusted offline catalog, and freshness gate completed
+  by issues #10 through #14.
+- `On Disk` uses `lstat` allocated blocks and is approximate. Symlinks are never
+  followed, filesystem identities deduplicate hard-linked bytes, missing
+  expected files retain their Installation Receipt and become `Needs Repair`,
+  and unexpected files inside a received Exact Artifact root remain attributed
+  to that artifact.
+- Valid resumable partial payloads are `Download Storage`; all remaining
+  managed bytes that are not attributed to an installed Exact Artifact are
+  `Other Model Data`. These categories are mutually exclusive and roll up to
+  `Total Managed Storage`.
+- Inventory refreshes at launch, Models opening, transfer lifecycle and terminal
+  install/verify/delete/cancel events, and foreground activation. Requests
+  coalesce, stale generations cannot publish, and SwiftUI catalog rows consume
+  immutable snapshots without scanning the filesystem.
+- The completed implementation normalizes duplicate receipts to one Exact
+  Artifact, preserves the full installed-child checkpoint aggregate when
+  unrelated filters hide variants, and supplies inspector file facts from the
+  same immutable snapshot used by rows and summaries.
+- Verification completed with 625 Swift tests (11 explicit opt-in native/model
+  smokes skipped, zero failures), an arm64 SwiftPM Release build, and a native
+  arm64 Xcode Debug app build. The final standards and issue-spec re-review
+  reported no remaining material findings.
+
 ## Catalog Freshness Queue Gate Handoff - 2026-07-24
 
 - GitHub issue #14 owns the narrow cross-task changes needed to gate the

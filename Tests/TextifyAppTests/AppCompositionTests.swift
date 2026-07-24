@@ -55,6 +55,24 @@ final class AppCompositionTests: XCTestCase {
     }
 
     @MainActor
+    func testBecomingActiveRequestsStorageInventoryRefresh() {
+        let previousRefresh = AppDelegate.modelStorageRefreshProvider
+        defer {
+            AppDelegate.modelStorageRefreshProvider = previousRefresh
+        }
+        var refreshCount = 0
+        AppDelegate.modelStorageRefreshProvider = {
+            refreshCount += 1
+        }
+
+        AppDelegate().applicationDidBecomeActive(
+            Notification(name: NSApplication.didBecomeActiveNotification)
+        )
+
+        XCTAssertEqual(refreshCount, 1)
+    }
+
+    @MainActor
     func testProductionCompositionBuildsRuntimeServices() throws {
         let paths = try Self.makeTemporaryPaths()
         let services = AppServices.production(
@@ -160,6 +178,61 @@ final class AppCompositionTests: XCTestCase {
 
         XCTAssertEqual(experience.rows.map(\.id), [largerID, smallerID])
         XCTAssertEqual(experience.rows.map(\.onDiskBytes), [100, 300])
+    }
+
+    @MainActor
+    func testCatalogExperienceConsumesTheLatestStorageInventorySnapshot() async throws {
+        let model = try Self.catalogModel(id: "qwen3-asr-0.6b-q8-0")
+        let paths = try Self.makeTemporaryPaths()
+        let layout = ModelStorageLayout(rootDirectory: paths.modelsDirectory)
+        let firstFile = try XCTUnwrap(model.files.first)
+        let installedURL = try layout.installedArtifactURL(
+            modelID: model.id,
+            relativePath: firstFile.relativePath ?? firstFile.filename
+        )
+        try FileManager.default.createDirectory(
+            at: installedURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data(repeating: 1, count: 8_192).write(to: installedURL)
+        let record = InstalledModelRecord(
+            model: model,
+            installedAt: "2026-07-24T00:00:00Z",
+            localFilesByManifestFilename: [
+                firstFile.filename: installedURL.path,
+            ]
+        )
+        try JSONEncoder().encode(
+            InstalledModelsStore(records: [record])
+        ).write(to: layout.installedStoreURL, options: .atomic)
+        let services = try Self.makeServices(paths: paths)
+
+        for _ in 0..<200 {
+            if case .available = services.modelStorageInventory.state {
+                break
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        guard case .available = services.modelStorageInventory.state else {
+            return XCTFail("Expected the launch inventory refresh to finish.")
+        }
+
+        let experience = services.modelCatalogExperience(
+            for: .transcription,
+            query: ModelCatalogQuery(scope: .installed)
+        )
+        let row = try XCTUnwrap(experience.rows.first { $0.id == model.id })
+        XCTAssertEqual(row.sizeLabel, "On Disk")
+        XCTAssertNotNil(row.onDiskBytes)
+        XCTAssertTrue(row.sizeDescription.hasPrefix("About "))
+        XCTAssertTrue(row.stateTokens.contains(.needsRepair))
+        XCTAssertEqual(row.storageInventory?.onDiskBytes, row.onDiskBytes)
+        XCTAssertEqual(
+            row.storageInventory?.missingExpectedRelativePaths,
+            Array(model.files.dropFirst()).map {
+                $0.relativePath ?? $0.filename
+            }
+        )
     }
 
     @MainActor

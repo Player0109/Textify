@@ -1,19 +1,9 @@
 import CryptoKit
 import Foundation
+import TextifyModels
 
-struct ModelCatalogArtifactInspectionRequest: Equatable, Sendable {
-    struct ExpectedFile: Equatable, Sendable {
-        let relativePath: String
-        let expectedSizeBytes: Int64
-        let localPath: String?
-    }
-
-    let artifactID: String
-    let expectedFiles: [ExpectedFile]
-}
-
-struct ModelCatalogArtifactVerificationRequest: Equatable, Sendable {
-    struct ExpectedFile: Equatable, Sendable {
+struct ModelCatalogArtifactVerificationRequest: Equatable {
+    struct ExpectedFile: Equatable {
         let relativePath: String
         let expectedSizeBytes: Int64
         let expectedSHA256: String
@@ -24,27 +14,29 @@ struct ModelCatalogArtifactVerificationRequest: Equatable, Sendable {
     let expectedFiles: [ExpectedFile]
 }
 
-enum ModelCatalogArtifactIntegrity: Equatable, Sendable {
+enum ModelCatalogArtifactIntegrity: Equatable {
     case notVerified
     case needsAttention
 }
 
-struct ModelCatalogArtifactLocalDetails: Equatable, Sendable {
+struct ModelCatalogArtifactLocalDetails: Equatable {
     let artifactID: String
-    let allocatedBytes: Int64
+    let allocatedBytes: Int64?
     let presentFileCount: Int
     let expectedFileCount: Int
     let missingRelativePaths: [String]
     let sizeMismatchRelativePaths: [String]
+    let unexpectedFileCount: Int
     let integrity: ModelCatalogArtifactIntegrity
 
     init(
         artifactID: String,
-        allocatedBytes: Int64,
+        allocatedBytes: Int64?,
         presentFileCount: Int,
         expectedFileCount: Int,
         missingRelativePaths: [String],
         sizeMismatchRelativePaths: [String] = [],
+        unexpectedFileCount: Int = 0,
         integrity: ModelCatalogArtifactIntegrity
     ) {
         self.artifactID = artifactID
@@ -53,76 +45,23 @@ struct ModelCatalogArtifactLocalDetails: Equatable, Sendable {
         self.expectedFileCount = expectedFileCount
         self.missingRelativePaths = missingRelativePaths
         self.sizeMismatchRelativePaths = sizeMismatchRelativePaths
+        self.unexpectedFileCount = unexpectedFileCount
         self.integrity = integrity
     }
-}
 
-enum ModelCatalogArtifactInventoryReader {
-    static func load(
-        request: ModelCatalogArtifactInspectionRequest
-    ) async throws -> ModelCatalogArtifactLocalDetails {
-        let worker = Task.detached(priority: .utility) {
-            var allocatedBytes: Int64 = 0
-            var presentFileCount = 0
-            var missingRelativePaths: [String] = []
-            var sizeMismatchRelativePaths: [String] = []
-            let resourceKeys: Set<URLResourceKey> = [
-                .fileAllocatedSizeKey,
-                .fileSizeKey,
-                .isRegularFileKey,
-                .totalFileAllocatedSizeKey,
-            ]
-
-            for expectedFile in request.expectedFiles {
-                try Task.checkCancellation()
-                guard let localPath = expectedFile.localPath else {
-                    missingRelativePaths.append(expectedFile.relativePath)
-                    continue
-                }
-
-                let values: URLResourceValues
-                do {
-                    values = try URL(fileURLWithPath: localPath)
-                        .resourceValues(forKeys: resourceKeys)
-                } catch {
-                    missingRelativePaths.append(expectedFile.relativePath)
-                    continue
-                }
-                guard values.isRegularFile == true else {
-                    missingRelativePaths.append(expectedFile.relativePath)
-                    continue
-                }
-
-                presentFileCount += 1
-                allocatedBytes += Int64(
-                    values.totalFileAllocatedSize
-                        ?? values.fileAllocatedSize
-                        ?? values.fileSize
-                        ?? 0
-                )
-                if Int64(values.fileSize ?? -1) != expectedFile.expectedSizeBytes {
-                    sizeMismatchRelativePaths.append(expectedFile.relativePath)
-                }
-            }
-
-            let requiresAttention = !missingRelativePaths.isEmpty
-                || !sizeMismatchRelativePaths.isEmpty
-            return ModelCatalogArtifactLocalDetails(
-                artifactID: request.artifactID,
-                allocatedBytes: allocatedBytes,
-                presentFileCount: presentFileCount,
-                expectedFileCount: request.expectedFiles.count,
-                missingRelativePaths: missingRelativePaths,
-                sizeMismatchRelativePaths: sizeMismatchRelativePaths,
-                integrity: requiresAttention ? .needsAttention : .notVerified
-            )
-        }
-
-        return try await withTaskCancellationHandler {
-            try await worker.value
-        } onCancel: {
-            worker.cancel()
-        }
+    init(inventory: ModelStorageArtifactInventory) {
+        self.init(
+            artifactID: inventory.artifactID,
+            allocatedBytes: inventory.onDiskBytes,
+            presentFileCount: inventory.presentExpectedFileCount,
+            expectedFileCount: inventory.expectedFileCount,
+            missingRelativePaths: inventory.missingExpectedRelativePaths,
+            sizeMismatchRelativePaths: inventory.sizeMismatchRelativePaths,
+            unexpectedFileCount: inventory.unexpectedFileCount,
+            integrity: inventory.condition == .needsRepair
+                ? .needsAttention
+                : .notVerified
+        )
     }
 }
 

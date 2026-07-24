@@ -44,6 +44,7 @@ struct ModelCatalogExactArtifactInspectorPresentation: Equatable {
     let license: String
     let sourceURL: URL?
     let canVerify: Bool
-    let localInspectionRequest: ModelCatalogArtifactInspectionRequest?
+    let localDetails: ModelCatalogArtifactLocalDetails?
+    let localDetailsStatus: ModelCatalogInstalledSizeStatus
     let verificationRequest: ModelCatalogArtifactVerificationRequest?
 }

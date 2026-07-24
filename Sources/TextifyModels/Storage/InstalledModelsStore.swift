@@ -20,7 +20,7 @@ public struct InstalledModelsStore: Codable, Equatable {
     public private(set) var records: [InstalledModelRecord]
 
     public init(records: [InstalledModelRecord] = []) {
-        self.records = records
+        self.records = Self.uniqueRecords(records)
     }
 
     public func record(forModelID modelID: String) -> InstalledModelRecord? {
@@ -38,5 +38,28 @@ public struct InstalledModelsStore: Codable, Equatable {
             return nil
         }
         return records.remove(at: index)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        records = try Self.uniqueRecords(
+            container.decode([InstalledModelRecord].self, forKey: .records)
+        )
+    }
+
+    private static func uniqueRecords(
+        _ records: [InstalledModelRecord]
+    ) -> [InstalledModelRecord] {
+        var result: [InstalledModelRecord] = []
+        for record in records {
+            if let index = result.firstIndex(
+                where: { $0.model.id == record.model.id }
+            ) {
+                result[index] = record
+            } else {
+                result.append(record)
+            }
+        }
+        return result
     }
 }

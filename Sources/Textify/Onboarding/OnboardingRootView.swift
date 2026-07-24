@@ -236,7 +236,8 @@ struct OnboardingRootView: View {
                                 [
                                     selectedModel.model.engineName,
                                     selectedModel.model.acceleratorName,
-                                    selectedModel.model.sizeDescription,
+                                    "Download Size: "
+                                        + selectedModel.model.sizeDescription,
                                 ].joined(separator: " • ")
                             )
                             .font(.caption)
@@ -254,6 +255,7 @@ struct OnboardingRootView: View {
                             Button("Verify Installed Model") {
                                 Task {
                                     _ = await services.dictation.refreshReadiness()
+                                    services.refreshModelStorageInventory()
                                     modelMessage = modelReadinessText
                                 }
                             }

@@ -4,6 +4,26 @@ import TextifyModels
 import XCTest
 
 final class ModelInstallCoordinatorQueueTests: XCTestCase {
+    @MainActor
+    func testTransferLifecycleChangesRequestStorageInventoryRefresh() {
+        let probe = ModelInventoryRefreshProbe()
+        let coordinator = ModelInstallCoordinator(
+            installOperation: { _, _ in },
+            makeAttemptID: { UUID().uuidString },
+            lifecycleDidChange: {
+                probe.record()
+            }
+        )
+
+        let queuedAttemptID = coordinator.start(modelID: "artifact-a")
+        XCTAssertEqual(probe.count, 1)
+
+        if let queuedAttemptID {
+            coordinator.cancel(attemptID: queuedAttemptID)
+        }
+        XCTAssertEqual(probe.count, 2)
+    }
+
     func testNetworkRecoveryFiresForInitialOnlinePathAndLaterOfflineToOnlineTransition() {
         var state = ModelTransferNetworkRecoveryState()
 
@@ -694,6 +714,15 @@ final class ModelInstallCoordinatorQueueTests: XCTestCase {
                 "TextifyModelInstallCoordinatorTests-\(UUID().uuidString)",
                 isDirectory: true
             )
+    }
+}
+
+@MainActor
+private final class ModelInventoryRefreshProbe {
+    private(set) var count = 0
+
+    func record() {
+        count += 1
     }
 }
 

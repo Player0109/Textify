@@ -451,30 +451,21 @@ public struct ModelInstallResumableDataInspector: @unchecked Sendable {
         var validatedBytes: Int64 = 0
         var fileCount = 0
         for metadataURL in metadataURLs {
-            guard let metadata = try? JSONDecoder().decode(
-                DownloadResumeMetadata.self,
-                from: Data(contentsOf: metadataURL)
-            ),
-            metadata.modelID == attempt.artifactID,
-            metadata.bytesDownloaded > 0,
-            metadata.bytesDownloaded < metadata.expectedSize,
-            Self.isSHA256(metadata.sha256),
-            Self.hasValidator(metadata),
-            let sourceURL = URL(string: metadata.url),
-            (try? ModelDownloadURLPolicy.requireApprovedModelFile(sourceURL)) != nil,
-            let partialURL = Self.partialURL(for: metadataURL),
-            let values = try? partialURL.resourceValues(
-                forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]
-            ),
-            values.isRegularFile == true,
-            values.isSymbolicLink != true,
-            Int64(values.fileSize ?? -1) == metadata.bytesDownloaded
+            guard let partialURL = ModelDownloadStorageValidation
+                .validatedPartialURL(
+                    for: metadataURL,
+                    expectedModelID: attempt.artifactID,
+                    fileManager: fileManager
+                ),
+            let fileSize = try? partialURL.resourceValues(
+                forKeys: [.fileSizeKey]
+            ).fileSize
             else {
                 continue
             }
 
             let addition = validatedBytes.addingReportingOverflow(
-                metadata.bytesDownloaded
+                Int64(fileSize)
             )
             guard !addition.overflow else {
                 continue
@@ -494,30 +485,4 @@ public struct ModelInstallResumableDataInspector: @unchecked Sendable {
         )
     }
 
-    private static func partialURL(for metadataURL: URL) -> URL? {
-        let suffix = ".resume.json"
-        let filename = metadataURL.lastPathComponent
-        guard filename.hasSuffix(suffix) else {
-            return nil
-        }
-        return metadataURL.deletingLastPathComponent().appendingPathComponent(
-            String(filename.dropLast(suffix.count)),
-            isDirectory: false
-        )
-    }
-
-    private static func isSHA256(_ value: String) -> Bool {
-        value.count == 64
-            && value.unicodeScalars.allSatisfy {
-                CharacterSet(charactersIn: "0123456789abcdef").contains($0)
-            }
-    }
-
-    private static func hasValidator(
-        _ metadata: DownloadResumeMetadata
-    ) -> Bool {
-        [metadata.eTag, metadata.lastModified]
-            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .contains { !$0.isEmpty }
-    }
 }

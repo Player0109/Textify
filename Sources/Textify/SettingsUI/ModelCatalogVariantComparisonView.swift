@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct ModelCatalogVariantComparisonHeader: View {
+    let sizeLabel: String
+
     var body: some View {
         ViewThatFits(in: .horizontal) {
             header(for: .wide)
@@ -36,7 +38,7 @@ struct ModelCatalogVariantComparisonHeader: View {
                     .frame(width: 90, alignment: .leading)
                 Text("SPEED")
                     .frame(width: 90, alignment: .leading)
-                Text("SIZE")
+                Text(sizeLabel.uppercased())
                     .frame(width: 74, alignment: .leading)
                 Text("COMPUTE ROUTE")
                     .frame(width: 112, alignment: .leading)
@@ -331,7 +333,7 @@ struct ModelCatalogVariantComparisonRow: View {
         case .speed:
             labeledMetric("Speed", presentation.speed)
         case .size:
-            labeledField("Size", presentation.size)
+            labeledField(presentation.sizeLabel, presentation.size)
         case .computeRoute:
             labeledField("Compute Route", presentation.computeRoute)
         case .state:

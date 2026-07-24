@@ -568,6 +568,233 @@ final class ModelCatalogExperienceTests: XCTestCase {
         XCTAssertEqual(rowIDs(.descending), [largeID, smallID, unknownID])
     }
 
+    func testSizeSemanticsDistinguishSignedDownloadFromMeasuredOnDiskBytes() throws {
+        let manifest = try signedV3FixtureManifest()
+        let model = try XCTUnwrap(
+            manifest.models.first { $0.id == "whisper-small-q5_1" }
+        )
+        let record = installed(model)
+
+        let all = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [record],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            installedSizeStatus: .calculating,
+            query: ModelCatalogQuery(scope: .all, purpose: .transcription)
+        )
+        let calculating = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [record],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            installedSizeStatus: .calculating,
+            query: ModelCatalogQuery(scope: .installed, purpose: .transcription)
+        )
+        let measured = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [record],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            onDiskBytesByModelID: [model.id: 4_096],
+            installedSizeStatus: .measured,
+            query: ModelCatalogQuery(scope: .installed, purpose: .transcription)
+        )
+        let unavailable = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [record],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            installedSizeStatus: .unavailable,
+            query: ModelCatalogQuery(scope: .installed, purpose: .transcription)
+        )
+
+        XCTAssertEqual(try XCTUnwrap(all.rows.first).sizeLabel, "Download Size")
+        XCTAssertNotEqual(try XCTUnwrap(all.rows.first).sizeDescription, "Calculating")
+        XCTAssertEqual(try XCTUnwrap(calculating.rows.first).sizeLabel, "On Disk")
+        XCTAssertEqual(try XCTUnwrap(calculating.rows.first).sizeDescription, "Calculating")
+        XCTAssertEqual(try XCTUnwrap(measured.rows.first).sizeLabel, "On Disk")
+        XCTAssertTrue(
+            try XCTUnwrap(measured.rows.first).sizeDescription.hasPrefix("About ")
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(unavailable.rows.first).sizeDescription,
+            "Size Unavailable"
+        )
+    }
+
+    func testCheckpointOnDiskAggregateIncludesOnlyInstalledExactArtifacts() throws {
+        let manifest = try signedV3FixtureManifest()
+        let installedModel = try XCTUnwrap(
+            manifest.models.first { $0.id == "whisper-small-q5_1" }
+        )
+        let experience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [installed(installedModel)],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            onDiskBytesByModelID: [installedModel.id: 7_777],
+            installedSizeStatus: .measured,
+            query: ModelCatalogQuery(
+                scope: .installed,
+                sort: .installedSize,
+                purpose: .transcription
+            )
+        )
+        let checkpoint = try XCTUnwrap(
+            experience.families
+                .flatMap(\.checkpoints)
+                .first { checkpoint in
+                    checkpoint.artifacts.contains {
+                        $0.id == installedModel.id
+                    }
+                }
+        )
+
+        XCTAssertEqual(checkpoint.artifacts.map(\.id), [installedModel.id])
+        XCTAssertEqual(checkpoint.installedOnDiskBytes, 7_777)
+    }
+
+    func testDuplicateInstalledReceiptsProduceOneOffCatalogRow() throws {
+        let model = try XCTUnwrap(
+            signedV3FixtureManifest().models.first {
+                $0.id == "whisper-small-q5_1"
+            }
+        )
+        let record = installed(model)
+        let experience = ModelCatalogExperience(
+            trustedModels: [],
+            installedRecords: [record, record],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            query: ModelCatalogQuery(scope: .installed)
+        )
+
+        XCTAssertEqual(experience.rows.map(\.id), [model.id])
+    }
+
+    func testInstalledCheckpointSortingUsesExactArtifactOnDiskAggregate() throws {
+        let manifest = try productionManifest()
+        let smallIDs = [
+            "qwen3-asr-0.6b-q8-0",
+            "qwen3-asr-0.6b-q5-k-m",
+        ]
+        let largeID = "qwen3-asr-1.7b-q8-0"
+        let records = try (smallIDs + [largeID]).map { modelID in
+            installed(try XCTUnwrap(
+                manifest.models.first { $0.id == modelID }
+            ))
+        }
+
+        func checkpoints(
+            direction: ModelCatalogSortDirection,
+            numericFormats: [ModelNumericFormat] = []
+        ) throws -> [ModelCatalogCheckpointPresentation] {
+            let experience = ModelCatalogExperience(
+                trustedManifest: manifest,
+                installedRecords: records,
+                activePreferences: ModelCatalogActivePreferences(),
+                transferState: nil,
+                onDiskBytesByModelID: [
+                    smallIDs[0]: 100,
+                    smallIDs[1]: 50,
+                    largeID: 300,
+                ],
+                query: ModelCatalogQuery(
+                    scope: .installed,
+                    sort: .installedSize,
+                    sortDirection: direction,
+                    numericFormats: numericFormats,
+                    purpose: .transcription
+                )
+            )
+            return try XCTUnwrap(
+                experience.families.first {
+                    $0.id == "family.qwen.qwen3-asr"
+                }
+            ).checkpoints
+        }
+
+        let ascending = try checkpoints(direction: .ascending)
+        XCTAssertEqual(
+            ascending.map(\.id),
+            [
+                "checkpoint.qwen.qwen3-asr-0.6b",
+                "checkpoint.qwen.qwen3-asr-1.7b",
+            ]
+        )
+        XCTAssertEqual(ascending.first?.installedOnDiskBytes, 150)
+        let filtered = try checkpoints(
+            direction: .ascending,
+            numericFormats: [.q8_0]
+        )
+        XCTAssertEqual(filtered.first?.artifacts.map(\.id), [smallIDs[0]])
+        XCTAssertEqual(filtered.first?.installedOnDiskBytes, 150)
+        XCTAssertEqual(
+            try checkpoints(direction: .descending).map(\.id),
+            Array(ascending.map(\.id).reversed())
+        )
+    }
+
+    func testInstalledStorageSummaryReportsEveryRequiredCategory() {
+        let snapshot = ModelStorageInventorySnapshot(
+            artifacts: [],
+            summary: ModelStorageInventorySummary(
+                installedArtifactCount: 2,
+                installedModelStorageBytes: 10,
+                downloadStorageBytes: 20,
+                otherModelDataBytes: 30,
+                totalManagedStorageBytes: 60,
+                availableSpaceBytes: 1_000
+            )
+        )
+        let presentation = ModelCatalogStorageSummaryPresentation(
+            state: .available(generation: 4, snapshot: snapshot),
+            installedCount: 2
+        )
+
+        XCTAssertEqual(
+            presentation.facts.map(\.label),
+            [
+                "Installed",
+                "Installed Model Storage",
+                "Download Storage",
+                "Other Model Data",
+                "Total Managed Storage",
+                "Available Space",
+            ]
+        )
+        XCTAssertEqual(presentation.facts.first?.value, "2")
+        XCTAssertTrue(
+            presentation.facts.dropFirst().allSatisfy {
+                $0.value != "Calculating" && $0.value != "Size Unavailable"
+            }
+        )
+    }
+
+    func testInstalledStorageSummaryKeepsMissingMeasurementsExplicit() {
+        let calculating = ModelCatalogStorageSummaryPresentation(
+            state: .calculating,
+            installedCount: 3
+        )
+        let unavailable = ModelCatalogStorageSummaryPresentation(
+            state: .unavailable(generation: 8),
+            installedCount: 3
+        )
+
+        XCTAssertEqual(calculating.facts.first?.value, "3")
+        XCTAssertTrue(
+            calculating.facts.dropFirst().allSatisfy {
+                $0.value == "Calculating"
+            }
+        )
+        XCTAssertTrue(
+            unavailable.facts.dropFirst().allSatisfy {
+                $0.value == "Size Unavailable"
+            }
+        )
+    }
+
     func testPinnedRevealDoesNotMutateOrdinaryQueryAndCanBeDismissed() throws {
         let manifest = try productionManifest()
         let installedModel = try XCTUnwrap(
@@ -1358,7 +1585,20 @@ final class ModelCatalogExperienceTests: XCTestCase {
                 phase: .downloading,
                 bytesDownloaded: 10,
                 totalBytes: 100
-            )
+            ),
+            storageInventoryByModelID: [
+                installedModel.id: ModelStorageArtifactInventory(
+                    artifactID: installedModel.id,
+                    installationReceiptPresent: true,
+                    onDiskBytes: 4_096,
+                    presentExpectedFileCount: 1,
+                    expectedFileCount: 1,
+                    missingExpectedRelativePaths: [],
+                    sizeMismatchRelativePaths: [],
+                    unexpectedFileCount: 1,
+                    condition: .complete
+                ),
+            ]
         )
 
         let inspector = try XCTUnwrap(
@@ -1404,10 +1644,8 @@ final class ModelCatalogExperienceTests: XCTestCase {
         )
         XCTAssertEqual(artifact.license, "MIT — MIT License (model)")
         XCTAssertTrue(artifact.canVerify)
-        XCTAssertEqual(
-            artifact.localInspectionRequest?.expectedFiles.map(\.relativePath),
-            ["model.bin"]
-        )
+        XCTAssertEqual(artifact.localDetails?.allocatedBytes, 4_096)
+        XCTAssertEqual(artifact.localDetails?.unexpectedFileCount, 1)
     }
 
     func testSingleVariantSelectionOpensExactArtifactInspector() throws {
@@ -1609,70 +1847,94 @@ final class ModelCatalogExperienceTests: XCTestCase {
     }
 
     @MainActor
-    func testInspectorCancelsAndRejectsStaleLocalDetailsAfterSelectionChanges() async throws {
+    func testInspectorUsesLatestImmutableLocalDetailsAfterSelectionChanges() throws {
         let manifest = try signedV3FixtureManifest()
         let installedModels = try [
             XCTUnwrap(manifest.models.first { $0.id == "whisper-small-q5_1" }),
             XCTUnwrap(manifest.models.first { $0.id == "whisper-small-q8_0" }),
         ]
+        let inventories = Dictionary(
+            uniqueKeysWithValues: installedModels.enumerated().map { index, model in
+                (
+                    model.id,
+                    ModelStorageArtifactInventory(
+                        artifactID: model.id,
+                        installationReceiptPresent: true,
+                        onDiskBytes: Int64((index + 1) * 40),
+                        presentExpectedFileCount: 1,
+                        expectedFileCount: 1,
+                        missingExpectedRelativePaths: [],
+                        sizeMismatchRelativePaths: [],
+                        unexpectedFileCount: index,
+                        condition: .complete
+                    )
+                )
+            }
+        )
         let experience = ModelCatalogExperience(
             trustedManifest: manifest,
             installedRecords: installedModels.map(installed),
             activePreferences: ModelCatalogActivePreferences(),
-            transferState: nil
+            transferState: nil,
+            storageInventoryByModelID: inventories
         )
-        let probe = InspectorDetailLoadProbe()
-        let controller = ModelCatalogInspectorController(
-            loadLocalDetails: { request in
-                try await probe.load(request)
-            }
-        )
+        let controller = ModelCatalogInspectorController()
 
         controller.select(.exactArtifact("whisper-small-q5_1"), in: experience)
         XCTAssertEqual(
             controller.localDetailsState,
-            .loading(artifactID: "whisper-small-q5_1")
+            .loaded(ModelCatalogArtifactLocalDetails(
+                inventory: try XCTUnwrap(inventories["whisper-small-q5_1"])
+            ))
         )
-        await probe.waitUntilRequested("whisper-small-q5_1")
 
         controller.select(.exactArtifact("whisper-small-q8_0"), in: experience)
         XCTAssertEqual(
             controller.localDetailsState,
-            .loading(artifactID: "whisper-small-q8_0")
-        )
-        await probe.waitUntilCancelled("whisper-small-q5_1")
-        await probe.waitUntilRequested("whisper-small-q8_0")
-
-        let expectedDetails = ModelCatalogArtifactLocalDetails(
-            artifactID: "whisper-small-q8_0",
-            allocatedBytes: 80,
-            presentFileCount: 1,
-            expectedFileCount: 1,
-            missingRelativePaths: [],
-            integrity: .notVerified
-        )
-        await probe.complete(
-            artifactID: "whisper-small-q8_0",
-            allocatedBytes: 80
-        )
-        await wait(
-            for: .loaded(expectedDetails),
-            from: controller
-        )
-
-        await probe.complete(
-            artifactID: "whisper-small-q5_1",
-            allocatedBytes: 50
-        )
-
-        XCTAssertEqual(
-            controller.localDetailsState,
-            .loaded(expectedDetails)
+            .loaded(ModelCatalogArtifactLocalDetails(
+                inventory: try XCTUnwrap(inventories["whisper-small-q8_0"])
+            ))
         )
         guard case let .exactArtifact(selected) = controller.presentation else {
             return XCTFail("The latest Exact Artifact must remain selected.")
         }
         XCTAssertEqual(selected.id, "whisper-small-q8_0")
+    }
+
+    @MainActor
+    func testInstalledInspectorUsesExplicitMissingMeasurementStates() throws {
+        let manifest = try signedV3FixtureManifest()
+        let model = try XCTUnwrap(
+            manifest.models.first { $0.id == "whisper-small-q5_1" }
+        )
+
+        for (status, expectedState) in [
+            (
+                ModelCatalogInstalledSizeStatus.calculating,
+                ModelCatalogInspectorLocalDetailsState.loading(
+                    artifactID: model.id
+                )
+            ),
+            (
+                ModelCatalogInstalledSizeStatus.unavailable,
+                ModelCatalogInspectorLocalDetailsState.failed(
+                    artifactID: model.id
+                )
+            ),
+        ] {
+            let experience = ModelCatalogExperience(
+                trustedManifest: manifest,
+                installedRecords: [installed(model)],
+                activePreferences: ModelCatalogActivePreferences(),
+                transferState: nil,
+                installedSizeStatus: status
+            )
+            let controller = ModelCatalogInspectorController()
+
+            controller.select(.exactArtifact(model.id), in: experience)
+
+            XCTAssertEqual(controller.localDetailsState, expectedState)
+        }
     }
 
     @MainActor
@@ -1689,16 +1951,6 @@ final class ModelCatalogExperienceTests: XCTestCase {
         )
         let verificationProbe = InspectorVerificationProbe()
         let controller = ModelCatalogInspectorController(
-            loadLocalDetails: { request in
-                ModelCatalogArtifactLocalDetails(
-                    artifactID: request.artifactID,
-                    allocatedBytes: 33,
-                    presentFileCount: 1,
-                    expectedFileCount: 1,
-                    missingRelativePaths: [],
-                    integrity: .notVerified
-                )
-            },
             verifyIntegrity: { request in
                 await verificationProbe.verify(request)
             }
@@ -1727,7 +1979,7 @@ final class ModelCatalogExperienceTests: XCTestCase {
         )
     }
 
-    func testLocalInventoryReadsMetadataWithoutClaimingFullVerification() async throws {
+    func testSnapshotLocalDetailsDoNotClaimFullVerification() async throws {
         let temporaryDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(
@@ -1740,23 +1992,24 @@ final class ModelCatalogExperienceTests: XCTestCase {
         let artifactURL = temporaryDirectory.appendingPathComponent("model.bin")
         try Data([1, 2, 3]).write(to: artifactURL)
 
-        let details = try await ModelCatalogArtifactInventoryReader.load(
-            request: ModelCatalogArtifactInspectionRequest(
+        let details = ModelCatalogArtifactLocalDetails(
+            inventory: ModelStorageArtifactInventory(
                 artifactID: "fixture",
-                expectedFiles: [
-                    ModelCatalogArtifactInspectionRequest.ExpectedFile(
-                        relativePath: "model.bin",
-                        expectedSizeBytes: 3,
-                        localPath: artifactURL.path
-                    ),
-                ]
+                installationReceiptPresent: true,
+                onDiskBytes: 4_096,
+                presentExpectedFileCount: 1,
+                expectedFileCount: 1,
+                missingExpectedRelativePaths: [],
+                sizeMismatchRelativePaths: [],
+                unexpectedFileCount: 0,
+                condition: .complete
             )
         )
 
         XCTAssertEqual(details.artifactID, "fixture")
         XCTAssertEqual(details.presentFileCount, 1)
         XCTAssertEqual(details.expectedFileCount, 1)
-        XCTAssertGreaterThan(details.allocatedBytes, 0)
+        XCTAssertEqual(details.allocatedBytes, 4_096)
         XCTAssertEqual(details.missingRelativePaths, [])
         XCTAssertEqual(details.sizeMismatchRelativePaths, [])
         XCTAssertEqual(details.integrity, .notVerified)
@@ -2060,70 +2313,6 @@ final class ModelCatalogExperienceTests: XCTestCase {
             capabilities: .legacyEnglishWhisper,
             presentation: nil,
             purpose: purpose
-        )
-    }
-}
-
-private actor InspectorDetailLoadProbe {
-    private var continuations: [
-        String: CheckedContinuation<ModelCatalogArtifactLocalDetails, Error>
-    ] = [:]
-    private var requestedArtifactIDs: Set<String> = []
-    private var requestWaiters: [String: [CheckedContinuation<Void, Never>]] = [:]
-    private var cancelledArtifactIDs: Set<String> = []
-    private var cancellationWaiters: [String: [CheckedContinuation<Void, Never>]] = [:]
-
-    func load(
-        _ request: ModelCatalogArtifactInspectionRequest
-    ) async throws -> ModelCatalogArtifactLocalDetails {
-        requestedArtifactIDs.insert(request.artifactID)
-        requestWaiters.removeValue(forKey: request.artifactID)?
-            .forEach { $0.resume() }
-        return try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { continuation in
-                continuations[request.artifactID] = continuation
-            }
-        } onCancel: {
-            Task {
-                await self.recordCancellation(of: request.artifactID)
-            }
-        }
-    }
-
-    func waitUntilRequested(_ artifactID: String) async {
-        guard !requestedArtifactIDs.contains(artifactID) else {
-            return
-        }
-        await withCheckedContinuation { continuation in
-            requestWaiters[artifactID, default: []].append(continuation)
-        }
-    }
-
-    func waitUntilCancelled(_ artifactID: String) async {
-        guard !cancelledArtifactIDs.contains(artifactID) else {
-            return
-        }
-        await withCheckedContinuation { continuation in
-            cancellationWaiters[artifactID, default: []].append(continuation)
-        }
-    }
-
-    private func recordCancellation(of artifactID: String) {
-        cancelledArtifactIDs.insert(artifactID)
-        cancellationWaiters.removeValue(forKey: artifactID)?
-            .forEach { $0.resume() }
-    }
-
-    func complete(artifactID: String, allocatedBytes: Int64) {
-        continuations.removeValue(forKey: artifactID)?.resume(
-            returning: ModelCatalogArtifactLocalDetails(
-                artifactID: artifactID,
-                allocatedBytes: allocatedBytes,
-                presentFileCount: 1,
-                expectedFileCount: 1,
-                missingRelativePaths: [],
-                integrity: .notVerified
-            )
         )
     }
 }

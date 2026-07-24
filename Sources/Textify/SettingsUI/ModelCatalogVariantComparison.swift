@@ -61,6 +61,7 @@ struct ModelCatalogVariantComparisonPresentation: Equatable, Identifiable {
     let runtime: String
     let quality: ModelCatalogVariantComparisonMetric
     let speed: ModelCatalogVariantComparisonMetric
+    let sizeLabel: String
     let size: String
     let computeRoute: String
     let state: String
@@ -216,7 +217,8 @@ extension ModelCatalogCheckpointPresentation {
                         }
                     }
                 ),
-                size: artifact.row.model.sizeDescription,
+                sizeLabel: artifact.row.sizeLabel,
+                size: artifact.row.sizeDescription,
                 computeRoute: ModelCatalogVariantTerminology.computeRoute(
                     artifact.metadata.computeRoute
                 ),

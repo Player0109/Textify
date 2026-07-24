@@ -81,3 +81,62 @@ public struct DownloadResumeMetadata: Codable, Equatable, Sendable {
         )
     }
 }
+
+enum ModelDownloadStorageValidation {
+    static func validatedPartialURL(
+        for metadataURL: URL,
+        expectedModelID: String? = nil,
+        fileManager: FileManager = .default
+    ) -> URL? {
+        guard let metadata = try? JSONDecoder().decode(
+            DownloadResumeMetadata.self,
+            from: Data(contentsOf: metadataURL)
+        ),
+        expectedModelID == nil || metadata.modelID == expectedModelID,
+        metadata.bytesDownloaded > 0,
+        metadata.bytesDownloaded < metadata.expectedSize,
+        isSHA256(metadata.sha256),
+        hasValidator(metadata),
+        let sourceURL = URL(string: metadata.url),
+        (try? ModelDownloadURLPolicy.requireApprovedModelFile(sourceURL)) != nil,
+        let partialURL = partialURL(for: metadataURL),
+        let values = try? partialURL.resourceValues(
+            forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]
+        ),
+        values.isRegularFile == true,
+        values.isSymbolicLink != true,
+        Int64(values.fileSize ?? -1) == metadata.bytesDownloaded,
+        fileManager.fileExists(atPath: partialURL.path)
+        else {
+            return nil
+        }
+        return partialURL
+    }
+
+    private static func partialURL(for metadataURL: URL) -> URL? {
+        let suffix = ".resume.json"
+        let filename = metadataURL.lastPathComponent
+        guard filename.hasSuffix(suffix) else {
+            return nil
+        }
+        return metadataURL.deletingLastPathComponent().appendingPathComponent(
+            String(filename.dropLast(suffix.count)),
+            isDirectory: false
+        )
+    }
+
+    private static func isSHA256(_ value: String) -> Bool {
+        value.count == 64
+            && value.unicodeScalars.allSatisfy {
+                CharacterSet(charactersIn: "0123456789abcdef").contains($0)
+            }
+    }
+
+    private static func hasValidator(
+        _ metadata: DownloadResumeMetadata
+    ) -> Bool {
+        [metadata.eTag, metadata.lastModified]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .contains { !$0.isEmpty }
+    }
+}

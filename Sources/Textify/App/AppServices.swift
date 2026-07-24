@@ -22,6 +22,7 @@ final class AppServices {
     let launchAtLogin: any LaunchAtLoginManaging
     let launchAtLoginLocation: any LaunchAtLoginLocationChecking
     let modelCatalogCompatibilityResolver: ModelCatalogCompatibilityResolver
+    let modelStorageInventory: ModelStorageInventoryCoordinator
     let startupIssue: AppStartupIssue?
     @ObservationIgnored private let modelTransferNetworkObserver:
         ModelTransferNetworkObserver?
@@ -108,6 +109,9 @@ final class AppServices {
         },
         isArtifactKnownRevoked: { _ in
             false
+        },
+        lifecycleDidChange: { [weak self] in
+            self?.refreshModelStorageInventory()
         }
     )
 
@@ -197,6 +201,14 @@ final class AppServices {
         self.launchAtLogin = launchAtLogin
         self.launchAtLoginLocation = launchAtLoginLocation
         self.modelCatalogCompatibilityResolver = modelCatalogCompatibilityResolver
+        let storageScanner = ModelStorageInventoryScanner(
+            layout: ModelStorageLayout(rootDirectory: paths.modelsDirectory),
+            fileManager: FileManager.default
+        )
+        self.modelStorageInventory = ModelStorageInventoryCoordinator {
+            installedRecords in
+            try await storageScanner.scan(installedRecords: installedRecords)
+        }
         self.overlayPresenter = overlayPresenter ?? RecordingOverlayPresenter()
         self.waitBeforeProcessingIndicator = waitBeforeProcessingIndicator
         self.waitBeforeTerminalStatusDismissal = waitBeforeTerminalStatusDismissal
@@ -223,6 +235,7 @@ final class AppServices {
                 self?.modelInstallCoordinator.networkDidBecomeAvailable()
             }
         }
+        refreshModelStorageInventory()
     }
 
     func startRuntime() {
@@ -514,11 +527,50 @@ final class AppServices {
 
     func modelCatalogExperience(
         for purpose: ModelPurpose,
-        onDiskBytesByModelID: [String: Int64] = [:],
+        onDiskBytesByModelID: [String: Int64]? = nil,
         query: ModelCatalogQuery = ModelCatalogQuery()
     ) -> ModelCatalogExperience {
         var scopedQuery = query
         scopedQuery.purpose = purpose
+        var readiness = managedReadinessByModelID
+        let measuredBytes: [String: Int64]
+        let storageInventoryByModelID: [String: ModelStorageArtifactInventory]
+        let installedSizeStatus: ModelCatalogInstalledSizeStatus
+        if let onDiskBytesByModelID {
+            measuredBytes = onDiskBytesByModelID
+            storageInventoryByModelID = [:]
+            installedSizeStatus = .measured
+        } else {
+            switch modelStorageInventory.state {
+            case .calculating:
+                measuredBytes = [:]
+                storageInventoryByModelID = [:]
+                installedSizeStatus = .calculating
+            case .unavailable:
+                measuredBytes = [:]
+                storageInventoryByModelID = [:]
+                installedSizeStatus = .unavailable
+            case let .available(_, snapshot):
+                measuredBytes = Dictionary(
+                    uniqueKeysWithValues: snapshot.artifacts.compactMap {
+                        artifact in
+                        artifact.onDiskBytes.map {
+                            (artifact.artifactID, $0)
+                        }
+                    }
+                )
+                storageInventoryByModelID = Dictionary(
+                    uniqueKeysWithValues: snapshot.artifacts.map {
+                        ($0.artifactID, $0)
+                    }
+                )
+                installedSizeStatus = .measured
+                for artifact in snapshot.artifacts
+                where artifact.condition == .needsRepair {
+                    readiness[artifact.artifactID] = .needsRepair
+                }
+            }
+        }
         return ModelCatalogExperience(
             trustedManifest: modelCatalogCoordinator.manifest,
             compatibilityResolver: modelCatalogCompatibilityResolver,
@@ -528,9 +580,17 @@ final class AppServices {
                 voiceCleaningModelID: preferences.activeVoiceCleaningModelID
             ),
             transferStatesByModelID: modelInstallCoordinator.artifactStates,
-            managedReadinessByModelID: managedReadinessByModelID,
-            onDiskBytesByModelID: onDiskBytesByModelID,
+            managedReadinessByModelID: readiness,
+            onDiskBytesByModelID: measuredBytes,
+            storageInventoryByModelID: storageInventoryByModelID,
+            installedSizeStatus: installedSizeStatus,
             query: scopedQuery
+        )
+    }
+
+    func refreshModelStorageInventory() {
+        modelStorageInventory.refresh(
+            installedRecords: installedModelsStore.records
         )
     }
 
@@ -544,6 +604,7 @@ final class AppServices {
         Task { @MainActor [weak self] in
             await self?.refreshManagedModelReadiness()
         }
+        refreshModelStorageInventory()
     }
 
     func completeModelInstall(
@@ -1076,6 +1137,7 @@ final class ModelInstallCoordinator {
         @MainActor @Sendable (String) async -> ModelTransferPrerequisiteResult
     private let isArtifactKnownRevoked:
         @MainActor @Sendable (String) -> Bool
+    private let lifecycleDidChange: @MainActor @Sendable () -> Void
     @ObservationIgnored private var installTask: Task<Void, Never>?
     @ObservationIgnored private var activeAttemptID: String?
     @ObservationIgnored private var queue: ModelInstallQueue
@@ -1128,7 +1190,8 @@ final class ModelInstallCoordinator {
         nowISO8601: @escaping @Sendable () -> String = {
             ISO8601DateFormatter().string(from: Date())
         },
-        now: @escaping @Sendable () -> Date = { Date() }
+        now: @escaping @Sendable () -> Date = { Date() },
+        lifecycleDidChange: @escaping @MainActor @Sendable () -> Void = {}
     ) {
         self.queueStore = queueStore
         self.installOperation = installOperation
@@ -1141,6 +1204,7 @@ final class ModelInstallCoordinator {
         self.makeAttemptID = makeAttemptID
         self.nowISO8601 = nowISO8601
         self.now = now
+        self.lifecycleDidChange = lifecycleDidChange
 
         if let queueStore {
             do {
@@ -1193,7 +1257,7 @@ final class ModelInstallCoordinator {
                 queue = previousQueue
                 return nil
             }
-            revision &+= 1
+            recordLifecycleChange()
         } catch {
             return nil
         }
@@ -1215,7 +1279,7 @@ final class ModelInstallCoordinator {
                 queue = previousQueue
                 return
             }
-            revision &+= 1
+            recordLifecycleChange()
             if activeAttemptID == attemptID {
                 installTask?.cancel()
             } else {
@@ -1295,7 +1359,7 @@ final class ModelInstallCoordinator {
                 queue = previousQueue
                 return nil
             }
-            revision &+= 1
+            recordLifecycleChange()
         } catch {
             return nil
         }
@@ -1513,7 +1577,11 @@ final class ModelInstallCoordinator {
                 queue = previousQueue
                 return
             }
-            revision &+= 1
+            if shouldPersist {
+                recordLifecycleChange()
+            } else {
+                revision &+= 1
+            }
         } catch {
             return
         }
@@ -1590,7 +1658,7 @@ final class ModelInstallCoordinator {
             queue = previousQueue
             throw ModelInstallCoordinatorError.storageOrConfigurationUnavailable
         }
-        revision &+= 1
+        recordLifecycleChange()
     }
 
     private func associateResumableDataIfAvailable(attemptID: String) {
@@ -1609,7 +1677,7 @@ final class ModelInstallCoordinator {
                 queue = previousQueue
                 return
             }
-            revision &+= 1
+            recordLifecycleChange()
         } catch {
             return
         }
@@ -1629,6 +1697,11 @@ final class ModelInstallCoordinator {
             persistenceErrorMessage = "Textify could not save the Downloads queue."
             return false
         }
+    }
+
+    private func recordLifecycleChange() {
+        revision &+= 1
+        lifecycleDidChange()
     }
 }
 

@@ -542,7 +542,6 @@ private struct ModelsSettingsPane: View {
     @State private var isImporting = false
     @State private var pendingRemovalModel: ProductionModelPresentation?
     @State private var discoveryQuery = ModelCatalogQuery()
-    @State private var onDiskBytesByModelID: [String: Int64] = [:]
     @State private var hierarchyState = ModelCatalogHierarchyState()
     @State private var inspectorController = ModelCatalogInspectorController()
     @State private var showsInspector = false
@@ -553,7 +552,6 @@ private struct ModelsSettingsPane: View {
     var body: some View {
         let catalogExperience = services.modelCatalogExperience(
             for: destination.purpose,
-            onDiskBytesByModelID: onDiskBytesByModelID,
             query: catalogQuery
         )
 
@@ -610,6 +608,15 @@ private struct ModelsSettingsPane: View {
                     }
                 }
 
+                if discoveryQuery.scope == .installed {
+                    ModelCatalogStorageSummaryView(
+                        presentation: ModelCatalogStorageSummaryPresentation(
+                            state: services.modelStorageInventory.state,
+                            installedCount: services.installedModelRecords.count
+                        )
+                    )
+                }
+
                 if let pinnedReveal = catalogExperience.pinnedReveal {
                     pinnedRevealView(
                         pinnedReveal,
@@ -636,6 +643,7 @@ private struct ModelsSettingsPane: View {
             ModelCatalogVariantsAboutView()
         }
         .task {
+            services.refreshModelStorageInventory()
             _ = await services.dictation.refreshReadiness()
             await services.modelCatalogCoordinator.refresh()
         }
@@ -653,13 +661,13 @@ private struct ModelsSettingsPane: View {
         .onChange(of: focusedCatalogRowID) { _, rowID in
             hierarchyState.focus(rowID)
         }
-        .onChange(of: inspectorController.localDetailsState) { _, state in
-            if case let .loaded(details) = state {
-                onDiskBytesByModelID[details.artifactID] = details.allocatedBytes
+        .onChange(of: inspectorController.verificationState) { _, state in
+            switch state {
+            case .verified, .failed:
+                services.refreshModelStorageInventory()
+            case .unavailable, .available, .verifying:
+                break
             }
-        }
-        .onChange(of: services.installedModelRecords) { _, _ in
-            onDiskBytesByModelID = [:]
         }
         .alert("Import local Whisper model?", isPresented: $showsImportConfirmation) {
             Button("Cancel", role: .cancel) {
@@ -805,6 +813,7 @@ private struct ModelsSettingsPane: View {
     private func verifyInstalledModels() {
         Task {
             _ = await services.dictation.refreshReadiness()
+            services.refreshModelStorageInventory()
             modelMessage = services.dictation.readiness.model.settingsModelStatus
         }
     }
@@ -814,6 +823,7 @@ private struct ModelsSettingsPane: View {
     ) -> some View {
         ModelCatalogSurface(
             rows: isInitialCatalogCheck ? [] : catalogExperience.rows,
+            sizeLabel: catalogExperience.sizeLabel,
             hierarchyRows: isInitialCatalogCheck
                 ? []
                 : hierarchyState.visibleRows(in: catalogExperience),
@@ -1076,6 +1086,8 @@ private struct ModelsSettingsPane: View {
         } else {
             TextifyModelCard(
                 model: row.model,
+                sizeLabel: row.sizeLabel,
+                sizeDescription: row.sizeDescription,
                 hierarchyContext: context,
                 compatibility: row.compatibility,
                 isInstalled: row.isInstalled,
@@ -1888,6 +1900,38 @@ private struct ModelCatalogFilterTokens: View {
     }
 }
 
+private struct ModelCatalogStorageSummaryView: View {
+    let presentation: ModelCatalogStorageSummaryPresentation
+
+    private let columns = Array(
+        repeating: GridItem(.flexible(), alignment: .topLeading),
+        count: 3
+    )
+
+    var body: some View {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
+            ForEach(
+                Array(presentation.facts.enumerated()),
+                id: \.offset
+            ) { _, fact in
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(fact.label.uppercased())
+                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                        .tracking(0.45)
+                        .foregroundStyle(.tertiary)
+                    Text(fact.value)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .padding(12)
+        .background(Color.primary.opacity(0.035))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
 private struct ModelCatalogArtifactRowContext {
     let title: String
     let description: String
@@ -2100,10 +2144,13 @@ private struct ModelCatalogInspectorView: View {
         case let .loaded(details) where details.artifactID == artifact.id:
             ModelInspectorFactRow(
                 label: "On Disk",
-                value: ByteCountFormatter.string(
-                    fromByteCount: details.allocatedBytes,
-                    countStyle: .file
-                )
+                value: details.allocatedBytes.map {
+                    "About "
+                        + ByteCountFormatter.string(
+                            fromByteCount: $0,
+                            countStyle: .file
+                        )
+                } ?? "Size Unavailable"
             )
             ModelInspectorFactRow(
                 label: "Files",
@@ -2128,10 +2175,17 @@ private struct ModelCatalogInspectorView: View {
                     value: details.sizeMismatchRelativePaths.joined(separator: ", ")
                 )
             }
+            if details.unexpectedFileCount > 0 {
+                ModelInspectorFactRow(
+                    label: "Unexpected Files",
+                    value: String(details.unexpectedFileCount)
+                )
+            }
         case let .failed(artifactID) where artifactID == artifact.id:
-            Label("Local file details are unavailable.", systemImage: "exclamationmark.triangle")
-                .font(.caption)
-                .foregroundStyle(TextifyVisualIdentity.warmWarning)
+            ModelInspectorFactRow(
+                label: "On Disk",
+                value: "Size Unavailable"
+            )
         case .notApplicable, .loading, .loaded, .failed:
             Text(
                 artifact.canVerify
@@ -2203,6 +2257,7 @@ private struct ModelInspectorFactRow: View {
 
 private struct ModelCatalogSurface<Row: View>: View {
     let rows: [ModelCatalogRowPresentation]
+    let sizeLabel: String
     let hierarchyRows: [ModelCatalogHierarchyRow]
     let selection: ModelCatalogHierarchySelection?
     let focusedRowID: FocusState<ModelCatalogHierarchyRowID?>.Binding
@@ -2216,6 +2271,7 @@ private struct ModelCatalogSurface<Row: View>: View {
 
     init(
         rows: [ModelCatalogRowPresentation],
+        sizeLabel: String,
         hierarchyRows: [ModelCatalogHierarchyRow],
         selection: ModelCatalogHierarchySelection?,
         focusedRowID: FocusState<ModelCatalogHierarchyRowID?>.Binding,
@@ -2229,6 +2285,7 @@ private struct ModelCatalogSurface<Row: View>: View {
         ) -> Row
     ) {
         self.rows = rows
+        self.sizeLabel = sizeLabel
         self.hierarchyRows = hierarchyRows
         self.selection = selection
         self.focusedRowID = focusedRowID
@@ -2283,7 +2340,9 @@ private struct ModelCatalogSurface<Row: View>: View {
                                         }
                                     )
                                     if hierarchyRow.isExpanded {
-                                        ModelCatalogVariantComparisonHeader()
+                                        ModelCatalogVariantComparisonHeader(
+                                            sizeLabel: sizeLabel
+                                        )
                                     }
                                 case let .exactArtifact(checkpoint, artifact, isSingleVariant):
                                     row(
@@ -2647,6 +2706,8 @@ private struct ModelCatalogColumnHeader: View {
 
 private struct TextifyModelCard: View {
     let model: ProductionModelPresentation
+    let sizeLabel: String
+    let sizeDescription: String
     let hierarchyContext: ModelCatalogArtifactRowContext?
     let compatibility: ModelCatalogCompatibility
     let isInstalled: Bool
@@ -2708,7 +2769,11 @@ private struct TextifyModelCard: View {
                     .frame(width: 86, alignment: .leading)
                 ModelSignalMetric(level: model.speedSignalLevel, label: model.speedLabel)
                     .frame(width: 86, alignment: .leading)
-                ModelFeaturesMetric(model: model)
+                ModelFeaturesMetric(
+                    model: model,
+                    sizeLabel: sizeLabel,
+                    sizeDescription: sizeDescription
+                )
                     .frame(width: 138, alignment: .leading)
             }
 
@@ -3051,10 +3116,15 @@ private struct ModelSignalMetric: View {
 
 private struct ModelFeaturesMetric: View {
     let model: ProductionModelPresentation
+    let sizeLabel: String
+    let sizeDescription: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Label(model.sizeDescription, systemImage: "internaldrive")
+            Label(
+                "\(sizeLabel): \(sizeDescription)",
+                systemImage: "internaldrive"
+            )
             Label(model.languageDescription, systemImage: "character.bubble")
             Label(model.acceleratorName, systemImage: "cpu")
         }

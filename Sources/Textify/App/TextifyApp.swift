@@ -19,6 +19,9 @@ struct TextifyApp: App {
         AppDelegate.modelInstallActivityProvider = {
             services.modelInstallCoordinator.isActive
         }
+        AppDelegate.modelStorageRefreshProvider = {
+            services.refreshModelStorageInventory()
+        }
         AppDelegate.launchCoordinator = AppLaunchCoordinator(
             services: services,
             showOnboarding: {

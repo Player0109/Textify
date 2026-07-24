@@ -10,6 +10,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static var mainWindowVisibilityProvider: (@MainActor () -> Bool)?
     @MainActor
     static var modelInstallActivityProvider: (@MainActor () -> Bool)?
+    @MainActor
+    static var modelStorageRefreshProvider: (@MainActor () -> Void)?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(Self.activationPolicy())
@@ -19,6 +21,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { @MainActor in
             await Self.launchCoordinator?.run()
         }
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        Self.modelStorageRefreshProvider?()
     }
 
     func applicationShouldHandleReopen(

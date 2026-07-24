@@ -16,7 +16,7 @@ enum ModelCatalogSort: String, CaseIterable, Identifiable {
         case .quality: "Quality"
         case .speed: "Speed"
         case .downloadSize: "Download Size"
-        case .installedSize: "Installed Size"
+        case .installedSize: "On Disk"
         }
     }
 }
@@ -44,6 +44,12 @@ enum ModelCatalogSortDirection: String, CaseIterable, Identifiable {
             "arrow.down"
         }
     }
+}
+
+enum ModelCatalogInstalledSizeStatus: Equatable {
+    case calculating
+    case measured
+    case unavailable
 }
 
 enum ModelCatalogScope: String, CaseIterable, Identifiable {
@@ -947,7 +953,11 @@ struct ModelCatalogRowPresentation: Equatable, Identifiable {
     let model: ProductionModelPresentation
     let operationalModel: ModelEntry?
     let installedRecord: InstalledModelRecord?
+    let storageInventory: ModelStorageArtifactInventory?
+    let installedSizeStatus: ModelCatalogInstalledSizeStatus
     let onDiskBytes: Int64?
+    let sizeLabel: String
+    let sizeDescription: String
     let compatibility: ModelCatalogCompatibility
     let isInstalled: Bool
     let isActive: Bool
@@ -995,9 +1005,22 @@ struct ModelCatalogCheckpointPresentation: Equatable, Identifiable {
     let referenceArtifact: ModelCatalogExactArtifactPresentation?
     let defaultInstallArtifact: ModelCatalogExactArtifactPresentation?
     let resolution: ModelCatalogCheckpointResolution?
+    let installedOnDiskBytes: Int64?
 
     var id: String {
         metadata.id
+    }
+
+    static func aggregateInstalledOnDiskBytes(
+        _ artifacts: [ModelCatalogExactArtifactPresentation]
+    ) -> Int64? {
+        let installedArtifacts = artifacts.filter(\.row.isInstalled)
+        guard !installedArtifacts.isEmpty,
+              installedArtifacts.allSatisfy({ $0.row.onDiskBytes != nil })
+        else {
+            return nil
+        }
+        return installedArtifacts.compactMap(\.row.onDiskBytes).reduce(0, +)
     }
 }
 
@@ -1310,11 +1333,101 @@ struct ModelDownloadsPresentation: Equatable {
     }
 }
 
+struct ModelCatalogStorageSummaryPresentation: Equatable {
+    struct Fact: Equatable {
+        let label: String
+        let value: String
+    }
+
+    let facts: [Fact]
+
+    init(
+        state: ModelStorageInventoryLoadState,
+        installedCount: Int
+    ) {
+        facts = [
+            Fact(
+                label: "Installed",
+                value: Self.installedCount(
+                    for: state,
+                    fallback: installedCount
+                )
+            ),
+            Fact(
+                label: "Installed Model Storage",
+                value: Self.value(
+                    for: state,
+                    bytes: { $0.installedModelStorageBytes }
+                )
+            ),
+            Fact(
+                label: "Download Storage",
+                value: Self.value(
+                    for: state,
+                    bytes: { $0.downloadStorageBytes }
+                )
+            ),
+            Fact(
+                label: "Other Model Data",
+                value: Self.value(
+                    for: state,
+                    bytes: { $0.otherModelDataBytes }
+                )
+            ),
+            Fact(
+                label: "Total Managed Storage",
+                value: Self.value(
+                    for: state,
+                    bytes: { $0.totalManagedStorageBytes }
+                )
+            ),
+            Fact(
+                label: "Available Space",
+                value: Self.value(
+                    for: state,
+                    bytes: { $0.availableSpaceBytes }
+                )
+            ),
+        ]
+    }
+
+    private static func installedCount(
+        for state: ModelStorageInventoryLoadState,
+        fallback: Int
+    ) -> String {
+        guard case let .available(_, snapshot) = state else {
+            return String(fallback)
+        }
+        return String(snapshot.summary.installedArtifactCount)
+    }
+
+    private static func value(
+        for state: ModelStorageInventoryLoadState,
+        bytes: (ModelStorageInventorySummary) -> Int64?
+    ) -> String {
+        switch state {
+        case .calculating:
+            return "Calculating"
+        case .unavailable:
+            return "Size Unavailable"
+        case let .available(_, snapshot):
+            guard let byteCount = bytes(snapshot.summary) else {
+                return "Size Unavailable"
+            }
+            return "About " + ByteCountFormatter.string(
+                fromByteCount: byteCount,
+                countStyle: .file
+            )
+        }
+    }
+}
+
 struct ModelCatalogExperience: Equatable {
     let rows: [ModelCatalogRowPresentation]
     let families: [ModelCatalogFamilyPresentation]
     let filterOptions: ModelCatalogFilterOptions
     let pinnedReveal: ModelCatalogPinnedRevealPresentation?
+    let sizeLabel: String
     private let inspectorFamilies: [ModelCatalogFamilyPresentation]
 
     init(
@@ -1324,6 +1437,8 @@ struct ModelCatalogExperience: Equatable {
         transferState: DownloadState?,
         managedReadinessByModelID: [String: ModelCatalogManagedReadiness] = [:],
         onDiskBytesByModelID: [String: Int64] = [:],
+        storageInventoryByModelID: [String: ModelStorageArtifactInventory] = [:],
+        installedSizeStatus: ModelCatalogInstalledSizeStatus = .measured,
         query: ModelCatalogQuery = ModelCatalogQuery()
     ) {
         self.init(
@@ -1336,6 +1451,8 @@ struct ModelCatalogExperience: Equatable {
             ),
             managedReadinessByModelID: managedReadinessByModelID,
             onDiskBytesByModelID: onDiskBytesByModelID,
+            storageInventoryByModelID: storageInventoryByModelID,
+            installedSizeStatus: installedSizeStatus,
             query: query
         )
     }
@@ -1348,6 +1465,8 @@ struct ModelCatalogExperience: Equatable {
         transferState: DownloadState?,
         managedReadinessByModelID: [String: ModelCatalogManagedReadiness] = [:],
         onDiskBytesByModelID: [String: Int64] = [:],
+        storageInventoryByModelID: [String: ModelStorageArtifactInventory] = [:],
+        installedSizeStatus: ModelCatalogInstalledSizeStatus = .measured,
         query: ModelCatalogQuery = ModelCatalogQuery()
     ) {
         let compatibilityByModelID = compatibilityResolver?
@@ -1366,6 +1485,8 @@ struct ModelCatalogExperience: Equatable {
             ),
             managedReadinessByModelID: managedReadinessByModelID,
             onDiskBytesByModelID: onDiskBytesByModelID,
+            storageInventoryByModelID: storageInventoryByModelID,
+            installedSizeStatus: installedSizeStatus,
             query: query
         )
     }
@@ -1378,6 +1499,8 @@ struct ModelCatalogExperience: Equatable {
         transferStatesByModelID: [String: DownloadState],
         managedReadinessByModelID: [String: ModelCatalogManagedReadiness] = [:],
         onDiskBytesByModelID: [String: Int64] = [:],
+        storageInventoryByModelID: [String: ModelStorageArtifactInventory] = [:],
+        installedSizeStatus: ModelCatalogInstalledSizeStatus = .measured,
         query: ModelCatalogQuery = ModelCatalogQuery()
     ) {
         let compatibilityByModelID = compatibilityResolver?
@@ -1394,6 +1517,8 @@ struct ModelCatalogExperience: Equatable {
             transferStatesByModelID: transferStatesByModelID,
             managedReadinessByModelID: managedReadinessByModelID,
             onDiskBytesByModelID: onDiskBytesByModelID,
+            storageInventoryByModelID: storageInventoryByModelID,
+            installedSizeStatus: installedSizeStatus,
             query: query
         )
     }
@@ -1408,8 +1533,15 @@ struct ModelCatalogExperience: Equatable {
         transferStatesByModelID: [String: DownloadState],
         managedReadinessByModelID: [String: ModelCatalogManagedReadiness],
         onDiskBytesByModelID: [String: Int64],
+        storageInventoryByModelID: [String: ModelStorageArtifactInventory],
+        installedSizeStatus: ModelCatalogInstalledSizeStatus,
         query: ModelCatalogQuery
     ) {
+        let installedRecords = InstalledModelsStore(
+            records: installedRecords
+        ).records
+        let sizeLabel = query.scope == .installed ? "On Disk" : "Download Size"
+        self.sizeLabel = sizeLabel
         let signedArtifactsByID = presentationGraph?.artifacts.reduce(
             into: [String: ModelExactArtifactPresentationNode]()
         ) {
@@ -1457,7 +1589,19 @@ struct ModelCatalogExperience: Equatable {
                 model: model,
                 operationalModel: trustedModelsByID[model.id] ?? installedModel,
                 installedRecord: installedRecordsByID[model.id],
+                storageInventory: storageInventoryByModelID[model.id],
+                installedSizeStatus: installedSizeStatus,
                 onDiskBytes: isInstalled ? onDiskBytesByModelID[model.id] : nil,
+                sizeLabel: query.scope == .installed && isInstalled
+                    ? "On Disk"
+                    : "Download Size",
+                sizeDescription: Self.sizeDescription(
+                    model: model,
+                    isInstalled: isInstalled,
+                    onDiskBytes: onDiskBytesByModelID[model.id],
+                    installedSizeStatus: installedSizeStatus,
+                    scope: query.scope
+                ),
                 compatibility: compatibilityByModelID[model.id] ?? .compatible,
                 isInstalled: isInstalled,
                 isActive: isActive,
@@ -1531,6 +1675,32 @@ struct ModelCatalogExperience: Equatable {
             return [:]
         }
         return [state.modelID: state]
+    }
+
+    private static func sizeDescription(
+        model: ProductionModelPresentation,
+        isInstalled: Bool,
+        onDiskBytes: Int64?,
+        installedSizeStatus: ModelCatalogInstalledSizeStatus,
+        scope: ModelCatalogScope
+    ) -> String {
+        guard scope == .installed, isInstalled else {
+            return model.sizeDescription
+        }
+        switch installedSizeStatus {
+        case .calculating:
+            return "Calculating"
+        case .unavailable:
+            return "Size Unavailable"
+        case .measured:
+            guard let onDiskBytes else {
+                return "Size Unavailable"
+            }
+            return "About " + ByteCountFormatter.string(
+                fromByteCount: onDiskBytes,
+                countStyle: .file
+            )
+        }
     }
 
     func inspectorPresentation(
@@ -1653,11 +1823,6 @@ struct ModelCatalogExperience: Equatable {
                 "\($0.spdxId) — \($0.name) (\($0.scope))"
             }.joined(separator: " • ")
         } ?? "License metadata unavailable"
-        let localInspectionRequest = makeLocalInspectionRequest(
-            artifactID: artifact.id,
-            model: model,
-            installedRecord: artifact.row.installedRecord
-        )
         let verificationRequest = makeVerificationRequest(
             artifactID: artifact.id,
             model: model,
@@ -1691,28 +1856,11 @@ struct ModelCatalogExperience: Equatable {
             license: license,
             sourceURL: artifact.row.model.sourceURL,
             canVerify: artifact.row.isInstalled,
-            localInspectionRequest: localInspectionRequest,
+            localDetails: artifact.row.storageInventory.map {
+                ModelCatalogArtifactLocalDetails(inventory: $0)
+            },
+            localDetailsStatus: artifact.row.installedSizeStatus,
             verificationRequest: verificationRequest
-        )
-    }
-
-    private static func makeLocalInspectionRequest(
-        artifactID: String,
-        model: ModelEntry?,
-        installedRecord: InstalledModelRecord?
-    ) -> ModelCatalogArtifactInspectionRequest? {
-        guard let model, let installedRecord else {
-            return nil
-        }
-        return ModelCatalogArtifactInspectionRequest(
-            artifactID: artifactID,
-            expectedFiles: model.files.map {
-                ModelCatalogArtifactInspectionRequest.ExpectedFile(
-                    relativePath: $0.relativePath ?? $0.filename,
-                    expectedSizeBytes: $0.sizeBytes,
-                    localPath: installedRecord.localFilesByManifestFilename[$0.filename]
-                )
-            }
         )
     }
 
@@ -1792,7 +1940,8 @@ struct ModelCatalogExperience: Equatable {
                     artifacts: artifacts,
                     referenceArtifact: checkpoint.referenceArtifact,
                     defaultInstallArtifact: checkpoint.defaultInstallArtifact,
-                    resolution: checkpoint.resolution
+                    resolution: checkpoint.resolution,
+                    installedOnDiskBytes: checkpoint.installedOnDiskBytes
                 )
                 }
             guard !checkpoints.isEmpty else {
@@ -1844,13 +1993,7 @@ struct ModelCatalogExperience: Equatable {
         case .downloadSize:
             return checkpoint.referenceArtifact?.row.operationalModel?.sizeBytes
         case .installedSize:
-            let installed = checkpoint.artifacts.filter(\.row.isInstalled)
-            guard !installed.isEmpty,
-                  installed.allSatisfy({ $0.row.onDiskBytes != nil })
-            else {
-                return nil
-            }
-            return installed.compactMap(\.row.onDiskBytes).reduce(0, +)
+            return checkpoint.installedOnDiskBytes
         }
     }
 
@@ -2101,7 +2244,9 @@ struct ModelCatalogExperience: Equatable {
                         artifacts: artifacts,
                         referenceArtifact: referenceArtifact,
                         defaultInstallArtifact: defaultInstallArtifact,
-                        resolution: resolution
+                        resolution: resolution,
+                        installedOnDiskBytes: ModelCatalogCheckpointPresentation
+                            .aggregateInstalledOnDiskBytes(artifacts)
                     )
                 }
                 .sorted {
