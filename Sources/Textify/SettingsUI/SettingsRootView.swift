@@ -525,9 +525,8 @@ private struct ModelsSettingsPane: View {
     @State private var showsImportConfirmation = false
     @State private var isImporting = false
     @State private var pendingRemovalModel: ProductionModelPresentation?
-    @State private var catalogSort: ModelCatalogSort = .catalog
-    @State private var catalogFormat: ModelArtifactFormat?
-    @State private var catalogPrecision: ModelArtifactPrecision?
+    @State private var discoveryQuery = ModelCatalogQuery()
+    @State private var onDiskBytesByModelID: [String: Int64] = [:]
     @State private var hierarchyState = ModelCatalogHierarchyState()
     @State private var inspectorController = ModelCatalogInspectorController()
     @State private var showsInspector = false
@@ -536,6 +535,7 @@ private struct ModelsSettingsPane: View {
     var body: some View {
         let catalogExperience = services.modelCatalogExperience(
             for: destination.purpose,
+            onDiskBytesByModelID: onDiskBytesByModelID,
             query: catalogQuery
         )
 
@@ -563,6 +563,35 @@ private struct ModelsSettingsPane: View {
                     .foregroundStyle(.secondary)
             }
 
+            ModelCatalogToolbar(
+                query: $discoveryQuery,
+                filterOptions: catalogExperience.filterOptions,
+                onReset: resetCatalogQuery,
+                onVerify: verifyInstalledModels,
+                onImport: destination == .transcription
+                    ? chooseCustomWhisperModel
+                    : nil,
+                onShowVariantHelp: {
+                    showsModelVariantsHelp = true
+                },
+                isImportDisabled: isInstalling || isImporting
+            )
+
+            if !discoveryQuery.appliedFilterTokens.isEmpty {
+                ModelCatalogFilterTokens(
+                    tokens: discoveryQuery.appliedFilterTokens
+                ) { token in
+                    discoveryQuery.removeFilter(token)
+                }
+            }
+
+            if let pinnedReveal = catalogExperience.pinnedReveal {
+                pinnedRevealView(
+                    pinnedReveal,
+                    in: catalogExperience
+                )
+            }
+
             catalogSurface(catalogExperience)
         }
         .inspector(isPresented: $showsInspector) {
@@ -576,24 +605,6 @@ private struct ModelsSettingsPane: View {
             }
             .scrollContentBackground(.hidden)
             .inspectorColumnWidth(min: 280, ideal: 320, max: 360)
-        }
-        .overlay(alignment: .topTrailing) {
-            ModelCatalogToolbar(
-                sort: $catalogSort,
-                format: $catalogFormat,
-                precision: $catalogPrecision,
-                onReset: resetCatalogQuery,
-                onVerify: verifyInstalledModels,
-                onImport: destination == .transcription
-                    ? chooseCustomWhisperModel
-                    : nil,
-                onShowVariantHelp: {
-                    showsModelVariantsHelp = true
-                },
-                isImportDisabled: isInstalling || isImporting
-            )
-            .padding(.top, 48)
-            .padding(.trailing, 24)
         }
         .popover(isPresented: $showsModelVariantsHelp) {
             ModelCatalogVariantsAboutView()
@@ -611,6 +622,14 @@ private struct ModelsSettingsPane: View {
             if hierarchyState.selection == nil {
                 showsInspector = false
             }
+        }
+        .onChange(of: inspectorController.localDetailsState) { _, state in
+            if case let .loaded(details) = state {
+                onDiskBytesByModelID[details.artifactID] = details.allocatedBytes
+            }
+        }
+        .onChange(of: services.installedModelRecords) { _, _ in
+            onDiskBytesByModelID = [:]
         }
         .alert("Import local Whisper model?", isPresented: $showsImportConfirmation) {
             Button("Cancel", role: .cancel) {
@@ -654,17 +673,17 @@ private struct ModelsSettingsPane: View {
     }
 
     private var catalogQuery: ModelCatalogQuery {
-        ModelCatalogQuery(
-            sort: catalogSort,
-            format: catalogFormat,
-            precision: catalogPrecision
-        )
+        var query = discoveryQuery
+        query.purpose = destination.purpose
+        if services.settingsRouter.modelReveal?.purpose == destination.purpose {
+            query.revealedArtifactID = services.settingsRouter.modelReveal?.artifactID
+        }
+        return query
     }
 
     private func resetCatalogQuery() {
-        catalogSort = .catalog
-        catalogFormat = nil
-        catalogPrecision = nil
+        discoveryQuery.resetDiscovery()
+        services.settingsRouter.dismissModelReveal()
     }
 
     private func verifyInstalledModels() {
@@ -701,25 +720,119 @@ private struct ModelsSettingsPane: View {
     }
 
     private var emptyPresentation: ModelCatalogEmptyPresentation {
-        if catalogQuery.hasUserFilters {
-            return .filtered
-        }
         if services.modelCatalogCoordinator.manifest == nil,
            services.modelCatalogCoordinator.errorMessage != nil
                 || ProductionModelInstallConfiguration.current == nil {
             return .unavailable(destination)
         }
-        return .purpose(destination)
+        if catalogQuery.emptyState == .validCatalog {
+            return .purpose(destination)
+        }
+        return .query(catalogQuery.emptyState)
     }
 
     private func performEmptyStateAction() {
-        if catalogQuery.hasUserFilters {
-            resetCatalogQuery()
-            return
+        switch catalogQuery.emptyState {
+        case .installed:
+            discoveryQuery.scope = .all
+            if discoveryQuery.sort == .installedSize {
+                discoveryQuery.sort = .catalog
+            }
+        case .search:
+            discoveryQuery.clearSearch()
+        case .filters:
+            discoveryQuery.clearFilters()
+        case .combined:
+            discoveryQuery.clearSearch()
+            discoveryQuery.clearFilters()
+        case .validCatalog:
+            Task {
+                await services.modelCatalogCoordinator.refresh()
+            }
         }
-        Task {
-            await services.modelCatalogCoordinator.refresh()
+    }
+
+    private func pinnedRevealView(
+        _ reveal: ModelCatalogPinnedRevealPresentation,
+        in catalogExperience: ModelCatalogExperience
+    ) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Image(systemName: "pin.fill")
+                    .foregroundStyle(TextifyVisualIdentity.voiceViolet)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("REVEALED EXACT ARTIFACT")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .tracking(0.8)
+                        .foregroundStyle(.secondary)
+                    Text(
+                        "\(reveal.family.metadata.presentation.displayName) → "
+                            + "\(reveal.checkpoint.metadata.presentation.displayName) → "
+                            + reveal.artifact.metadata.presentation.displayName
+                    )
+                    .font(.callout.weight(.semibold))
+                    .lineLimit(1)
+                }
+
+                Spacer(minLength: 8)
+
+                Button("Back to Filtered Results") {
+                    services.settingsRouter.dismissModelReveal()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                Button {
+                    services.settingsRouter.dismissModelReveal()
+                } label: {
+                    Label("Dismiss Reveal", systemImage: "xmark")
+                        .labelStyle(.iconOnly)
+                }
+                .buttonStyle(.borderless)
+                .help("Dismiss Reveal")
+            }
+            .padding(12)
+
+            Divider()
+
+            catalogRow(
+                reveal.row,
+                context: ModelCatalogArtifactRowContext(
+                    title: reveal.artifact.metadata.presentation.displayName,
+                    description: reveal.checkpoint.metadata.presentation.description,
+                    variantLabel: nil,
+                    isRecommended: reveal.checkpoint.metadata
+                        .recommendedArtifactID == reveal.artifact.id,
+                    isFallback: reveal.checkpoint.resolution?.fallback?
+                        .fallbackArtifactID == reveal.artifact.id,
+                    isSelected: hierarchyState.selection
+                        == .exactArtifact(reveal.artifact.id),
+                    indentation: 0,
+                    comparison: nil,
+                    onSelect: {
+                        let selection = ModelCatalogHierarchySelection
+                            .exactArtifact(reveal.artifact.id)
+                        hierarchyState.select(selection)
+                        inspectorController.select(
+                            selection,
+                            in: catalogExperience
+                        )
+                        showsInspector = true
+                    }
+                )
+            )
         }
+        .background(TextifyVisualIdentity.cardSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(
+                    TextifyVisualIdentity.voiceViolet.opacity(0.65),
+                    lineWidth: 1
+                )
+        }
+        .accessibilityElement(children: .contain)
     }
 
     @ViewBuilder
@@ -1033,9 +1146,8 @@ private struct ModelDeckFact: View {
 }
 
 private struct ModelCatalogToolbar: View {
-    @Binding var sort: ModelCatalogSort
-    @Binding var format: ModelArtifactFormat?
-    @Binding var precision: ModelArtifactPrecision?
+    @Binding var query: ModelCatalogQuery
+    let filterOptions: ModelCatalogFilterOptions
     let onReset: () -> Void
     let onVerify: () -> Void
     let onImport: (() -> Void)?
@@ -1043,35 +1155,160 @@ private struct ModelCatalogToolbar: View {
     let isImportDisabled: Bool
 
     var body: some View {
-        HStack(spacing: 8) {
-            Picker("Sort models", selection: $sort) {
-                ForEach(ModelCatalogSort.allCases) { option in
-                    Text(option.title).tag(option)
+        HStack(spacing: 10) {
+            Picker("Catalog scope", selection: scopeBinding) {
+                ForEach(ModelCatalogScope.allCases) { scope in
+                    Text(scope.title).tag(scope)
                 }
             }
-            .labelsHidden()
             .pickerStyle(.segmented)
-            .frame(width: 210)
+            .frame(width: 150)
+
+            HStack(spacing: 7) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("Search models", text: $query.searchText)
+                    .textFieldStyle(.plain)
+                if query.hasSearch {
+                    Button {
+                        query.clearSearch()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Clear Search")
+                }
+            }
+            .padding(.horizontal, 10)
+            .frame(minWidth: 180, idealWidth: 280)
+            .frame(height: 28)
+            .background(
+                Color.primary.opacity(0.055),
+                in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .stroke(TextifyVisualIdentity.separator, lineWidth: 1)
+            }
 
             Menu {
-                Menu("Format") {
-                    Picker("Format", selection: $format) {
-                        Text("All formats").tag(ModelArtifactFormat?.none)
-                        ForEach(ModelArtifactFormat.filterOptions) { option in
-                            Text(option.title).tag(Optional(option))
+                Picker("Sort models", selection: $query.sort) {
+                    ForEach(query.availableSorts) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+                if query.sort != .catalog {
+                    Divider()
+                    Picker("Direction", selection: $query.sortDirection) {
+                        ForEach(ModelCatalogSortDirection.allCases) { direction in
+                            Label(direction.title, systemImage: direction.systemImage)
+                                .tag(direction)
                         }
                     }
                 }
-                Menu("Precision") {
-                    Picker("Precision", selection: $precision) {
-                        Text("All precision").tag(ModelArtifactPrecision?.none)
-                        ForEach(ModelArtifactPrecision.filterOptions) { option in
-                            Text(option.title).tag(Optional(option))
-                        }
+            } label: {
+                Label(
+                    query.sort.title,
+                    systemImage: query.sort == .catalog
+                        ? "arrow.up.arrow.down"
+                        : query.sortDirection.systemImage
+                )
+            }
+            .fixedSize()
+
+            Menu {
+                Menu("Compatibility") {
+                    ForEach(ModelCatalogCompatibilityFilter.allCases) { value in
+                        filterButton(
+                            value,
+                            at: \.compatibility,
+                            title: value.title
+                        )
                     }
                 }
+                Menu("State") {
+                    ForEach(ModelCatalogStateFilter.allCases) { value in
+                        filterButton(value, at: \.states, title: value.title)
+                    }
+                }
+                Menu("Artifact Format") {
+                    ForEach(filterOptions.artifactFormats, id: \.rawValue) { value in
+                        filterButton(
+                            value,
+                            at: \.artifactFormats,
+                            title: ModelCatalogVariantTerminology.artifactFormat(value)
+                        )
+                    }
+                }
+                Menu("Numeric Format") {
+                    ForEach(filterOptions.numericFormats, id: \.rawValue) { value in
+                        filterButton(
+                            value,
+                            at: \.numericFormats,
+                            title: value.rawValue
+                        )
+                    }
+                }
+                Menu("Runtime") {
+                    ForEach(filterOptions.runtimes, id: \.rawValue) { value in
+                        filterButton(
+                            value,
+                            at: \.runtimes,
+                            title: ModelCatalogVariantTerminology.runtime(value)
+                        )
+                    }
+                }
+                Menu("Compute Route") {
+                    ForEach(filterOptions.computeRoutes, id: \.rawValue) { value in
+                        filterButton(
+                            value,
+                            at: \.computeRoutes,
+                            title: ModelCatalogVariantTerminology.computeRoute(value)
+                        )
+                    }
+                }
+                Menu("Language") {
+                    ForEach(filterOptions.languages, id: \.self) { value in
+                        filterButton(
+                            value,
+                            at: \.languages,
+                            title: ModelCatalogQuery.languageName(value)
+                        )
+                    }
+                }
+                Menu("Evidence") {
+                    ForEach(ModelCatalogEvidenceFilter.allCases) { value in
+                        filterButton(value, at: \.evidence, title: value.title)
+                    }
+                }
+                if query.hasAppliedFilters {
+                    Divider()
+                    Button("Clear Filters", systemImage: "line.3.horizontal.decrease.circle") {
+                        query.clearFilters()
+                    }
+                }
+            } label: {
+                Label(
+                    query.hasAppliedFilters
+                        ? "Filters (\(query.appliedFilterTokens.count))"
+                        : "Filters",
+                    systemImage: query.hasAppliedFilters
+                        ? "line.3.horizontal.decrease.circle.fill"
+                        : "line.3.horizontal.decrease.circle"
+                )
+            }
+            .fixedSize()
+
+            Spacer(minLength: 0)
+
+            Menu {
                 if hasChanges {
-                    Button("Reset Filters", systemImage: "arrow.counterclockwise", action: onReset)
+                    Button(
+                        "Reset Catalog View",
+                        systemImage: "arrow.counterclockwise",
+                        action: onReset
+                    )
                 }
                 Divider()
                 Button(
@@ -1089,7 +1326,7 @@ private struct ModelCatalogToolbar: View {
                     .disabled(isImportDisabled)
                 }
             } label: {
-                Image(systemName: hasFilters ? "ellipsis.circle.fill" : "ellipsis.circle")
+                Image(systemName: "ellipsis.circle")
                     .font(.system(size: 15, weight: .medium))
             }
             .menuStyle(.borderlessButton)
@@ -1099,12 +1336,89 @@ private struct ModelCatalogToolbar: View {
         .accessibilityElement(children: .contain)
     }
 
-    private var hasFilters: Bool {
-        format != nil || precision != nil
+    private var scopeBinding: Binding<ModelCatalogScope> {
+        Binding(
+            get: { query.scope },
+            set: { scope in
+                query.scope = scope
+                if scope == .all, query.sort == .installedSize {
+                    query.sort = .catalog
+                }
+            }
+        )
     }
 
     private var hasChanges: Bool {
-        sort != .catalog || hasFilters
+        query.scope != .all
+            || query.hasSearch
+            || query.hasAppliedFilters
+            || query.sort != .catalog
+    }
+
+    private func filterButton<Value: Equatable>(
+        _ value: Value,
+        at keyPath: WritableKeyPath<ModelCatalogQuery, [Value]>,
+        title: String
+    ) -> some View {
+        let isSelected = query[keyPath: keyPath].contains(value)
+        return Button {
+            if isSelected {
+                query[keyPath: keyPath].removeAll { $0 == value }
+            } else {
+                query[keyPath: keyPath].append(value)
+            }
+        } label: {
+            if isSelected {
+                Label(title, systemImage: "checkmark")
+            } else {
+                Text(title)
+            }
+        }
+    }
+}
+
+private struct ModelCatalogFilterTokens: View {
+    let tokens: [ModelCatalogFilterToken]
+    let onRemove: (ModelCatalogFilterToken) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                Text("FILTERED BY")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .tracking(0.8)
+                    .foregroundStyle(.tertiary)
+
+                ForEach(Array(tokens.enumerated()), id: \.offset) { _, token in
+                    Button {
+                        onRemove(token)
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text(token.title)
+                            Image(systemName: "xmark")
+                                .font(.system(size: 8, weight: .bold))
+                        }
+                        .font(.caption.weight(.medium))
+                        .padding(.horizontal, 8)
+                        .frame(height: 24)
+                        .background(
+                            TextifyVisualIdentity.voiceViolet.opacity(0.14),
+                            in: Capsule()
+                        )
+                        .overlay {
+                            Capsule()
+                                .stroke(
+                                    TextifyVisualIdentity.voiceViolet.opacity(0.36),
+                                    lineWidth: 1
+                                )
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Remove \(token.title) filter")
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
     }
 }
 
@@ -1544,14 +1858,25 @@ private struct ModelCatalogSurface<Row: View>: View {
 }
 
 private enum ModelCatalogEmptyPresentation {
-    case filtered
+    case query(ModelCatalogQueryEmptyState)
     case purpose(ModelCatalogPurposeDestination)
     case unavailable(ModelCatalogPurposeDestination)
 
     var icon: String {
         switch self {
-        case .filtered:
-            return "line.3.horizontal.decrease.circle"
+        case let .query(state):
+            switch state {
+            case .installed:
+                return "internaldrive"
+            case .search:
+                return "magnifyingglass"
+            case .filters:
+                return "line.3.horizontal.decrease.circle"
+            case .combined:
+                return "magnifyingglass.circle"
+            case .validCatalog:
+                return "shippingbox"
+            }
         case .purpose:
             return "shippingbox"
         case .unavailable:
@@ -1561,8 +1886,8 @@ private enum ModelCatalogEmptyPresentation {
 
     var title: String {
         switch self {
-        case .filtered:
-            return "No models match these filters"
+        case let .query(state):
+            return state.title
         case let .purpose(destination):
             return destination.emptyTitle
         case let .unavailable(destination):
@@ -1572,8 +1897,8 @@ private enum ModelCatalogEmptyPresentation {
 
     var detail: String {
         switch self {
-        case .filtered:
-            return "Reset the catalog controls to see every model."
+        case let .query(state):
+            return state.detail
         case let .purpose(destination):
             return destination.emptyDetail
         case let .unavailable(destination):
@@ -1583,8 +1908,8 @@ private enum ModelCatalogEmptyPresentation {
 
     var actionTitle: String {
         switch self {
-        case .filtered:
-            return "Reset Filters"
+        case let .query(state):
+            return state.actionTitle
         case let .purpose(destination), let .unavailable(destination):
             return destination.unavailableActionTitle
         }

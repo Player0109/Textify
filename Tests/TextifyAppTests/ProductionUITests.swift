@@ -180,68 +180,6 @@ final class ProductionUITests: XCTestCase {
         XCTAssertNil(ModelProviderIdentity.community.logoAssetName)
     }
 
-    func testModelCatalogCanSortByQualityOrSpeed() {
-        let accurate = ProductionModelPresentation(
-            id: "accurate",
-            displayName: "Accurate",
-            description: "Accuracy first.",
-            details: nil,
-            supportTier: "Accurate",
-            benchmark: benchmarkRating(
-                modelID: "accurate",
-                qualityScore: 95,
-                qualityLevel: 5,
-                speedScore: 45,
-                speedLevel: 2
-            )
-        )
-        let fast = ProductionModelPresentation(
-            id: "fast",
-            displayName: "Fast",
-            description: "Speed first.",
-            details: nil,
-            supportTier: "Fast",
-            benchmark: benchmarkRating(
-                modelID: "fast",
-                qualityScore: 60,
-                qualityLevel: 3,
-                speedScore: 96,
-                speedLevel: 5
-            )
-        )
-        let recommended = ProductionModelPresentation(
-            id: "recommended",
-            displayName: "Recommended",
-            description: "Balanced.",
-            details: nil,
-            supportTier: "Recommended",
-            benchmark: benchmarkRating(
-                modelID: "recommended",
-                qualityScore: 82,
-                qualityLevel: 4,
-                speedScore: 80,
-                speedLevel: 4
-            )
-        )
-        let unrated = ProductionModelPresentation(
-            id: "unrated",
-            displayName: "Unrated",
-            description: "No comparable benchmark.",
-            details: nil,
-            supportTier: "Accurate"
-        )
-        let models = [unrated, recommended, fast, accurate]
-
-        XCTAssertEqual(
-            ModelCatalogQuery(sort: .quality).apply(to: models).map(\.id),
-            ["accurate", "recommended", "fast", "unrated"]
-        )
-        XCTAssertEqual(
-            ModelCatalogQuery(sort: .speed).apply(to: models).map(\.id),
-            ["fast", "recommended", "accurate", "unrated"]
-        )
-    }
-
     func testModelCatalogExposesSignedBenchmarkEvidence() {
         let rating = benchmarkRating(
             modelID: "measured",
@@ -267,43 +205,6 @@ final class ProductionUITests: XCTestCase {
         XCTAssertTrue(model.speedEvidenceDescription?.contains("p95 205 ms") == true)
         XCTAssertTrue(model.benchmarkPolicyDescription.contains("3 runs"))
         XCTAssertTrue(model.benchmarkPolicyDescription.contains("source cccccccccccc"))
-    }
-
-    func testModelCatalogCombinesFormatAndPrecisionFilters() {
-        let mlx8Bit = ProductionModelPresentation(
-            id: "mlx-8",
-            displayName: "MLX 8-bit",
-            description: "MLX model.",
-            details: nil,
-            artifactFormat: .mlx,
-            artifactPrecision: .eightBit
-        )
-        let gguf16Bit = ProductionModelPresentation(
-            id: "gguf-16",
-            displayName: "GGUF 16-bit",
-            description: "GGUF model.",
-            details: nil,
-            artifactFormat: .gguf,
-            artifactPrecision: .sixteenBit
-        )
-        let gguf5Bit = ProductionModelPresentation(
-            id: "gguf-5",
-            displayName: "GGUF 5-bit",
-            description: "GGUF model.",
-            details: nil,
-            artifactFormat: .gguf,
-            artifactPrecision: .fiveBit
-        )
-        let models = [mlx8Bit, gguf16Bit, gguf5Bit]
-
-        XCTAssertEqual(
-            ModelCatalogQuery(format: .gguf, precision: .fiveBit).apply(to: models).map(\.id),
-            ["gguf-5"]
-        )
-        XCTAssertEqual(
-            ModelCatalogQuery(format: .mlx).apply(to: models).map(\.id),
-            ["mlx-8"]
-        )
     }
 
     func testBundledCatalogClassifiesMLXGGUFAndQuantizationMetadata() throws {

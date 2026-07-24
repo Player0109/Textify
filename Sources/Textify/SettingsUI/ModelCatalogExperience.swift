@@ -5,6 +5,8 @@ enum ModelCatalogSort: String, CaseIterable, Identifiable {
     case catalog
     case quality
     case speed
+    case downloadSize
+    case installedSize
 
     var id: Self { self }
 
@@ -13,6 +15,49 @@ enum ModelCatalogSort: String, CaseIterable, Identifiable {
         case .catalog: "Catalog"
         case .quality: "Quality"
         case .speed: "Speed"
+        case .downloadSize: "Download Size"
+        case .installedSize: "Installed Size"
+        }
+    }
+}
+
+enum ModelCatalogSortDirection: String, CaseIterable, Identifiable {
+    case ascending
+    case descending
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .ascending:
+            "Ascending"
+        case .descending:
+            "Descending"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .ascending:
+            "arrow.up"
+        case .descending:
+            "arrow.down"
+        }
+    }
+}
+
+enum ModelCatalogScope: String, CaseIterable, Identifiable {
+    case all
+    case installed
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .all:
+            "All"
+        case .installed:
+            "Installed"
         }
     }
 }
@@ -65,47 +110,504 @@ enum ModelArtifactPrecision: String, CaseIterable, Identifiable {
     }
 }
 
-struct ModelCatalogQuery: Equatable {
-    var sort: ModelCatalogSort = .catalog
-    var format: ModelArtifactFormat?
-    var precision: ModelArtifactPrecision?
-    var purpose: ModelPurpose?
-    var compatibleModelIDs: Set<String>?
+enum ModelCatalogCompatibilityFilter: String, CaseIterable, Identifiable {
+    case compatible
+    case requiresUpdate
+    case incompatible
+    case indeterminate
 
-    func apply(to models: [ProductionModelPresentation]) -> [ProductionModelPresentation] {
-        let matches = models.enumerated().filter { _, model in
-            (purpose == nil || model.purpose == purpose)
-                && (compatibleModelIDs == nil || compatibleModelIDs?.contains(model.id) == true)
-                && (format == nil || model.artifactFormat == format)
-                && (precision == nil || model.artifactPrecision == precision)
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .compatible:
+            "Compatible"
+        case .requiresUpdate:
+            "Requires Update"
+        case .incompatible:
+            "Incompatible"
+        case .indeterminate:
+            "Indeterminate"
         }
+    }
+}
 
-        switch sort {
-        case .catalog:
-            return matches.map(\.element)
+enum ModelCatalogStateFilter: String, CaseIterable, Identifiable {
+    case notInstalled
+    case installed
+    case ready
+    case active
+    case needsRepair
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .notInstalled:
+            "Not Installed"
+        case .installed:
+            "Installed"
+        case .ready:
+            "Ready"
+        case .active:
+            "Active"
+        case .needsRepair:
+            "Needs Repair"
+        }
+    }
+}
+
+enum ModelCatalogEvidenceFilter: String, CaseIterable, Identifiable {
+    case quality
+    case speed
+    case qualityAndSpeed
+    case unrated
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
         case .quality:
-            return matches.sorted { lhs, rhs in
-                if lhs.element.qualityScore != rhs.element.qualityScore {
-                    return (lhs.element.qualityScore ?? -1)
-                        > (rhs.element.qualityScore ?? -1)
-                }
-                return lhs.offset < rhs.offset
-            }
-            .map(\.element)
+            "Quality Rated"
         case .speed:
-            return matches.sorted { lhs, rhs in
-                if lhs.element.speedScore != rhs.element.speedScore {
-                    return (lhs.element.speedScore ?? -1)
-                        > (rhs.element.speedScore ?? -1)
-                }
-                return lhs.offset < rhs.offset
-            }
-            .map(\.element)
+            "Speed Rated"
+        case .qualityAndSpeed:
+            "Quality + Speed Rated"
+        case .unrated:
+            "Unrated"
+        }
+    }
+}
+
+enum ModelCatalogQueryEmptyState: Equatable {
+    case installed
+    case search
+    case filters
+    case combined
+    case validCatalog
+
+    var title: String {
+        switch self {
+        case .installed:
+            "No installed models"
+        case .search:
+            "No models match this search"
+        case .filters:
+            "No models match these filters"
+        case .combined:
+            "No models match this search and filters"
+        case .validCatalog:
+            "No curated models available"
         }
     }
 
+    var detail: String {
+        switch self {
+        case .installed:
+            "Installed shows only Exact Artifacts that currently consume storage on this Mac."
+        case .search:
+            "Try a different family, checkpoint, provider, language, format, or runtime term."
+        case .filters:
+            "Remove one or more filter tokens to broaden the catalog."
+        case .combined:
+            "Clear the search and filters to return to the full catalog."
+        case .validCatalog:
+            "Refresh the trusted catalog to check for newly curated models."
+        }
+    }
+
+    var actionTitle: String {
+        switch self {
+        case .installed:
+            "Show All Models"
+        case .search:
+            "Clear Search"
+        case .filters:
+            "Clear Filters"
+        case .combined:
+            "Clear Search and Filters"
+        case .validCatalog:
+            "Refresh Catalog"
+        }
+    }
+}
+
+enum ModelCatalogFilterTokenID: Equatable {
+    case artifactFormat(ModelArtifactContainerFormat)
+    case numericFormat(ModelNumericFormat)
+    case runtime(TranscriptionEngine)
+    case computeRoute(ModelComputeRoute)
+    case language(String)
+    case compatibility(ModelCatalogCompatibilityFilter)
+    case state(ModelCatalogStateFilter)
+    case evidence(ModelCatalogEvidenceFilter)
+}
+
+struct ModelCatalogFilterToken: Equatable {
+    let id: ModelCatalogFilterTokenID
+    let title: String
+}
+
+struct ModelCatalogQuery: Equatable {
+    var scope: ModelCatalogScope = .all
+    var searchText = ""
+    var sort: ModelCatalogSort = .catalog
+    var sortDirection: ModelCatalogSortDirection = .descending
+    var artifactFormats: [ModelArtifactContainerFormat] = []
+    var numericFormats: [ModelNumericFormat] = []
+    var runtimes: [TranscriptionEngine] = []
+    var computeRoutes: [ModelComputeRoute] = []
+    var languages: [String] = []
+    var compatibility: [ModelCatalogCompatibilityFilter] = []
+    var states: [ModelCatalogStateFilter] = []
+    var evidence: [ModelCatalogEvidenceFilter] = []
+    var purpose: ModelPurpose?
+    var revealedArtifactID: String?
+
     var hasUserFilters: Bool {
-        sort != .catalog || format != nil || precision != nil
+        hasSearch || hasAppliedFilters || scope == .installed
+    }
+
+    var hasSearch: Bool {
+        !normalizedSearchTokens.isEmpty
+    }
+
+    var hasAppliedFilters: Bool {
+        !artifactFormats.isEmpty
+            || !numericFormats.isEmpty
+            || !runtimes.isEmpty
+            || !computeRoutes.isEmpty
+            || !languages.isEmpty
+            || !compatibility.isEmpty
+            || !states.isEmpty
+            || !evidence.isEmpty
+    }
+
+    var availableSorts: [ModelCatalogSort] {
+        if scope == .installed {
+            return [.catalog, .quality, .speed, .downloadSize, .installedSize]
+        }
+        return [.catalog, .quality, .speed, .downloadSize]
+    }
+
+    var emptyState: ModelCatalogQueryEmptyState {
+        if hasSearch, hasAppliedFilters {
+            return .combined
+        }
+        if hasSearch {
+            return .search
+        }
+        if hasAppliedFilters {
+            return .filters
+        }
+        if scope == .installed {
+            return .installed
+        }
+        return .validCatalog
+    }
+
+    var ordinaryQuery: ModelCatalogQuery {
+        var query = self
+        query.revealedArtifactID = nil
+        return query
+    }
+
+    var appliedFilterTokens: [ModelCatalogFilterToken] {
+        artifactFormats.map {
+            ModelCatalogFilterToken(
+                id: .artifactFormat($0),
+                title: ModelCatalogVariantTerminology.artifactFormat($0)
+            )
+        }
+            + numericFormats.map {
+                ModelCatalogFilterToken(
+                    id: .numericFormat($0),
+                    title: $0.rawValue
+                )
+            }
+            + runtimes.map {
+                ModelCatalogFilterToken(
+                    id: .runtime($0),
+                    title: ModelCatalogVariantTerminology.runtime($0)
+                )
+            }
+            + computeRoutes.map {
+                ModelCatalogFilterToken(
+                    id: .computeRoute($0),
+                    title: ModelCatalogVariantTerminology.computeRoute($0)
+                )
+            }
+            + languages.map {
+                ModelCatalogFilterToken(
+                    id: .language($0),
+                    title: Self.languageName($0)
+                )
+            }
+            + compatibility.map {
+                ModelCatalogFilterToken(id: .compatibility($0), title: $0.title)
+            }
+            + states.map {
+                ModelCatalogFilterToken(id: .state($0), title: $0.title)
+            }
+            + evidence.map {
+                ModelCatalogFilterToken(id: .evidence($0), title: $0.title)
+            }
+    }
+
+    mutating func removeFilter(_ token: ModelCatalogFilterToken) {
+        switch token.id {
+        case let .artifactFormat(value):
+            artifactFormats.removeAll { $0 == value }
+        case let .numericFormat(value):
+            numericFormats.removeAll { $0 == value }
+        case let .runtime(value):
+            runtimes.removeAll { $0 == value }
+        case let .computeRoute(value):
+            computeRoutes.removeAll { $0 == value }
+        case let .language(value):
+            languages.removeAll { $0 == value }
+        case let .compatibility(value):
+            compatibility.removeAll { $0 == value }
+        case let .state(value):
+            states.removeAll { $0 == value }
+        case let .evidence(value):
+            evidence.removeAll { $0 == value }
+        }
+    }
+
+    mutating func clearSearch() {
+        searchText = ""
+    }
+
+    mutating func clearFilters() {
+        artifactFormats = []
+        numericFormats = []
+        runtimes = []
+        computeRoutes = []
+        languages = []
+        compatibility = []
+        states = []
+        evidence = []
+    }
+
+    mutating func resetDiscovery() {
+        scope = .all
+        searchText = ""
+        sort = .catalog
+        sortDirection = .descending
+        clearFilters()
+        dismissReveal()
+    }
+
+    mutating func reveal(artifactID: String) {
+        revealedArtifactID = artifactID
+    }
+
+    mutating func dismissReveal() {
+        revealedArtifactID = nil
+    }
+
+    func matches(
+        artifact: ModelCatalogExactArtifactPresentation,
+        checkpoint: ModelCatalogCheckpointPresentation,
+        family: ModelCatalogFamilyPresentation
+    ) -> Bool {
+        let row = artifact.row
+        guard matchesCommon(row),
+              artifactFormats.isEmpty
+                || artifactFormats.contains(artifact.metadata.artifactFormat),
+              numericFormats.isEmpty
+                || numericFormats.contains(artifact.metadata.numericFormat),
+              runtimes.isEmpty || runtimes.contains(artifact.metadata.runtime),
+              computeRoutes.isEmpty
+                || computeRoutes.contains(artifact.metadata.computeRoute),
+              matchesSearch(searchTerms(
+                artifact: artifact,
+                checkpoint: checkpoint,
+                family: family
+              ))
+        else {
+            return false
+        }
+        return true
+    }
+
+    func matchesStandalone(_ row: ModelCatalogRowPresentation) -> Bool {
+        matchesCommon(row)
+            && artifactFormats.isEmpty
+            && numericFormats.isEmpty
+            && computeRoutes.isEmpty
+            && (runtimes.isEmpty
+                || row.operationalModel.map { runtimes.contains($0.runtime.engine) } == true)
+            && matchesSearch([
+                row.id,
+                row.model.displayName,
+                row.model.description,
+                row.model.sourceName,
+                row.model.languageDescription,
+                row.model.engineName,
+                row.model.artifactName,
+            ])
+    }
+
+    func stableSort<T>(
+        _ values: [(offset: Int, element: T)],
+        value: (T) -> Int64?
+    ) -> [T] {
+        values.sorted { lhs, rhs in
+            let left = value(lhs.element)
+            let right = value(rhs.element)
+            switch (left, right) {
+            case (nil, nil):
+                return lhs.offset < rhs.offset
+            case (nil, _):
+                return false
+            case (_, nil):
+                return true
+            case let (left?, right?) where left != right:
+                return sortDirection == .ascending ? left < right : left > right
+            case (_?, _?):
+                return lhs.offset < rhs.offset
+            }
+        }.map(\.element)
+    }
+
+    private var normalizedSearchTokens: [String] {
+        Self.normalized(searchText)
+            .split(whereSeparator: \.isWhitespace)
+            .map(String.init)
+    }
+
+    private func matchesCommon(_ row: ModelCatalogRowPresentation) -> Bool {
+        (purpose == nil || row.model.purpose == purpose)
+            && (scope != .installed || row.isInstalled)
+            && matchesLanguages(row)
+            && matchesCompatibility(row.compatibility)
+            && matchesState(row)
+            && matchesEvidence(row.model)
+    }
+
+    private func matchesLanguages(_ row: ModelCatalogRowPresentation) -> Bool {
+        guard !languages.isEmpty else {
+            return true
+        }
+        guard let supported = row.operationalModel?.capabilities.languages else {
+            return false
+        }
+        return languages.contains { language in
+            supported.contains("*") || supported.contains {
+                $0.caseInsensitiveCompare(language) == .orderedSame
+            }
+        }
+    }
+
+    private func matchesCompatibility(
+        _ value: ModelCatalogCompatibility
+    ) -> Bool {
+        compatibility.isEmpty || compatibility.contains {
+            switch ($0, value) {
+            case (.compatible, .compatible),
+                 (.requiresUpdate, .requiresAppUpdate),
+                 (.requiresUpdate, .requiresMacOSUpdate),
+                 (.incompatible, .incompatible),
+                 (.indeterminate, .indeterminate):
+                true
+            default:
+                false
+            }
+        }
+    }
+
+    private func matchesState(_ row: ModelCatalogRowPresentation) -> Bool {
+        states.isEmpty || states.contains {
+            switch $0 {
+            case .notInstalled:
+                !row.isInstalled
+            case .installed:
+                row.isInstalled
+            case .ready:
+                row.stateTokens.contains(.ready)
+            case .active:
+                row.isActive
+            case .needsRepair:
+                row.stateTokens.contains(.needsRepair)
+            }
+        }
+    }
+
+    private func matchesEvidence(_ model: ProductionModelPresentation) -> Bool {
+        evidence.isEmpty || evidence.contains {
+            switch $0 {
+            case .quality:
+                model.qualityScore != nil
+            case .speed:
+                model.speedScore != nil
+            case .qualityAndSpeed:
+                model.qualityScore != nil && model.speedScore != nil
+            case .unrated:
+                model.qualityScore == nil && model.speedScore == nil
+            }
+        }
+    }
+
+    private func matchesSearch(_ values: [String]) -> Bool {
+        guard !normalizedSearchTokens.isEmpty else {
+            return true
+        }
+        let haystack = Self.normalized(values.joined(separator: " "))
+        return normalizedSearchTokens.allSatisfy(haystack.contains)
+    }
+
+    private func searchTerms(
+        artifact: ModelCatalogExactArtifactPresentation,
+        checkpoint: ModelCatalogCheckpointPresentation,
+        family: ModelCatalogFamilyPresentation
+    ) -> [String] {
+        let model = artifact.row.operationalModel
+        let languages = model?.capabilities.languages ?? []
+        return [
+            family.id,
+            family.metadata.presentation.displayName,
+            family.metadata.presentation.description,
+            family.metadata.presentation.provider.id,
+            family.metadata.presentation.provider.displayName,
+            checkpoint.id,
+            checkpoint.metadata.presentation.displayName,
+            checkpoint.metadata.presentation.description,
+            artifact.id,
+            artifact.metadata.presentation.displayName,
+            artifact.metadata.artifactFormat.rawValue,
+            ModelCatalogVariantTerminology.artifactFormat(
+                artifact.metadata.artifactFormat
+            ),
+            artifact.metadata.numericFormat.rawValue,
+            artifact.metadata.runtime.rawValue,
+            ModelCatalogVariantTerminology.runtime(artifact.metadata.runtime),
+            artifact.metadata.computeRoute.rawValue,
+            ModelCatalogVariantTerminology.computeRoute(
+                artifact.metadata.computeRoute
+            ),
+            artifact.row.model.displayName,
+            artifact.row.model.description,
+            model?.provenance.sourceName ?? "",
+            model?.provenance.originalModelName ?? "",
+        ] + languages + languages.map(Self.languageName)
+    }
+
+    private static func normalized(_ value: String) -> String {
+        value.folding(
+            options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+            locale: Locale(identifier: "en_US_POSIX")
+        )
+    }
+
+    static func languageName(_ code: String) -> String {
+        if code == "*" {
+            return "All Languages"
+        }
+        return Locale(identifier: "en_US").localizedString(
+            forLanguageCode: code
+        )?.capitalized ?? code.uppercased()
     }
 }
 
@@ -445,6 +947,7 @@ struct ModelCatalogRowPresentation: Equatable, Identifiable {
     let model: ProductionModelPresentation
     let operationalModel: ModelEntry?
     let installedRecord: InstalledModelRecord?
+    let onDiskBytes: Int64?
     let compatibility: ModelCatalogCompatibility
     let isInstalled: Bool
     let isActive: Bool
@@ -459,6 +962,22 @@ struct ModelCatalogRowPresentation: Equatable, Identifiable {
     var installState: DownloadState? {
         install?.state
     }
+}
+
+struct ModelCatalogFilterOptions: Equatable {
+    let artifactFormats: [ModelArtifactContainerFormat]
+    let numericFormats: [ModelNumericFormat]
+    let runtimes: [TranscriptionEngine]
+    let computeRoutes: [ModelComputeRoute]
+    let languages: [String]
+
+    static let empty = ModelCatalogFilterOptions(
+        artifactFormats: [],
+        numericFormats: [],
+        runtimes: [],
+        computeRoutes: [],
+        languages: []
+    )
 }
 
 struct ModelCatalogFamilyPresentation: Equatable, Identifiable {
@@ -488,6 +1007,16 @@ struct ModelCatalogExactArtifactPresentation: Equatable, Identifiable {
 
     var id: String {
         metadata.id
+    }
+}
+
+struct ModelCatalogPinnedRevealPresentation: Equatable {
+    let family: ModelCatalogFamilyPresentation
+    let checkpoint: ModelCatalogCheckpointPresentation
+    let artifact: ModelCatalogExactArtifactPresentation
+
+    var row: ModelCatalogRowPresentation {
+        artifact.row
     }
 }
 
@@ -666,6 +1195,8 @@ struct ModelCatalogInstallPresentation: Equatable {
 struct ModelCatalogExperience: Equatable {
     let rows: [ModelCatalogRowPresentation]
     let families: [ModelCatalogFamilyPresentation]
+    let filterOptions: ModelCatalogFilterOptions
+    let pinnedReveal: ModelCatalogPinnedRevealPresentation?
     private let inspectorFamilies: [ModelCatalogFamilyPresentation]
 
     init(
@@ -674,6 +1205,7 @@ struct ModelCatalogExperience: Equatable {
         activePreferences: ModelCatalogActivePreferences,
         transferState: DownloadState?,
         managedReadinessByModelID: [String: ModelCatalogManagedReadiness] = [:],
+        onDiskBytesByModelID: [String: Int64] = [:],
         query: ModelCatalogQuery = ModelCatalogQuery()
     ) {
         self.init(
@@ -683,6 +1215,7 @@ struct ModelCatalogExperience: Equatable {
             activePreferences: activePreferences,
             transferState: transferState,
             managedReadinessByModelID: managedReadinessByModelID,
+            onDiskBytesByModelID: onDiskBytesByModelID,
             query: query
         )
     }
@@ -694,6 +1227,7 @@ struct ModelCatalogExperience: Equatable {
         activePreferences: ModelCatalogActivePreferences,
         transferState: DownloadState?,
         managedReadinessByModelID: [String: ModelCatalogManagedReadiness] = [:],
+        onDiskBytesByModelID: [String: Int64] = [:],
         query: ModelCatalogQuery = ModelCatalogQuery()
     ) {
         let compatibilityByModelID = compatibilityResolver?
@@ -709,6 +1243,7 @@ struct ModelCatalogExperience: Equatable {
             activePreferences: activePreferences,
             transferState: transferState,
             managedReadinessByModelID: managedReadinessByModelID,
+            onDiskBytesByModelID: onDiskBytesByModelID,
             query: query
         )
     }
@@ -722,6 +1257,7 @@ struct ModelCatalogExperience: Equatable {
         activePreferences: ModelCatalogActivePreferences,
         transferState: DownloadState?,
         managedReadinessByModelID: [String: ModelCatalogManagedReadiness],
+        onDiskBytesByModelID: [String: Int64],
         query: ModelCatalogQuery
     ) {
         let signedArtifactsByID = presentationGraph?.artifacts.reduce(
@@ -753,15 +1289,7 @@ struct ModelCatalogExperience: Equatable {
             .filter { !trustedIDs.contains($0.id) }
             .map { ProductionModelPresentation(model: $0, isCurated: false) }
 
-        var orderedCatalog = trustedCatalog + localCatalog
-        for activeID in activePreferences.orderedModelIDs.reversed() {
-            guard let activeIndex = orderedCatalog.firstIndex(where: { $0.id == activeID }) else {
-                continue
-            }
-            let activeModel = orderedCatalog.remove(at: activeIndex)
-            orderedCatalog.insert(activeModel, at: 0)
-        }
-
+        let orderedCatalog = trustedCatalog + localCatalog
         let allRows = orderedCatalog.map { model in
             let installedModel = installedByID[model.id]
             let isInstalled = installedIDs.contains(model.id)
@@ -779,6 +1307,7 @@ struct ModelCatalogExperience: Equatable {
                 model: model,
                 operationalModel: trustedModelsByID[model.id] ?? installedModel,
                 installedRecord: installedRecordsByID[model.id],
+                onDiskBytes: isInstalled ? onDiskBytesByModelID[model.id] : nil,
                 compatibility: compatibilityByModelID[model.id] ?? .compatible,
                 isInstalled: isInstalled,
                 isActive: isActive,
@@ -798,22 +1327,7 @@ struct ModelCatalogExperience: Equatable {
                 )
             )
         }
-        let allRowsByID = allRows.reduce(into: [String: ModelCatalogRowPresentation]()) {
-            $0[$1.id] = $1
-        }
-        let derivedRows = query.apply(to: orderedCatalog).compactMap {
-            allRowsByID[$0.id]
-        }
-        rows = derivedRows
-        families = presentationGraph.map {
-            Self.makeFamilyPresentations(
-                graph: $0,
-                rows: derivedRows,
-                referenceRows: allRows,
-                checkpointResolutions: checkpointResolutions
-            )
-        } ?? []
-        inspectorFamilies = presentationGraph.map {
+        let allFamilies = presentationGraph.map {
             Self.makeFamilyPresentations(
                 graph: $0,
                 rows: allRows,
@@ -821,6 +1335,42 @@ struct ModelCatalogExperience: Equatable {
                 checkpointResolutions: checkpointResolutions
             )
         } ?? []
+        inspectorFamilies = allFamilies
+        filterOptions = Self.makeFilterOptions(
+            families: allFamilies,
+            rows: allRows,
+            purpose: query.purpose
+        )
+        pinnedReveal = Self.makePinnedReveal(
+            artifactID: query.revealedArtifactID,
+            families: allFamilies
+        )
+
+        if presentationGraph != nil {
+            let queriedFamilies = Self.queryFamilies(
+                allFamilies,
+                query: query
+            )
+            families = queriedFamilies
+            let representedIDs = Set(
+                allFamilies
+                    .flatMap(\.checkpoints)
+                    .flatMap(\.artifacts)
+                    .map(\.id)
+            )
+            let standaloneRows = Self.queryStandaloneRows(
+                allRows.filter { !representedIDs.contains($0.id) },
+                query: query
+            )
+            rows = queriedFamilies
+                .flatMap(\.checkpoints)
+                .flatMap(\.artifacts)
+                .map(\.row)
+                + standaloneRows
+        } else {
+            families = []
+            rows = Self.queryStandaloneRows(allRows, query: query)
+        }
     }
 
     func inspectorPresentation(
@@ -1054,18 +1604,188 @@ struct ModelCatalogExperience: Equatable {
         if languageCodes.count > 5 {
             return "\(languageCodes.count) languages"
         }
-        return languageCodes.map(languageName).joined(separator: ", ")
+        return languageCodes.map(ModelCatalogQuery.languageName).joined(separator: ", ")
     }
 
-    private static func languageName(_ code: String) -> String {
-        Locale(identifier: "en_US").localizedString(forLanguageCode: code)?
-            .capitalized
-            ?? code.uppercased()
+    private static func queryFamilies(
+        _ source: [ModelCatalogFamilyPresentation],
+        query: ModelCatalogQuery
+    ) -> [ModelCatalogFamilyPresentation] {
+        let filtered: [ModelCatalogFamilyPresentation] = source.compactMap { family in
+            guard query.purpose == nil || family.metadata.purpose == query.purpose else {
+                return nil
+            }
+            let checkpoints: [ModelCatalogCheckpointPresentation] = family.checkpoints
+                .compactMap { checkpoint in
+                let artifacts = checkpoint.artifacts.filter {
+                    query.matches(
+                        artifact: $0,
+                        checkpoint: checkpoint,
+                        family: family
+                    )
+                }
+                guard !artifacts.isEmpty else {
+                    return nil
+                }
+                return ModelCatalogCheckpointPresentation(
+                    metadata: checkpoint.metadata,
+                    artifacts: artifacts,
+                    referenceArtifact: checkpoint.referenceArtifact,
+                    defaultInstallArtifact: checkpoint.defaultInstallArtifact,
+                    resolution: checkpoint.resolution
+                )
+                }
+            guard !checkpoints.isEmpty else {
+                return nil
+            }
+            return ModelCatalogFamilyPresentation(
+                metadata: family.metadata,
+                checkpoints: sortCheckpoints(checkpoints, query: query)
+            )
+        }
+
+        guard query.sort != .catalog else {
+            return filtered
+        }
+        return query.stableSort(Array(filtered.enumerated())) { family in
+            family.checkpoints.first.flatMap {
+                checkpointSortValue($0, sort: query.sort)
+            }
+        }
     }
 
-    private static func orderedUnique(_ values: [String]) -> [String] {
-        var seen: Set<String> = []
-        return values.filter { seen.insert($0).inserted }
+    private static func sortCheckpoints(
+        _ checkpoints: [ModelCatalogCheckpointPresentation],
+        query: ModelCatalogQuery
+    ) -> [ModelCatalogCheckpointPresentation] {
+        guard query.sort != .catalog else {
+            return checkpoints
+        }
+        return query.stableSort(Array(checkpoints.enumerated())) {
+            checkpointSortValue($0, sort: query.sort)
+        }
+    }
+
+    private static func checkpointSortValue(
+        _ checkpoint: ModelCatalogCheckpointPresentation,
+        sort: ModelCatalogSort
+    ) -> Int64? {
+        switch sort {
+        case .catalog:
+            return nil
+        case .quality:
+            return checkpoint.referenceArtifact?.row.model.qualityScore.map(
+                Int64.init
+            )
+        case .speed:
+            return checkpoint.referenceArtifact?.row.model.speedScore.map(
+                Int64.init
+            )
+        case .downloadSize:
+            return checkpoint.referenceArtifact?.row.operationalModel?.sizeBytes
+        case .installedSize:
+            let installed = checkpoint.artifacts.filter(\.row.isInstalled)
+            guard !installed.isEmpty,
+                  installed.allSatisfy({ $0.row.onDiskBytes != nil })
+            else {
+                return nil
+            }
+            return installed.compactMap(\.row.onDiskBytes).reduce(0, +)
+        }
+    }
+
+    private static func queryStandaloneRows(
+        _ source: [ModelCatalogRowPresentation],
+        query: ModelCatalogQuery
+    ) -> [ModelCatalogRowPresentation] {
+        let filtered = source.enumerated().filter {
+            query.matchesStandalone($0.element)
+        }
+        switch query.sort {
+        case .catalog:
+            return filtered.map(\.element)
+        case .quality:
+            return query.stableSort(filtered) {
+                $0.model.qualityScore.map(Int64.init)
+            }
+        case .speed:
+            return query.stableSort(filtered) {
+                $0.model.speedScore.map(Int64.init)
+            }
+        case .downloadSize:
+            return query.stableSort(filtered) {
+                $0.operationalModel?.sizeBytes
+            }
+        case .installedSize:
+            return query.stableSort(filtered) {
+                $0.onDiskBytes
+            }
+        }
+    }
+
+    private static func makeFilterOptions(
+        families: [ModelCatalogFamilyPresentation],
+        rows: [ModelCatalogRowPresentation],
+        purpose: ModelPurpose?
+    ) -> ModelCatalogFilterOptions {
+        let artifacts = families
+            .filter { purpose == nil || $0.metadata.purpose == purpose }
+            .flatMap(\.checkpoints)
+            .flatMap(\.artifacts)
+        let scopedRows = rows.filter {
+            purpose == nil || $0.model.purpose == purpose
+        }
+        return ModelCatalogFilterOptions(
+            artifactFormats: orderedUnique(
+                artifacts.map(\.metadata.artifactFormat)
+            ),
+            numericFormats: orderedUnique(
+                artifacts.map(\.metadata.numericFormat)
+            ),
+            runtimes: orderedUnique(artifacts.map(\.metadata.runtime)),
+            computeRoutes: orderedUnique(
+                artifacts.map(\.metadata.computeRoute)
+            ),
+            languages: orderedUnique(
+                scopedRows
+                    .compactMap(\.operationalModel)
+                    .flatMap(\.capabilities.languages)
+            )
+        )
+    }
+
+    private static func orderedUnique<Value: Equatable>(
+        _ values: [Value]
+    ) -> [Value] {
+        values.reduce(into: []) { result, value in
+            if !result.contains(value) {
+                result.append(value)
+            }
+        }
+    }
+
+    private static func makePinnedReveal(
+        artifactID: String?,
+        families: [ModelCatalogFamilyPresentation]
+    ) -> ModelCatalogPinnedRevealPresentation? {
+        guard let artifactID else {
+            return nil
+        }
+        for family in families {
+            for checkpoint in family.checkpoints {
+                guard let artifact = checkpoint.artifacts.first(
+                    where: { $0.id == artifactID }
+                ) else {
+                    continue
+                }
+                return ModelCatalogPinnedRevealPresentation(
+                    family: family,
+                    checkpoint: checkpoint,
+                    artifact: artifact
+                )
+            }
+        }
+        return nil
     }
 
     private static func actions(
@@ -1172,6 +1892,10 @@ struct ModelCatalogExperience: Equatable {
                                 row: row
                             )
                         }
+                        .sorted {
+                            $0.metadata.presentation.curatedRank
+                                < $1.metadata.presentation.curatedRank
+                        }
                     guard !artifacts.isEmpty else {
                         return nil
                     }
@@ -1216,6 +1940,10 @@ struct ModelCatalogExperience: Equatable {
                         resolution: resolution
                     )
                 }
+                .sorted {
+                    $0.metadata.presentation.curatedRank
+                        < $1.metadata.presentation.curatedRank
+                }
             guard !checkpoints.isEmpty else {
                 return nil
             }
@@ -1223,6 +1951,10 @@ struct ModelCatalogExperience: Equatable {
                 metadata: family,
                 checkpoints: checkpoints
             )
+        }
+        .sorted {
+            $0.metadata.presentation.curatedRank
+                < $1.metadata.presentation.curatedRank
         }
     }
 }

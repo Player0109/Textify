@@ -948,3 +948,36 @@ Task 1 must merge before parallel Wave 1 work begins.
   43-model manifest, a native macOS grouped-variant visual smoke, clean
   Standards and Spec reviews, and the full 537-test suite (11 opt-in native
   smokes skipped, zero failures).
+
+## Model Catalog Discovery And Reveal Handoff - 2026-07-24
+
+- GitHub issue #11 owns the Task 11 catalog-query and Models-destination
+  presentation changes under `Sources/Textify/SettingsUI/`, focused semantic
+  coverage in `Tests/TextifyAppTests/`, and the minimum `SettingsRouter`
+  extension in `Sources/Textify/App/AppServices.swift` required to carry one
+  purpose-specific Exact Artifact reveal identity into the existing main
+  window.
+- All and Installed remain projections of the same trusted signed graph and
+  local-state overlay. Search and filters retain signed Family, Checkpoint,
+  Exact Artifact, provider, language, Artifact Format, Numeric Format, Runtime,
+  Compute Route, compatibility, state, and benchmark-evidence truth without
+  filename inference for v3 artifacts.
+- Catalog order follows signed `curatedRank` at the Family, Checkpoint, and
+  Exact Artifact levels. Quality, Speed, and Download Size use each
+  Checkpoint's signed recommended Exact Artifact as their reference, and metric
+  ties preserve that signed order.
+- Installed Size consumes On Disk bytes as the existing inspector measures
+  them, invalidates those measurements when the typed installed records change,
+  and keeps unknown measurements last in both directions. Persistent
+  background storage inventory remains owned by issue #15.
+- A reveal is a separate pinned Exact Artifact projection. It never mutates the
+  user's scope, search, filters, or sort, and dismissal restores the ordinary
+  query result.
+- Persistent queues, storage inventory collection, revocation, deletion
+  transactions, runtime switching, catalog staging, keyboard virtualization,
+  and large-catalog performance work remain owned by later tickets.
+- Final verification covers 546 tests with 11 opt-in native smokes skipped and
+  zero failures, the staged app's 43-model signed manifest, and a native macOS
+  smoke of All/Installed, search, filters, removable tokens, sorting, inspector
+  On Disk measurement, and Installed Size. Independent Standards and Spec
+  reviews report no remaining findings.

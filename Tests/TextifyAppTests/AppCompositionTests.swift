@@ -125,6 +125,44 @@ final class AppCompositionTests: XCTestCase {
     }
 
     @MainActor
+    func testCatalogExperienceUsesMeasuredOnDiskBytesWhenAvailable() async throws {
+        let manifestURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("models/manifest.json")
+        let manifest = try ModelManifest.decode(Data(contentsOf: manifestURL))
+        let smallerID = "qwen3-asr-0.6b-q8-0"
+        let largerID = "qwen3-asr-1.7b-q8-0"
+        let installed = try [smallerID, largerID].map { modelID in
+            try XCTUnwrap(manifest.models.first { $0.id == modelID })
+        }
+        let paths = try Self.makeTemporaryPaths()
+        try Self.writeInstalledStore(models: installed, to: paths)
+        let services = try Self.makeServices(paths: paths)
+        services.modelCatalogCoordinator = ModelCatalogCoordinator(
+            loadOperation: { manifest }
+        )
+        await services.modelCatalogCoordinator.refresh()
+
+        let experience = services.modelCatalogExperience(
+            for: .transcription,
+            onDiskBytesByModelID: [
+                smallerID: 300,
+                largerID: 100,
+            ],
+            query: ModelCatalogQuery(
+                scope: .installed,
+                sort: .installedSize,
+                sortDirection: .ascending
+            )
+        )
+
+        XCTAssertEqual(experience.rows.map(\.id), [largerID, smallerID])
+        XCTAssertEqual(experience.rows.map(\.onDiskBytes), [100, 300])
+    }
+
+    @MainActor
     func testPurposeCatalogKeepsInstalledModelsWhenTrustOrCompatibilityChanges() async throws {
         let paths = try Self.makeTemporaryPaths()
         let removedModel = try Self.catalogModel(id: "parakeet-rnnt-1.1b")

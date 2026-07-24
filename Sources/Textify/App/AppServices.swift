@@ -376,6 +376,7 @@ final class AppServices {
 
     func modelCatalogExperience(
         for purpose: ModelPurpose,
+        onDiskBytesByModelID: [String: Int64] = [:],
         query: ModelCatalogQuery = ModelCatalogQuery()
     ) -> ModelCatalogExperience {
         var scopedQuery = query
@@ -390,6 +391,7 @@ final class AppServices {
             ),
             transferState: modelInstallCoordinator.state,
             managedReadinessByModelID: managedReadinessByModelID,
+            onDiskBytesByModelID: onDiskBytesByModelID,
             query: scopedQuery
         )
     }
@@ -949,6 +951,26 @@ final class ModelCatalogCoordinator {
 @Observable
 final class SettingsRouter {
     var selectedPane: SettingsPane = .general
+    private(set) var modelReveal: ModelCatalogRevealRequest?
+
+    func revealModelArtifact(id: String, purpose: ModelPurpose) {
+        modelReveal = ModelCatalogRevealRequest(
+            artifactID: id,
+            purpose: purpose
+        )
+        selectedPane = purpose == .voiceCleaning
+            ? .voiceCleaning
+            : .transcriptionModels
+    }
+
+    func dismissModelReveal() {
+        modelReveal = nil
+    }
+}
+
+struct ModelCatalogRevealRequest: Equatable {
+    let artifactID: String
+    let purpose: ModelPurpose
 }
 
 enum SettingsPane: String, CaseIterable, Identifiable {

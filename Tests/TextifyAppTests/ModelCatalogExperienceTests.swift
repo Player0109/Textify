@@ -114,7 +114,10 @@ final class ModelCatalogExperienceTests: XCTestCase {
             transferState: transfer
         )
 
-        XCTAssertEqual(experience.rows.map(\.id), [active.id, downloadable.id, noLongerCurated.id])
+        XCTAssertEqual(
+            experience.rows.map(\.id),
+            [downloadable.id, active.id, noLongerCurated.id]
+        )
 
         let activeRow = try XCTUnwrap(experience.rows.first { $0.id == active.id })
         XCTAssertTrue(activeRow.isInstalled)
@@ -159,7 +162,7 @@ final class ModelCatalogExperienceTests: XCTestCase {
             transferState: nil
         )
 
-        XCTAssertEqual(experience.rows.map(\.id), [transcription.id, cleaner.id])
+        XCTAssertEqual(experience.rows.map(\.id), [cleaner.id, transcription.id])
 
         let transcriptionRow = try XCTUnwrap(experience.rows.first { $0.id == transcription.id })
         XCTAssertTrue(transcriptionRow.isActive)
@@ -204,6 +207,398 @@ final class ModelCatalogExperienceTests: XCTestCase {
         XCTAssertTrue(cleaning.families.allSatisfy { $0.metadata.purpose == .voiceCleaning })
     }
 
+    func testInstalledScopeKeepsOnlyInstalledArtifactsAndTheirParents() throws {
+        let manifest = try productionManifest()
+        let installedIDs = [
+            "parakeet-tdt-0.6b-v3-q5-k-m",
+            "qwen3-asr-0.6b-q8-0",
+        ]
+        let records = try installedIDs.map { modelID in
+            installed(try XCTUnwrap(manifest.models.first { $0.id == modelID }))
+        }
+
+        let all = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: records,
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            query: ModelCatalogQuery(
+                scope: .all,
+                purpose: .transcription
+            )
+        )
+        let installedOnly = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: records,
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            query: ModelCatalogQuery(
+                scope: .installed,
+                purpose: .transcription
+            )
+        )
+
+        XCTAssertGreaterThan(all.rows.count, installedOnly.rows.count)
+        XCTAssertEqual(Set(installedOnly.rows.map(\.id)), Set(installedIDs))
+        XCTAssertEqual(
+            Set(installedOnly.families.map(\.id)),
+            ["family.nvidia.parakeet", "family.qwen.qwen3-asr"]
+        )
+        XCTAssertEqual(
+            installedOnly.families
+                .flatMap(\.checkpoints)
+                .flatMap(\.artifacts)
+                .map(\.id),
+            installedIDs
+        )
+    }
+
+    func testSearchMatchesSignedHierarchyProviderLanguageFormatNumericFormatAndRuntime() throws {
+        let manifest = try productionManifest()
+
+        func resultIDs(searchText: String) -> Set<String> {
+            Set(ModelCatalogExperience(
+                trustedManifest: manifest,
+                installedRecords: [],
+                activePreferences: ModelCatalogActivePreferences(),
+                transferState: nil,
+                query: ModelCatalogQuery(
+                    searchText: searchText,
+                    purpose: .transcription
+                )
+            ).rows.map(\.id))
+        }
+
+        XCTAssertTrue(resultIDs(searchText: "NVIDIA").contains("parakeet-tdt-0.6b-v3"))
+        XCTAssertEqual(
+            resultIDs(searchText: "Whisper small.en"),
+            ["ggml-small.en-q5_1"]
+        )
+        XCTAssertTrue(resultIDs(searchText: "Japanese").contains("parakeet-ja"))
+        XCTAssertTrue(resultIDs(searchText: "GGUF").contains("qwen3-asr-0.6b-q8-0"))
+        XCTAssertTrue(resultIDs(searchText: "Q5_K_M").contains("qwen3-asr-1.7b-q5-k-m"))
+        XCTAssertTrue(resultIDs(searchText: "transcribe.cpp").contains("parakeet-tdt-0.6b-v3-f16"))
+    }
+
+    func testStructuredFiltersUseSignedExactArtifactAndLocalStateTruth() throws {
+        let manifest = try productionManifest()
+        let installedID = "qwen3-asr-0.6b-q8-0"
+        let activeID = "qwen3-asr-1.7b-q5-k-m"
+        let installedModels = try [installedID, activeID].map { modelID in
+            installed(try XCTUnwrap(manifest.models.first { $0.id == modelID }))
+        }
+        let resolver = ModelCatalogCompatibilityResolver(
+            context: ModelCatalogCompatibilityContext(
+                appVersion: "1.1.0",
+                macOSVersion: "14.0.0",
+                architecture: .arm64,
+                physicalMemoryBytes: 8_000_000_000,
+                supportedRuntimes: [.whisperCpp]
+            )
+        )
+
+        func experience(
+            _ configure: (inout ModelCatalogQuery) -> Void
+        ) -> ModelCatalogExperience {
+            var query = ModelCatalogQuery(purpose: .transcription)
+            configure(&query)
+            return ModelCatalogExperience(
+                trustedManifest: manifest,
+                compatibilityResolver: resolver,
+                installedRecords: installedModels,
+                activePreferences: ModelCatalogActivePreferences(
+                    transcriptionModelID: activeID
+                ),
+                transferState: nil,
+                managedReadinessByModelID: [
+                    installedID: .needsRepair,
+                    activeID: .ready,
+                ],
+                query: query
+            )
+        }
+
+        XCTAssertTrue(experience {
+            $0.artifactFormats = [.gguf]
+        }.families.flatMap(\.checkpoints).flatMap(\.artifacts).allSatisfy {
+            $0.metadata.artifactFormat == .gguf
+        })
+        XCTAssertTrue(experience {
+            $0.numericFormats = [.q5_k_m]
+        }.families.flatMap(\.checkpoints).flatMap(\.artifacts).allSatisfy {
+            $0.metadata.numericFormat == .q5_k_m
+        })
+        XCTAssertTrue(experience {
+            $0.runtimes = [.mlxAudio]
+        }.families.flatMap(\.checkpoints).flatMap(\.artifacts).allSatisfy {
+            $0.metadata.runtime == .mlxAudio
+        })
+        XCTAssertTrue(experience {
+            $0.computeRoutes = [.cpuOnly]
+        }.families.flatMap(\.checkpoints).flatMap(\.artifacts).allSatisfy {
+            $0.metadata.computeRoute == .cpuOnly
+        })
+        XCTAssertTrue(experience {
+            $0.languages = ["ja"]
+        }.rows.allSatisfy {
+            $0.operationalModel?.capabilities.languages.contains("ja") == true
+                || $0.operationalModel?.capabilities.languages.contains("*") == true
+        })
+        XCTAssertTrue(experience {
+            $0.evidence = [.qualityAndSpeed]
+        }.rows.allSatisfy {
+            $0.model.qualityScore != nil && $0.model.speedScore != nil
+        })
+        XCTAssertEqual(
+            experience { $0.states = [.needsRepair] }.rows.map(\.id),
+            [installedID]
+        )
+        XCTAssertEqual(
+            experience { $0.states = [.active] }.rows.map(\.id),
+            [activeID]
+        )
+        XCTAssertTrue(experience {
+            $0.compatibility = [.incompatible]
+        }.rows.allSatisfy {
+            if case .incompatible = $0.compatibility {
+                return true
+            }
+            return false
+        })
+    }
+
+    func testAppliedFilterTokensAreIndividuallyRemovable() throws {
+        var query = ModelCatalogQuery(
+            searchText: "parakeet",
+            artifactFormats: [.gguf],
+            numericFormats: [.q5_k_m],
+            runtimes: [.transcribeCpp],
+            computeRoutes: [.cpuOnly],
+            languages: ["en"],
+            compatibility: [.compatible],
+            states: [.installed],
+            evidence: [.qualityAndSpeed]
+        )
+
+        let originalTokens = query.appliedFilterTokens
+        XCTAssertEqual(originalTokens.count, 8)
+        let formatToken = originalTokens.first {
+            $0.id == .artifactFormat(.gguf)
+        }
+        XCTAssertNotNil(formatToken)
+
+        query.removeFilter(try XCTUnwrap(formatToken))
+
+        XCTAssertTrue(query.artifactFormats.isEmpty)
+        XCTAssertEqual(query.searchText, "parakeet")
+        XCTAssertEqual(query.appliedFilterTokens.count, 7)
+    }
+
+    func testCatalogSortUsesSignedCuratedRankAtEveryHierarchyLevel() throws {
+        let experience = ModelCatalogExperience(
+            trustedManifest: try reversedCatalogArraysManifest(),
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            query: ModelCatalogQuery(
+                sort: .catalog,
+                purpose: .transcription
+            )
+        )
+
+        XCTAssertEqual(
+            experience.families.map(\.metadata.presentation.curatedRank),
+            experience.families
+                .map(\.metadata.presentation.curatedRank)
+                .sorted()
+        )
+        for family in experience.families {
+            XCTAssertEqual(
+                family.checkpoints.map(\.metadata.presentation.curatedRank),
+                family.checkpoints
+                    .map(\.metadata.presentation.curatedRank)
+                    .sorted()
+            )
+            for checkpoint in family.checkpoints {
+                XCTAssertEqual(
+                    checkpoint.artifacts.map(\.metadata.presentation.curatedRank),
+                    checkpoint.artifacts
+                        .map(\.metadata.presentation.curatedRank)
+                        .sorted()
+                )
+            }
+        }
+    }
+
+    func testCheckpointSortingUsesSignedReferenceAndKeepsUnknownLastBothDirections() throws {
+        let manifest = try productionManifest()
+
+        func parakeetCheckpointIDs(
+            sort: ModelCatalogSort,
+            direction: ModelCatalogSortDirection
+        ) throws -> [String] {
+            let experience = ModelCatalogExperience(
+                trustedManifest: manifest,
+                installedRecords: [],
+                activePreferences: ModelCatalogActivePreferences(),
+                transferState: nil,
+                query: ModelCatalogQuery(
+                    scope: .all,
+                    sort: sort,
+                    sortDirection: direction,
+                    purpose: .transcription
+                )
+            )
+            return try XCTUnwrap(
+                experience.families.first {
+                    $0.id == "family.nvidia.parakeet"
+                }
+            ).checkpoints.map(\.id)
+        }
+
+        let descending = try parakeetCheckpointIDs(
+            sort: .quality,
+            direction: .descending
+        )
+        XCTAssertEqual(
+            Array(descending.prefix(2)),
+            [
+                "checkpoint.nvidia.parakeet-tdt-0.6b-v3",
+                "checkpoint.nvidia.parakeet-tdt-0.6b-v2",
+            ],
+            "Equal signed reference scores keep signed catalog order."
+        )
+        XCTAssertEqual(
+            descending.last,
+            "checkpoint.nvidia.parakeet-tdt-ctc-0.6b-ja"
+        )
+        XCTAssertEqual(
+            try parakeetCheckpointIDs(sort: .quality, direction: .ascending).last,
+            "checkpoint.nvidia.parakeet-tdt-ctc-0.6b-ja"
+        )
+    }
+
+    func testInstalledSizeSortUsesLocalBytesAndKeepsUnknownLast() throws {
+        let manifest = try productionManifest()
+        let smallID = "qwen3-asr-0.6b-q8-0"
+        let largeID = "qwen3-asr-1.7b-q8-0"
+        let unknownID = "ggml-small.en-q5_1"
+        let records = try [smallID, largeID, unknownID].map { modelID in
+            installed(try XCTUnwrap(manifest.models.first { $0.id == modelID }))
+        }
+
+        func rowIDs(_ direction: ModelCatalogSortDirection) -> [String] {
+            ModelCatalogExperience(
+                trustedManifest: manifest,
+                installedRecords: records,
+                activePreferences: ModelCatalogActivePreferences(),
+                transferState: nil,
+                onDiskBytesByModelID: [
+                    smallID: 100,
+                    largeID: 300,
+                ],
+                query: ModelCatalogQuery(
+                    scope: .installed,
+                    sort: .installedSize,
+                    sortDirection: direction,
+                    purpose: .transcription
+                )
+            ).rows.map(\.id)
+        }
+
+        XCTAssertEqual(rowIDs(.ascending), [smallID, largeID, unknownID])
+        XCTAssertEqual(rowIDs(.descending), [largeID, smallID, unknownID])
+    }
+
+    func testPinnedRevealDoesNotMutateOrdinaryQueryAndCanBeDismissed() throws {
+        let manifest = try productionManifest()
+        let installedModel = try XCTUnwrap(
+            manifest.models.first { $0.id == "ggml-small.en-q5_1" }
+        )
+        var query = ModelCatalogQuery(
+            scope: .installed,
+            searchText: "no ordinary result",
+            artifactFormats: [.gguf],
+            purpose: .transcription
+        )
+        let queryBeforeReveal = query
+        query.reveal(artifactID: "qwen3-asr-0.6b-q8-0")
+
+        let revealed = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [installed(installedModel)],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            query: query
+        )
+
+        XCTAssertTrue(revealed.rows.isEmpty)
+        XCTAssertEqual(revealed.pinnedReveal?.row.id, "qwen3-asr-0.6b-q8-0")
+        XCTAssertEqual(query.ordinaryQuery, queryBeforeReveal)
+
+        query.dismissReveal()
+
+        XCTAssertNil(query.revealedArtifactID)
+        XCTAssertEqual(query, queryBeforeReveal)
+    }
+
+    @MainActor
+    func testModelDeepLinkRoutesToPurposeAndRetainsExactRevealIdentity() {
+        let router = SettingsRouter()
+
+        router.revealModelArtifact(
+            id: "mossformer2-se-fp16",
+            purpose: .voiceCleaning
+        )
+
+        XCTAssertEqual(router.selectedPane, .voiceCleaning)
+        XCTAssertEqual(
+            router.modelReveal,
+            ModelCatalogRevealRequest(
+                artifactID: "mossformer2-se-fp16",
+                purpose: .voiceCleaning
+            )
+        )
+
+        router.dismissModelReveal()
+
+        XCTAssertNil(router.modelReveal)
+        XCTAssertEqual(router.selectedPane, .voiceCleaning)
+    }
+
+    func testQueryEmptyStatesHaveDistinctRecoverySemantics() {
+        XCTAssertEqual(
+            ModelCatalogQuery(scope: .installed).emptyState,
+            .installed
+        )
+        XCTAssertEqual(
+            ModelCatalogQuery(searchText: "qwen").emptyState,
+            .search
+        )
+        XCTAssertEqual(
+            ModelCatalogQuery(artifactFormats: [.gguf]).emptyState,
+            .filters
+        )
+        XCTAssertEqual(
+            ModelCatalogQuery(
+                searchText: "qwen",
+                artifactFormats: [.gguf]
+            ).emptyState,
+            .combined
+        )
+        XCTAssertEqual(ModelCatalogQuery().emptyState, .validCatalog)
+        XCTAssertEqual(
+            Set([
+                ModelCatalogQueryEmptyState.installed.actionTitle,
+                ModelCatalogQueryEmptyState.search.actionTitle,
+                ModelCatalogQueryEmptyState.filters.actionTitle,
+                ModelCatalogQueryEmptyState.combined.actionTitle,
+                ModelCatalogQueryEmptyState.validCatalog.actionTitle,
+            ]).count,
+            5
+        )
+    }
+
     func testCompatibilityResolverUsesSignedRequirementsForSettingsAndOnboarding() throws {
         let manifest = try productionManifest()
         let resolver = ModelCatalogCompatibilityResolver(
@@ -222,12 +617,13 @@ final class ModelCatalogExperienceTests: XCTestCase {
 
         let experience = ModelCatalogExperience(
             trustedManifest: manifest,
+            compatibilityResolver: resolver,
             installedRecords: [],
             activePreferences: ModelCatalogActivePreferences(),
             transferState: nil,
             query: ModelCatalogQuery(
-                purpose: .transcription,
-                compatibleModelIDs: compatibleIDs
+                compatibility: [.compatible],
+                purpose: .transcription
             )
         )
         let onboarding = OnboardingModelCatalog(experience: experience)
@@ -437,7 +833,7 @@ final class ModelCatalogExperienceTests: XCTestCase {
             installedRecords: [],
             activePreferences: ModelCatalogActivePreferences(),
             transferState: nil,
-            query: ModelCatalogQuery(format: .gguf, precision: .fiveBit)
+            query: ModelCatalogQuery(runtimes: [.transcribeCpp])
         )
 
         XCTAssertEqual(experience.rows.map(\.id), [gguf.id])
@@ -607,7 +1003,7 @@ final class ModelCatalogExperienceTests: XCTestCase {
             installedRecords: [],
             activePreferences: ModelCatalogActivePreferences(),
             transferState: nil,
-            query: ModelCatalogQuery(precision: .fiveBit)
+            query: ModelCatalogQuery(numericFormats: [.q5_1])
         )
         let checkpoint = try XCTUnwrap(experience.families.first?.checkpoints.first)
         var state = ModelCatalogHierarchyState()
@@ -992,7 +1388,7 @@ final class ModelCatalogExperienceTests: XCTestCase {
             installedRecords: [],
             activePreferences: ModelCatalogActivePreferences(),
             transferState: nil,
-            query: ModelCatalogQuery(precision: .sixteenBit)
+            query: ModelCatalogQuery(numericFormats: [.bf16])
         )
         let checkpoint = try XCTUnwrap(
             experience.families
@@ -1370,6 +1766,35 @@ final class ModelCatalogExperienceTests: XCTestCase {
         artifact["presentation"] = presentation
         artifacts[index] = artifact
         graph["artifacts"] = artifacts
+        root["presentationGraph"] = graph
+        return try ModelManifest.decode(
+            JSONSerialization.data(withJSONObject: root)
+        )
+    }
+
+    private func reversedCatalogArraysManifest() throws -> ModelManifest {
+        let manifestURL = repositoryRoot.appendingPathComponent("models/manifest.json")
+        var root = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL))
+                as? [String: Any]
+        )
+        var graph = try XCTUnwrap(root["presentationGraph"] as? [String: Any])
+        var families = try XCTUnwrap(graph["families"] as? [[String: Any]])
+        for index in families.indices {
+            let checkpointIDs = try XCTUnwrap(
+                families[index]["checkpointIDs"] as? [String]
+            )
+            families[index]["checkpointIDs"] = Array(checkpointIDs.reversed())
+        }
+        var checkpoints = try XCTUnwrap(graph["checkpoints"] as? [[String: Any]])
+        for index in checkpoints.indices {
+            let artifactIDs = try XCTUnwrap(
+                checkpoints[index]["artifactIDs"] as? [String]
+            )
+            checkpoints[index]["artifactIDs"] = Array(artifactIDs.reversed())
+        }
+        graph["families"] = Array(families.reversed())
+        graph["checkpoints"] = checkpoints
         root["presentationGraph"] = graph
         return try ModelManifest.decode(
             JSONSerialization.data(withJSONObject: root)
