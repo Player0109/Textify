@@ -1,36 +1,94 @@
 import CryptoKit
 import Foundation
 
+public enum ModelManifestDecodingError: Error, Equatable {
+    case unsupportedManifestVersion(Int)
+}
+
+enum ModelManifestSchemaVersion: Int, CaseIterable {
+    case v1 = 1
+    case v2 = 2
+    case v3 = 3
+
+    var contentType: String {
+        "application/vnd.textify.model-manifest+json;version=\(rawValue)"
+    }
+
+    var requiresPresentationGraph: Bool {
+        self == .v3
+    }
+
+    init?(contentType: String) {
+        guard let version = Self.allCases.first(where: { $0.contentType == contentType }) else {
+            return nil
+        }
+        self = version
+    }
+}
+
 public struct ModelManifest: Codable, Equatable, Sendable {
     public let manifestVersion: Int
     public let generatedAt: String
     public let models: [ModelEntry]
+    public let presentationGraph: ModelCatalogPresentationGraph?
 
     public static func decode(_ data: Data) throws -> ModelManifest {
         try JSONDecoder().decode(ModelManifest.self, from: data)
     }
 
-    public init(manifestVersion: Int, generatedAt: String, models: [ModelEntry]) {
+    public init(
+        manifestVersion: Int,
+        generatedAt: String,
+        models: [ModelEntry],
+        presentationGraph: ModelCatalogPresentationGraph? = nil
+    ) {
         self.manifestVersion = manifestVersion
         self.generatedAt = generatedAt
         self.models = models
+        self.presentationGraph = presentationGraph
     }
 
     public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let decodedVersion = try container.decode(Int.self, forKey: .manifestVersion)
+        guard let schemaVersion = ModelManifestSchemaVersion(rawValue: decodedVersion) else {
+            throw ModelManifestDecodingError.unsupportedManifestVersion(decodedVersion)
+        }
+        let requiredKeys: [CodingKeys] = schemaVersion.requiresPresentationGraph
+            ? CodingKeys.allCases
+            : [.manifestVersion, .generatedAt, .models]
         try StrictJSONKeys.validate(
             decoder: decoder,
-            allowedKeys: CodingKeys.allCases.map(\.stringValue)
+            allowedKeys: requiredKeys.map(\.stringValue)
         )
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        manifestVersion = try container.decode(Int.self, forKey: .manifestVersion)
+        manifestVersion = decodedVersion
         generatedAt = try container.decode(String.self, forKey: .generatedAt)
         models = try container.decode([ModelEntry].self, forKey: .models)
+        if schemaVersion.requiresPresentationGraph {
+            presentationGraph = try container.decode(
+                ModelCatalogPresentationGraph.self,
+                forKey: .presentationGraph
+            )
+        } else {
+            presentationGraph = nil
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(manifestVersion, forKey: .manifestVersion)
+        try container.encode(generatedAt, forKey: .generatedAt)
+        try container.encode(models, forKey: .models)
+        if ModelManifestSchemaVersion(rawValue: manifestVersion)?.requiresPresentationGraph == true {
+            try container.encode(presentationGraph, forKey: .presentationGraph)
+        }
     }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
         case manifestVersion
         case generatedAt
         case models
+        case presentationGraph
     }
 }
 

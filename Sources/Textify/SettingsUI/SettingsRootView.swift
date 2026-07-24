@@ -541,7 +541,7 @@ private struct ModelsSettingsPane: View {
 
     var body: some View {
         let catalogExperience = ModelCatalogExperience(
-            trustedModels: services.modelCatalogCoordinator.models,
+            trustedManifest: services.modelCatalogCoordinator.manifest,
             installedRecords: services.installedModelRecords,
             activePreferences: ModelCatalogActivePreferences(
                 transcriptionModelID: services.preferences.activeModelID,

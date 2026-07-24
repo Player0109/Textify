@@ -785,3 +785,19 @@ Task 1 must merge before parallel Wave 1 work begins.
   active state, install progress, and user-facing actions.
 - Manifest v3, hierarchical rows, revised action semantics, persistent queues,
   storage inventory, and runtime behavior remain owned by later tickets.
+
+## Signed Manifest V3 Presentation Graph Handoff - 2026-07-24
+
+- GitHub issue #3 owns the additive manifest work under
+  `Sources/TextifyModels/Manifest/`, its focused model fixtures/tests, and the
+  minimum `AppServices`/settings composition and catalog-experience seam
+  extension needed to carry verified Family, Checkpoint, and Exact Artifact
+  presentation data end to end.
+- `ModelEntry` remains the exact operational installation/runtime record.
+  Manifest v3 adds a separate normalized signed presentation graph with strict
+  typed metadata and production-policy validation; signed v1/v2 decoding,
+  installation identities, receipts, and active preferences must remain
+  behaviorally unchanged.
+- This slice does not publish or rewrite `models/manifest.json`, render native
+  hierarchy rows, change user-facing actions, resolve compatibility fallbacks,
+  or implement later queue, storage, migration, revocation, and release work.

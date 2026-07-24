@@ -1,0 +1,280 @@
+{
+  "manifestVersion": 3,
+  "generatedAt": "2026-07-24T00:00:00Z",
+  "models": [
+    {
+      "id": "whisper-small-q5_1",
+      "displayName": "Whisper Small Q5_1",
+      "tier": "recommended",
+      "description": "A compact Whisper Small exact artifact.",
+      "sizeBytes": 33,
+      "files": [
+        {
+          "filename": "model.bin",
+          "url": "https://github.com/Player0109/Textify/releases/download/models-v1/model.bin",
+          "sha256": "66bd26882020db56790522008135dfc28268bac4ed7ebce49086c7179bd2f868",
+          "sizeBytes": 33
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "model",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://example.com/licenses/whisper-small-q5_1.txt"
+        }
+      ],
+      "provenance": {
+        "sourceName": "Fixture",
+        "sourceUrl": "https://huggingface.co/openai/whisper-small",
+        "sourceRevision": "1234567890abcdef1234567890abcdef12345678",
+        "sourceFile": "model.bin",
+        "originalModelName": "Whisper Small",
+        "originalModelUrl": "https://huggingface.co/openai/whisper-small",
+        "mirroredBy": "Textify",
+        "mirroredAt": "2026-07-24T00:00:00Z"
+      },
+      "runtimeParameters": {
+        "language": "en",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0.0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1.0,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0"
+    },
+    {
+      "id": "whisper-small-q8_0",
+      "displayName": "Whisper Small Q8_0",
+      "tier": "accurate",
+      "description": "A higher precision Whisper Small exact artifact.",
+      "sizeBytes": 33,
+      "files": [
+        {
+          "filename": "model.bin",
+          "url": "https://github.com/Player0109/Textify/releases/download/models-v1/model.bin",
+          "sha256": "66bd26882020db56790522008135dfc28268bac4ed7ebce49086c7179bd2f868",
+          "sizeBytes": 33
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "model",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://example.com/licenses/whisper-small-q8_0.txt"
+        }
+      ],
+      "provenance": {
+        "sourceName": "Fixture",
+        "sourceUrl": "https://huggingface.co/openai/whisper-small",
+        "sourceRevision": "1234567890abcdef1234567890abcdef12345678",
+        "sourceFile": "model.bin",
+        "originalModelName": "Whisper Small",
+        "originalModelUrl": "https://huggingface.co/openai/whisper-small",
+        "mirroredBy": "Textify",
+        "mirroredAt": "2026-07-24T00:00:00Z"
+      },
+      "runtimeParameters": {
+        "language": "en",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0.0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1.0,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0"
+    },
+    {
+      "id": "whisper-tiny-f16",
+      "displayName": "Whisper Tiny F16",
+      "tier": "fast",
+      "description": "The sole exact artifact for Whisper Tiny.",
+      "sizeBytes": 33,
+      "files": [
+        {
+          "filename": "model.bin",
+          "url": "https://github.com/Player0109/Textify/releases/download/models-v1/model.bin",
+          "sha256": "66bd26882020db56790522008135dfc28268bac4ed7ebce49086c7179bd2f868",
+          "sizeBytes": 33
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "model",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://example.com/licenses/whisper-tiny-f16.txt"
+        }
+      ],
+      "provenance": {
+        "sourceName": "Fixture",
+        "sourceUrl": "https://huggingface.co/openai/whisper-tiny",
+        "sourceRevision": "1234567890abcdef1234567890abcdef12345678",
+        "sourceFile": "model.bin",
+        "originalModelName": "Whisper Tiny",
+        "originalModelUrl": "https://huggingface.co/openai/whisper-tiny",
+        "mirroredBy": "Textify",
+        "mirroredAt": "2026-07-24T00:00:00Z"
+      },
+      "runtimeParameters": {
+        "language": "en",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0.0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 60
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1.0,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0"
+    }
+  ],
+  "presentationGraph": {
+    "families": [
+      {
+        "id": "family.whisper",
+        "purpose": "transcription",
+        "checkpointIDs": [
+          "checkpoint.whisper.small",
+          "checkpoint.whisper.tiny"
+        ],
+        "presentation": {
+          "displayName": "Whisper",
+          "description": "General-purpose local speech recognition checkpoints.",
+          "provider": {
+            "id": "openai",
+            "displayName": "OpenAI"
+          },
+          "curatedRank": 10
+        }
+      }
+    ],
+    "checkpoints": [
+      {
+        "id": "checkpoint.whisper.small",
+        "purpose": "transcription",
+        "artifactIDs": [
+          "whisper-small-q5_1",
+          "whisper-small-q8_0"
+        ],
+        "recommendedArtifactID": "whisper-small-q5_1",
+        "fallbackArtifactIDs": [
+          "whisper-small-q8_0"
+        ],
+        "presentation": {
+          "displayName": "Whisper Small",
+          "description": "Balanced English speech recognition.",
+          "curatedRank": 10
+        }
+      },
+      {
+        "id": "checkpoint.whisper.tiny",
+        "purpose": "transcription",
+        "artifactIDs": [
+          "whisper-tiny-f16"
+        ],
+        "recommendedArtifactID": "whisper-tiny-f16",
+        "fallbackArtifactIDs": [],
+        "presentation": {
+          "displayName": "Whisper Tiny",
+          "description": "A small fast English checkpoint.",
+          "curatedRank": 20
+        }
+      }
+    ],
+    "artifacts": [
+      {
+        "id": "whisper-small-q5_1",
+        "purpose": "transcription",
+        "artifactFormat": "ggml",
+        "numericFormat": "Q5_1",
+        "runtime": "whisper_cpp",
+        "computeRoute": "gpu_via_metal",
+        "compatibility": {
+          "minimumAppVersion": "1.1.0",
+          "minimumMacOSVersion": "14.0.0",
+          "supportedArchitectures": [
+            "arm64"
+          ],
+          "minimumMemoryBytes": 1073741824
+        },
+        "presentation": {
+          "displayName": "Q5_1",
+          "curatedRank": 10,
+          "comparisonGroupID": "whisper-small-en-v1"
+        }
+      },
+      {
+        "id": "whisper-small-q8_0",
+        "purpose": "transcription",
+        "artifactFormat": "ggml",
+        "numericFormat": "Q8_0",
+        "runtime": "whisper_cpp",
+        "computeRoute": "gpu_via_metal",
+        "compatibility": {
+          "minimumAppVersion": "1.1.0",
+          "minimumMacOSVersion": "14.0.0",
+          "supportedArchitectures": [
+            "arm64"
+          ],
+          "minimumMemoryBytes": 1073741824
+        },
+        "presentation": {
+          "displayName": "Q8_0",
+          "curatedRank": 20,
+          "comparisonGroupID": "whisper-small-en-v1"
+        }
+      },
+      {
+        "id": "whisper-tiny-f16",
+        "purpose": "transcription",
+        "artifactFormat": "ggml",
+        "numericFormat": "F16",
+        "runtime": "whisper_cpp",
+        "computeRoute": "gpu_via_metal",
+        "compatibility": {
+          "minimumAppVersion": "1.1.0",
+          "minimumMacOSVersion": "14.0.0",
+          "supportedArchitectures": [
+            "arm64"
+          ]
+        },
+        "presentation": {
+          "displayName": "F16",
+          "curatedRank": 10,
+          "comparisonGroupID": "whisper-tiny-en-v1"
+        }
+      }
+    ]
+  }
+}

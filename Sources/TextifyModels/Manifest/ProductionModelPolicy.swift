@@ -28,13 +28,14 @@ public enum ProductionModelPolicyError: Error, Equatable {
     case benchmarkNotAllowedInV1(modelID: String)
     case invalidBenchmark(modelID: String)
     case benchmarkArtifactMismatch(modelID: String)
+    case invalidPresentationGraph(ModelCatalogGraphValidationError)
 }
 
 public enum ProductionModelPolicy {
     public static let requiredModelID = "ggml-small.en-q5_1"
 
     public static func validateV1_1ProductionManifest(_ manifest: ModelManifest) throws {
-        guard manifest.manifestVersion == 1 else {
+        guard ModelManifestSchemaVersion(rawValue: manifest.manifestVersion) == .v1 else {
             throw ProductionModelPolicyError.unsupportedManifestVersion(manifest.manifestVersion)
         }
         guard manifest.models.count == 1 else {
@@ -60,7 +61,9 @@ public enum ProductionModelPolicy {
     }
 
     public static func validateProductionManifest(_ manifest: ModelManifest) throws {
-        guard manifest.manifestVersion == 1 || manifest.manifestVersion == 2 else {
+        guard let schemaVersion = ModelManifestSchemaVersion(
+            rawValue: manifest.manifestVersion
+        ) else {
             throw ProductionModelPolicyError.unsupportedManifestVersion(manifest.manifestVersion)
         }
         guard ISO8601DateFormatter().date(from: manifest.generatedAt) != nil else {
@@ -72,7 +75,7 @@ public enum ProductionModelPolicy {
 
         var modelIDs = Set<String>()
         for model in manifest.models {
-            if manifest.manifestVersion == 1, model.benchmark != nil {
+            if schemaVersion == .v1, model.benchmark != nil {
                 throw ProductionModelPolicyError.benchmarkNotAllowedInV1(modelID: model.id)
             }
             guard modelIDs.insert(model.id).inserted else {
@@ -228,6 +231,19 @@ public enum ProductionModelPolicy {
 
             if let benchmark = model.benchmark {
                 try validateBenchmark(benchmark, for: model)
+            }
+        }
+
+        if schemaVersion.requiresPresentationGraph {
+            guard let presentationGraph = manifest.presentationGraph else {
+                throw ProductionModelPolicyError.invalidPresentationGraph(
+                    .missingPresentationGraph
+                )
+            }
+            do {
+                try presentationGraph.validate(operationalModels: manifest.models)
+            } catch let error as ModelCatalogGraphValidationError {
+                throw ProductionModelPolicyError.invalidPresentationGraph(error)
             }
         }
     }

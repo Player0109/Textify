@@ -46,8 +46,9 @@ public struct ManifestVerifier {
     public static let algorithm = "Ed25519"
     public static let signatureType = "io.github.Player0109.Textify.model-manifest"
     public static let manifestFile = "manifest.json"
-    public static let contentTypeV1 = "application/vnd.textify.model-manifest+json;version=1"
-    public static let contentTypeV2 = "application/vnd.textify.model-manifest+json;version=2"
+    public static let contentTypeV1 = ModelManifestSchemaVersion.v1.contentType
+    public static let contentTypeV2 = ModelManifestSchemaVersion.v2.contentType
+    public static let contentTypeV3 = ModelManifestSchemaVersion.v3.contentType
     public static let contentType = contentTypeV1
 
     private let trustedKeys: [TrustedModelManifestKey]
@@ -80,9 +81,9 @@ public struct ManifestVerifier {
         guard envelope.manifestFile == Self.manifestFile else {
             throw ManifestVerificationError.unexpectedManifestFile(envelope.manifestFile)
         }
-        guard envelope.contentType == Self.contentTypeV1
-            || envelope.contentType == Self.contentTypeV2
-        else {
+        guard let envelopeVersion = ModelManifestSchemaVersion(
+            contentType: envelope.contentType
+        ) else {
             throw ManifestVerificationError.unsupportedContentType(envelope.contentType)
         }
 
@@ -106,19 +107,23 @@ public struct ManifestVerifier {
         guard publicKey.isValidSignature(signatureBytes, for: payload) else {
             throw ManifestVerificationError.signatureRejected
         }
-        let manifest = try ModelManifest.decode(manifestData)
-        let expectedContentType: String
-        switch manifest.manifestVersion {
-        case 1:
-            expectedContentType = Self.contentTypeV1
-        case 2:
-            expectedContentType = Self.contentTypeV2
-        default:
+        let manifest: ModelManifest
+        do {
+            manifest = try ModelManifest.decode(manifestData)
+        } catch let error as ModelManifestDecodingError {
+            switch error {
+            case let .unsupportedManifestVersion(version):
+                throw ManifestVerificationError.unsupportedManifestVersion(version)
+            }
+        }
+        guard let manifestVersion = ModelManifestSchemaVersion(
+            rawValue: manifest.manifestVersion
+        ) else {
             throw ManifestVerificationError.unsupportedManifestVersion(
                 manifest.manifestVersion
             )
         }
-        guard envelope.contentType == expectedContentType else {
+        guard envelopeVersion == manifestVersion else {
             throw ManifestVerificationError.contentTypeManifestVersionMismatch
         }
         return manifest

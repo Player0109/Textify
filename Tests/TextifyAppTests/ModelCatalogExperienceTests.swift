@@ -167,6 +167,63 @@ final class ModelCatalogExperienceTests: XCTestCase {
         XCTAssertNotNil(row.model.speedEvidenceDescription)
     }
 
+    @MainActor
+    func testSignedV3FixtureReachesFamilyCheckpointAndExactArtifactPresentation() async throws {
+        let fixtureDirectory = repositoryRoot
+            .appendingPathComponent("Tests/TextifyModelsTests/Fixtures/Models")
+        let manifestData = try Data(
+            contentsOf: fixtureDirectory.appendingPathComponent("manifest_v3.json")
+        )
+        let publicKey = try String(
+            contentsOf: fixtureDirectory
+                .appendingPathComponent("manifest_v3.fixture-public-key.base64"),
+            encoding: .utf8
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
+        let verifier = ManifestVerifier(trustedKeys: [
+            TrustedModelManifestKey(
+                keyId: "fixture-v3-key",
+                publicKeyBase64: publicKey
+            )
+        ])
+        let manifest = try verifier.verify(
+            manifestData: manifestData,
+            signatureData: Data(
+                contentsOf: fixtureDirectory.appendingPathComponent("manifest_v3.json.sig")
+            )
+        )
+        try ProductionModelPolicy.validateProductionManifest(manifest)
+        let coordinator = ModelCatalogCoordinator(loadOperation: { manifest })
+        await coordinator.refresh()
+
+        let experience = ModelCatalogExperience(
+            trustedManifest: coordinator.manifest,
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+
+        XCTAssertEqual(experience.families.map(\.id), ["family.whisper"])
+        let family = try XCTUnwrap(experience.families.first)
+        XCTAssertEqual(
+            family.checkpoints.map(\.id),
+            ["checkpoint.whisper.small", "checkpoint.whisper.tiny"]
+        )
+        XCTAssertEqual(family.checkpoints.map(\.artifacts.count), [2, 1])
+
+        let multiVariant = family.checkpoints[0]
+        XCTAssertEqual(
+            multiVariant.artifacts.map(\.id),
+            ["whisper-small-q5_1", "whisper-small-q8_0"]
+        )
+        XCTAssertEqual(multiVariant.artifacts[0].metadata.artifactFormat, .ggml)
+        XCTAssertEqual(multiVariant.artifacts[0].metadata.numericFormat, .q5_1)
+        XCTAssertEqual(multiVariant.artifacts[0].row.model.id, "whisper-small-q5_1")
+
+        let singleVariant = family.checkpoints[1]
+        XCTAssertEqual(singleVariant.artifacts.map(\.id), ["whisper-tiny-f16"])
+        XCTAssertEqual(singleVariant.artifacts[0].metadata.numericFormat, .f16)
+    }
+
     private var repositoryRoot: URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

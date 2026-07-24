@@ -114,7 +114,7 @@ final class AppServices {
             }
             return try await ProductionModelManifestLoader(
                 configuration: configuration
-            ).load().models
+            ).load()
         }
     )
 
@@ -802,10 +802,10 @@ final class ModelInstallCoordinator {
 @MainActor
 @Observable
 final class ModelCatalogCoordinator {
-    typealias LoadOperation = @Sendable () async throws -> [ModelEntry]
+    typealias LoadOperation = @Sendable () async throws -> ModelManifest
 
     private let loadOperation: LoadOperation
-    private(set) var models: [ModelEntry] = []
+    private(set) var manifest: ModelManifest?
     private(set) var isLoading = false
     private(set) var errorMessage: String?
 
@@ -820,7 +820,7 @@ final class ModelCatalogCoordinator {
         isLoading = true
         defer { isLoading = false }
         do {
-            models = try await loadOperation()
+            manifest = try await loadOperation()
             errorMessage = nil
         } catch {
             errorMessage = "The signed model catalog is unavailable. Your installed model still works offline."

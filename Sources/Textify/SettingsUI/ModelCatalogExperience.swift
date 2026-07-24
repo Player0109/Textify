@@ -182,6 +182,33 @@ struct ModelCatalogRowPresentation: Equatable, Identifiable {
     }
 }
 
+struct ModelCatalogFamilyPresentation: Equatable, Identifiable {
+    let metadata: ModelFamilyPresentationNode
+    let checkpoints: [ModelCatalogCheckpointPresentation]
+
+    var id: String {
+        metadata.id
+    }
+}
+
+struct ModelCatalogCheckpointPresentation: Equatable, Identifiable {
+    let metadata: ModelCheckpointPresentationNode
+    let artifacts: [ModelCatalogExactArtifactPresentation]
+
+    var id: String {
+        metadata.id
+    }
+}
+
+struct ModelCatalogExactArtifactPresentation: Equatable, Identifiable {
+    let metadata: ModelExactArtifactPresentationNode
+    let row: ModelCatalogRowPresentation
+
+    var id: String {
+        metadata.id
+    }
+}
+
 struct ModelCatalogInstallPresentation: Equatable {
     let state: DownloadState
     let title: String
@@ -200,6 +227,7 @@ struct ModelCatalogInstallPresentation: Equatable {
 
 struct ModelCatalogExperience: Equatable {
     let rows: [ModelCatalogRowPresentation]
+    let families: [ModelCatalogFamilyPresentation]
 
     init(
         trustedModels: [ModelEntry],
@@ -208,9 +236,54 @@ struct ModelCatalogExperience: Equatable {
         transferState: DownloadState?,
         query: ModelCatalogQuery = ModelCatalogQuery()
     ) {
+        self.init(
+            trustedModels: trustedModels,
+            presentationGraph: nil,
+            installedRecords: installedRecords,
+            activePreferences: activePreferences,
+            transferState: transferState,
+            query: query
+        )
+    }
+
+    init(
+        trustedManifest: ModelManifest?,
+        installedRecords: [InstalledModelRecord],
+        activePreferences: ModelCatalogActivePreferences,
+        transferState: DownloadState?,
+        query: ModelCatalogQuery = ModelCatalogQuery()
+    ) {
+        self.init(
+            trustedModels: trustedManifest?.models ?? [],
+            presentationGraph: trustedManifest?.presentationGraph,
+            installedRecords: installedRecords,
+            activePreferences: activePreferences,
+            transferState: transferState,
+            query: query
+        )
+    }
+
+    private init(
+        trustedModels: [ModelEntry],
+        presentationGraph: ModelCatalogPresentationGraph?,
+        installedRecords: [InstalledModelRecord],
+        activePreferences: ModelCatalogActivePreferences,
+        transferState: DownloadState?,
+        query: ModelCatalogQuery
+    ) {
+        let signedArtifactsByID = presentationGraph?.artifacts.reduce(
+            into: [String: ModelExactArtifactPresentationNode]()
+        ) {
+            $0[$1.id] = $1
+        } ?? [:]
         let trustedCatalog = trustedModels.isEmpty
             ? ProductionModelPresentation.visibleCatalog
-            : trustedModels.map { ProductionModelPresentation(model: $0) }
+            : trustedModels.map {
+                ProductionModelPresentation(
+                    model: $0,
+                    signedArtifact: signedArtifactsByID[$0.id]
+                )
+            }
         let trustedIDs = Set(trustedCatalog.map(\.id))
         let installedByID = installedRecords.reduce(into: [String: ModelEntry]()) {
             $0[$1.model.id] = $1.model
@@ -230,7 +303,7 @@ struct ModelCatalogExperience: Equatable {
             orderedCatalog.insert(activeModel, at: 0)
         }
 
-        rows = query.apply(to: orderedCatalog).map { model in
+        let derivedRows = query.apply(to: orderedCatalog).map { model in
             let installedModel = installedByID[model.id]
             let isInstalled = installedIDs.contains(model.id)
             let activePurpose = installedModel?.purpose ?? model.purpose
@@ -253,6 +326,10 @@ struct ModelCatalogExperience: Equatable {
                 )
             )
         }
+        rows = derivedRows
+        families = presentationGraph.map {
+            Self.makeFamilyPresentations(graph: $0, rows: derivedRows)
+        } ?? []
     }
 
     private static func actions(
@@ -287,6 +364,59 @@ struct ModelCatalogExperience: Equatable {
         }
 
         return actions
+    }
+
+    private static func makeFamilyPresentations(
+        graph: ModelCatalogPresentationGraph,
+        rows: [ModelCatalogRowPresentation]
+    ) -> [ModelCatalogFamilyPresentation] {
+        let checkpointsByID = graph.checkpoints.reduce(
+            into: [String: ModelCheckpointPresentationNode]()
+        ) {
+            $0[$1.id] = $1
+        }
+        let artifactsByID = graph.artifacts.reduce(
+            into: [String: ModelExactArtifactPresentationNode]()
+        ) {
+            $0[$1.id] = $1
+        }
+        let rowsByID = rows.reduce(into: [String: ModelCatalogRowPresentation]()) {
+            $0[$1.id] = $1
+        }
+
+        return graph.families.compactMap { family in
+            let checkpoints: [ModelCatalogCheckpointPresentation] = family.checkpointIDs
+                .compactMap { checkpointID in
+                    guard let checkpoint = checkpointsByID[checkpointID] else {
+                        return nil
+                    }
+                    let artifacts: [ModelCatalogExactArtifactPresentation] =
+                        checkpoint.artifactIDs.compactMap { artifactID in
+                            guard let artifact = artifactsByID[artifactID],
+                                  let row = rowsByID[artifactID] else {
+                                return nil
+                            }
+                            return ModelCatalogExactArtifactPresentation(
+                                metadata: artifact,
+                                row: row
+                            )
+                        }
+                    guard !artifacts.isEmpty else {
+                        return nil
+                    }
+                    return ModelCatalogCheckpointPresentation(
+                        metadata: checkpoint,
+                        artifacts: artifacts
+                    )
+                }
+            guard !checkpoints.isEmpty else {
+                return nil
+            }
+            return ModelCatalogFamilyPresentation(
+                metadata: family,
+                checkpoints: checkpoints
+            )
+        }
     }
 }
 
@@ -464,14 +594,22 @@ struct ProductionModelPresentation: Equatable, Identifiable {
 
     static let visibleCatalog: [ProductionModelPresentation] = [v1_1]
 
-    init(model: ModelEntry, isCurated: Bool = true) {
+    init(
+        model: ModelEntry,
+        isCurated: Bool = true,
+        signedArtifact: ModelExactArtifactPresentationNode? = nil
+    ) {
         id = model.id
         displayName = model.displayName
         description = model.description
         purpose = model.purpose
         self.isCurated = isCurated
-        artifactFormat = Self.artifactFormat(for: model)
-        artifactPrecision = Self.artifactPrecision(for: model)
+        artifactFormat = signedArtifact.map {
+            Self.artifactFormat(for: $0.artifactFormat)
+        } ?? Self.artifactFormat(for: model)
+        artifactPrecision = signedArtifact.map {
+            Self.artifactPrecision(for: $0.numericFormat)
+        } ?? Self.artifactPrecision(for: model)
         let enginePresentation = switch model.runtime.engine {
         case .whisperCpp: ("Whisper.cpp", "waveform.circle")
         case .fluidAudioParakeet: ("Parakeet", "bolt.horizontal.circle")
@@ -685,6 +823,19 @@ struct ProductionModelPresentation: Equatable, Identifiable {
         return .other
     }
 
+    private static func artifactFormat(
+        for format: ModelArtifactContainerFormat
+    ) -> ModelArtifactFormat {
+        switch format {
+        case .mlx:
+            .mlx
+        case .gguf:
+            .gguf
+        case .ggml, .coreML, .onnx:
+            .other
+        }
+    }
+
     private static func artifactPrecision(for model: ModelEntry) -> ModelArtifactPrecision {
         let searchableMetadata = ([
             model.id,
@@ -707,6 +858,23 @@ struct ProductionModelPresentation: Equatable, Identifiable {
         return precisionPatterns.first { _, patterns in
             patterns.contains(where: searchableMetadata.contains)
         }?.0 ?? .other
+    }
+
+    private static func artifactPrecision(
+        for format: ModelNumericFormat
+    ) -> ModelArtifactPrecision {
+        switch format {
+        case .fp32, .f32:
+            .thirtyTwoBit
+        case .fp16, .f16, .bf16:
+            .sixteenBit
+        case .int8, .eightBit, .q8_0:
+            .eightBit
+        case .q5_k_m, .q5_1, .q5_0:
+            .fiveBit
+        case .q4_k_m:
+            .fourBit
+        }
     }
 
     private static func languageDescription(for languageCodes: [String]) -> String {
