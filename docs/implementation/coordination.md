@@ -2,6 +2,35 @@
 
 This file records cross-agent handoffs during implementation.
 
+## Catalog Freshness Queue Gate Handoff - 2026-07-24
+
+- GitHub issue #14 owns the narrow cross-task changes needed to gate the
+  persistent installation queue on network recovery and an independently
+  persisted, 12-hour authoritative catalog-integrity timestamp.
+- This slice may update the trusted-catalog store/coordinator, installation
+  queue coordinator, Downloads/model-row recovery actions, production network
+  observation, and their focused tests. It must preserve trusted offline
+  browsing, installed-model use, FIFO ordering, and the staged-catalog behavior
+  completed by issues #12 and #13.
+- Signed revocation envelope parsing and identity-wide revocation semantics
+  remain owned by issues #18 and #19. Issue #14 provides a fail-closed known-
+  revocation prerequisite seam so those tickets can terminate affected Queue
+  Attempts without replacing the freshness or network gate.
+- The completed gate persists the last successful authoritative integrity-check
+  time independently from the signed catalog revision, accepts it for exactly
+  12 hours, and rejects missing, stale, or future timestamps before starting or
+  resuming managed-byte transfer. Concurrent catalog checks coalesce onto one
+  verified result, and installation consumes the accepted staged-or-presented
+  authoritative manifest without changing trusted offline presentation.
+- A waiting FIFO head resumes automatically on the first already-online path,
+  a later offline-to-online transition, or a successful authoritative catalog
+  refresh. These signals never poll, append a replacement authorization, or
+  bypass the known-revocation seam; catalog-check failures remain explicitly
+  retryable and both prerequisite wait states remain cancellable.
+- Verification completed with 605 Swift tests (11 explicit opt-in native/model
+  smokes skipped, zero failures), an arm64 SwiftPM Release build, and the staged
+  signed app-bundle launch with its verified 43-model catalog.
+
 ## Current Merge Gate
 
 Task 1 must merge before parallel Wave 1 work begins.

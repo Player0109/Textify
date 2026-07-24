@@ -3,6 +3,35 @@ import TextifyModels
 import XCTest
 
 final class ModelInstallQueueTests: XCTestCase {
+    func testTransferFreshnessIncludesExactTwelveHourBoundaryAndRejectsFutureClockValues() throws {
+        let policy = ModelTransferFreshnessPolicy()
+        let now = try XCTUnwrap(
+            ISO8601DateFormatter().date(from: "2026-07-24T12:00:00Z")
+        )
+
+        XCTAssertTrue(
+            policy.isFresh(
+                lastSuccessfulCheckAt: now.addingTimeInterval(-12 * 60 * 60),
+                now: now
+            )
+        )
+        XCTAssertFalse(
+            policy.isFresh(
+                lastSuccessfulCheckAt: now.addingTimeInterval(-12 * 60 * 60 - 0.001),
+                now: now
+            )
+        )
+        XCTAssertFalse(
+            policy.isFresh(
+                lastSuccessfulCheckAt: now.addingTimeInterval(1),
+                now: now
+            )
+        )
+        XCTAssertFalse(
+            policy.isFresh(lastSuccessfulCheckAt: nil, now: now)
+        )
+    }
+
     func testAuthorizationsAppendImmutableAttemptsInFIFOOrder() throws {
         var ids = ["attempt-1", "attempt-2"].makeIterator()
         var queue = ModelInstallQueue()

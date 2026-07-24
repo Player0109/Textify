@@ -61,17 +61,21 @@ public struct TrustedCatalogStoredState: Equatable, Sendable {
     public var presentedSnapshot: TrustedCatalogSnapshot?
     public var stagedSnapshot: TrustedCatalogSnapshot?
     public var securityIssue: TrustedCatalogSecurityIssue?
+    public var lastSuccessfulCatalogIntegrityCheckAt: Date?
 
     public init(
         highestAcceptedRevision: String? = nil,
         presentedSnapshot: TrustedCatalogSnapshot? = nil,
         stagedSnapshot: TrustedCatalogSnapshot? = nil,
-        securityIssue: TrustedCatalogSecurityIssue? = nil
+        securityIssue: TrustedCatalogSecurityIssue? = nil,
+        lastSuccessfulCatalogIntegrityCheckAt: Date? = nil
     ) {
         self.highestAcceptedRevision = highestAcceptedRevision
         self.presentedSnapshot = presentedSnapshot
         self.stagedSnapshot = stagedSnapshot
         self.securityIssue = securityIssue
+        self.lastSuccessfulCatalogIntegrityCheckAt =
+            lastSuccessfulCatalogIntegrityCheckAt
     }
 }
 
@@ -117,7 +121,9 @@ public struct TrustedCatalogStore {
             highestAcceptedRevision: archive.highestAcceptedRevision,
             presentedSnapshot: presented,
             stagedSnapshot: staged,
-            securityIssue: archive.securityIssue
+            securityIssue: archive.securityIssue,
+            lastSuccessfulCatalogIntegrityCheckAt:
+                archive.lastSuccessfulCatalogIntegrityCheckAt
         )
         try Self.validateRevisionOrder(state)
         return state
@@ -130,7 +136,9 @@ public struct TrustedCatalogStore {
             highestAcceptedRevision: state.highestAcceptedRevision,
             presentedSnapshot: state.presentedSnapshot.map(StoredSnapshot.init),
             stagedSnapshot: state.stagedSnapshot.map(StoredSnapshot.init),
-            securityIssue: state.securityIssue
+            securityIssue: state.securityIssue,
+            lastSuccessfulCatalogIntegrityCheckAt:
+                state.lastSuccessfulCatalogIntegrityCheckAt
         )
         try fileManager.createDirectory(
             at: fileURL.deletingLastPathComponent(),
@@ -194,6 +202,7 @@ public struct TrustedCatalogStore {
         let presentedSnapshot: StoredSnapshot?
         let stagedSnapshot: StoredSnapshot?
         let securityIssue: TrustedCatalogSecurityIssue?
+        let lastSuccessfulCatalogIntegrityCheckAt: Date?
     }
 
     private struct StoredSnapshot: Codable {

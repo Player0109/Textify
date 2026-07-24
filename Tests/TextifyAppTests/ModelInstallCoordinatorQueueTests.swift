@@ -4,6 +4,15 @@ import TextifyModels
 import XCTest
 
 final class ModelInstallCoordinatorQueueTests: XCTestCase {
+    func testNetworkRecoveryFiresForInitialOnlinePathAndLaterOfflineToOnlineTransition() {
+        var state = ModelTransferNetworkRecoveryState()
+
+        XCTAssertTrue(state.receive(isSatisfied: true))
+        XCTAssertFalse(state.receive(isSatisfied: true))
+        XCTAssertFalse(state.receive(isSatisfied: false))
+        XCTAssertTrue(state.receive(isSatisfied: true))
+    }
+
     @MainActor
     func testCoordinatorExecutesAttemptsSeriallyInFIFOOrder() async throws {
         let gate = InstallExecutionGate()
@@ -145,7 +154,7 @@ final class ModelInstallCoordinatorQueueTests: XCTestCase {
     }
 
     @MainActor
-    func testWaitingHeadPersistsAndBlocksLaterFIFOAttemptUntilResumed() async throws {
+    func testWaitingHeadPersistsAndBlocksLaterFIFOAttemptUntilNetworkRecovers() async throws {
         let readiness = InstallReadinessProbe()
         let gate = InstallExecutionGate()
         let ids = SequentialAttemptIDs(["attempt-1", "attempt-2"])
@@ -175,7 +184,7 @@ final class ModelInstallCoordinatorQueueTests: XCTestCase {
         XCTAssertEqual(startedWhileWaiting, [])
 
         await readiness.setNetworkAvailable(for: "artifact-a")
-        coordinator.resume(attemptID: "attempt-1")
+        coordinator.networkDidBecomeAvailable()
         await waitUntilAsync {
             await gate.startedArtifacts().contains("artifact-a")
         }
@@ -188,6 +197,320 @@ final class ModelInstallCoordinatorQueueTests: XCTestCase {
         }
         await gate.release("artifact-b")
         await waitUntil { !coordinator.isActive }
+    }
+
+    @MainActor
+    func testOfflineHeadRecoversAutomaticallyInFIFOOrderWithoutRetryStorms() async throws {
+        let now = try XCTUnwrap(
+            ISO8601DateFormatter().date(from: "2026-07-24T12:00:00Z")
+        )
+        let authority = TransferAuthorityProbe(
+            steps: [
+                .waitingForNetwork,
+                .ready(checkedAt: now),
+            ]
+        )
+        let gate = InstallExecutionGate()
+        let ids = SequentialAttemptIDs(["attempt-1", "attempt-2"])
+        let coordinator = ModelInstallCoordinator(
+            installOperation: { artifactID, _ in
+                await gate.begin(artifactID)
+                await gate.waitUntilReleased(artifactID)
+            },
+            lastSuccessfulCatalogIntegrityCheckAt: {
+                authority.lastSuccessfulCheckAt
+            },
+            integrityCheckOperation: { artifactID in
+                authority.check(artifactID: artifactID)
+            },
+            makeAttemptID: { ids.next() },
+            now: { now }
+        )
+
+        _ = coordinator.start(modelID: "artifact-a")
+        _ = coordinator.start(modelID: "artifact-b")
+        await waitUntil {
+            coordinator.attempt(id: "attempt-1")?.state.phase
+                == .waitingForNetwork
+        }
+        for _ in 0..<100 {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(authority.checkCount, 1)
+        XCTAssertEqual(
+            coordinator.attempts.map(\.state.phase),
+            [.waitingForNetwork, .queued]
+        )
+
+        coordinator.networkDidBecomeAvailable()
+        coordinator.networkDidBecomeAvailable()
+        await waitUntilAsync {
+            await gate.startedArtifacts().contains("artifact-a")
+        }
+
+        XCTAssertEqual(authority.checkCount, 2)
+        XCTAssertEqual(coordinator.attempts.map(\.id), [
+            "attempt-1",
+            "attempt-2",
+        ])
+
+        await gate.release("artifact-a")
+        await waitUntilAsync {
+            await gate.startedArtifacts().contains("artifact-b")
+        }
+        XCTAssertEqual(authority.checkCount, 2)
+
+        await gate.release("artifact-b")
+        await waitUntil { !coordinator.isActive }
+    }
+
+    @MainActor
+    func testCatalogCheckRetryKeepsOriginalAuthorizationAndCancelAvailable() async throws {
+        let now = try XCTUnwrap(
+            ISO8601DateFormatter().date(from: "2026-07-24T12:00:00Z")
+        )
+        let authority = TransferAuthorityProbe(
+            steps: [
+                .waitingForCatalogCheck,
+                .ready(checkedAt: now),
+            ]
+        )
+        let gate = InstallExecutionGate()
+        let coordinator = ModelInstallCoordinator(
+            installOperation: { artifactID, _ in
+                await gate.begin(artifactID)
+                await gate.waitUntilReleased(artifactID)
+            },
+            lastSuccessfulCatalogIntegrityCheckAt: {
+                authority.lastSuccessfulCheckAt
+            },
+            integrityCheckOperation: { artifactID in
+                authority.check(artifactID: artifactID)
+            },
+            makeAttemptID: { "attempt-1" },
+            now: { now }
+        )
+
+        _ = coordinator.start(modelID: "artifact-a")
+        await waitUntil {
+            coordinator.attempt(id: "attempt-1")?.state.phase
+                == .waitingForCatalogCheck
+        }
+
+        XCTAssertTrue(
+            ModelInstallRowPresentation.offersCancel(
+                for: try XCTUnwrap(
+                    coordinator.attempt(id: "attempt-1")?.state
+                )
+            )
+        )
+        XCTAssertEqual(coordinator.retry(attemptID: "attempt-1"), "attempt-1")
+        await waitUntilAsync {
+            await gate.startedArtifacts().contains("artifact-a")
+        }
+
+        XCTAssertEqual(authority.checkCount, 2)
+        XCTAssertEqual(coordinator.attempts.map(\.id), ["attempt-1"])
+
+        await gate.release("artifact-a")
+        await waitUntil { !coordinator.isActive }
+    }
+
+    @MainActor
+    func testAcceptedCatalogRefreshWakesWaitingHeadWithoutNewAuthorization() async throws {
+        let now = try XCTUnwrap(
+            ISO8601DateFormatter().date(from: "2026-07-24T12:00:00Z")
+        )
+        let authority = TransferAuthorityProbe(
+            steps: [.waitingForCatalogCheck]
+        )
+        let gate = InstallExecutionGate()
+        let coordinator = ModelInstallCoordinator(
+            installOperation: { artifactID, _ in
+                await gate.begin(artifactID)
+                await gate.waitUntilReleased(artifactID)
+            },
+            lastSuccessfulCatalogIntegrityCheckAt: {
+                authority.lastSuccessfulCheckAt
+            },
+            integrityCheckOperation: { artifactID in
+                authority.check(artifactID: artifactID)
+            },
+            makeAttemptID: { "attempt-1" },
+            now: { now }
+        )
+
+        _ = coordinator.start(modelID: "artifact-a")
+        await waitUntil {
+            coordinator.attempt(id: "attempt-1")?.state.phase
+                == .waitingForCatalogCheck
+        }
+
+        authority.acceptCatalog(at: now)
+        coordinator.catalogIntegrityCheckDidSucceed()
+        await waitUntilAsync {
+            await gate.startedArtifacts().contains("artifact-a")
+        }
+
+        XCTAssertEqual(authority.checkCount, 1)
+        XCTAssertEqual(coordinator.attempts.map(\.id), ["attempt-1"])
+
+        await gate.release("artifact-a")
+        await waitUntil { !coordinator.isActive }
+    }
+
+    @MainActor
+    func testAcceptedCatalogRefreshAlsoWakesNetworkBlockedHead() async throws {
+        let now = try XCTUnwrap(
+            ISO8601DateFormatter().date(from: "2026-07-24T12:00:00Z")
+        )
+        let authority = TransferAuthorityProbe(
+            steps: [.waitingForNetwork]
+        )
+        let gate = InstallExecutionGate()
+        let coordinator = ModelInstallCoordinator(
+            installOperation: { artifactID, _ in
+                await gate.begin(artifactID)
+                await gate.waitUntilReleased(artifactID)
+            },
+            lastSuccessfulCatalogIntegrityCheckAt: {
+                authority.lastSuccessfulCheckAt
+            },
+            integrityCheckOperation: { artifactID in
+                authority.check(artifactID: artifactID)
+            },
+            makeAttemptID: { "attempt-1" },
+            now: { now }
+        )
+
+        _ = coordinator.start(modelID: "artifact-a")
+        await waitUntil {
+            coordinator.attempt(id: "attempt-1")?.state.phase
+                == .waitingForNetwork
+        }
+
+        authority.acceptCatalog(at: now)
+        coordinator.catalogIntegrityCheckDidSucceed()
+        await waitUntilAsync {
+            await gate.startedArtifacts().contains("artifact-a")
+        }
+
+        XCTAssertEqual(authority.checkCount, 1)
+        XCTAssertEqual(coordinator.attempts.map(\.id), ["attempt-1"])
+
+        await gate.release("artifact-a")
+        await waitUntil { !coordinator.isActive }
+    }
+
+    @MainActor
+    func testPersistedResumeRequiresFreshIntegrityCheckBeforeTransferStarts() async throws {
+        let directory = temporaryDirectory()
+        defer {
+            if FileManager.default.fileExists(atPath: directory.path) {
+                try? FileManager.default.removeItem(at: directory)
+            }
+        }
+        let store = ModelInstallQueueStore(
+            fileURL: directory.appendingPathComponent("install-queue.json")
+        )
+        var queue = ModelInstallQueue()
+        _ = try queue.authorize(
+            artifactID: "artifact-a",
+            purpose: .transcription,
+            action: .install,
+            attemptID: "attempt-1",
+            createdAt: "2026-07-23T20:00:00Z"
+        )
+        try queue.transition(
+            attemptID: "attempt-1",
+            to: DownloadState(
+                modelID: "artifact-a",
+                phase: .checkingSpace
+            )
+        )
+        try queue.transition(
+            attemptID: "attempt-1",
+            to: DownloadState(
+                modelID: "artifact-a",
+                phase: .downloading,
+                bytesDownloaded: 50,
+                totalBytes: 100
+            )
+        )
+        try store.save(queue)
+
+        let now = try XCTUnwrap(
+            ISO8601DateFormatter().date(from: "2026-07-24T12:00:00Z")
+        )
+        let stale = now.addingTimeInterval(-12 * 60 * 60 - 1)
+        let authority = TransferAuthorityProbe(
+            lastSuccessfulCheckAt: stale,
+            steps: [.ready(checkedAt: now)]
+        )
+        let gate = InstallExecutionGate()
+        let coordinator = ModelInstallCoordinator(
+            queueStore: store,
+            installOperation: { artifactID, _ in
+                await gate.begin(artifactID)
+                await gate.waitUntilReleased(artifactID)
+            },
+            lastSuccessfulCatalogIntegrityCheckAt: {
+                authority.lastSuccessfulCheckAt
+            },
+            integrityCheckOperation: { artifactID in
+                authority.check(artifactID: artifactID)
+            },
+            now: { now }
+        )
+
+        await waitUntilAsync {
+            await gate.startedArtifacts().contains("artifact-a")
+        }
+
+        XCTAssertEqual(authority.checkCount, 1)
+        XCTAssertEqual(
+            coordinator.attempt(id: "attempt-1")?.state.bytesDownloaded,
+            50
+        )
+
+        await gate.release("artifact-a")
+        await waitUntil { !coordinator.isActive }
+    }
+
+    @MainActor
+    func testKnownRevocationOverridesFreshCachedAuthorityBeforeInstallStarts() async throws {
+        let now = try XCTUnwrap(
+            ISO8601DateFormatter().date(from: "2026-07-24T12:00:00Z")
+        )
+        let authority = TransferAuthorityProbe(
+            lastSuccessfulCheckAt: now,
+            steps: []
+        )
+        let gate = InstallExecutionGate()
+        let coordinator = ModelInstallCoordinator(
+            installOperation: { artifactID, _ in
+                await gate.begin(artifactID)
+            },
+            lastSuccessfulCatalogIntegrityCheckAt: {
+                authority.lastSuccessfulCheckAt
+            },
+            integrityCheckOperation: { artifactID in
+                authority.check(artifactID: artifactID)
+            },
+            isArtifactKnownRevoked: { $0 == "artifact-a" },
+            makeAttemptID: { "attempt-1" },
+            now: { now }
+        )
+
+        _ = coordinator.start(modelID: "artifact-a")
+        await waitUntil {
+            coordinator.attempt(id: "attempt-1")?.state.phase == .revoked
+        }
+
+        XCTAssertEqual(authority.checkCount, 0)
+        let startedArtifacts = await gate.startedArtifacts()
+        XCTAssertEqual(startedArtifacts, [])
     }
 
     @MainActor
@@ -433,5 +756,52 @@ private actor InstallReadinessProbe {
 
     func setNetworkAvailable(for artifactID: String) {
         waitingArtifacts.remove(artifactID)
+    }
+}
+
+private final class TransferAuthorityProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private var steps: [ModelTransferPrerequisiteResult]
+    private var storedLastSuccessfulCheckAt: Date?
+    private var storedCheckCount = 0
+
+    init(
+        lastSuccessfulCheckAt: Date? = nil,
+        steps: [ModelTransferPrerequisiteResult]
+    ) {
+        storedLastSuccessfulCheckAt = lastSuccessfulCheckAt
+        self.steps = steps
+    }
+
+    var lastSuccessfulCheckAt: Date? {
+        lock.withLock {
+            storedLastSuccessfulCheckAt
+        }
+    }
+
+    var checkCount: Int {
+        lock.withLock {
+            storedCheckCount
+        }
+    }
+
+    func check(artifactID: String) -> ModelTransferPrerequisiteResult {
+        lock.withLock {
+            storedCheckCount += 1
+            guard !steps.isEmpty else {
+                return .waitingForCatalogCheck
+            }
+            let next = steps.removeFirst()
+            if case let .ready(checkedAt) = next {
+                storedLastSuccessfulCheckAt = checkedAt
+            }
+            return next
+        }
+    }
+
+    func acceptCatalog(at date: Date) {
+        lock.withLock {
+            storedLastSuccessfulCheckAt = date
+        }
     }
 }

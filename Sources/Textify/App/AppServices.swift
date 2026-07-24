@@ -1,4 +1,5 @@
 import Foundation
+import Network
 import Observation
 import TextifyAudio
 import TextifyDiagnostics
@@ -22,6 +23,8 @@ final class AppServices {
     let launchAtLoginLocation: any LaunchAtLoginLocationChecking
     let modelCatalogCompatibilityResolver: ModelCatalogCompatibilityResolver
     let startupIssue: AppStartupIssue?
+    @ObservationIgnored private let modelTransferNetworkObserver:
+        ModelTransferNetworkObserver?
 
     private var installedModelsStore: InstalledModelsStore
 
@@ -34,17 +37,13 @@ final class AppServices {
         installOperation: { [weak self] modelID, onStateChange in
             guard let self,
                   self.startupIssue == nil,
-                  let configuration = ProductionModelInstallConfiguration.current
+                  ProductionModelInstallConfiguration.current != nil
             else {
                 throw ModelInstallCoordinatorError.storageOrConfigurationUnavailable
             }
 
-            let manifest: ModelManifest
-            do {
-                manifest = try await ProductionModelManifestLoader(
-                    configuration: configuration
-                ).load()
-            } catch {
+            guard let manifest =
+                self.modelCatalogCoordinator.authoritativeManifest else {
                 throw ModelInstallCoordinatorError.catalogCheckUnavailable
             }
             let installer = ModelInstaller(
@@ -82,6 +81,33 @@ final class AppServices {
                     rootDirectory: self.paths.modelsDirectory
                 )
             ).inspect(for: attempt)
+        },
+        lastSuccessfulCatalogIntegrityCheckAt: { [weak self] in
+            self?.modelCatalogCoordinator
+                .lastSuccessfulCatalogIntegrityCheckAt
+        },
+        integrityCheckOperation: { [weak self] _ in
+            guard let self else {
+                return .waitingForCatalogCheck
+            }
+            switch await self.modelCatalogCoordinator.refresh() {
+            case .authoritativeIntegrityAccepted:
+                guard let checkedAt = self.modelCatalogCoordinator
+                    .lastSuccessfulCatalogIntegrityCheckAt else {
+                    return .waitingForCatalogCheck
+                }
+                return .ready(checkedAt: checkedAt)
+            case .networkUnavailable:
+                return .waitingForNetwork
+            case .presentationAccepted,
+                 .catalogUnavailable,
+                 .rejected,
+                 .requiresNewerTextify:
+                return .waitingForCatalogCheck
+            }
+        },
+        isArtifactKnownRevoked: { _ in
+            false
         }
     )
 
@@ -160,6 +186,7 @@ final class AppServices {
         waitBeforeTerminalStatusDismissal: @escaping @Sendable () async -> Void = {
             try? await Task.sleep(nanoseconds: 2_500_000_000)
         },
+        modelTransferNetworkObserver: ModelTransferNetworkObserver? = nil,
         startupIssue: AppStartupIssue? = nil
     ) {
         self.paths = paths
@@ -173,6 +200,7 @@ final class AppServices {
         self.overlayPresenter = overlayPresenter ?? RecordingOverlayPresenter()
         self.waitBeforeProcessingIndicator = waitBeforeProcessingIndicator
         self.waitBeforeTerminalStatusDismissal = waitBeforeTerminalStatusDismissal
+        self.modelTransferNetworkObserver = modelTransferNetworkObserver
         self.startupIssue = startupIssue
         self.runtimeIssue = startupIssue == nil ? nil : .persistentStorageUnavailable
         let installedModelsStore = Self.loadInstalledModelsStore(paths: paths)
@@ -190,6 +218,11 @@ final class AppServices {
             await self?.refreshManagedModelReadiness()
         }
         modelCatalogCoordinator = makeProductionModelCatalogCoordinator()
+        modelTransferNetworkObserver?.start { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.modelInstallCoordinator.networkDidBecomeAvailable()
+            }
+        }
     }
 
     func startRuntime() {
@@ -350,6 +383,10 @@ final class AppServices {
             },
             diagnosticOperation: { [weak self] issue in
                 self?.logCatalogSecurityIssue(issue)
+            },
+            integrityCheckAcceptedOperation: { [weak self] in
+                self?.modelInstallCoordinator
+                    .catalogIntegrityCheckDidSucceed()
             }
         )
     }
@@ -859,6 +896,7 @@ final class AppServices {
             hotkeyMonitor: GlobalHotkeyMonitor(trigger: trigger),
             launchAtLogin: launchAtLogin,
             launchAtLoginLocation: launchAtLoginLocation,
+            modelTransferNetworkObserver: ModelTransferNetworkObserver(),
             startupIssue: startupIssue
         )
     }
@@ -876,6 +914,73 @@ final class AppServices {
         case .controlSpace:
             return .controlSpace
         }
+    }
+}
+
+final class ModelTransferNetworkObserver: @unchecked Sendable {
+    private let monitor: NWPathMonitor
+    private let callbackQueue: DispatchQueue
+    private let lock = NSLock()
+    private var recoveryState = ModelTransferNetworkRecoveryState()
+    private var recoveryOperation: (@Sendable () -> Void)?
+    private var isStarted = false
+
+    init(
+        monitor: NWPathMonitor = NWPathMonitor(),
+        callbackQueue: DispatchQueue = DispatchQueue(
+            label: "io.github.Player0109.Textify.model-transfer-network"
+        )
+    ) {
+        self.monitor = monitor
+        self.callbackQueue = callbackQueue
+    }
+
+    func start(
+        recoveryOperation: @escaping @Sendable () -> Void
+    ) {
+        lock.lock()
+        guard !isStarted else {
+            lock.unlock()
+            return
+        }
+        isStarted = true
+        self.recoveryOperation = recoveryOperation
+        lock.unlock()
+
+        monitor.pathUpdateHandler = { [weak self] path in
+            self?.receive(path.status)
+        }
+        monitor.start(queue: callbackQueue)
+    }
+
+    private func receive(_ status: NWPath.Status) {
+        let shouldRecover: Bool
+        let operation: (@Sendable () -> Void)?
+        lock.lock()
+        shouldRecover = recoveryState.receive(
+            isSatisfied: status == .satisfied
+        )
+        operation = recoveryOperation
+        lock.unlock()
+
+        if shouldRecover {
+            operation?()
+        }
+    }
+
+    deinit {
+        monitor.cancel()
+    }
+}
+
+struct ModelTransferNetworkRecoveryState {
+    private var wasSatisfied: Bool?
+
+    mutating func receive(isSatisfied: Bool) -> Bool {
+        defer {
+            wasSatisfied = isSatisfied
+        }
+        return isSatisfied && wasSatisfied != true
     }
 }
 
@@ -903,6 +1008,13 @@ enum ModelInstallCoordinatorError: Error {
     case bundledCatalogIncomplete
     case networkUnavailable
     case catalogCheckUnavailable
+}
+
+enum ModelTransferPrerequisiteResult: Equatable, Sendable {
+    case ready(checkedAt: Date)
+    case waitingForNetwork
+    case waitingForCatalogCheck
+    case revoked
 }
 
 enum AppModelActivationResult: Equatable {
@@ -956,6 +1068,14 @@ final class ModelInstallCoordinator {
         @MainActor @Sendable (ModelInstallQueueAttempt) -> ModelInstallResumableData?
     private let makeAttemptID: @Sendable () -> String
     private let nowISO8601: @Sendable () -> String
+    private let now: @Sendable () -> Date
+    private let freshnessPolicy: ModelTransferFreshnessPolicy
+    private let lastSuccessfulCatalogIntegrityCheckAt:
+        @MainActor @Sendable () -> Date?
+    private let integrityCheckOperation:
+        @MainActor @Sendable (String) async -> ModelTransferPrerequisiteResult
+    private let isArtifactKnownRevoked:
+        @MainActor @Sendable (String) -> Bool
     @ObservationIgnored private var installTask: Task<Void, Never>?
     @ObservationIgnored private var activeAttemptID: String?
     @ObservationIgnored private var queue: ModelInstallQueue
@@ -990,18 +1110,37 @@ final class ModelInstallCoordinator {
         resumableDataProvider: @escaping @MainActor @Sendable (
             ModelInstallQueueAttempt
         ) -> ModelInstallResumableData? = { _ in nil },
+        freshnessPolicy: ModelTransferFreshnessPolicy =
+            ModelTransferFreshnessPolicy(),
+        lastSuccessfulCatalogIntegrityCheckAt:
+            @escaping @MainActor @Sendable () -> Date? = { Date() },
+        integrityCheckOperation:
+            @escaping @MainActor @Sendable (
+                String
+            ) async -> ModelTransferPrerequisiteResult = { _ in
+                .ready(checkedAt: Date())
+            },
+        isArtifactKnownRevoked:
+            @escaping @MainActor @Sendable (String) -> Bool = { _ in false },
         makeAttemptID: @escaping @Sendable () -> String = {
             UUID().uuidString.lowercased()
         },
         nowISO8601: @escaping @Sendable () -> String = {
             ISO8601DateFormatter().string(from: Date())
-        }
+        },
+        now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.queueStore = queueStore
         self.installOperation = installOperation
         self.resumableDataProvider = resumableDataProvider
+        self.freshnessPolicy = freshnessPolicy
+        self.lastSuccessfulCatalogIntegrityCheckAt =
+            lastSuccessfulCatalogIntegrityCheckAt
+        self.integrityCheckOperation = integrityCheckOperation
+        self.isArtifactKnownRevoked = isArtifactKnownRevoked
         self.makeAttemptID = makeAttemptID
         self.nowISO8601 = nowISO8601
+        self.now = now
 
         if let queueStore {
             do {
@@ -1109,8 +1248,7 @@ final class ModelInstallCoordinator {
 
     func resume(attemptID: String) {
         guard let attempt = queue.attempt(id: attemptID),
-              [.paused, .waitingForNetwork, .waitingForCatalogCheck]
-                .contains(attempt.state.phase)
+              attempt.state.phase == .paused
         else {
             return
         }
@@ -1130,6 +1268,20 @@ final class ModelInstallCoordinator {
     func retry(attemptID: String) -> String? {
         guard persistenceIsAvailable else {
             return nil
+        }
+        if queue.attempt(id: attemptID)?.state.phase
+            == .waitingForCatalogCheck {
+            do {
+                try transition(
+                    attemptID: attemptID,
+                    phase: .queued,
+                    message: "Checking catalog authority."
+                )
+                processNextAttempt()
+                return attemptID
+            } catch {
+                return nil
+            }
         }
         let previousQueue = queue
         let newAttemptID = makeAttemptID()
@@ -1155,6 +1307,20 @@ final class ModelInstallCoordinator {
         queue.attempt(id: id)
     }
 
+    func networkDidBecomeAvailable() {
+        requeueWaitingHead(
+            phases: [.waitingForNetwork],
+            message: "Checking network and catalog authority."
+        )
+    }
+
+    func catalogIntegrityCheckDidSucceed() {
+        requeueWaitingHead(
+            phases: [.waitingForNetwork, .waitingForCatalogCheck],
+            message: "Catalog authority restored."
+        )
+    }
+
     private func processNextAttempt() {
         guard installTask == nil,
               persistenceIsAvailable,
@@ -1163,18 +1329,95 @@ final class ModelInstallCoordinator {
             return
         }
 
-        do {
-            try transition(
-                attemptID: attempt.id,
-                phase: .checkingSpace,
-                message: "Preparing model download."
-            )
-        } catch {
-            return
-        }
         activeAttemptID = attempt.id
         installTask = Task { @MainActor [weak self] in
             guard let self else {
+                return
+            }
+            if isArtifactKnownRevoked(attempt.artifactID) {
+                finish(
+                    attemptID: attempt.id,
+                    phase: .revoked,
+                    message: "Install revoked."
+                )
+                return
+            }
+
+            let currentTime = now()
+            if !freshnessPolicy.isFresh(
+                lastSuccessfulCheckAt:
+                    lastSuccessfulCatalogIntegrityCheckAt(),
+                now: currentTime
+            ) {
+                let prerequisite = await integrityCheckOperation(
+                    attempt.artifactID
+                )
+                guard !Task.isCancelled,
+                      queue.attempt(id: attempt.id)?.state.phase
+                        .isTerminal == false
+                else {
+                    completeTask(attemptID: attempt.id)
+                    return
+                }
+                switch prerequisite {
+                case let .ready(checkedAt):
+                    guard freshnessPolicy.isFresh(
+                        lastSuccessfulCheckAt: checkedAt,
+                        now: now()
+                    ),
+                    freshnessPolicy.isFresh(
+                        lastSuccessfulCheckAt:
+                            lastSuccessfulCatalogIntegrityCheckAt(),
+                        now: now()
+                    ) else {
+                        finish(
+                            attemptID: attempt.id,
+                            phase: .waitingForCatalogCheck,
+                            message: "Waiting for catalog check."
+                        )
+                        return
+                    }
+                case .waitingForNetwork:
+                    finish(
+                        attemptID: attempt.id,
+                        phase: .waitingForNetwork,
+                        message: "Waiting for network."
+                    )
+                    return
+                case .waitingForCatalogCheck:
+                    finish(
+                        attemptID: attempt.id,
+                        phase: .waitingForCatalogCheck,
+                        message: "Waiting for catalog check."
+                    )
+                    return
+                case .revoked:
+                    finish(
+                        attemptID: attempt.id,
+                        phase: .revoked,
+                        message: "Install revoked."
+                    )
+                    return
+                }
+            }
+
+            if isArtifactKnownRevoked(attempt.artifactID) {
+                finish(
+                    attemptID: attempt.id,
+                    phase: .revoked,
+                    message: "Install revoked."
+                )
+                return
+            }
+
+            do {
+                try transition(
+                    attemptID: attempt.id,
+                    phase: .checkingSpace,
+                    message: "Preparing model download."
+                )
+            } catch {
+                completeTask(attemptID: attempt.id)
                 return
             }
             do {
@@ -1212,6 +1455,28 @@ final class ModelInstallCoordinator {
                     message: "Model install failed. Check your connection and try again."
                 )
             }
+        }
+    }
+
+    private func requeueWaitingHead(
+        phases: [DownloadPhase],
+        message: String
+    ) {
+        guard installTask == nil,
+              let head = queue.headAttempt,
+              phases.contains(head.state.phase)
+        else {
+            return
+        }
+        do {
+            try transition(
+                attemptID: head.id,
+                phase: .queued,
+                message: message
+            )
+            processNextAttempt()
+        } catch {
+            return
         }
     }
 
@@ -1398,10 +1663,15 @@ final class ModelCatalogCoordinator {
     private let loadCandidate: @Sendable () async throws -> Candidate
     private let saveOperation: SaveOperation?
     private let diagnosticOperation: DiagnosticOperation
+    private let now: @Sendable () -> Date
+    private let integrityCheckAcceptedOperation:
+        @MainActor @Sendable () -> Void
     @ObservationIgnored private var openDestinations: Set<ModelPurpose> = []
     @ObservationIgnored private var presentedSnapshot: TrustedCatalogSnapshot?
     @ObservationIgnored private var stagedSnapshot: TrustedCatalogSnapshot?
     @ObservationIgnored private var refreshInProgress = false
+    @ObservationIgnored private var refreshWaiters:
+        [CheckedContinuation<ModelCatalogRefreshResult, Never>] = []
 
     private(set) var manifest: ModelManifest?
     private(set) var stagedManifest: ModelManifest?
@@ -1409,10 +1679,15 @@ final class ModelCatalogCoordinator {
     private(set) var presentedRevision: String?
     private(set) var stagedRevision: String?
     private(set) var securityIssue: TrustedCatalogSecurityIssue?
+    private(set) var lastSuccessfulCatalogIntegrityCheckAt: Date?
     private(set) var status: ModelCatalogCoordinatorStatus
 
     var isLoading: Bool {
         refreshInProgress || manifest == nil && status == .checking
+    }
+
+    var authoritativeManifest: ModelManifest? {
+        stagedManifest ?? manifest
     }
 
     var errorMessage: String? {
@@ -1433,16 +1708,23 @@ final class ModelCatalogCoordinator {
     init(
         initialManifest: ModelManifest? = nil,
         loadOperation: @escaping LoadOperation,
-        diagnosticOperation: @escaping DiagnosticOperation = { _ in }
+        diagnosticOperation: @escaping DiagnosticOperation = { _ in },
+        now: @escaping @Sendable () -> Date = { Date() },
+        integrityCheckAcceptedOperation:
+            @escaping @MainActor @Sendable () -> Void = {}
     ) {
         self.loadCandidate = {
             .manifest(try await loadOperation())
         }
         self.saveOperation = nil
         self.diagnosticOperation = diagnosticOperation
+        self.now = now
+        self.integrityCheckAcceptedOperation =
+            integrityCheckAcceptedOperation
         self.manifest = initialManifest
         self.highestAcceptedRevision = initialManifest?.generatedAt
         self.presentedRevision = initialManifest?.generatedAt
+        self.lastSuccessfulCatalogIntegrityCheckAt = nil
         self.status = initialManifest == nil ? .checking : .trusted
     }
 
@@ -1451,13 +1733,19 @@ final class ModelCatalogCoordinator {
         bundledSnapshot: TrustedCatalogSnapshot?,
         snapshotLoadOperation: @escaping SnapshotLoadOperation,
         saveOperation: @escaping SaveOperation,
-        diagnosticOperation: @escaping DiagnosticOperation = { _ in }
+        diagnosticOperation: @escaping DiagnosticOperation = { _ in },
+        now: @escaping @Sendable () -> Date = { Date() },
+        integrityCheckAcceptedOperation:
+            @escaping @MainActor @Sendable () -> Void = {}
     ) {
         self.loadCandidate = {
             .snapshot(try await snapshotLoadOperation())
         }
         self.saveOperation = saveOperation
         self.diagnosticOperation = diagnosticOperation
+        self.now = now
+        self.integrityCheckAcceptedOperation =
+            integrityCheckAcceptedOperation
 
         var resolved = storedState
         if let staged = resolved.stagedSnapshot {
@@ -1497,6 +1785,8 @@ final class ModelCatalogCoordinator {
         presentedRevision = resolved.presentedSnapshot?.revision
         stagedRevision = resolved.stagedSnapshot?.revision
         securityIssue = resolved.securityIssue
+        lastSuccessfulCatalogIntegrityCheckAt =
+            resolved.lastSuccessfulCatalogIntegrityCheckAt
         if let issue = resolved.securityIssue {
             status = .securityFailure(issue.reason)
         } else {
@@ -1504,42 +1794,70 @@ final class ModelCatalogCoordinator {
         }
     }
 
-    func refresh() async {
-        guard !refreshInProgress else {
-            return
+    @discardableResult
+    func refresh() async -> ModelCatalogRefreshResult {
+        if refreshInProgress {
+            return await withCheckedContinuation { continuation in
+                refreshWaiters.append(continuation)
+            }
         }
         refreshInProgress = true
         status = manifest == nil ? .checking : .checkingForUpdates
-        defer { refreshInProgress = false }
+        let result: ModelCatalogRefreshResult
         do {
-            try accept(try await loadCandidate())
+            result = try accept(try await loadCandidate())
         } catch let error as ModelCatalogRefreshError {
             handle(error)
+            result = switch error {
+            case .networkUnavailable:
+                .networkUnavailable
+            case .unavailable:
+                .catalogUnavailable
+            case let .requiresNewerTextify(manifestVersion):
+                .requiresNewerTextify(manifestVersion: manifestVersion)
+            }
         } catch let error as ManifestVerificationError {
             switch error {
             case let .unsupportedManifestVersion(version):
                 handle(
                     .requiresNewerTextify(manifestVersion: version)
                 )
+                result = .requiresNewerTextify(manifestVersion: version)
             default:
                 reject(reason: .invalidSignature)
+                result = .rejected
             }
         } catch is DecodingError {
             reject(reason: .strictDecoding)
+            result = .rejected
         } catch is ModelManifestDecodingError {
             reject(reason: .strictDecoding)
+            result = .rejected
         } catch let error as ProductionModelPolicyError {
             switch error {
             case let .unsupportedManifestVersion(version):
                 handle(
                     .requiresNewerTextify(manifestVersion: version)
                 )
+                result = .requiresNewerTextify(manifestVersion: version)
             default:
                 reject(reason: .schemaValidation)
+                result = .rejected
             }
+        } catch let error as URLError where Self.isNetworkUnavailable(error) {
+            handle(.networkUnavailable)
+            result = .networkUnavailable
         } catch {
             handle(.unavailable)
+            result = .catalogUnavailable
         }
+        refreshInProgress = false
+        let waiters = refreshWaiters
+        refreshWaiters.removeAll()
+        for waiter in waiters {
+            waiter.resume(returning: result)
+        }
+        return result
     }
 
     func destinationOpened(_ purpose: ModelPurpose) {
@@ -1576,7 +1894,9 @@ final class ModelCatalogCoordinator {
             highestAcceptedRevision: highestAcceptedRevision,
             presentedSnapshot: stagedSnapshot ?? presentedSnapshot,
             stagedSnapshot: nil,
-            securityIssue: securityIssue
+            securityIssue: securityIssue,
+            lastSuccessfulCatalogIntegrityCheckAt:
+                lastSuccessfulCatalogIntegrityCheckAt
         )
         guard persist(nextState) else {
             return
@@ -1592,7 +1912,9 @@ final class ModelCatalogCoordinator {
         } ?? .trusted
     }
 
-    private func accept(_ candidate: Candidate) throws {
+    private func accept(
+        _ candidate: Candidate
+    ) throws -> ModelCatalogRefreshResult {
         let candidateManifest = candidate.manifest
         guard let candidateDate = Self.revisionDate(
             candidateManifest.generatedAt
@@ -1601,7 +1923,7 @@ final class ModelCatalogCoordinator {
                 reason: .schemaValidation,
                 candidateRevision: candidateManifest.generatedAt
             )
-            return
+            return .rejected
         }
 
         if let highestAcceptedRevision,
@@ -1613,36 +1935,52 @@ final class ModelCatalogCoordinator {
                     reason: .rollback,
                     candidateRevision: candidateManifest.generatedAt
                 )
-                return
+                return .rejected
             }
             if candidateDate == highestDate {
+                let acceptedAt = candidate.snapshot == nil
+                    ? lastSuccessfulCatalogIntegrityCheckAt
+                    : now()
                 securityIssue = nil
-                let nextState = storedState(securityIssue: nil)
+                let nextState = storedState(
+                    securityIssue: nil,
+                    lastSuccessfulCatalogIntegrityCheckAt: acceptedAt
+                )
                 guard persist(nextState) else {
-                    return
+                    return .catalogUnavailable
                 }
+                lastSuccessfulCatalogIntegrityCheckAt = acceptedAt
                 status = stagedManifest == nil
                     ? .trusted
                     : .updateAvailable
-                return
+                if candidate.snapshot != nil {
+                    integrityCheckAcceptedOperation()
+                    return .authoritativeIntegrityAccepted
+                }
+                return .presentationAccepted
             }
         }
 
         let shouldStage = !openDestinations.isEmpty && manifest != nil
+        let acceptedAt = candidate.snapshot == nil
+            ? lastSuccessfulCatalogIntegrityCheckAt
+            : now()
         let nextState = TrustedCatalogStoredState(
             highestAcceptedRevision: candidateManifest.generatedAt,
             presentedSnapshot: shouldStage
                 ? presentedSnapshot
                 : candidate.snapshot ?? presentedSnapshot,
             stagedSnapshot: shouldStage ? candidate.snapshot : nil,
-            securityIssue: nil
+            securityIssue: nil,
+            lastSuccessfulCatalogIntegrityCheckAt: acceptedAt
         )
         guard persist(nextState) else {
-            return
+            return .catalogUnavailable
         }
 
         highestAcceptedRevision = candidateManifest.generatedAt
         securityIssue = nil
+        lastSuccessfulCatalogIntegrityCheckAt = acceptedAt
         if shouldStage {
             stagedManifest = candidateManifest
             stagedRevision = candidateManifest.generatedAt
@@ -1657,6 +1995,11 @@ final class ModelCatalogCoordinator {
             stagedSnapshot = nil
             status = .trusted
         }
+        if candidate.snapshot != nil {
+            integrityCheckAcceptedOperation()
+            return .authoritativeIntegrityAccepted
+        }
+        return .presentationAccepted
     }
 
     private func matchesAcceptedCandidate(_ candidate: ModelManifest) -> Bool {
@@ -1665,7 +2008,7 @@ final class ModelCatalogCoordinator {
 
     private func handle(_ error: ModelCatalogRefreshError) {
         switch error {
-        case .unavailable:
+        case .networkUnavailable, .unavailable:
             if let securityIssue {
                 status = .securityFailure(securityIssue.reason)
             } else if stagedManifest != nil {
@@ -1696,13 +2039,17 @@ final class ModelCatalogCoordinator {
     }
 
     private func storedState(
-        securityIssue: TrustedCatalogSecurityIssue?
+        securityIssue: TrustedCatalogSecurityIssue?,
+        lastSuccessfulCatalogIntegrityCheckAt: Date? = nil
     ) -> TrustedCatalogStoredState {
         TrustedCatalogStoredState(
             highestAcceptedRevision: highestAcceptedRevision,
             presentedSnapshot: presentedSnapshot,
             stagedSnapshot: stagedSnapshot,
-            securityIssue: securityIssue
+            securityIssue: securityIssue,
+            lastSuccessfulCatalogIntegrityCheckAt:
+                lastSuccessfulCatalogIntegrityCheckAt
+                    ?? self.lastSuccessfulCatalogIntegrityCheckAt
         )
     }
 
@@ -1723,10 +2070,33 @@ final class ModelCatalogCoordinator {
     private static func revisionDate(_ revision: String) -> Date? {
         ISO8601DateFormatter().date(from: revision)
     }
+
+    private static func isNetworkUnavailable(_ error: URLError) -> Bool {
+        switch error.code {
+        case .notConnectedToInternet,
+             .networkConnectionLost,
+             .dataNotAllowed,
+             .internationalRoamingOff,
+             .callIsActive:
+            return true
+        default:
+            return false
+        }
+    }
 }
 
 enum ModelCatalogRefreshError: Error, Equatable {
+    case networkUnavailable
     case unavailable
+    case requiresNewerTextify(manifestVersion: Int)
+}
+
+enum ModelCatalogRefreshResult: Equatable {
+    case authoritativeIntegrityAccepted
+    case presentationAccepted
+    case networkUnavailable
+    case catalogUnavailable
+    case rejected
     case requiresNewerTextify(manifestVersion: Int)
 }
 

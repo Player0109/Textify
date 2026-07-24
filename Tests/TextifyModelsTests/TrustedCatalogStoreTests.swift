@@ -2,6 +2,42 @@ import TextifyModels
 import XCTest
 
 final class TrustedCatalogStoreTests: XCTestCase {
+    func testRoundTripsIntegrityCheckTimeIndependentlyFromCatalogPublicationTime() throws {
+        let fixture = try signedV3Fixture()
+        let snapshot = try TrustedCatalogSnapshot(
+            manifestData: fixture.manifestData,
+            signatureData: fixture.signatureData,
+            verifier: fixture.verifier
+        )
+        let integrityCheckAt = try XCTUnwrap(
+            ISO8601DateFormatter().date(from: "2026-07-24T10:30:00Z")
+        )
+        let state = TrustedCatalogStoredState(
+            highestAcceptedRevision: snapshot.revision,
+            presentedSnapshot: snapshot,
+            lastSuccessfulCatalogIntegrityCheckAt: integrityCheckAt
+        )
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("TrustedCatalogStoreTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = TrustedCatalogStore(
+            fileURL: directory.appendingPathComponent("catalog-state.json"),
+            verifier: fixture.verifier
+        )
+
+        try store.save(state)
+        let restored = try store.load()
+
+        XCTAssertEqual(
+            restored.lastSuccessfulCatalogIntegrityCheckAt,
+            integrityCheckAt
+        )
+        XCTAssertNotEqual(
+            ISO8601DateFormatter().string(from: integrityCheckAt),
+            snapshot.manifest.generatedAt
+        )
+    }
+
     func testRoundTripsVerifiedPresentedAndStagedSnapshotsWithIndependentRevisions() throws {
         let fixture = try signedV3Fixture()
         let snapshot = try TrustedCatalogSnapshot(

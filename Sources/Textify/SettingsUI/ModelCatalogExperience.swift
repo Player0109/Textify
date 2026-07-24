@@ -1283,8 +1283,7 @@ struct ModelDownloadAttemptPresentation: Equatable, Identifiable {
     }
 
     var canResume: Bool {
-        [.paused, .waitingForNetwork, .waitingForCatalogCheck]
-            .contains(state.phase)
+        state.phase == .paused
     }
 
     var canRetry: Bool {
@@ -2220,11 +2219,10 @@ enum ModelInstallRowPresentation {
 
     static func offersRetry(for state: DownloadState) -> Bool {
         switch state.phase {
-        case .interrupted, .failed, .cancelled:
+        case .waitingForCatalogCheck, .interrupted, .failed, .cancelled:
             return true
-        case .queued, .paused, .waitingForNetwork, .waitingForCatalogCheck,
-             .checkingSpace, .downloading, .verifying, .installing, .installed,
-             .revoked:
+        case .queued, .paused, .waitingForNetwork, .checkingSpace,
+             .downloading, .verifying, .installing, .installed, .revoked:
             return false
         }
     }

@@ -2879,11 +2879,12 @@ private struct ModelCardInstallProgress: View {
 
                 Spacer(minLength: 8)
 
-                if actions.contains(.cancelInstall) {
-                    Button("Cancel", systemImage: "xmark.circle", action: onCancel)
-                } else if actions.contains(.retryInstall) {
+                if actions.contains(.retryInstall) {
                     Button("Retry", systemImage: "arrow.clockwise", action: onRetry)
                         .disabled(!isActionable)
+                }
+                if actions.contains(.cancelInstall) {
+                    Button("Cancel", systemImage: "xmark.circle", action: onCancel)
                 }
             }
 

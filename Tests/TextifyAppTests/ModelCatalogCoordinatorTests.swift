@@ -35,7 +35,177 @@ final class ModelCatalogCoordinatorTests: XCTestCase {
         XCTAssertTrue(coordinator.isLoading)
 
         await gate.open()
-        await refresh.value
+        _ = await refresh.value
+    }
+
+    @MainActor
+    func testReadingCachedSnapshotDoesNotRefreshIntegrityCheckTime() async throws {
+        let privateKey = Curve25519.Signing.PrivateKey()
+        let cached = try signedSnapshot(
+            revision: "2026-07-24T00:00:00Z",
+            privateKey: privateKey
+        )
+        let checkTime = try XCTUnwrap(
+            ISO8601DateFormatter().date(from: "2026-07-24T12:00:00Z")
+        )
+        let coordinator = ModelCatalogCoordinator(
+            storedState: TrustedCatalogStoredState(
+                highestAcceptedRevision: cached.revision,
+                presentedSnapshot: cached
+            ),
+            bundledSnapshot: nil,
+            snapshotLoadOperation: { cached },
+            saveOperation: { _ in },
+            now: { checkTime }
+        )
+
+        XCTAssertNil(coordinator.lastSuccessfulCatalogIntegrityCheckAt)
+    }
+
+    @MainActor
+    func testAcceptedAuthoritativeResponsePersistsIntegrityCheckTime() async throws {
+        let privateKey = Curve25519.Signing.PrivateKey()
+        let cached = try signedSnapshot(
+            revision: "2026-07-24T00:00:00Z",
+            privateKey: privateKey
+        )
+        let checkTime = try XCTUnwrap(
+            ISO8601DateFormatter().date(from: "2026-07-24T12:00:00Z")
+        )
+        var persisted: TrustedCatalogStoredState?
+        let coordinator = ModelCatalogCoordinator(
+            storedState: TrustedCatalogStoredState(
+                highestAcceptedRevision: cached.revision,
+                presentedSnapshot: cached
+            ),
+            bundledSnapshot: nil,
+            snapshotLoadOperation: { cached },
+            saveOperation: { persisted = $0 },
+            now: { checkTime }
+        )
+
+        let result = await coordinator.refresh()
+
+        XCTAssertEqual(result, .authoritativeIntegrityAccepted)
+        XCTAssertEqual(
+            coordinator.lastSuccessfulCatalogIntegrityCheckAt,
+            checkTime
+        )
+        XCTAssertEqual(
+            persisted?.lastSuccessfulCatalogIntegrityCheckAt,
+            checkTime
+        )
+    }
+
+    @MainActor
+    func testConcurrentRefreshCallersShareOneAuthoritativeResult() async throws {
+        let privateKey = Curve25519.Signing.PrivateKey()
+        let cached = try signedSnapshot(
+            revision: "2026-07-24T00:00:00Z",
+            privateKey: privateKey
+        )
+        let gate = CatalogRefreshGate()
+        let calls = CatalogRefreshCallCounter()
+        let coordinator = ModelCatalogCoordinator(
+            storedState: TrustedCatalogStoredState(
+                highestAcceptedRevision: cached.revision,
+                presentedSnapshot: cached
+            ),
+            bundledSnapshot: nil,
+            snapshotLoadOperation: {
+                await calls.increment()
+                await gate.wait()
+                return cached
+            },
+            saveOperation: { _ in }
+        )
+
+        let first = Task { await coordinator.refresh() }
+        await Task.yield()
+        let second = Task { await coordinator.refresh() }
+        await Task.yield()
+        await gate.open()
+
+        let firstResult = await first.value
+        let secondResult = await second.value
+        XCTAssertEqual(firstResult, .authoritativeIntegrityAccepted)
+        XCTAssertEqual(secondResult, .authoritativeIntegrityAccepted)
+        let callCount = await calls.value
+        XCTAssertEqual(callCount, 1)
+    }
+
+    @MainActor
+    func testRejectedAuthoritativeResponseDoesNotRefreshIntegrityCheckTime() async throws {
+        let privateKey = Curve25519.Signing.PrivateKey()
+        let cached = try signedSnapshot(
+            revision: "2026-07-24T00:00:00Z",
+            privateKey: privateKey
+        )
+        let priorCheck = try XCTUnwrap(
+            ISO8601DateFormatter().date(from: "2026-07-24T01:00:00Z")
+        )
+        let rejectedAt = try XCTUnwrap(
+            ISO8601DateFormatter().date(from: "2026-07-24T12:00:00Z")
+        )
+        var persisted: TrustedCatalogStoredState?
+        let coordinator = ModelCatalogCoordinator(
+            storedState: TrustedCatalogStoredState(
+                highestAcceptedRevision: cached.revision,
+                presentedSnapshot: cached,
+                lastSuccessfulCatalogIntegrityCheckAt: priorCheck
+            ),
+            bundledSnapshot: nil,
+            snapshotLoadOperation: {
+                throw ManifestVerificationError.signatureRejected
+            },
+            saveOperation: { persisted = $0 },
+            now: { rejectedAt }
+        )
+
+        let result = await coordinator.refresh()
+
+        XCTAssertEqual(result, .rejected)
+        XCTAssertEqual(
+            coordinator.lastSuccessfulCatalogIntegrityCheckAt,
+            priorCheck
+        )
+        XCTAssertEqual(
+            persisted?.lastSuccessfulCatalogIntegrityCheckAt,
+            priorCheck
+        )
+    }
+
+    @MainActor
+    func testOfflineTransportErrorDoesNotRefreshIntegrityCheckTime() async throws {
+        let privateKey = Curve25519.Signing.PrivateKey()
+        let cached = try signedSnapshot(
+            revision: "2026-07-24T00:00:00Z",
+            privateKey: privateKey
+        )
+        let priorCheck = try XCTUnwrap(
+            ISO8601DateFormatter().date(from: "2026-07-24T01:00:00Z")
+        )
+        let coordinator = ModelCatalogCoordinator(
+            storedState: TrustedCatalogStoredState(
+                highestAcceptedRevision: cached.revision,
+                presentedSnapshot: cached,
+                lastSuccessfulCatalogIntegrityCheckAt: priorCheck
+            ),
+            bundledSnapshot: nil,
+            snapshotLoadOperation: {
+                throw URLError(.notConnectedToInternet)
+            },
+            saveOperation: { _ in }
+        )
+
+        let result = await coordinator.refresh()
+
+        XCTAssertEqual(result, .networkUnavailable)
+        XCTAssertEqual(coordinator.status, .offline)
+        XCTAssertEqual(
+            coordinator.lastSuccessfulCatalogIntegrityCheckAt,
+            priorCheck
+        )
     }
 
     @MainActor
@@ -613,6 +783,14 @@ private actor CatalogRefreshGate {
 
 private enum CatalogPersistenceTestError: Error {
     case writeFailed
+}
+
+private actor CatalogRefreshCallCounter {
+    private(set) var value = 0
+
+    func increment() {
+        value += 1
+    }
 }
 
 private actor CatalogRefreshScript {

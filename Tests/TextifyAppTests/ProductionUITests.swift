@@ -583,6 +583,9 @@ final class ProductionUITests: XCTestCase {
         XCTAssertTrue(presentation.active[0].canPause)
         XCTAssertTrue(presentation.pending[0].canCancel)
         XCTAssertTrue(presentation.pending[1].canResume)
+        XCTAssertFalse(presentation.pending[2].canResume)
+        XCTAssertTrue(presentation.pending[3].canRetry)
+        XCTAssertTrue(presentation.pending[3].canCancel)
         XCTAssertTrue(presentation.history[1].canRetry)
         XCTAssertFalse(presentation.history[3].canRetry)
         XCTAssertEqual(
