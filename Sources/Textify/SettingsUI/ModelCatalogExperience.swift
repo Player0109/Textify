@@ -231,6 +231,7 @@ struct ModelCatalogFamilyPresentation: Equatable, Identifiable {
 struct ModelCatalogCheckpointPresentation: Equatable, Identifiable {
     let metadata: ModelCheckpointPresentationNode
     let artifacts: [ModelCatalogExactArtifactPresentation]
+    let referenceArtifact: ModelCatalogExactArtifactPresentation?
 
     var id: String {
         metadata.id
@@ -519,10 +520,18 @@ struct ModelCatalogExperience: Equatable {
         }
         rows = derivedRows
         families = presentationGraph.map {
-            Self.makeFamilyPresentations(graph: $0, rows: derivedRows)
+            Self.makeFamilyPresentations(
+                graph: $0,
+                rows: derivedRows,
+                referenceRows: allRows
+            )
         } ?? []
         inspectorFamilies = presentationGraph.map {
-            Self.makeFamilyPresentations(graph: $0, rows: allRows)
+            Self.makeFamilyPresentations(
+                graph: $0,
+                rows: allRows,
+                referenceRows: allRows
+            )
         } ?? []
     }
 
@@ -656,10 +665,14 @@ struct ModelCatalogExperience: Equatable {
             checkpointName: checkpoint.metadata.presentation.displayName,
             displayName: metadata.presentation.displayName,
             description: model?.description ?? artifact.row.model.description,
-            artifactFormat: artifactFormatName(metadata.artifactFormat),
+            artifactFormat: ModelCatalogVariantTerminology.artifactFormat(
+                metadata.artifactFormat
+            ),
             numericFormat: metadata.numericFormat.rawValue,
-            runtime: runtimeName(metadata.runtime),
-            computeRoute: computeRouteName(metadata.computeRoute),
+            runtime: ModelCatalogVariantTerminology.runtime(metadata.runtime),
+            computeRoute: ModelCatalogVariantTerminology.computeRoute(
+                metadata.computeRoute
+            ),
             compatibility: compatibilityParts.joined(separator: " • "),
             qualityEvidence: artifact.row.model.qualityEvidenceDescription ?? "Unrated",
             speedEvidence: artifact.row.model.speedEvidenceDescription ?? "Unrated",
@@ -731,53 +744,6 @@ struct ModelCatalogExperience: Equatable {
         return "Not installed"
     }
 
-    private static func artifactFormatName(
-        _ format: ModelArtifactContainerFormat
-    ) -> String {
-        switch format {
-        case .ggml:
-            "GGML"
-        case .gguf:
-            "GGUF"
-        case .mlx:
-            "MLX"
-        case .coreML:
-            "Core ML"
-        case .onnx:
-            "ONNX"
-        }
-    }
-
-    private static func runtimeName(_ runtime: TranscriptionEngine) -> String {
-        switch runtime {
-        case .whisperCpp:
-            "Whisper.cpp"
-        case .fluidAudioParakeet:
-            "FluidAudio Parakeet"
-        case .fluidAudioParaformer:
-            "FluidAudio Paraformer"
-        case .sherpaOnnx:
-            "sherpa-onnx"
-        case .transcribeCpp:
-            "transcribe.cpp"
-        case .mlxAudio:
-            "MLX Audio"
-        case .liteRTLM:
-            "LiteRT-LM"
-        }
-    }
-
-    private static func computeRouteName(_ route: ModelComputeRoute) -> String {
-        switch route {
-        case .gpuViaMetal:
-            "GPU via Metal"
-        case .coreMLNeuralEngine:
-            "Core ML / Neural Engine"
-        case .cpuOnly:
-            "CPU only"
-        }
-    }
-
     private static func checkpointLanguageDescription(
         _ artifacts: [ModelCatalogExactArtifactPresentation]
     ) -> String {
@@ -845,7 +811,8 @@ struct ModelCatalogExperience: Equatable {
 
     private static func makeFamilyPresentations(
         graph: ModelCatalogPresentationGraph,
-        rows: [ModelCatalogRowPresentation]
+        rows: [ModelCatalogRowPresentation],
+        referenceRows: [ModelCatalogRowPresentation]
     ) -> [ModelCatalogFamilyPresentation] {
         let checkpointsByID = graph.checkpoints.reduce(
             into: [String: ModelCheckpointPresentationNode]()
@@ -858,6 +825,11 @@ struct ModelCatalogExperience: Equatable {
             $0[$1.id] = $1
         }
         let rowsByID = rows.reduce(into: [String: ModelCatalogRowPresentation]()) {
+            $0[$1.id] = $1
+        }
+        let referenceRowsByID = referenceRows.reduce(
+            into: [String: ModelCatalogRowPresentation]()
+        ) {
             $0[$1.id] = $1
         }
 
@@ -881,9 +853,25 @@ struct ModelCatalogExperience: Equatable {
                     guard !artifacts.isEmpty else {
                         return nil
                     }
+                    var referenceArtifact = artifacts.first {
+                        $0.id == checkpoint.recommendedArtifactID
+                    }
+                    if referenceArtifact == nil,
+                       let metadata = artifactsByID[
+                           checkpoint.recommendedArtifactID
+                       ],
+                       let row = referenceRowsByID[
+                           checkpoint.recommendedArtifactID
+                       ] {
+                        referenceArtifact = ModelCatalogExactArtifactPresentation(
+                            metadata: metadata,
+                            row: row
+                        )
+                    }
                     return ModelCatalogCheckpointPresentation(
                         metadata: checkpoint,
-                        artifacts: artifacts
+                        artifacts: artifacts,
+                        referenceArtifact: referenceArtifact
                     )
                 }
             guard !checkpoints.isEmpty else {

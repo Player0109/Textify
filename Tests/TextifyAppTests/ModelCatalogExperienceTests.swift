@@ -516,6 +516,182 @@ final class ModelCatalogExperienceTests: XCTestCase {
         XCTAssertEqual(artifact.numericFormat, "F16")
     }
 
+    func testVariantComparisonRetainsExactSignedTerminology() throws {
+        let experience = ModelCatalogExperience(
+            trustedManifest: try productionManifest(),
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        let checkpoint = try XCTUnwrap(
+            experience.families
+                .flatMap(\.checkpoints)
+                .first { $0.id == "checkpoint.qwen.qwen3-asr-1.7b" }
+        )
+        let variants = checkpoint.variantComparisons
+
+        XCTAssertEqual(
+            variants.map(\.numericFormat),
+            ["8bit", "BF16", "Q8_0", "Q5_K_M"]
+        )
+        XCTAssertEqual(
+            variants.map(\.artifactFormat),
+            ["MLX", "GGUF", "GGUF", "GGUF"]
+        )
+        XCTAssertEqual(
+            variants.map(\.runtime),
+            ["MLX Audio", "transcribe.cpp", "transcribe.cpp", "transcribe.cpp"]
+        )
+        XCTAssertEqual(
+            Set(variants.map(\.computeRoute)),
+            ["GPU via Metal"]
+        )
+        XCTAssertFalse(variants.map(\.numericFormat).contains("FP16"))
+    }
+
+    func testVariantComparisonUsesOnlyMatchingSignedEvidenceGroups() throws {
+        let experience = ModelCatalogExperience(
+            trustedManifest: try productionManifest(
+                comparisonGroupOverride: (
+                    artifactID: "qwen3-asr-1.7b-q5-k-m",
+                    groupID: "different-evidence-group"
+                )
+            ),
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        let checkpoint = try XCTUnwrap(
+            experience.families
+                .flatMap(\.checkpoints)
+                .first { $0.id == "checkpoint.qwen.qwen3-asr-1.7b" }
+        )
+        let reference = try XCTUnwrap(
+            checkpoint.variantComparisons.first {
+                $0.id == checkpoint.metadata.recommendedArtifactID
+            }
+        )
+        XCTAssertEqual(reference.quality, .reference(label: "High"))
+        XCTAssertEqual(reference.speed, .reference(label: "Balanced"))
+
+        let comparable = try XCTUnwrap(
+            checkpoint.variantComparisons.first {
+                $0.id == "qwen3-asr-1.7b-bf16"
+            }
+        )
+        XCTAssertEqual(
+            comparable.quality,
+            .compared(label: "Highest", scoreDelta: 7)
+        )
+        XCTAssertEqual(
+            comparable.speed,
+            .compared(label: "Measured", scoreDelta: -14)
+        )
+
+        let differentGroup = try XCTUnwrap(
+            checkpoint.variantComparisons.first {
+                $0.id == "qwen3-asr-1.7b-q5-k-m"
+            }
+        )
+        XCTAssertEqual(differentGroup.quality, .notComparable)
+        XCTAssertEqual(differentGroup.speed, .notComparable)
+
+        let inspector = try XCTUnwrap(
+            experience.inspectorPresentation(
+                for: .exactArtifact(differentGroup.id)
+            )
+        )
+        guard case let .exactArtifact(artifact) = inspector else {
+            return XCTFail("Raw signed evidence must remain inspectable.")
+        }
+        XCTAssertNotEqual(artifact.qualityEvidence, "Unrated")
+        XCTAssertNotEqual(artifact.speedEvidence, "Unrated")
+    }
+
+    func testUnratedReferenceProducesNoInventedComparisonBaseline() throws {
+        let experience = ModelCatalogExperience(
+            trustedManifest: try signedV3FixtureManifest(),
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        let checkpoint = try XCTUnwrap(
+            experience.families.first?.checkpoints.first
+        )
+
+        XCTAssertEqual(
+            checkpoint.variantComparisons.map(\.quality),
+            [.noBaseline, .noBaseline]
+        )
+        XCTAssertEqual(
+            checkpoint.variantComparisons.map(\.speed),
+            [.noBaseline, .noBaseline]
+        )
+    }
+
+    func testFilteredVariantStillComparesWithItsHiddenSignedReference() throws {
+        let experience = ModelCatalogExperience(
+            trustedManifest: try productionManifest(),
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            query: ModelCatalogQuery(precision: .sixteenBit)
+        )
+        let checkpoint = try XCTUnwrap(
+            experience.families
+                .flatMap(\.checkpoints)
+                .first { $0.id == "checkpoint.qwen.qwen3-asr-1.7b" }
+        )
+
+        XCTAssertEqual(
+            checkpoint.artifacts.map(\.id),
+            ["qwen3-asr-1.7b-bf16"]
+        )
+        XCTAssertEqual(
+            checkpoint.variantComparisons.map(\.quality),
+            [.compared(label: "Highest", scoreDelta: 7)]
+        )
+    }
+
+    func testVariantComparisonLayoutProgressivelyLabelsSecondaryFields() {
+        XCTAssertTrue(ModelCatalogVariantComparisonLayout.wide.showsInlineState)
+        XCTAssertTrue(ModelCatalogVariantComparisonLayout.medium.showsInlineState)
+        XCTAssertFalse(ModelCatalogVariantComparisonLayout.narrow.showsInlineState)
+        XCTAssertEqual(ModelCatalogVariantComparisonLayout.wide.labeledFields, [])
+        XCTAssertEqual(
+            ModelCatalogVariantComparisonLayout.medium.labeledFields,
+            [
+                .artifactFormat,
+                .numericFormat,
+                .quality,
+                .speed,
+                .size,
+                .computeRoute,
+            ]
+        )
+        XCTAssertTrue(
+            ModelCatalogVariantComparisonLayout.narrow.labeledFields
+                .contains(.state)
+        )
+    }
+
+    func testAboutModelVariantsDefinesCanonicalTermsAndTradeoffs() {
+        XCTAssertTrue(
+            ModelCatalogVariantTerminology.artifactFormatExplanation
+                .contains("packaging")
+        )
+        XCTAssertTrue(
+            ModelCatalogVariantTerminology.numericFormatExplanation
+                .contains("weight representation")
+        )
+        for effect in ["storage", "memory", "speed", "accuracy"] {
+            XCTAssertTrue(
+                ModelCatalogVariantTerminology.tradeoffExplanation
+                    .contains(effect)
+            )
+        }
+    }
+
     @MainActor
     func testInspectorCancelsAndRejectsStaleLocalDetailsAfterSelectionChanges() async throws {
         let manifest = try signedV3FixtureManifest()
@@ -778,6 +954,39 @@ final class ModelCatalogExperienceTests: XCTestCase {
             signatureData: Data(
                 contentsOf: fixtureDirectory.appendingPathComponent("manifest_v3.json.sig")
             )
+        )
+    }
+
+    private func productionManifest(
+        comparisonGroupOverride: (artifactID: String, groupID: String)? = nil
+    ) throws -> ModelManifest {
+        let manifestURL = repositoryRoot.appendingPathComponent("models/manifest.json")
+        guard let comparisonGroupOverride else {
+            return try ModelManifest.decode(Data(contentsOf: manifestURL))
+        }
+
+        var root = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL))
+                as? [String: Any]
+        )
+        var graph = try XCTUnwrap(root["presentationGraph"] as? [String: Any])
+        var artifacts = try XCTUnwrap(graph["artifacts"] as? [[String: Any]])
+        let index = try XCTUnwrap(
+            artifacts.firstIndex {
+                $0["id"] as? String == comparisonGroupOverride.artifactID
+            }
+        )
+        var artifact = artifacts[index]
+        var presentation = try XCTUnwrap(
+            artifact["presentation"] as? [String: Any]
+        )
+        presentation["comparisonGroupID"] = comparisonGroupOverride.groupID
+        artifact["presentation"] = presentation
+        artifacts[index] = artifact
+        graph["artifacts"] = artifacts
+        root["presentationGraph"] = graph
+        return try ModelManifest.decode(
+            JSONSerialization.data(withJSONObject: root)
         )
     }
 

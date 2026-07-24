@@ -850,3 +850,26 @@ Task 1 must merge before parallel Wave 1 work begins.
   inventory accounting, comparison tables, query expansion, queues,
   revocation, deletion transactions, and runtime changes remain owned by later
   tickets.
+
+## Exact Artifact Variant Comparison Handoff - 2026-07-24
+
+- GitHub issue #7 owns the expanded-checkpoint comparison presentation under
+  `Sources/Textify/SettingsUI/` and its focused catalog-experience coverage in
+  `Tests/TextifyAppTests/`.
+- The signed recommended exact artifact is the checkpoint reference. Quality
+  and speed may be summarized relative to it only when both artifacts carry
+  the same non-empty signed comparison-group identifier. Different groups
+  report Not Comparable, and an unrated reference produces no invented
+  baseline; the exact artifact inspector continues to expose raw signed
+  evidence.
+- This slice owns only precise Artifact Format, Numeric Format, Runtime,
+  Compute Route, responsive comparison layout, and the accessible About Model
+  Variants explanation. Existing exact actions and installation/runtime
+  identities remain unchanged. Purpose destinations, query expansion, queues,
+  storage, revocation, deletion transactions, and runtime behavior remain
+  owned by later tickets.
+- The same slice owns the narrow Task 14 source-membership refresh in the
+  generated Xcode project. `project.yml` already includes
+  `Sources/Textify/`, but the checked-in project predates the catalog files
+  added by issues #2–#7; regeneration is required so production Xcode builds
+  compile the same settings UI sources as SwiftPM.

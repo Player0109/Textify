@@ -541,6 +541,7 @@ private struct ModelsSettingsPane: View {
     @State private var hierarchyState = ModelCatalogHierarchyState()
     @State private var inspectorController = ModelCatalogInspectorController()
     @State private var showsInspector = false
+    @State private var showsModelVariantsHelp = false
 
     var body: some View {
         let catalogExperience = ModelCatalogExperience(
@@ -600,10 +601,16 @@ private struct ModelsSettingsPane: View {
                 onReset: resetCatalogQuery,
                 onVerify: verifyInstalledModels,
                 onImport: chooseCustomWhisperModel,
+                onShowVariantHelp: {
+                    showsModelVariantsHelp = true
+                },
                 isImportDisabled: isInstalling || isImporting
             )
             .padding(.top, 48)
             .padding(.trailing, 24)
+        }
+        .popover(isPresented: $showsModelVariantsHelp) {
+            ModelCatalogVariantsAboutView()
         }
         .task {
             _ = await services.dictation.refreshReadiness()
@@ -702,6 +709,62 @@ private struct ModelsSettingsPane: View {
             },
             onReset: resetCatalogQuery
         ) { row, context in
+            catalogRow(row, context: context)
+        }
+    }
+
+    @ViewBuilder
+    private func catalogRow(
+        _ row: ModelCatalogRowPresentation,
+        context: ModelCatalogArtifactRowContext?
+    ) -> some View {
+        let onUse: () -> Void = {
+            activatingModelID = row.id
+            Task {
+                let activated = await services.activateInstalledModel(row.id)
+                modelMessage = activated
+                    ? row.model.activationMessage
+                    : "Textify kept the previous model because \(row.model.displayName) could not be prepared."
+                activatingModelID = nil
+            }
+        }
+        let onDisable: () -> Void = {
+            Task {
+                await services.disableVoiceCleaning()
+                modelMessage = "Voice cleaning is off."
+            }
+        }
+        let onInstall: () -> Void = {
+            services.modelInstallCoordinator.start(modelID: row.id)
+        }
+        let onCancelInstall: () -> Void = {
+            services.modelInstallCoordinator.cancel()
+        }
+        let onRetryInstall: () -> Void = {
+            services.modelInstallCoordinator.retry()
+        }
+        let onDelete: () -> Void = {
+            pendingRemovalModel = row.model
+        }
+
+        if let context, let comparison = context.comparison {
+            ModelCatalogVariantComparisonRow(
+                model: row.model,
+                presentation: comparison,
+                isSelected: context.isSelected,
+                isActivating: activatingModelID == row.id,
+                isBusy: activatingModelID != nil || isInstalling || isImporting,
+                install: row.install,
+                actions: row.actions,
+                onSelect: context.onSelect,
+                onUse: onUse,
+                onDisable: onDisable,
+                onInstall: onInstall,
+                onCancelInstall: onCancelInstall,
+                onRetryInstall: onRetryInstall,
+                onDelete: onDelete
+            )
+        } else {
             TextifyModelCard(
                 model: row.model,
                 hierarchyContext: context,
@@ -711,34 +774,12 @@ private struct ModelsSettingsPane: View {
                 isBusy: activatingModelID != nil || isInstalling || isImporting,
                 install: row.install,
                 actions: row.actions,
-                onUse: {
-                    activatingModelID = row.id
-                    Task {
-                        let activated = await services.activateInstalledModel(row.id)
-                        modelMessage = activated
-                            ? row.model.activationMessage
-                            : "Textify kept the previous model because \(row.model.displayName) could not be prepared."
-                        activatingModelID = nil
-                    }
-                },
-                onDisable: {
-                    Task {
-                        await services.disableVoiceCleaning()
-                        modelMessage = "Voice cleaning is off."
-                    }
-                },
-                onInstall: {
-                    services.modelInstallCoordinator.start(modelID: row.id)
-                },
-                onCancelInstall: {
-                    services.modelInstallCoordinator.cancel()
-                },
-                onRetryInstall: {
-                    services.modelInstallCoordinator.retry()
-                },
-                onDelete: {
-                    pendingRemovalModel = row.model
-                }
+                onUse: onUse,
+                onDisable: onDisable,
+                onInstall: onInstall,
+                onCancelInstall: onCancelInstall,
+                onRetryInstall: onRetryInstall,
+                onDelete: onDelete
             )
         }
     }
@@ -982,6 +1023,7 @@ private struct ModelCatalogToolbar: View {
     let onReset: () -> Void
     let onVerify: () -> Void
     let onImport: () -> Void
+    let onShowVariantHelp: () -> Void
     let isImportDisabled: Bool
 
     var body: some View {
@@ -1016,6 +1058,11 @@ private struct ModelCatalogToolbar: View {
                     Button("Reset Filters", systemImage: "arrow.counterclockwise", action: onReset)
                 }
                 Divider()
+                Button(
+                    "About Model Variants…",
+                    systemImage: "questionmark.circle",
+                    action: onShowVariantHelp
+                )
                 Button("Verify Installed", systemImage: "checkmark.seal", action: onVerify)
                 Button("Import Whisper Model…", systemImage: "square.and.arrow.down", action: onImport)
                     .disabled(isImportDisabled)
@@ -1046,6 +1093,7 @@ private struct ModelCatalogArtifactRowContext {
     let isRecommended: Bool
     let isSelected: Bool
     let indentation: CGFloat
+    let comparison: ModelCatalogVariantComparisonPresentation?
     let onSelect: () -> Void
 }
 
@@ -1393,6 +1441,9 @@ private struct ModelCatalogSurface<Row: View>: View {
                                         }
                                     }
                                 )
+                                if hierarchyRow.isExpanded {
+                                    ModelCatalogVariantComparisonHeader()
+                                }
                             case let .exactArtifact(checkpoint, artifact, isSingleVariant):
                                 row(
                                     artifact.row,
@@ -1411,6 +1462,11 @@ private struct ModelCatalogSurface<Row: View>: View {
                                                 .recommendedArtifactID == artifact.id,
                                         isSelected: selection == .exactArtifact(artifact.id),
                                         indentation: isSingleVariant ? 0 : 30,
+                                        comparison: isSingleVariant
+                                            ? nil
+                                            : checkpoint.variantComparisons.first {
+                                                $0.id == artifact.id
+                                            },
                                         onSelect: {
                                             onSelect(.exactArtifact(artifact.id))
                                         }
