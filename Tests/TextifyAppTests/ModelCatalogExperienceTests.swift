@@ -224,6 +224,52 @@ final class ModelCatalogExperienceTests: XCTestCase {
         XCTAssertEqual(singleVariant.artifacts[0].metadata.numericFormat, .f16)
     }
 
+    func testProductionV3ResolvesV2ReceiptAndActivePreferenceToSameExactArtifact() throws {
+        let fixtures = repositoryRoot
+            .appendingPathComponent("Tests/TextifyModelsTests/Fixtures/Models")
+        let v2 = try ModelManifest.decode(
+            Data(
+                contentsOf: fixtures
+                    .appendingPathComponent("manifest_v2.production-migration.json")
+            )
+        )
+        let v3 = try ModelManifest.decode(
+            Data(contentsOf: repositoryRoot.appendingPathComponent("models/manifest.json"))
+        )
+        let activeID = "qwen3-asr-1.7b-bf16"
+        let previousModel = try XCTUnwrap(v2.models.first { $0.id == activeID })
+        let record = InstalledModelRecord(
+            model: previousModel,
+            installedAt: "2026-07-23T00:00:00Z",
+            localFilesByManifestFilename: Dictionary(
+                uniqueKeysWithValues: previousModel.files.map {
+                    ($0.filename, "/Models/\(activeID)/\($0.relativePath ?? $0.filename)")
+                }
+            )
+        )
+
+        let experience = ModelCatalogExperience(
+            trustedManifest: v3,
+            installedRecords: [record],
+            activePreferences: ModelCatalogActivePreferences(
+                transcriptionModelID: activeID,
+                voiceCleaningModelID: nil
+            ),
+            transferState: nil
+        )
+
+        let exactArtifact = try XCTUnwrap(
+            experience.families
+                .flatMap(\.checkpoints)
+                .flatMap(\.artifacts)
+                .first { $0.id == activeID }
+        )
+        XCTAssertEqual(exactArtifact.row.model.id, record.model.id)
+        XCTAssertTrue(exactArtifact.row.isInstalled)
+        XCTAssertTrue(exactArtifact.row.isActive)
+        XCTAssertEqual(experience.rows.filter(\.isActive).map(\.id), [activeID])
+    }
+
     private var repositoryRoot: URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

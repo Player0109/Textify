@@ -801,3 +801,20 @@ Task 1 must merge before parallel Wave 1 work begins.
 - This slice does not publish or rewrite `models/manifest.json`, render native
   hierarchy rows, change user-facing actions, resolve compatibility fallbacks,
   or implement later queue, storage, migration, revocation, and release work.
+
+## Bundled Production Catalog V3 Publication Handoff - 2026-07-24
+
+- GitHub issue #4 owns the production-only migration of
+  `models/manifest.json` and its detached signature from schema v2 to v3. The
+  operational `models` array, every exact artifact ID, immutable URL, digest,
+  byte size, runtime tuple, and managed layout must remain unchanged.
+- This slice also owns the minimum v3 enablement in the standalone manifest
+  signing and verification helpers, their publication guidance, a frozen v2
+  migration fixture, and focused production-catalog integration tests.
+- The standalone verifier may add one narrowly scoped Swift executable target
+  in `Package.swift` so publication checks reuse `TextifyModels` strict
+  decoding, signature verification, and production policy instead of carrying
+  a second schema implementation in shell tooling.
+- Runtime behavior, installer semantics, active-preference mutation, native
+  hierarchy rendering, queues, storage inventory, and revocation remain owned
+  by later tickets.

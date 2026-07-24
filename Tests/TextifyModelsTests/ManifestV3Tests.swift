@@ -204,6 +204,23 @@ final class ManifestV3Tests: XCTestCase {
         )
     }
 
+    func testV3StrictDecodeRejectsMissingFamilyProvider() throws {
+        var json = try fixtureJSON()
+        var graph = try presentationGraph(in: json)
+        var families = try XCTUnwrap(graph["families"] as? [[String: Any]])
+        var presentation = try XCTUnwrap(
+            families[0]["presentation"] as? [String: Any]
+        )
+        presentation.removeValue(forKey: "provider")
+        families[0]["presentation"] = presentation
+        graph["families"] = families
+        json["presentationGraph"] = graph
+
+        XCTAssertThrowsError(
+            try ModelManifest.decode(JSONSerialization.data(withJSONObject: json))
+        )
+    }
+
     func testStrictDecodeRejectsUnsupportedManifestVersion() throws {
         var json = try fixtureJSON()
         json["manifestVersion"] = 4

@@ -12,7 +12,7 @@ final class BenchmarkModelCatalogTests: XCTestCase {
             manifest.models.filter { $0.benchmark == nil }.map(\.id)
         )
 
-        XCTAssertEqual(manifest.manifestVersion, 2)
+        XCTAssertEqual(manifest.manifestVersion, 3)
         XCTAssertEqual(ratedModels.count, 31)
         XCTAssertEqual(
             unratedModelIDs,

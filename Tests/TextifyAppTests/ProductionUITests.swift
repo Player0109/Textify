@@ -517,6 +517,8 @@ final class ProductionUITests: XCTestCase {
             resourceDirectory: temporaryResources
         ).load()
 
+        XCTAssertEqual(manifest.manifestVersion, 3)
+        XCTAssertNotNil(manifest.presentationGraph)
         XCTAssertEqual(
             manifest.models.map(\.id),
             [

@@ -88,8 +88,8 @@ do {
     guard let manifestObject = try JSONSerialization.jsonObject(with: manifestData)
         as? [String: Any],
           let manifestVersion = manifestObject["manifestVersion"] as? Int,
-          manifestVersion == 1 || manifestVersion == 2 else {
-        fail("manifestVersion must be 1 or 2")
+          [1, 2, 3].contains(manifestVersion) else {
+        fail("manifestVersion must be 1, 2, or 3")
     }
     let contentType = "application/vnd.textify.model-manifest+json;version=\(manifestVersion)"
     let contentSHA256 = SHA256.hash(data: manifestData)

@@ -1,6 +1,6 @@
 # Model Manifest Signing
 
-Textify model-manifest versions 1 and 2 use a detached JSON signature envelope at
+Textify model-manifest versions 1, 2, and 3 use a detached JSON signature envelope at
 `manifest.json.sig`. The envelope records the SHA-256 of the exact raw manifest
 bytes, and the Ed25519 signature covers the canonical UTF-8 payload defined in
 `docs/SPEC.md` section 22.2. Do not reformat or rewrite the manifest between
@@ -43,7 +43,7 @@ The script writes `path/to/manifest.json.sig` with this envelope shape:
 {
   "algorithm": "Ed25519",
   "contentSHA256": "<lowercase SHA-256 of the exact manifest bytes>",
-  "contentType": "application/vnd.textify.model-manifest+json;version=2",
+  "contentType": "application/vnd.textify.model-manifest+json;version=3",
   "keyId": "textify-model-manifest-2026-huggingface",
   "manifestFile": "manifest.json",
   "signature": "<unpadded base64url Ed25519 signature>",
@@ -59,9 +59,9 @@ SPEC envelope; republish the live signature in that format at the next
 maintainer signing opportunity.
 
 The signing helper reads `manifestVersion` from the exact input bytes and
-emits the matching content type. Versions 1 and 2 are the only accepted values,
-and verification rejects a correctly signed envelope when its content-type
-version differs from the parsed manifest version.
+emits the matching content type. Versions 1, 2, and 3 are accepted, and
+verification rejects a correctly signed envelope when its content-type version
+differs from the parsed manifest version.
 
 ## Verify Before Publishing
 
@@ -96,10 +96,16 @@ Verification checks the detached signature and the production catalog policy:
   suite-index hash, three Apple M4 Max runs, exact runtime identity, source Git
   revision, internally consistent absolute score math, and an artifact
   fingerprint recomputed from the signed file paths, hashes, and sizes
+- a manifest-v3 presentation graph in which every exact artifact appears once
+  under one checkpoint and family, with valid signed order, recommendation,
+  fallback, format, numeric format, runtime, compute route, and compatibility
+  metadata
 
-Manifest v1 remains valid and cannot contain `benchmark`. Manifest v2 may
-leave a model without `benchmark`; the app then shows quality and speed as
-`Unrated`. An eligible candidate is generated under
+Manifest v1 remains valid and cannot contain `benchmark`. Manifest v2 adds
+benchmark evidence, and manifest v3 retains those exact operational records
+while requiring the normalized presentation graph. A model may leave
+`benchmark` absent; the app then shows quality and speed as `Unrated`. An
+eligible candidate is generated under
 `Benchmarks/RealtimeASR` and reviewed manually:
 
 ```bash
@@ -107,10 +113,11 @@ leave a model without `benchmark`; the app then shows quality and speed as
   MODEL_ID MEASURED_AT RUN_ID_1 RUN_ID_2 RUN_ID_3 candidate.json
 ```
 
-Copy the complete candidate object into that model entry's `benchmark`
-field, change the document to `manifestVersion: 2`, run the verification
-tests, and only then sign with the maintainer key. Nightly workflows never
-modify the catalog and never receive a manifest private key.
+Copy the complete candidate object into that model entry's `benchmark` field.
+Use manifest v2 only for a catalog that has no presentation graph; keep a v3
+production catalog at v3 and preserve its exact graph mapping. Run the
+verification tests and only then sign with the maintainer key. Nightly
+workflows never modify the catalog and never receive a manifest private key.
 
 The production runtime tuples are deliberately closed:
 

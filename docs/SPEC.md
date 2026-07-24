@@ -1678,6 +1678,14 @@ Manifest version 2 adds an optional strict `benchmark` object to each model.
 Missing benchmark evidence is valid and means `Unrated`; it is never
 replaced with a tier-derived estimate.
 
+Manifest version 3 retains the exact version-2 operational model records and
+requires a separate normalized signed presentation graph. The graph assigns
+every Exact Artifact to exactly one Checkpoint and every Checkpoint to exactly
+one Family and purpose. It carries stable IDs, signed presentation order,
+checkpoint recommendation and fallback references, Artifact Format, Numeric
+Format, Runtime, Compute Route, compatibility requirements, and comparable
+evidence group identifiers without parsing filenames or display titles.
+
 The English benchmark schema-version-1 object is generated, not hand-calculated. It
 binds the policy and suite IDs, suite-index SHA-256, model ID, canonical
 artifact fingerprint, language, exact engine/version/license/compute route,
@@ -1851,7 +1859,7 @@ Verification order:
 8. Rebuild the canonical payload exactly.
 9. Verify the Ed25519 signature using the embedded public key for `keyId`.
 10. Only then parse and strict-schema-validate `manifest.json`.
-11. Require manifest version 1 or 2 and require the signed content-type version
+11. Require manifest version 1, 2, or 3 and require the signed content-type version
     to equal `manifestVersion` exactly.
 
 `keyId` is an opaque ASCII identifier into the app's embedded manifest

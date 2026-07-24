@@ -79,6 +79,10 @@ let package = Package(
         .library(name: "TextifySettings", targets: ["TextifySettings"]),
         .library(name: "TextifyRuntime", targets: ["TextifyRuntime"]),
         .library(name: "TextifyWhisperShim", targets: ["TextifyWhisperShim"]),
+        .executable(
+            name: "TextifyModelManifestVerifier",
+            targets: ["TextifyModelManifestVerifier"]
+        ),
         .executable(name: "Textify", targets: ["Textify"])
     ],
     dependencies: [
@@ -177,6 +181,10 @@ let package = Package(
         .target(name: "TextifyHotkeys", dependencies: ["TextifyCore", "TextifyDiagnostics"]),
         .target(name: "TextifyDiagnostics"),
         .target(name: "TextifySettings", dependencies: ["TextifyModels"]),
+        .executableTarget(
+            name: "TextifyModelManifestVerifier",
+            dependencies: ["TextifyModels"]
+        ),
         .target(
             name: "TextifyRuntime",
             dependencies: [

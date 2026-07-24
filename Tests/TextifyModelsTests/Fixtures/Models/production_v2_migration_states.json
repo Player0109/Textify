@@ -1,0 +1,48 @@
+{
+  "sourceManifestVersion": 2,
+  "activeArtifactID": "qwen3-asr-1.7b-bf16",
+  "records": [
+    {
+      "artifactID": "ggml-small.en-q5_1",
+      "condition": "installed",
+      "filename": "ggml-small.en-q5_1.bin",
+      "receiptPresent": true,
+      "filePresent": true,
+      "observedSizeBytes": 190098681,
+      "observedSHA256": "bfdff4894dcb76bbf647d56263ea2a96645423f1669176f4844a1bf8e478ad30"
+    },
+    {
+      "artifactID": "qwen3-asr-1.7b-bf16",
+      "condition": "active",
+      "filename": "Qwen3-ASR-1.7B-BF16.gguf",
+      "receiptPresent": true,
+      "filePresent": true,
+      "observedSizeBytes": 4083087904,
+      "observedSHA256": "57db745f8ec3ad2ea391b0205661e7d74f76158877a33f151e4d4624ed2b7cc9"
+    },
+    {
+      "artifactID": "parakeet-tdt-0.6b-v3",
+      "condition": "missing",
+      "filename": "parakeet-parakeet_vocab.json",
+      "receiptPresent": true,
+      "filePresent": false
+    },
+    {
+      "artifactID": "whisper-large-v3-turbo-mlx",
+      "condition": "corrupt",
+      "filename": "weights.safetensors",
+      "receiptPresent": true,
+      "filePresent": true,
+      "observedSizeBytes": 1613977612,
+      "observedSHA256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "artifactID": "mossformer2-se-fp16",
+      "condition": "partial",
+      "filename": "model.safetensors",
+      "receiptPresent": false,
+      "filePresent": true,
+      "observedSizeBytes": 55326314
+    }
+  ]
+}
