@@ -1334,12 +1334,7 @@ final class ModelInstallCoordinator {
             guard let self else {
                 return
             }
-            if isArtifactKnownRevoked(attempt.artifactID) {
-                finish(
-                    attemptID: attempt.id,
-                    phase: .revoked,
-                    message: "Install revoked."
-                )
+            if finishIfKnownRevoked(attempt) {
                 return
             }
 
@@ -1401,12 +1396,7 @@ final class ModelInstallCoordinator {
                 }
             }
 
-            if isArtifactKnownRevoked(attempt.artifactID) {
-                finish(
-                    attemptID: attempt.id,
-                    phase: .revoked,
-                    message: "Install revoked."
-                )
+            if finishIfKnownRevoked(attempt) {
                 return
             }
 
@@ -1456,6 +1446,20 @@ final class ModelInstallCoordinator {
                 )
             }
         }
+    }
+
+    private func finishIfKnownRevoked(
+        _ attempt: ModelInstallQueueAttempt
+    ) -> Bool {
+        guard isArtifactKnownRevoked(attempt.artifactID) else {
+            return false
+        }
+        finish(
+            attemptID: attempt.id,
+            phase: .revoked,
+            message: "Install revoked."
+        )
+        return true
     }
 
     private func requeueWaitingHead(
