@@ -10,8 +10,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static var mainWindowVisibilityProvider: (@MainActor () -> Bool)?
     @MainActor
     static var modelInstallActivityProvider: (@MainActor () -> Bool)?
-    @MainActor
-    static var cancelModelInstall: (@MainActor () -> Void)?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(Self.activationPolicy())
@@ -50,13 +48,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let alert = NSAlert()
         alert.messageText = "Quit while the model is downloading?"
-        alert.informativeText = "Textify will cancel the download and remove the partial file."
-        alert.addButton(withTitle: "Quit and Cancel Download")
+        alert.informativeText = "Textify will save the Downloads queue and continue it the next time you open the app."
+        alert.addButton(withTitle: "Quit")
         alert.addButton(withTitle: "Keep Textify Open")
         guard alert.runModal() == .alertFirstButtonReturn else {
             return .terminateCancel
         }
-        Self.cancelModelInstall?()
         return .terminateNow
     }
 

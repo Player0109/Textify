@@ -584,16 +584,25 @@ final class AppCompositionTests: XCTestCase {
             )
         }
 
-        services.modelInstallCoordinator.start(modelID: secondVariant.id)
+        guard let successfulAttemptID = services.modelInstallCoordinator.start(
+            modelID: secondVariant.id
+        ) else {
+            return XCTFail("Expected the successful install to be authorized.")
+        }
         for _ in 0..<1_000 {
-            if services.modelInstallCoordinator.state?.phase == .installed {
+            if services.modelInstallCoordinator
+                .attempt(id: successfulAttemptID)?
+                .state.phase == .installed
+            {
                 break
             }
             await Task.yield()
         }
 
         XCTAssertEqual(
-            services.modelInstallCoordinator.state?.phase,
+            services.modelInstallCoordinator
+                .attempt(id: successfulAttemptID)?
+                .state.phase,
             .installed
         )
         XCTAssertTrue(services.isModelInstalled(secondVariant.id))
@@ -603,15 +612,27 @@ final class AppCompositionTests: XCTestCase {
         services.modelInstallCoordinator = ModelInstallCoordinator { _, _ in
             throw ModelInstallCoordinatorError.modelPreparationFailed
         }
-        services.modelInstallCoordinator.start(modelID: "failed-variant")
+        guard let failedAttemptID = services.modelInstallCoordinator.start(
+            modelID: "failed-variant"
+        ) else {
+            return XCTFail("Expected the failed install to be authorized.")
+        }
         for _ in 0..<1_000 {
-            if services.modelInstallCoordinator.state?.phase == .failed {
+            if services.modelInstallCoordinator
+                .attempt(id: failedAttemptID)?
+                .state.phase == .failed
+            {
                 break
             }
             await Task.yield()
         }
 
-        XCTAssertEqual(services.modelInstallCoordinator.state?.phase, .failed)
+        XCTAssertEqual(
+            services.modelInstallCoordinator
+                .attempt(id: failedAttemptID)?
+                .state.phase,
+            .failed
+        )
         XCTAssertEqual(services.preferences.activeModelID, active.id)
         XCTAssertEqual(services.settingsStore.load().activeModelID, active.id)
     }
@@ -819,6 +840,72 @@ final class AppCompositionTests: XCTestCase {
         XCTAssertFalse(didShowMainWindow)
         XCTAssertEqual(runtimeTap.startCount, 0)
         XCTAssertFalse(services.dictation.readiness.canDictate)
+    }
+
+    @MainActor
+    func testAppLaunchCoordinatorRestoresQueueBeforeShowingFirstWindow() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let temporaryRoot = paths.applicationSupportDirectory
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        defer { try? FileManager.default.removeItem(at: temporaryRoot) }
+        let store = ModelInstallQueueStore(
+            fileURL: ModelStorageLayout(
+                rootDirectory: paths.modelsDirectory
+            ).installQueueURL
+        )
+        var queue = ModelInstallQueue()
+        _ = try queue.authorize(
+            artifactID: "missing-artifact",
+            purpose: .transcription,
+            action: .install,
+            attemptID: "persisted-attempt",
+            createdAt: "2026-07-24T10:00:00Z"
+        )
+        try queue.transition(
+            attemptID: "persisted-attempt",
+            to: DownloadState(
+                modelID: "missing-artifact",
+                phase: .checkingSpace
+            )
+        )
+        try queue.transition(
+            attemptID: "persisted-attempt",
+            to: DownloadState(
+                modelID: "missing-artifact",
+                phase: .downloading
+            )
+        )
+        try store.save(queue)
+
+        var preferences = AppPreferences.defaults
+        preferences.onboardingCompleted = false
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths
+        )
+        var phaseWhenFirstWindowOpened: DownloadPhase?
+        let coordinator = AppLaunchCoordinator(
+            services: services,
+            showOnboarding: {
+                phaseWhenFirstWindowOpened = try? store.load()
+                    .attempt(id: "persisted-attempt")?
+                    .state
+                    .phase
+            },
+            showMainWindow: {}
+        )
+
+        await coordinator.run()
+
+        XCTAssertEqual(phaseWhenFirstWindowOpened, .queued)
+        services.modelInstallCoordinator.cancel(
+            attemptID: "persisted-attempt"
+        )
+        for _ in 0..<2_000 where services.modelInstallCoordinator.isActive {
+            await Task.yield()
+        }
+        XCTAssertFalse(services.modelInstallCoordinator.isActive)
     }
 
     @MainActor
@@ -1199,15 +1286,14 @@ final class AppCompositionTests: XCTestCase {
     }
 
     @MainActor
-    func testModelInstallCoordinatorAllowsOnlyOneActiveOperationAndCancels() async {
+    func testModelInstallCoordinatorCancelsActiveOperation() async {
         let gate = SuspendedModelInstallGate()
         let coordinator = ModelInstallCoordinator { _ in
             await gate.wait()
             try Task.checkCancellation()
         }
 
-        coordinator.start()
-        coordinator.start()
+        let attemptID = coordinator.start()
         for _ in 0..<100 where await gate.callCount() == 0 {
             await Task.yield()
         }
@@ -1215,14 +1301,20 @@ final class AppCompositionTests: XCTestCase {
         let callCount = await gate.callCount()
         XCTAssertEqual(callCount, 1)
         XCTAssertTrue(coordinator.isActive)
-        coordinator.cancel()
+        guard let attemptID else {
+            return XCTFail("Expected a stable queue-attempt identity.")
+        }
+        coordinator.cancel(attemptID: attemptID)
         await gate.release()
         for _ in 0..<100 where coordinator.isActive {
             await Task.yield()
         }
 
         XCTAssertFalse(coordinator.isActive)
-        XCTAssertEqual(coordinator.state?.phase, .cancelled)
+        XCTAssertEqual(
+            coordinator.attempt(id: attemptID)?.state.phase,
+            .cancelled
+        )
     }
 
     @MainActor

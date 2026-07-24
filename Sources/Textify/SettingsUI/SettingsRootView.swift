@@ -531,6 +531,7 @@ private struct ModelsSettingsPane: View {
     @State private var inspectorController = ModelCatalogInspectorController()
     @State private var showsInspector = false
     @State private var showsModelVariantsHelp = false
+    @State private var showsDownloads = false
 
     var body: some View {
         let catalogExperience = services.modelCatalogExperience(
@@ -565,6 +566,7 @@ private struct ModelsSettingsPane: View {
 
             ModelCatalogToolbar(
                 query: $discoveryQuery,
+                showsDownloads: $showsDownloads,
                 filterOptions: catalogExperience.filterOptions,
                 onReset: resetCatalogQuery,
                 onVerify: verifyInstalledModels,
@@ -574,7 +576,13 @@ private struct ModelsSettingsPane: View {
                 onShowVariantHelp: {
                     showsModelVariantsHelp = true
                 },
-                isImportDisabled: isInstalling || isImporting
+                downloadCount: services.modelInstallCoordinator
+                    .hasNonterminalAttempts
+                    ? ModelDownloadsPresentation(
+                        attempts: services.modelInstallCoordinator.attempts
+                    ).nonterminalCount
+                    : 0,
+                isImportDisabled: hasPendingDownloads || isImporting
             )
 
             if !discoveryQuery.appliedFilterTokens.isEmpty {
@@ -668,8 +676,8 @@ private struct ModelsSettingsPane: View {
         }
     }
 
-    private var isInstalling: Bool {
-        services.modelInstallCoordinator.isActive
+    private var hasPendingDownloads: Bool {
+        services.modelInstallCoordinator.hasNonterminalAttempts
     }
 
     private var catalogQuery: ModelCatalogQuery {
@@ -752,9 +760,68 @@ private struct ModelsSettingsPane: View {
         }
     }
 
+    @ViewBuilder
     private func pinnedRevealView(
         _ reveal: ModelCatalogPinnedRevealPresentation,
         in catalogExperience: ModelCatalogExperience
+    ) -> some View {
+        switch reveal {
+        case let .catalogArtifact(family, checkpoint, artifact):
+            pinnedRevealCard(
+                title: "\(family.metadata.presentation.displayName) → "
+                    + "\(checkpoint.metadata.presentation.displayName) → "
+                    + artifact.metadata.presentation.displayName
+            ) {
+                catalogRow(
+                    artifact.row,
+                    context: ModelCatalogArtifactRowContext(
+                        title: artifact.metadata.presentation.displayName,
+                        description: checkpoint.metadata.presentation.description,
+                        variantLabel: nil,
+                        isRecommended: checkpoint.metadata
+                            .recommendedArtifactID == artifact.id,
+                        isFallback: checkpoint.resolution?.fallback?
+                            .fallbackArtifactID == artifact.id,
+                        isSelected: hierarchyState.selection
+                            == .exactArtifact(artifact.id),
+                        indentation: 0,
+                        comparison: nil,
+                        onSelect: {
+                            let selection = ModelCatalogHierarchySelection
+                                .exactArtifact(artifact.id)
+                            hierarchyState.select(selection)
+                            inspectorController.select(
+                                selection,
+                                in: catalogExperience
+                            )
+                            showsInspector = true
+                        }
+                    )
+                )
+            }
+        case let .standaloneArtifact(row):
+            pinnedRevealCard(
+                title: "\(row.model.displayName) (\(row.id))"
+            ) {
+                catalogRow(row, context: nil)
+            }
+        case let .unavailableArtifact(artifactID):
+            pinnedRevealCard(title: artifactID) {
+                Label(
+                    "This Exact Artifact is no longer in the signed catalog and is not installed on this Mac.",
+                    systemImage: "questionmark.folder"
+                )
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private func pinnedRevealCard<Content: View>(
+        title: String,
+        @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
@@ -766,13 +833,9 @@ private struct ModelsSettingsPane: View {
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .tracking(0.8)
                         .foregroundStyle(.secondary)
-                    Text(
-                        "\(reveal.family.metadata.presentation.displayName) → "
-                            + "\(reveal.checkpoint.metadata.presentation.displayName) → "
-                            + reveal.artifact.metadata.presentation.displayName
-                    )
-                    .font(.callout.weight(.semibold))
-                    .lineLimit(1)
+                    Text(title)
+                        .font(.callout.weight(.semibold))
+                        .lineLimit(1)
                 }
 
                 Spacer(minLength: 8)
@@ -796,32 +859,7 @@ private struct ModelsSettingsPane: View {
 
             Divider()
 
-            catalogRow(
-                reveal.row,
-                context: ModelCatalogArtifactRowContext(
-                    title: reveal.artifact.metadata.presentation.displayName,
-                    description: reveal.checkpoint.metadata.presentation.description,
-                    variantLabel: nil,
-                    isRecommended: reveal.checkpoint.metadata
-                        .recommendedArtifactID == reveal.artifact.id,
-                    isFallback: reveal.checkpoint.resolution?.fallback?
-                        .fallbackArtifactID == reveal.artifact.id,
-                    isSelected: hierarchyState.selection
-                        == .exactArtifact(reveal.artifact.id),
-                    indentation: 0,
-                    comparison: nil,
-                    onSelect: {
-                        let selection = ModelCatalogHierarchySelection
-                            .exactArtifact(reveal.artifact.id)
-                        hierarchyState.select(selection)
-                        inspectorController.select(
-                            selection,
-                            in: catalogExperience
-                        )
-                        showsInspector = true
-                    }
-                )
-            )
+            content()
         }
         .background(TextifyVisualIdentity.cardSurface)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -857,13 +895,23 @@ private struct ModelsSettingsPane: View {
             }
         }
         let onInstall: () -> Void = {
-            services.modelInstallCoordinator.start(modelID: row.id)
+            services.modelInstallCoordinator.start(
+                modelID: row.id,
+                purpose: row.model.purpose,
+                action: row.isInstalled ? .reinstall : .install
+            )
         }
         let onCancelInstall: () -> Void = {
-            services.modelInstallCoordinator.cancel()
+            guard let attemptID = row.install?.state.attemptID else {
+                return
+            }
+            services.modelInstallCoordinator.cancel(attemptID: attemptID)
         }
         let onRetryInstall: () -> Void = {
-            services.modelInstallCoordinator.retry()
+            guard let attemptID = row.install?.state.attemptID else {
+                return
+            }
+            services.modelInstallCoordinator.retry(attemptID: attemptID)
         }
         let onDelete: () -> Void = {
             pendingRemovalModel = row.model
@@ -876,7 +924,6 @@ private struct ModelsSettingsPane: View {
                 isSelected: context.isSelected,
                 isActivating: activatingModelID == row.id,
                 isBusy: activatingModelID != nil
-                    || isInstalling
                     || isImporting
                     || !services.dictation.allowsModelTransactions,
                 install: row.install,
@@ -898,7 +945,6 @@ private struct ModelsSettingsPane: View {
                 isActive: row.isActive,
                 isActivating: activatingModelID == row.id,
                 isBusy: activatingModelID != nil
-                    || isInstalling
                     || isImporting
                     || !services.dictation.allowsModelTransactions,
                 install: row.install,
@@ -1145,13 +1191,263 @@ private struct ModelDeckFact: View {
     }
 }
 
+private struct ModelDownloadsPopover: View {
+    @Environment(AppServices.self) private var services
+    let onDismiss: () -> Void
+
+    var body: some View {
+        let presentation = ModelDownloadsPresentation(
+            attempts: services.modelInstallCoordinator.attempts
+        )
+
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Downloads")
+                        .font(.system(.title3, design: .rounded, weight: .bold))
+                    Text("Installations run one at a time in authorization order.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 16)
+
+                if presentation.nonterminalCount > 0 {
+                    Text("\(presentation.nonterminalCount) pending")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(TextifyVisualIdentity.voiceViolet)
+                }
+            }
+            .padding(16)
+
+            Divider()
+
+            if presentation.active.isEmpty,
+               presentation.pending.isEmpty,
+               presentation.history.isEmpty {
+                ContentUnavailableView(
+                    "No Downloads",
+                    systemImage: "arrow.down.circle",
+                    description: Text(
+                        "Authorized model installations and their history appear here."
+                    )
+                )
+                .frame(maxWidth: .infinity, minHeight: 230)
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 16) {
+                        downloadsSection(
+                            "Active",
+                            rows: presentation.active
+                        )
+                        downloadsSection(
+                            "Queue",
+                            rows: presentation.pending
+                        )
+                        downloadsSection(
+                            "History",
+                            rows: Array(presentation.history.reversed())
+                        )
+                    }
+                    .padding(16)
+                }
+            }
+
+            if let persistenceErrorMessage =
+                services.modelInstallCoordinator.persistenceErrorMessage {
+                Divider()
+                Label(
+                    persistenceErrorMessage,
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(TextifyVisualIdentity.warmWarning)
+                .padding(12)
+            }
+        }
+        .frame(width: 390, height: 420)
+        .background(TextifyVisualIdentity.windowSurface)
+    }
+
+    @ViewBuilder
+    private func downloadsSection(
+        _ title: String,
+        rows: [ModelDownloadAttemptPresentation]
+    ) -> some View {
+        if !rows.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(title.uppercased())
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .tracking(0.8)
+                    .foregroundStyle(.tertiary)
+
+                ForEach(rows) { row in
+                    ModelDownloadAttemptRow(
+                        row: row,
+                        onReveal: {
+                            services.settingsRouter.revealModelArtifact(
+                                id: row.revealRequest.artifactID,
+                                purpose: row.revealRequest.purpose
+                            )
+                            onDismiss()
+                        },
+                        onPause: {
+                            services.modelInstallCoordinator.pause(
+                                attemptID: row.id
+                            )
+                        },
+                        onResume: {
+                            services.modelInstallCoordinator.resume(
+                                attemptID: row.id
+                            )
+                        },
+                        onCancel: {
+                            services.modelInstallCoordinator.cancel(
+                                attemptID: row.id
+                            )
+                        },
+                        onRetry: {
+                            services.modelInstallCoordinator.retry(
+                                attemptID: row.id
+                            )
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+private struct ModelDownloadAttemptRow: View {
+    let row: ModelDownloadAttemptPresentation
+    let onReveal: () -> Void
+    let onPause: () -> Void
+    let onResume: () -> Void
+    let onCancel: () -> Void
+    let onRetry: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: statusImage)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(statusColor)
+                    .frame(width: 20, height: 20)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(row.artifactID)
+                        .font(.callout.weight(.semibold))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Text(row.statusTitle)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(statusColor)
+                }
+
+                Spacer(minLength: 8)
+
+                Text(row.attempt.action == .reinstall ? "Reinstall" : "Install")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            if row.state.totalBytes > 0 {
+                HStack(spacing: 8) {
+                    ProgressView(value: row.progressValue, total: 1)
+                        .tint(statusColor)
+                    if let percentText = row.percentText {
+                        Text(percentText)
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            Text(row.detailText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+
+            HStack(spacing: 12) {
+                Button("Show in Catalog", action: onReveal)
+
+                Spacer(minLength: 0)
+
+                if row.canPause {
+                    Button("Pause", action: onPause)
+                }
+                if row.canResume {
+                    Button("Resume", action: onResume)
+                }
+                if row.canRetry {
+                    Button("Retry", action: onRetry)
+                }
+                if row.canCancel {
+                    Button("Cancel", role: .destructive, action: onCancel)
+                }
+            }
+            .buttonStyle(.borderless)
+            .controlSize(.small)
+        }
+        .padding(12)
+        .background(
+            Color.primary.opacity(0.045),
+            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(TextifyVisualIdentity.separator, lineWidth: 1)
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private var statusImage: String {
+        switch row.state.phase {
+        case .queued:
+            return "clock"
+        case .paused:
+            return "pause.circle.fill"
+        case .waitingForNetwork:
+            return "wifi.exclamationmark"
+        case .waitingForCatalogCheck:
+            return "checkmark.seal"
+        case .checkingSpace, .downloading, .verifying, .installing:
+            return "arrow.down.circle.fill"
+        case .installed:
+            return "checkmark.circle.fill"
+        case .interrupted, .failed:
+            return "exclamationmark.circle.fill"
+        case .cancelled:
+            return "xmark.circle"
+        case .revoked:
+            return "hand.raised.circle.fill"
+        }
+    }
+
+    private var statusColor: Color {
+        switch row.state.phase {
+        case .installed:
+            return TextifyVisualIdentity.readyMint
+        case .interrupted, .failed, .revoked:
+            return TextifyVisualIdentity.warmWarning
+        case .cancelled:
+            return .secondary
+        case .queued, .paused, .waitingForNetwork, .waitingForCatalogCheck,
+             .checkingSpace, .downloading, .verifying, .installing:
+            return TextifyVisualIdentity.voiceViolet
+        }
+    }
+}
+
 private struct ModelCatalogToolbar: View {
     @Binding var query: ModelCatalogQuery
+    @Binding var showsDownloads: Bool
     let filterOptions: ModelCatalogFilterOptions
     let onReset: () -> Void
     let onVerify: () -> Void
     let onImport: (() -> Void)?
     let onShowVariantHelp: () -> Void
+    let downloadCount: Int
     let isImportDisabled: Bool
 
     var body: some View {
@@ -1301,6 +1597,39 @@ private struct ModelCatalogToolbar: View {
             .fixedSize()
 
             Spacer(minLength: 0)
+
+            Button {
+                showsDownloads = true
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: downloadCount > 0
+                        ? "arrow.down.circle.fill"
+                        : "arrow.down.circle")
+                    Text("Downloads")
+                    if downloadCount > 0 {
+                        Text("\(downloadCount)")
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 5)
+                            .frame(minWidth: 17, minHeight: 17)
+                            .background(
+                                TextifyVisualIdentity.voiceViolet,
+                                in: Capsule()
+                            )
+                    }
+                }
+            }
+            .fixedSize()
+            .accessibilityLabel(
+                downloadCount == 0
+                    ? "Downloads"
+                    : "Downloads, \(downloadCount) pending"
+            )
+            .popover(isPresented: $showsDownloads) {
+                ModelDownloadsPopover {
+                    showsDownloads = false
+                }
+            }
 
             Menu {
                 if hasChanges {
@@ -2411,17 +2740,27 @@ private struct ModelCardInstallProgress: View {
 
     private var statusColor: Color {
         switch install.state.phase {
-        case .interrupted, .failed:
+        case .paused, .waitingForNetwork, .waitingForCatalogCheck,
+             .interrupted, .failed, .revoked:
             return TextifyVisualIdentity.recordCoral
         case .cancelled:
             return TextifyVisualIdentity.slate
-        case .checkingSpace, .downloading, .verifying, .installing, .installed:
+        case .queued, .checkingSpace, .downloading, .verifying, .installing,
+             .installed:
             return TextifyVisualIdentity.voiceViolet
         }
     }
 
     private var phaseIcon: String {
         switch install.state.phase {
+        case .queued:
+            return "list.number"
+        case .paused:
+            return "pause.circle"
+        case .waitingForNetwork:
+            return "wifi.exclamationmark"
+        case .waitingForCatalogCheck:
+            return "checkmark.shield"
         case .checkingSpace:
             return "internaldrive"
         case .downloading:
@@ -2438,6 +2777,8 @@ private struct ModelCardInstallProgress: View {
             return "exclamationmark.triangle.fill"
         case .cancelled:
             return "xmark.circle"
+        case .revoked:
+            return "hand.raised.fill"
         }
     }
 }

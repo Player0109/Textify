@@ -435,9 +435,10 @@ struct ModelCatalogVariantComparisonRow: View {
             return TextifyVisualIdentity.warmWarning
         }
         switch install?.state.phase {
-        case .failed, .interrupted:
+        case .paused, .waitingForNetwork, .waitingForCatalogCheck,
+             .failed, .interrupted, .revoked:
             return TextifyVisualIdentity.warmWarning
-        case .checkingSpace, .downloading, .verifying, .installing,
+        case .queued, .checkingSpace, .downloading, .verifying, .installing,
              .installed, .cancelled, .none:
             return .secondary
         }

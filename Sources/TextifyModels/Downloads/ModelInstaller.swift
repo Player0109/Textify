@@ -197,6 +197,7 @@ public struct ModelInstaller {
             throw ModelInstallError.checksumMismatch(expected: file.sha256, actual: actualChecksum)
         }
 
+        try Task.checkCancellation()
         onStateChange(DownloadState(
             modelID: model.id,
             phase: .installing,
@@ -374,6 +375,7 @@ public struct ModelInstaller {
             completedBytes += file.sizeBytes
         }
 
+        try Task.checkCancellation()
         onStateChange(DownloadState(
             modelID: model.id,
             phase: .installing,

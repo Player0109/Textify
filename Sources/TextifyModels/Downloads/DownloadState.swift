@@ -11,6 +11,10 @@ public struct DownloadFileProgress: Codable, Equatable, Sendable {
 }
 
 public enum DownloadPhase: String, CaseIterable, Codable, Equatable, Sendable {
+    case queued
+    case paused
+    case waitingForNetwork
+    case waitingForCatalogCheck
     case checkingSpace
     case downloading
     case interrupted
@@ -19,6 +23,27 @@ public enum DownloadPhase: String, CaseIterable, Codable, Equatable, Sendable {
     case installed
     case failed
     case cancelled
+    case revoked
+
+    public var isTerminal: Bool {
+        switch self {
+        case .interrupted, .installed, .failed, .cancelled, .revoked:
+            return true
+        case .queued, .paused, .waitingForNetwork, .waitingForCatalogCheck,
+             .checkingSpace, .downloading, .verifying, .installing:
+            return false
+        }
+    }
+
+    public var isPipelineActive: Bool {
+        switch self {
+        case .checkingSpace, .downloading, .verifying, .installing:
+            return true
+        case .queued, .paused, .waitingForNetwork, .waitingForCatalogCheck,
+             .interrupted, .installed, .failed, .cancelled, .revoked:
+            return false
+        }
+    }
 }
 
 public struct DownloadState: Codable, Equatable, Sendable {
@@ -27,19 +52,22 @@ public struct DownloadState: Codable, Equatable, Sendable {
     public let bytesDownloaded: Int64
     public let totalBytes: Int64
     public let message: String?
+    public let attemptID: String?
 
     public init(
         modelID: String,
         phase: DownloadPhase,
         bytesDownloaded: Int64 = 0,
         totalBytes: Int64 = 0,
-        message: String? = nil
+        message: String? = nil,
+        attemptID: String? = nil
     ) {
         self.modelID = modelID
         self.phase = phase
         self.bytesDownloaded = bytesDownloaded
         self.totalBytes = totalBytes
         self.message = message
+        self.attemptID = attemptID
     }
 
     public var progressFraction: Double {
@@ -52,11 +80,6 @@ public struct DownloadState: Codable, Equatable, Sendable {
     }
 
     public var isActive: Bool {
-        switch phase {
-        case .checkingSpace, .downloading, .verifying, .installing:
-            return true
-        case .interrupted, .installed, .failed, .cancelled:
-            return false
-        }
+        phase.isPipelineActive
     }
 }

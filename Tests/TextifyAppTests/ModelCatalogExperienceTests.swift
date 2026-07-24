@@ -145,6 +145,64 @@ final class ModelCatalogExperienceTests: XCTestCase {
         XCTAssertEqual(localRow.actions, [.use, .reinstall, .delete, .details])
     }
 
+    func testQueueProjectionUpdatesOnlyAffectedArtifactsAndCheckpointRollups() throws {
+        let manifest = try signedV3FixtureManifest()
+        let unrelated = model(id: "unrelated-local")
+        let downloading = DownloadState(
+            modelID: "whisper-small-q5_1",
+            phase: .downloading,
+            bytesDownloaded: 25,
+            totalBytes: 100,
+            attemptID: "attempt-1"
+        )
+        let queued = DownloadState(
+            modelID: "whisper-small-q8_0",
+            phase: .queued,
+            attemptID: "attempt-2"
+        )
+
+        let experience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [installed(unrelated)],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferStatesByModelID: [
+                downloading.modelID: downloading,
+                queued.modelID: queued,
+            ]
+        )
+
+        XCTAssertEqual(
+            experience.rows.first {
+                $0.id == downloading.modelID
+            }?.installState,
+            downloading
+        )
+        XCTAssertEqual(
+            experience.rows.first {
+                $0.id == queued.modelID
+            }?.installState,
+            queued
+        )
+        XCTAssertNil(
+            experience.rows.first {
+                $0.id == unrelated.id
+            }?.installState
+        )
+
+        let affectedCheckpoint = try XCTUnwrap(
+            experience.inspectorPresentation(
+                for: .checkpoint("checkpoint.whisper.small")
+            )
+        )
+        guard case let .checkpoint(checkpoint) = affectedCheckpoint else {
+            return XCTFail("Expected affected checkpoint inspector.")
+        }
+        XCTAssertEqual(
+            checkpoint.aggregateState,
+            "No variants installed • Downloading model"
+        )
+    }
+
     func testUsesPurposeSpecificActivePreference() throws {
         let transcription = model(id: "transcription")
         let cleaner = model(id: "cleaner", purpose: .voiceCleaning)
@@ -533,13 +591,57 @@ final class ModelCatalogExperienceTests: XCTestCase {
         )
 
         XCTAssertTrue(revealed.rows.isEmpty)
-        XCTAssertEqual(revealed.pinnedReveal?.row.id, "qwen3-asr-0.6b-q8-0")
+        XCTAssertEqual(
+            revealed.pinnedReveal?.artifactID,
+            "qwen3-asr-0.6b-q8-0"
+        )
         XCTAssertEqual(query.ordinaryQuery, queryBeforeReveal)
 
         query.dismissReveal()
 
         XCTAssertNil(query.revealedArtifactID)
         XCTAssertEqual(query, queryBeforeReveal)
+    }
+
+    func testPinnedRevealRetainsOffCatalogAndUnavailableArtifactIdentity() throws {
+        let manifest = try productionManifest()
+        let offCatalogModel = model(id: "retired-installed-artifact")
+        var installedQuery = ModelCatalogQuery(purpose: .transcription)
+        installedQuery.reveal(artifactID: offCatalogModel.id)
+
+        let installedReveal = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [installed(offCatalogModel)],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            query: installedQuery
+        )
+
+        XCTAssertEqual(
+            installedReveal.pinnedReveal,
+            .standaloneArtifact(
+                try XCTUnwrap(
+                    installedReveal.rows.first {
+                        $0.id == offCatalogModel.id
+                    }
+                )
+            )
+        )
+
+        var unavailableQuery = ModelCatalogQuery(purpose: .transcription)
+        unavailableQuery.reveal(artifactID: "revoked-history-artifact")
+        let unavailableReveal = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            query: unavailableQuery
+        )
+
+        XCTAssertEqual(
+            unavailableReveal.pinnedReveal,
+            .unavailableArtifact("revoked-history-artifact")
+        )
     }
 
     @MainActor

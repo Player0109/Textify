@@ -1010,13 +1010,24 @@ struct ModelCatalogExactArtifactPresentation: Equatable, Identifiable {
     }
 }
 
-struct ModelCatalogPinnedRevealPresentation: Equatable {
-    let family: ModelCatalogFamilyPresentation
-    let checkpoint: ModelCatalogCheckpointPresentation
-    let artifact: ModelCatalogExactArtifactPresentation
+enum ModelCatalogPinnedRevealPresentation: Equatable {
+    case catalogArtifact(
+        family: ModelCatalogFamilyPresentation,
+        checkpoint: ModelCatalogCheckpointPresentation,
+        artifact: ModelCatalogExactArtifactPresentation
+    )
+    case standaloneArtifact(ModelCatalogRowPresentation)
+    case unavailableArtifact(String)
 
-    var row: ModelCatalogRowPresentation {
-        artifact.row
+    var artifactID: String {
+        switch self {
+        case let .catalogArtifact(_, _, artifact):
+            return artifact.id
+        case let .standaloneArtifact(row):
+            return row.id
+        case let .unavailableArtifact(artifactID):
+            return artifactID
+        }
     }
 }
 
@@ -1192,6 +1203,81 @@ struct ModelCatalogInstallPresentation: Equatable {
     }
 }
 
+struct ModelDownloadAttemptPresentation: Equatable, Identifiable {
+    let attempt: ModelInstallQueueAttempt
+
+    var id: String {
+        attempt.id
+    }
+
+    var artifactID: String {
+        attempt.artifactID
+    }
+
+    var state: DownloadState {
+        attempt.state
+    }
+
+    var statusTitle: String {
+        ModelInstallProgressPresentation.title(for: state)
+    }
+
+    var detailText: String {
+        ModelInstallProgressPresentation.detailText(for: state)
+    }
+
+    var progressValue: Double {
+        ModelInstallProgressPresentation.progressValue(for: state)
+    }
+
+    var percentText: String? {
+        ModelInstallProgressPresentation.percentText(for: state)
+    }
+
+    var revealRequest: ModelCatalogRevealRequest {
+        ModelCatalogRevealRequest(
+            artifactID: attempt.artifactID,
+            purpose: attempt.purpose
+        )
+    }
+
+    var canCancel: Bool {
+        ModelInstallRowPresentation.offersCancel(for: state)
+    }
+
+    var canPause: Bool {
+        state.phase == .downloading
+    }
+
+    var canResume: Bool {
+        [.paused, .waitingForNetwork, .waitingForCatalogCheck]
+            .contains(state.phase)
+    }
+
+    var canRetry: Bool {
+        ModelInstallRowPresentation.offersRetry(for: state)
+    }
+}
+
+struct ModelDownloadsPresentation: Equatable {
+    let active: [ModelDownloadAttemptPresentation]
+    let pending: [ModelDownloadAttemptPresentation]
+    let history: [ModelDownloadAttemptPresentation]
+
+    init(attempts: [ModelInstallQueueAttempt]) {
+        let rows = attempts.map(ModelDownloadAttemptPresentation.init)
+        active = rows.filter { $0.state.phase.isPipelineActive }
+        pending = rows.filter {
+            !$0.state.phase.isTerminal && !$0.state.phase.isPipelineActive
+        }
+        history = rows.filter { $0.state.phase.isTerminal }
+    }
+
+    var nonterminalCount: Int {
+        active.count + pending.count
+    }
+}
+
 struct ModelCatalogExperience: Equatable {
     let rows: [ModelCatalogRowPresentation]
     let families: [ModelCatalogFamilyPresentation]
@@ -1213,7 +1299,9 @@ struct ModelCatalogExperience: Equatable {
             presentationGraph: nil,
             installedRecords: installedRecords,
             activePreferences: activePreferences,
-            transferState: transferState,
+            transferStatesByModelID: Self.transferStatesByModelID(
+                from: transferState
+            ),
             managedReadinessByModelID: managedReadinessByModelID,
             onDiskBytesByModelID: onDiskBytesByModelID,
             query: query
@@ -1241,7 +1329,37 @@ struct ModelCatalogExperience: Equatable {
             checkpointResolutions: checkpointResolutions,
             installedRecords: installedRecords,
             activePreferences: activePreferences,
-            transferState: transferState,
+            transferStatesByModelID: Self.transferStatesByModelID(
+                from: transferState
+            ),
+            managedReadinessByModelID: managedReadinessByModelID,
+            onDiskBytesByModelID: onDiskBytesByModelID,
+            query: query
+        )
+    }
+
+    init(
+        trustedManifest: ModelManifest?,
+        compatibilityResolver: ModelCatalogCompatibilityResolver? = nil,
+        installedRecords: [InstalledModelRecord],
+        activePreferences: ModelCatalogActivePreferences,
+        transferStatesByModelID: [String: DownloadState],
+        managedReadinessByModelID: [String: ModelCatalogManagedReadiness] = [:],
+        onDiskBytesByModelID: [String: Int64] = [:],
+        query: ModelCatalogQuery = ModelCatalogQuery()
+    ) {
+        let compatibilityByModelID = compatibilityResolver?
+            .compatibilityByModelID(in: trustedManifest) ?? [:]
+        let checkpointResolutions = compatibilityResolver?
+            .checkpointResolutions(in: trustedManifest) ?? [:]
+        self.init(
+            trustedModels: trustedManifest?.models ?? [],
+            presentationGraph: trustedManifest?.presentationGraph,
+            compatibilityByModelID: compatibilityByModelID,
+            checkpointResolutions: checkpointResolutions,
+            installedRecords: installedRecords,
+            activePreferences: activePreferences,
+            transferStatesByModelID: transferStatesByModelID,
             managedReadinessByModelID: managedReadinessByModelID,
             onDiskBytesByModelID: onDiskBytesByModelID,
             query: query
@@ -1255,7 +1373,7 @@ struct ModelCatalogExperience: Equatable {
         checkpointResolutions: [String: ModelCatalogCheckpointResolution] = [:],
         installedRecords: [InstalledModelRecord],
         activePreferences: ModelCatalogActivePreferences,
-        transferState: DownloadState?,
+        transferStatesByModelID: [String: DownloadState],
         managedReadinessByModelID: [String: ModelCatalogManagedReadiness],
         onDiskBytesByModelID: [String: Int64],
         query: ModelCatalogQuery
@@ -1301,7 +1419,7 @@ struct ModelCatalogExperience: Equatable {
                 && activePreferences.contains(modelID: model.id, purpose: activePurpose)
             let installState = ModelInstallRowPresentation.state(
                 for: model.id,
-                from: transferState
+                from: transferStatesByModelID
             )
             return ModelCatalogRowPresentation(
                 model: model,
@@ -1343,7 +1461,8 @@ struct ModelCatalogExperience: Equatable {
         )
         pinnedReveal = Self.makePinnedReveal(
             artifactID: query.revealedArtifactID,
-            families: allFamilies
+            families: allFamilies,
+            rows: allRows
         )
 
         if presentationGraph != nil {
@@ -1371,6 +1490,15 @@ struct ModelCatalogExperience: Equatable {
             families = []
             rows = Self.queryStandaloneRows(allRows, query: query)
         }
+    }
+
+    private static func transferStatesByModelID(
+        from state: DownloadState?
+    ) -> [String: DownloadState] {
+        guard let state else {
+            return [:]
+        }
+        return [state.modelID: state]
     }
 
     func inspectorPresentation(
@@ -1766,7 +1894,8 @@ struct ModelCatalogExperience: Equatable {
 
     private static func makePinnedReveal(
         artifactID: String?,
-        families: [ModelCatalogFamilyPresentation]
+        families: [ModelCatalogFamilyPresentation],
+        rows: [ModelCatalogRowPresentation]
     ) -> ModelCatalogPinnedRevealPresentation? {
         guard let artifactID else {
             return nil
@@ -1778,14 +1907,17 @@ struct ModelCatalogExperience: Equatable {
                 ) else {
                     continue
                 }
-                return ModelCatalogPinnedRevealPresentation(
+                return .catalogArtifact(
                     family: family,
                     checkpoint: checkpoint,
                     artifact: artifact
                 )
             }
         }
-        return nil
+        if let row = rows.first(where: { $0.id == artifactID }) {
+            return .standaloneArtifact(row)
+        }
+        return .unavailableArtifact(artifactID)
     }
 
     private static func actions(
@@ -2042,15 +2174,24 @@ enum ModelInstallRowPresentation {
         return state
     }
 
+    static func state(
+        for modelID: String,
+        from statesByModelID: [String: DownloadState]
+    ) -> DownloadState? {
+        state(for: modelID, from: statesByModelID[modelID])
+    }
+
     static func offersCancel(for state: DownloadState) -> Bool {
-        state.isActive
+        !state.phase.isTerminal && state.phase != .installing
     }
 
     static func offersRetry(for state: DownloadState) -> Bool {
         switch state.phase {
         case .interrupted, .failed, .cancelled:
             return true
-        case .checkingSpace, .downloading, .verifying, .installing, .installed:
+        case .queued, .paused, .waitingForNetwork, .waitingForCatalogCheck,
+             .checkingSpace, .downloading, .verifying, .installing, .installed,
+             .revoked:
             return false
         }
     }
@@ -2059,6 +2200,14 @@ enum ModelInstallRowPresentation {
 enum ModelInstallProgressPresentation {
     static func title(for state: DownloadState) -> String {
         switch state.phase {
+        case .queued:
+            return "Queued"
+        case .paused:
+            return "Download paused"
+        case .waitingForNetwork:
+            return "Waiting for network"
+        case .waitingForCatalogCheck:
+            return "Waiting for catalog check"
         case .checkingSpace:
             return "Preparing download"
         case .downloading:
@@ -2075,6 +2224,8 @@ enum ModelInstallProgressPresentation {
             return "Install failed"
         case .cancelled:
             return "Install cancelled"
+        case .revoked:
+            return "Install revoked"
         }
     }
 

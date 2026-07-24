@@ -49,11 +49,12 @@ struct ModelInstallProgressView: View {
 
     private var voiceMarkState: TextifyVoiceMarkState {
         switch state.phase {
-        case .checkingSpace, .downloading, .verifying, .installing:
+        case .queued, .checkingSpace, .downloading, .verifying, .installing:
             return .processing
         case .installed:
             return .ready
-        case .interrupted, .failed:
+        case .paused, .waitingForNetwork, .waitingForCatalogCheck,
+             .interrupted, .failed, .revoked:
             return .blocked
         case .cancelled:
             return .idle

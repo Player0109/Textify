@@ -538,6 +538,64 @@ final class ProductionUITests: XCTestCase {
         XCTAssertNil(ModelInstallRowPresentation.state(for: state.modelID, from: installed))
     }
 
+    func testDownloadsPresentationClassifiesEveryQueueStatusAndExactControl() {
+        let phases: [DownloadPhase] = [
+            .downloading,
+            .queued,
+            .paused,
+            .waitingForNetwork,
+            .waitingForCatalogCheck,
+            .installed,
+            .failed,
+            .cancelled,
+            .revoked,
+        ]
+        let attempts = phases.enumerated().map { index, phase in
+            ModelInstallQueueAttempt(
+                id: "attempt-\(index)",
+                artifactID: "artifact-\(index)",
+                purpose: index.isMultiple(of: 2)
+                    ? .transcription
+                    : .voiceCleaning,
+                action: index == 0 ? .install : .reinstall,
+                createdAt: "2026-07-24T10:0\(index):00Z",
+                state: DownloadState(
+                    modelID: "artifact-\(index)",
+                    phase: phase,
+                    bytesDownloaded: phase == .downloading ? 25 : 0,
+                    totalBytes: phase == .downloading ? 100 : 0
+                )
+            )
+        }
+
+        let presentation = ModelDownloadsPresentation(attempts: attempts)
+
+        XCTAssertEqual(presentation.active.map(\.id), ["attempt-0"])
+        XCTAssertEqual(
+            presentation.pending.map(\.id),
+            ["attempt-1", "attempt-2", "attempt-3", "attempt-4"]
+        )
+        XCTAssertEqual(
+            presentation.history.map(\.id),
+            ["attempt-5", "attempt-6", "attempt-7", "attempt-8"]
+        )
+        XCTAssertEqual(presentation.nonterminalCount, 5)
+        XCTAssertTrue(presentation.active[0].canPause)
+        XCTAssertTrue(presentation.pending[0].canCancel)
+        XCTAssertTrue(presentation.pending[1].canResume)
+        XCTAssertTrue(presentation.history[1].canRetry)
+        XCTAssertFalse(presentation.history[3].canRetry)
+        XCTAssertEqual(
+            presentation.pending[2].revealRequest,
+            ModelCatalogRevealRequest(
+                artifactID: "artifact-3",
+                purpose: .voiceCleaning
+            )
+        )
+        XCTAssertEqual(presentation.history[0].statusTitle, "Model installed")
+        XCTAssertEqual(presentation.history[3].statusTitle, "Install revoked")
+    }
+
     func testLaunchAtLoginToggleUsesLiveStatus() {
         XCTAssertTrue(LaunchAtLoginToggleModel.isOn(status: .enabled))
         XCTAssertFalse(LaunchAtLoginToggleModel.isOn(status: .disabled))

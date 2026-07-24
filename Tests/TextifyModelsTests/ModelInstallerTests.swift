@@ -549,6 +549,56 @@ final class ModelInstallerTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: layout.installedStoreURL.path))
     }
 
+    func testCancellationDoesNotRemoveExistingInstalledArtifact() async throws {
+        let manifest = try Self.fixtureManifest()
+        let model = try XCTUnwrap(manifest.models.first)
+        let file = try XCTUnwrap(model.files.first)
+        let rootDirectory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectory) }
+        let layout = ModelStorageLayout(rootDirectory: rootDirectory)
+        let installedURL = try layout.installedFileURL(
+            modelID: model.id,
+            filename: file.filename
+        )
+        try FileManager.default.createDirectory(
+            at: installedURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let existingData = Data("existing model bytes".utf8)
+        try existingData.write(to: installedURL)
+        let existingRecord = InstalledModelRecord(
+            model: model,
+            installedAt: "2026-07-23T00:00:00Z",
+            localFilesByManifestFilename: [
+                file.filename: installedURL.path,
+            ]
+        )
+        try JSONEncoder().encode(
+            InstalledModelsStore(records: [existingRecord])
+        ).write(to: layout.installedStoreURL, options: .atomic)
+        let installer = ModelInstaller(
+            layout: layout,
+            transport: CancellationDownloadTransport()
+        )
+
+        do {
+            _ = try await installer.install(
+                modelID: model.id,
+                from: manifest
+            )
+            XCTFail("Expected cancellation.")
+        } catch is CancellationError {
+            // Expected injected cancellation.
+        }
+
+        XCTAssertEqual(try Data(contentsOf: installedURL), existingData)
+        let stored = try JSONDecoder().decode(
+            InstalledModelsStore.self,
+            from: Data(contentsOf: layout.installedStoreURL)
+        )
+        XCTAssertEqual(stored.record(forModelID: model.id), existingRecord)
+    }
+
     private static func fixtureManifest(
         replacingModelID modelID: String? = nil,
         replacingFilename filename: String? = nil,
@@ -703,6 +753,19 @@ private final class FixtureFileDownloadTransport: DownloadTransport {
 
 private enum FixtureFileDownloadTransportError: Error {
     case missingResponse
+}
+
+private struct CancellationDownloadTransport: DownloadTransport {
+    func fetch(_ request: URLRequest) async throws -> DownloadResponse {
+        throw CancellationError()
+    }
+
+    func downloadFile(
+        _ request: URLRequest,
+        to temporaryURL: URL
+    ) async throws -> DownloadFileResponse {
+        throw CancellationError()
+    }
 }
 
 private final class InstallStateRecorder: @unchecked Sendable {

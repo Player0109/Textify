@@ -19,9 +19,6 @@ struct TextifyApp: App {
         AppDelegate.modelInstallActivityProvider = {
             services.modelInstallCoordinator.isActive
         }
-        AppDelegate.cancelModelInstall = {
-            services.modelInstallCoordinator.cancel()
-        }
         AppDelegate.launchCoordinator = AppLaunchCoordinator(
             services: services,
             showOnboarding: {
@@ -89,6 +86,8 @@ final class AppLaunchCoordinator {
             showMainWindow()
             return
         }
+
+        _ = services.modelInstallCoordinator
 
         switch AppLaunchPolicy.action(for: services.preferences) {
         case .showOnboarding:

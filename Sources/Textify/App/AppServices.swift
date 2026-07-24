@@ -26,6 +26,11 @@ final class AppServices {
     private var installedModelsStore: InstalledModelsStore
 
     @ObservationIgnored lazy var modelInstallCoordinator = ModelInstallCoordinator(
+        queueStore: ModelInstallQueueStore(
+            fileURL: ModelStorageLayout(
+                rootDirectory: paths.modelsDirectory
+            ).installQueueURL
+        ),
         installOperation: { [weak self] modelID, onStateChange in
             guard let self,
                   self.startupIssue == nil,
@@ -34,9 +39,14 @@ final class AppServices {
                 throw ModelInstallCoordinatorError.storageOrConfigurationUnavailable
             }
 
-            let manifest = try await ProductionModelManifestLoader(
-                configuration: configuration
-            ).load()
+            let manifest: ModelManifest
+            do {
+                manifest = try await ProductionModelManifestLoader(
+                    configuration: configuration
+                ).load()
+            } catch {
+                throw ModelInstallCoordinatorError.catalogCheckUnavailable
+            }
             let installer = ModelInstaller(
                 layout: ModelStorageLayout(rootDirectory: self.paths.modelsDirectory),
                 transport: URLSessionDownloadTransport(),
@@ -44,19 +54,34 @@ final class AppServices {
                     forInfoDictionaryKey: "CFBundleShortVersionString"
                 ) as? String ?? "1.1.0"
             )
-            let installedRecord = try await installer.install(
-                modelID: modelID,
-                from: manifest
-            ) { state in
-                guard state.phase != .installed else {
-                    return
+            let installedRecord: InstalledModelRecord
+            do {
+                installedRecord = try await installer.install(
+                    modelID: modelID,
+                    from: manifest
+                ) { state in
+                    guard !state.phase.isTerminal else {
+                        return
+                    }
+                    onStateChange(state)
                 }
-                onStateChange(state)
+            } catch is URLError {
+                throw ModelInstallCoordinatorError.networkUnavailable
             }
             try await self.completeModelInstall(
                 installedRecord.model,
                 onStateChange: onStateChange
             )
+        },
+        resumableDataProvider: { [weak self] attempt in
+            guard let self else {
+                return nil
+            }
+            return try? ModelInstallResumableDataInspector(
+                layout: ModelStorageLayout(
+                    rootDirectory: self.paths.modelsDirectory
+                )
+            ).inspect(for: attempt)
         }
     )
 
@@ -389,7 +414,7 @@ final class AppServices {
                 transcriptionModelID: preferences.activeModelID,
                 voiceCleaningModelID: preferences.activeVoiceCleaningModelID
             ),
-            transferState: modelInstallCoordinator.state,
+            transferStatesByModelID: modelInstallCoordinator.artifactStates,
             managedReadinessByModelID: managedReadinessByModelID,
             onDiskBytesByModelID: onDiskBytesByModelID,
             query: scopedQuery
@@ -800,6 +825,8 @@ enum ModelInstallCoordinatorError: Error {
     case storageOrConfigurationUnavailable
     case modelPreparationFailed
     case bundledCatalogIncomplete
+    case networkUnavailable
+    case catalogCheckUnavailable
 }
 
 enum AppModelActivationResult: Equatable {
@@ -848,17 +875,74 @@ final class ModelInstallCoordinator {
     ) async throws -> Void
 
     private let installOperation: InstallOperation
+    private let queueStore: ModelInstallQueueStore?
+    private let resumableDataProvider:
+        @MainActor @Sendable (ModelInstallQueueAttempt) -> ModelInstallResumableData?
+    private let makeAttemptID: @Sendable () -> String
+    private let nowISO8601: @Sendable () -> String
     @ObservationIgnored private var installTask: Task<Void, Never>?
-    @ObservationIgnored private var activeModelID: String?
+    @ObservationIgnored private var activeAttemptID: String?
+    @ObservationIgnored private var queue: ModelInstallQueue
+    @ObservationIgnored private var persistenceIsAvailable = true
 
-    private(set) var state: DownloadState?
+    private(set) var revision = 0
+    private(set) var persistenceErrorMessage: String?
 
     var isActive: Bool {
-        installTask != nil
+        _ = revision
+        return installTask != nil
     }
 
-    init(installOperation: @escaping InstallOperation) {
+    var hasNonterminalAttempts: Bool {
+        _ = revision
+        return queue.headAttempt != nil
+    }
+
+    var attempts: [ModelInstallQueueAttempt] {
+        _ = revision
+        return queue.attempts
+    }
+
+    var artifactStates: [String: DownloadState] {
+        _ = revision
+        return queue.latestStatesByArtifactID
+    }
+
+    init(
+        queueStore: ModelInstallQueueStore? = nil,
+        installOperation: @escaping InstallOperation,
+        resumableDataProvider: @escaping @MainActor @Sendable (
+            ModelInstallQueueAttempt
+        ) -> ModelInstallResumableData? = { _ in nil },
+        makeAttemptID: @escaping @Sendable () -> String = {
+            UUID().uuidString.lowercased()
+        },
+        nowISO8601: @escaping @Sendable () -> String = {
+            ISO8601DateFormatter().string(from: Date())
+        }
+    ) {
+        self.queueStore = queueStore
         self.installOperation = installOperation
+        self.resumableDataProvider = resumableDataProvider
+        self.makeAttemptID = makeAttemptID
+        self.nowISO8601 = nowISO8601
+
+        if let queueStore {
+            do {
+                queue = try queueStore.loadForRelaunch()
+                try queueStore.save(queue)
+            } catch {
+                queue = ModelInstallQueue()
+                persistenceIsAvailable = false
+                persistenceErrorMessage = "Textify could not restore the Downloads queue."
+            }
+        } else {
+            queue = ModelInstallQueue()
+        }
+
+        Task { @MainActor [weak self] in
+            self?.processNextAttempt()
+        }
     }
 
     convenience init(
@@ -871,38 +955,183 @@ final class ModelInstallCoordinator {
         }
     }
 
-    func start(modelID: String = ProductionModelPolicy.requiredModelID) {
-        guard installTask == nil else {
+    @discardableResult
+    func start(
+        modelID: String = ProductionModelPolicy.requiredModelID,
+        purpose: ModelPurpose = .transcription,
+        action: ModelInstallQueueAction = .install
+    ) -> String? {
+        guard persistenceIsAvailable else {
+            return nil
+        }
+        let previousQueue = queue
+        let attemptID = makeAttemptID()
+        do {
+            try queue.authorize(
+                artifactID: modelID,
+                purpose: purpose,
+                action: action,
+                attemptID: attemptID,
+                createdAt: nowISO8601()
+            )
+            guard persistQueue() else {
+                queue = previousQueue
+                return nil
+            }
+            revision &+= 1
+        } catch {
+            return nil
+        }
+        processNextAttempt()
+        return attemptID
+    }
+
+    func cancel(attemptID: String) {
+        guard let attempt = queue.attempt(id: attemptID),
+              !attempt.state.phase.isTerminal,
+              attempt.state.phase != .installing
+        else {
+            return
+        }
+        let previousQueue = queue
+        do {
+            try queue.cancel(attemptID: attemptID)
+            guard persistQueue() else {
+                queue = previousQueue
+                return
+            }
+            revision &+= 1
+            if activeAttemptID == attemptID {
+                installTask?.cancel()
+            } else {
+                processNextAttempt()
+            }
+        } catch {
+            return
+        }
+    }
+
+    func pause(attemptID: String) {
+        guard let attempt = queue.attempt(id: attemptID),
+              attempt.state.phase == .downloading
+        else {
+            return
+        }
+        do {
+            try transition(
+                attemptID: attemptID,
+                phase: .paused,
+                message: "Download paused."
+            )
+            if activeAttemptID == attemptID {
+                installTask?.cancel()
+            }
+        } catch {
+            return
+        }
+    }
+
+    func resume(attemptID: String) {
+        guard let attempt = queue.attempt(id: attemptID),
+              [.paused, .waitingForNetwork, .waitingForCatalogCheck]
+                .contains(attempt.state.phase)
+        else {
+            return
+        }
+        do {
+            try transition(
+                attemptID: attemptID,
+                phase: .queued,
+                message: "Queued"
+            )
+            processNextAttempt()
+        } catch {
+            return
+        }
+    }
+
+    @discardableResult
+    func retry(attemptID: String) -> String? {
+        guard persistenceIsAvailable else {
+            return nil
+        }
+        let previousQueue = queue
+        let newAttemptID = makeAttemptID()
+        do {
+            try queue.retry(
+                attemptID: attemptID,
+                newAttemptID: newAttemptID,
+                createdAt: nowISO8601()
+            )
+            guard persistQueue() else {
+                queue = previousQueue
+                return nil
+            }
+            revision &+= 1
+        } catch {
+            return nil
+        }
+        processNextAttempt()
+        return newAttemptID
+    }
+
+    func attempt(id: String) -> ModelInstallQueueAttempt? {
+        queue.attempt(id: id)
+    }
+
+    private func processNextAttempt() {
+        guard installTask == nil,
+              persistenceIsAvailable,
+              let attempt = queue.nextRunnableAttempt
+        else {
             return
         }
 
-        activeModelID = modelID
-        state = DownloadState(
-            modelID: modelID,
-            phase: .checkingSpace,
-            message: "Preparing model download."
-        )
+        do {
+            try transition(
+                attemptID: attempt.id,
+                phase: .checkingSpace,
+                message: "Preparing model download."
+            )
+        } catch {
+            return
+        }
+        activeAttemptID = attempt.id
         installTask = Task { @MainActor [weak self] in
             guard let self else {
                 return
             }
-            defer { installTask = nil }
-
             do {
-                try await installOperation(modelID) { [weak self] state in
-                    Task { @MainActor in
-                        self?.state = state
+                try await installOperation(attempt.artifactID) { [weak self] state in
+                    Task { @MainActor [weak self] in
+                        self?.receive(
+                            state,
+                            forAttemptID: attempt.id
+                        )
                     }
                 }
+                finish(
+                    attemptID: attempt.id,
+                    phase: .installed,
+                    message: "Model installed."
+                )
             } catch is CancellationError {
-                state = DownloadState(
-                    modelID: modelID,
-                    phase: .cancelled,
-                    message: "Download cancelled."
+                finishCancelledTask(attemptID: attempt.id)
+            } catch ModelInstallCoordinatorError.networkUnavailable {
+                finish(
+                    attemptID: attempt.id,
+                    phase: .waitingForNetwork,
+                    message: "Waiting for network."
+                )
+            } catch ModelInstallCoordinatorError.catalogCheckUnavailable {
+                finish(
+                    attemptID: attempt.id,
+                    phase: .waitingForCatalogCheck,
+                    message: "Waiting for catalog check."
                 )
             } catch {
-                state = DownloadState(
-                    modelID: modelID,
+                finish(
+                    attemptID: attempt.id,
                     phase: .failed,
                     message: "Model install failed. Check your connection and try again."
                 )
@@ -910,12 +1139,151 @@ final class ModelInstallCoordinator {
         }
     }
 
-    func cancel() {
-        installTask?.cancel()
+    private func receive(
+        _ state: DownloadState,
+        forAttemptID attemptID: String
+    ) {
+        guard activeAttemptID == attemptID,
+              !state.phase.isTerminal,
+              let attempt = queue.attempt(id: attemptID),
+              !attempt.state.phase.isTerminal
+        else {
+            return
+        }
+        do {
+            let previousQueue = queue
+            let shouldPersist = attempt.state.phase != state.phase
+            try queue.transition(
+                attemptID: attemptID,
+                to: DownloadState(
+                    modelID: attempt.artifactID,
+                    phase: state.phase,
+                    bytesDownloaded: state.bytesDownloaded,
+                    totalBytes: state.totalBytes,
+                    message: state.message,
+                    attemptID: attemptID
+                )
+            )
+            if shouldPersist, !persistQueue() {
+                queue = previousQueue
+                return
+            }
+            revision &+= 1
+        } catch {
+            return
+        }
     }
 
-    func retry() {
-        start(modelID: activeModelID ?? ProductionModelPolicy.requiredModelID)
+    private func finishCancelledTask(attemptID: String) {
+        guard let attempt = queue.attempt(id: attemptID) else {
+            completeTask(attemptID: attemptID)
+            return
+        }
+        if !attempt.state.phase.isTerminal,
+           attempt.state.phase != .paused {
+            finish(
+                attemptID: attemptID,
+                phase: .cancelled,
+                message: "Download cancelled."
+            )
+            return
+        }
+        associateResumableDataIfAvailable(attemptID: attemptID)
+        completeTask(attemptID: attemptID)
+    }
+
+    private func finish(
+        attemptID: String,
+        phase: DownloadPhase,
+        message: String
+    ) {
+        if let attempt = queue.attempt(id: attemptID),
+           !attempt.state.phase.isTerminal,
+           attempt.state.phase != .paused {
+            try? transition(
+                attemptID: attemptID,
+                phase: phase,
+                message: message
+            )
+        }
+        if phase != .installed {
+            associateResumableDataIfAvailable(attemptID: attemptID)
+        }
+        completeTask(attemptID: attemptID)
+    }
+
+    private func completeTask(attemptID: String) {
+        guard activeAttemptID == attemptID else {
+            return
+        }
+        installTask = nil
+        activeAttemptID = nil
+        processNextAttempt()
+    }
+
+    private func transition(
+        attemptID: String,
+        phase: DownloadPhase,
+        message: String
+    ) throws {
+        guard let attempt = queue.attempt(id: attemptID) else {
+            throw ModelInstallQueueError.attemptNotFound(attemptID)
+        }
+        let previousQueue = queue
+        try queue.transition(
+            attemptID: attemptID,
+            to: DownloadState(
+                modelID: attempt.artifactID,
+                phase: phase,
+                bytesDownloaded: attempt.state.bytesDownloaded,
+                totalBytes: attempt.state.totalBytes,
+                message: message,
+                attemptID: attemptID
+            )
+        )
+        guard persistQueue() else {
+            queue = previousQueue
+            throw ModelInstallCoordinatorError.storageOrConfigurationUnavailable
+        }
+        revision &+= 1
+    }
+
+    private func associateResumableDataIfAvailable(attemptID: String) {
+        guard let attempt = queue.attempt(id: attemptID),
+              let resumableData = resumableDataProvider(attempt)
+        else {
+            return
+        }
+        let previousQueue = queue
+        do {
+            try queue.associateResumableData(
+                resumableData,
+                with: attemptID
+            )
+            guard persistQueue() else {
+                queue = previousQueue
+                return
+            }
+            revision &+= 1
+        } catch {
+            return
+        }
+    }
+
+    @discardableResult
+    private func persistQueue() -> Bool {
+        guard let queueStore else {
+            return true
+        }
+        do {
+            try queueStore.save(queue)
+            persistenceErrorMessage = nil
+            return true
+        } catch {
+            persistenceIsAvailable = false
+            persistenceErrorMessage = "Textify could not save the Downloads queue."
+            return false
+        }
     }
 }
 

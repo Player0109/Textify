@@ -11,6 +11,7 @@ public struct ModelStorageLayout: Equatable, Sendable {
     public var downloadsDirectory: URL { rootDirectory.appendingPathComponent("downloads", isDirectory: true) }
     public var installedModelsDirectory: URL { rootDirectory.appendingPathComponent("installed", isDirectory: true) }
     public var installedStoreURL: URL { rootDirectory.appendingPathComponent("installed-models.json", isDirectory: false) }
+    public var installQueueURL: URL { rootDirectory.appendingPathComponent("install-queue.json", isDirectory: false) }
 
     public init(rootDirectory: URL) {
         self.rootDirectory = rootDirectory

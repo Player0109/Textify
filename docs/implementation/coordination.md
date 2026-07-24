@@ -981,3 +981,39 @@ Task 1 must merge before parallel Wave 1 work begins.
   smoke of All/Installed, search, filters, removable tokens, sorting, inspector
   On Disk measurement, and Installed Size. Independent Standards and Spec
   reviews report no remaining findings.
+
+## Persistent Model Installation Queue Handoff - 2026-07-24
+
+- GitHub issue #12 owns the Task 12 model-download state and persistence work
+  under `Sources/TextifyModels/Downloads/`, the narrow Task 11 app coordinator
+  and Downloads-popover wiring under `Sources/Textify/{App,SettingsUI}/`, and
+  focused queue, composition, and catalog-experience tests.
+- The minimum call-site and persistence closure also owns the existing
+  onboarding install actions, the shared install-progress phase switch,
+  `ModelStorageLayout.installQueueURL`, and their focused tests. These files
+  route existing behavior through the queue; they do not broaden onboarding,
+  general storage inventory, or model-install policy.
+- A Queue Attempt is the durable identity of one Install or Reinstall
+  authorization. Attempts retain explicit FIFO order and terminal history;
+  Retry appends a new linked attempt at the tail and never rewrites the prior
+  lifecycle.
+- The queue is the only path that invokes `ModelInstaller`. It serializes
+  managed byte mutation, persists nonterminal work before execution, restores
+  interrupted active work as queued after relaunch, and projects state by Exact
+  Artifact so unrelated rows and Checkpoint rollups remain unchanged.
+- Cancel, Pause, Resume, Retry, and Reveal target one stable Queue Attempt.
+  Canceling queue work never calls installed-model deletion. Validator-bound
+  resumable data may be associated with a later attempt, but only
+  `ModelInstaller` may create installed ownership after complete verification
+  and atomic installation.
+- Revoked is a terminal Queue Attempt state required for truthful Downloads
+  history in this ticket. Fetching or applying signed revocations remains
+  outside this slice.
+- Persistent storage inventory, peak-space policy, signed-catalog freshness,
+  revocation ingestion, deletion transactions, generalized runtime switching,
+  catalog staging, and large-catalog virtualization remain owned by later
+  tickets.
+- Final verification completed with 568 tests (11 opt-in native backend
+  smokes skipped, zero failures), the staged signed app bundle and its
+  43-model manifest, a native macOS Downloads-popover smoke, and clean
+  independent Standards and Spec reviews.

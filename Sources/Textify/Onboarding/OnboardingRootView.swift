@@ -465,29 +465,41 @@ struct OnboardingRootView: View {
         case .install:
             Button("Install Model") {
                 selectedOnboardingModelID = row.id
-                services.modelInstallCoordinator.start(modelID: row.id)
+                services.modelInstallCoordinator.start(
+                    modelID: row.id,
+                    purpose: row.model.purpose,
+                    action: .install
+                )
             }
             .disabled(
-                services.modelInstallCoordinator.isActive
-                    || ProductionModelInstallConfiguration.current == nil
+                ProductionModelInstallConfiguration.current == nil
             )
         case .reinstall:
             Button("Reinstall Model") {
                 selectedOnboardingModelID = row.id
-                services.modelInstallCoordinator.start(modelID: row.id)
+                services.modelInstallCoordinator.start(
+                    modelID: row.id,
+                    purpose: row.model.purpose,
+                    action: .reinstall
+                )
             }
             .disabled(
-                services.modelInstallCoordinator.isActive
-                    || ProductionModelInstallConfiguration.current == nil
+                ProductionModelInstallConfiguration.current == nil
             )
         case .cancelInstall:
             Button("Cancel") {
-                services.modelInstallCoordinator.cancel()
+                guard let attemptID = row.installState?.attemptID else {
+                    return
+                }
+                services.modelInstallCoordinator.cancel(attemptID: attemptID)
             }
         case .retryInstall:
             Button("Retry") {
                 selectedOnboardingModelID = row.id
-                services.modelInstallCoordinator.retry()
+                guard let attemptID = row.installState?.attemptID else {
+                    return
+                }
+                services.modelInstallCoordinator.retry(attemptID: attemptID)
             }
         case .activate:
             Button("Use Model") {
