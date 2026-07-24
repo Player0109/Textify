@@ -777,6 +777,7 @@ private struct ModelsSettingsPane: View {
             TextifyModelCard(
                 model: row.model,
                 hierarchyContext: context,
+                compatibility: row.compatibility,
                 isInstalled: row.isInstalled,
                 isActive: row.isActive,
                 isActivating: activatingModelID == row.id,
@@ -1106,6 +1107,7 @@ private struct ModelCatalogArtifactRowContext {
     let description: String
     let variantLabel: String?
     let isRecommended: Bool
+    let isFallback: Bool
     let isSelected: Bool
     let indentation: CGFloat
     let comparison: ModelCatalogVariantComparisonPresentation?
@@ -1182,6 +1184,23 @@ private struct ModelCatalogInspectorView: View {
                 label: "Speed Evidence",
                 value: checkpoint.referenceSpeedEvidence
             )
+            ModelInspectorFactRow(
+                label: "Compatibility",
+                value: checkpoint.referenceCompatibility
+            )
+            ModelInspectorFactRow(
+                label: "Compatibility Detail",
+                value: checkpoint.referenceCompatibilityExplanation
+            )
+            if let artifactName = checkpoint.defaultInstallArtifactName,
+               let artifactID = checkpoint.defaultInstallArtifactID {
+                ModelInspectorFactRow(
+                    label: artifactID == checkpoint.referenceArtifactID
+                        ? "Default Install"
+                        : "Signed Fallback",
+                    value: "\(artifactName) (\(artifactID))"
+                )
+            }
         }
 
         ModelInspectorSection(title: "Aggregate State") {
@@ -1207,7 +1226,12 @@ private struct ModelCatalogInspectorView: View {
             ModelInspectorFactRow(label: "Numeric Format", value: artifact.numericFormat)
             ModelInspectorFactRow(label: "Runtime", value: artifact.runtime)
             ModelInspectorFactRow(label: "Compute Route", value: artifact.computeRoute)
-            ModelInspectorFactRow(label: "Compatibility", value: artifact.compatibility)
+            ModelInspectorFactRow(label: "Compatibility", value: artifact.compatibilityStatus)
+            ModelInspectorFactRow(
+                label: "Compatibility Detail",
+                value: artifact.compatibilityExplanation
+            )
+            ModelInspectorFactRow(label: "Requirements", value: artifact.compatibility)
             ModelInspectorFactRow(label: "Download Size", value: artifact.transferSize)
             ModelInspectorFactRow(label: "Local State", value: artifact.localState)
         }
@@ -1481,6 +1505,9 @@ private struct ModelCatalogSurface<Row: View>: View {
                                         isRecommended: !isSingleVariant
                                             && checkpoint.metadata
                                                 .recommendedArtifactID == artifact.id,
+                                        isFallback: !isSingleVariant
+                                            && checkpoint.resolution?.fallback?
+                                                .fallbackArtifactID == artifact.id,
                                         isSelected: selection == .exactArtifact(artifact.id),
                                         indentation: isSingleVariant ? 0 : 30,
                                         comparison: isSingleVariant
@@ -1540,7 +1567,7 @@ private enum ModelCatalogEmptyPresentation {
     var detail: String {
         switch self {
         case .filtered:
-            return "Reset the catalog controls to see every compatible model."
+            return "Reset the catalog controls to see every model."
         case let .purpose(destination):
             return destination.emptyDetail
         case let .unavailable(destination):
@@ -1683,9 +1710,7 @@ private struct ModelCatalogCheckpointRow: View {
     }
 
     private var recommendedArtifact: ModelCatalogExactArtifactPresentation? {
-        checkpoint.artifacts.first {
-            $0.id == checkpoint.metadata.recommendedArtifactID
-        }
+        checkpoint.referenceArtifact
     }
 
     private var checkpointState: some View {
@@ -1698,6 +1723,19 @@ private struct ModelCatalogCheckpointRow: View {
                 Text(activeArtifact.metadata.presentation.displayName)
             } else if installedCount > 0 {
                 Label("\(installedCount) installed", systemImage: "internaldrive")
+            } else if let resolution = checkpoint.resolution,
+                      resolution.recommendedCompatibility != .compatible {
+                Label(
+                    resolution.fallback == nil
+                        ? resolution.recommendedCompatibility.catalogTitle
+                        : "Signed fallback",
+                    systemImage: resolution.fallback == nil
+                        ? "exclamationmark.triangle"
+                        : "arrow.triangle.branch"
+                )
+                if let fallback = checkpoint.defaultInstallArtifact {
+                    Text(fallback.metadata.presentation.displayName)
+                }
             } else {
                 Label("Not installed", systemImage: "arrow.down.circle")
             }
@@ -1705,6 +1743,10 @@ private struct ModelCatalogCheckpointRow: View {
         .font(.system(size: 10, weight: .medium))
         .foregroundStyle(.secondary)
         .lineLimit(1)
+        .help(
+            checkpoint.resolution?.recommendedCompatibility.catalogExplanation
+                ?? "Signed recommendation"
+        )
     }
 
     private var rowBackground: Color {
@@ -1767,6 +1809,7 @@ private struct ModelCatalogColumnHeader: View {
 private struct TextifyModelCard: View {
     let model: ProductionModelPresentation
     let hierarchyContext: ModelCatalogArtifactRowContext?
+    let compatibility: ModelCatalogCompatibility
     let isInstalled: Bool
     let isActive: Bool
     let isActivating: Bool
@@ -1807,6 +1850,9 @@ private struct TextifyModelCard: View {
                         if hierarchyContext?.isRecommended == true {
                             TextifyStatusBadge(title: "RECOMMENDED", tone: .accent)
                         }
+                        if hierarchyContext?.isFallback == true {
+                            TextifyStatusBadge(title: "SIGNED FALLBACK", tone: .warning)
+                        }
                         TextifyStatusBadge(title: model.supportTier.uppercased(), tone: tierTone)
                         if !model.isCurated {
                             TextifyStatusBadge(title: "NO LONGER CURATED", tone: .warning)
@@ -1844,16 +1890,27 @@ private struct TextifyModelCard: View {
                     }
                 } else if actions.contains(.use) {
                     Button(model.useLabel, systemImage: "waveform", action: onUse)
-                        .disabled(isBusy)
+                        .disabled(isBusy || !compatibility.allowsModelOperations)
+                        .help(compatibility.catalogExplanation)
                 }
 
                 if actions.contains(.reinstall) {
                     Button("Reinstall", systemImage: "arrow.clockwise", action: onInstall)
-                        .disabled(isBusy || ProductionModelInstallConfiguration.current == nil)
+                        .disabled(
+                            isBusy
+                                || !compatibility.allowsModelOperations
+                                || ProductionModelInstallConfiguration.current == nil
+                        )
+                        .help(compatibility.catalogExplanation)
                         .foregroundStyle(.secondary)
                 } else if actions.contains(.install) {
                     Button(model.installLabel, systemImage: "arrow.down.circle", action: onInstall)
-                        .disabled(isBusy || ProductionModelInstallConfiguration.current == nil)
+                        .disabled(
+                            isBusy
+                                || !compatibility.allowsModelOperations
+                                || ProductionModelInstallConfiguration.current == nil
+                        )
+                        .help(compatibility.catalogExplanation)
                 }
 
                 if actions.contains(.delete) {
@@ -1885,10 +1942,22 @@ private struct TextifyModelCard: View {
             .font(.callout)
             .buttonStyle(.borderless)
 
+            if compatibility != .compatible {
+                Label(
+                    "\(compatibility.catalogTitle): \(compatibility.catalogExplanation)",
+                    systemImage: "exclamationmark.triangle"
+                )
+                .font(.caption)
+                .foregroundStyle(TextifyVisualIdentity.warmWarning)
+                .padding(.leading, hierarchyContext == nil ? 76 : 28)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
             if let install {
                 ModelCardInstallProgress(
                     install: install,
                     actions: actions,
+                    isActionable: compatibility.allowsModelOperations,
                     onCancel: onCancelInstall,
                     onRetry: onRetryInstall
                 )
@@ -1952,6 +2021,7 @@ private struct TextifyModelCard: View {
 private struct ModelCardInstallProgress: View {
     let install: ModelCatalogInstallPresentation
     let actions: Set<ModelCatalogRowAction>
+    let isActionable: Bool
     let onCancel: () -> Void
     let onRetry: () -> Void
 
@@ -1974,6 +2044,7 @@ private struct ModelCardInstallProgress: View {
                     Button("Cancel", systemImage: "xmark.circle", action: onCancel)
                 } else if actions.contains(.retryInstall) {
                     Button("Retry", systemImage: "arrow.clockwise", action: onRetry)
+                        .disabled(!isActionable)
                 }
             }
 

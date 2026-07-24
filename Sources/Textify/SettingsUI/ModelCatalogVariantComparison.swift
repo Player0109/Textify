@@ -55,6 +55,7 @@ struct ModelCatalogVariantComparisonPresentation: Equatable, Identifiable {
     let id: String
     let variant: String
     let isRecommended: Bool
+    let isFallback: Bool
     let artifactFormat: String
     let numericFormat: String
     let runtime: String
@@ -63,6 +64,8 @@ struct ModelCatalogVariantComparisonPresentation: Equatable, Identifiable {
     let size: String
     let computeRoute: String
     let state: String
+    let compatibilityExplanation: String
+    let isActionable: Bool
     let isActive: Bool
     let primaryAction: ModelCatalogVariantPrimaryAction
 }
@@ -187,6 +190,7 @@ extension ModelCatalogCheckpointPresentation {
                 id: artifact.id,
                 variant: artifact.metadata.presentation.displayName,
                 isRecommended: artifact.id == reference.id,
+                isFallback: resolution?.fallback?.fallbackArtifactID == artifact.id,
                 artifactFormat: ModelCatalogVariantTerminology.artifactFormat(
                     artifact.metadata.artifactFormat
                 ),
@@ -217,6 +221,8 @@ extension ModelCatalogCheckpointPresentation {
                     artifact.metadata.computeRoute
                 ),
                 state: Self.state(for: artifact.row),
+                compatibilityExplanation: artifact.row.compatibility.catalogExplanation,
+                isActionable: artifact.row.compatibility.allowsModelOperations,
                 isActive: artifact.row.isActive,
                 primaryAction: Self.primaryAction(for: artifact.row.actions)
             )
@@ -260,6 +266,9 @@ extension ModelCatalogCheckpointPresentation {
     private static func state(for row: ModelCatalogRowPresentation) -> String {
         if row.isActive {
             return "Active"
+        }
+        guard row.compatibility == .compatible else {
+            return row.compatibility.catalogTitle
         }
         if let install = row.install {
             return install.title

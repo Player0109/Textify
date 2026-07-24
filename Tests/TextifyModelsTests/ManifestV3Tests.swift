@@ -274,6 +274,164 @@ final class ManifestV3Tests: XCTestCase {
         XCTAssertTrue(try compatibleIDs(macOSVersion: "13.6.9").isEmpty)
     }
 
+    func testCompatibilityResolverReturnsTypedConstraintOutcomes() throws {
+        let manifest = try ModelManifest.decode(try fixtureData("manifest_v3.json"))
+        let modelID = "whisper-small-q5_1"
+
+        func compatibility(
+            appVersion: String = "1.1.0",
+            macOSVersion: String = "14.0.0",
+            architecture: ModelArchitecture? = .arm64,
+            physicalMemoryBytes: Int64 = 8_589_934_592,
+            supportedRuntimes: [TranscriptionEngine] = TranscriptionEngine.allCases,
+            supportedArtifactLayouts: [ModelArtifactLayout] = ModelArtifactLayout.allCases,
+            supportedComputeRoutes: [ModelComputeRoute] = ModelComputeRoute.allCases
+        ) -> ModelCatalogCompatibility {
+            ModelCatalogCompatibilityResolver(
+                context: ModelCatalogCompatibilityContext(
+                    appVersion: appVersion,
+                    macOSVersion: macOSVersion,
+                    architecture: architecture,
+                    physicalMemoryBytes: physicalMemoryBytes,
+                    supportedRuntimes: supportedRuntimes,
+                    supportedArtifactLayouts: supportedArtifactLayouts,
+                    supportedComputeRoutes: supportedComputeRoutes
+                )
+            ).compatibility(for: modelID, in: manifest)
+        }
+
+        XCTAssertEqual(compatibility(), .compatible)
+        XCTAssertEqual(
+            compatibility(appVersion: "1.0.9"),
+            .requiresAppUpdate(minimumVersion: "1.1.0")
+        )
+        XCTAssertEqual(
+            compatibility(macOSVersion: "13.6.9"),
+            .requiresMacOSUpdate(minimumVersion: "14.0.0")
+        )
+        XCTAssertEqual(
+            compatibility(architecture: nil),
+            .incompatible(
+                .unsupportedArchitecture(
+                    current: nil,
+                    supported: [.arm64]
+                )
+            )
+        )
+        XCTAssertEqual(
+            compatibility(physicalMemoryBytes: 536_870_912),
+            .incompatible(
+                .insufficientMemory(
+                    requiredBytes: 1_073_741_824,
+                    availableBytes: 536_870_912
+                )
+            )
+        )
+        XCTAssertEqual(
+            compatibility(supportedRuntimes: []),
+            .incompatible(.unsupportedRuntime(.whisperCpp))
+        )
+        XCTAssertEqual(
+            compatibility(supportedArtifactLayouts: []),
+            .incompatible(.unsupportedArtifactLayout(.singleFile))
+        )
+        XCTAssertEqual(
+            compatibility(supportedComputeRoutes: []),
+            .incompatible(.unsupportedComputeRoute(.gpuViaMetal))
+        )
+        XCTAssertEqual(
+            compatibility(appVersion: "development"),
+            .indeterminate(.invalidCurrentAppVersion("development"))
+        )
+    }
+
+    func testCompatibilityResolverPreservesSignedLegacyCatalogOperations() throws {
+        let manifest = try ModelManifest.decode(try fixtureData("manifest.json"))
+        let modelID = try XCTUnwrap(manifest.models.first?.id)
+        let resolver = ModelCatalogCompatibilityResolver(
+            context: ModelCatalogCompatibilityContext(
+                appVersion: "1.1.0",
+                macOSVersion: "14.0.0",
+                architecture: .arm64,
+                physicalMemoryBytes: 8_589_934_592
+            )
+        )
+
+        XCTAssertEqual(
+            resolver.compatibility(for: modelID, in: manifest),
+            .compatible
+        )
+        XCTAssertEqual(resolver.compatibleModelIDs(in: manifest), [modelID])
+    }
+
+    func testCheckpointFallbackUsesSignedOrderOnlyForDeterministicIncompatibility() throws {
+        var json = try fixtureJSON()
+        var graph = try presentationGraph(in: json)
+        var artifacts = try XCTUnwrap(graph["artifacts"] as? [[String: Any]])
+        var recommendedCompatibility = try XCTUnwrap(
+            artifacts[0]["compatibility"] as? [String: Any]
+        )
+        recommendedCompatibility["minimumMemoryBytes"] = 16_000_000_000
+        artifacts[0]["compatibility"] = recommendedCompatibility
+        graph["artifacts"] = artifacts
+        json["presentationGraph"] = graph
+        let manifest = try ModelManifest.decode(
+            JSONSerialization.data(withJSONObject: json)
+        )
+
+        let resolver = ModelCatalogCompatibilityResolver(
+            context: ModelCatalogCompatibilityContext(
+                appVersion: "1.1.0",
+                macOSVersion: "14.0.0",
+                architecture: .arm64,
+                physicalMemoryBytes: 8_000_000_000
+            )
+        )
+        let resolution = try XCTUnwrap(
+            resolver.checkpointResolution(
+                for: "checkpoint.whisper.small",
+                in: manifest
+            )
+        )
+
+        XCTAssertEqual(resolution.recommendedArtifactID, "whisper-small-q5_1")
+        XCTAssertEqual(
+            resolution.recommendedCompatibility,
+            .incompatible(
+                .insufficientMemory(
+                    requiredBytes: 16_000_000_000,
+                    availableBytes: 8_000_000_000
+                )
+            )
+        )
+        XCTAssertEqual(resolution.installArtifactID, "whisper-small-q8_0")
+        XCTAssertEqual(
+            resolution.fallback,
+            ModelCatalogFallbackResolution(
+                recommendedArtifactID: "whisper-small-q5_1",
+                fallbackArtifactID: "whisper-small-q8_0"
+            )
+        )
+
+        let updateRequired = ModelCatalogCompatibilityResolver(
+            context: ModelCatalogCompatibilityContext(
+                appVersion: "1.0.9",
+                macOSVersion: "14.0.0",
+                architecture: .arm64,
+                physicalMemoryBytes: 8_000_000_000
+            )
+        ).checkpointResolution(
+            for: "checkpoint.whisper.small",
+            in: manifest
+        )
+        XCTAssertEqual(
+            updateRequired?.recommendedCompatibility,
+            .requiresAppUpdate(minimumVersion: "1.1.0")
+        )
+        XCTAssertNil(updateRequired?.installArtifactID)
+        XCTAssertNil(updateRequired?.fallback)
+    }
+
     func testCompatibilityResolverHasNoAuthorityWithoutATrustedManifest() {
         let resolver = ModelCatalogCompatibilityResolver(
             context: ModelCatalogCompatibilityContext(
@@ -285,6 +443,10 @@ final class ManifestV3Tests: XCTestCase {
         )
 
         XCTAssertNil(resolver.compatibleModelIDs(in: nil))
+        XCTAssertEqual(
+            resolver.compatibility(for: "missing", in: nil),
+            .indeterminate(.trustedManifestUnavailable)
+        )
     }
 
     private func assertGraphPolicyError(

@@ -901,3 +901,24 @@ Task 1 must merge before parallel Wave 1 work begins.
   architecture, and physical-memory values plus dependency composition.
 - This handoff does not expand issue #8 into installer policy, runtime
   switching, storage inventory, revocation, or queue ownership.
+
+## Transparent Recommendation And Fallback Handoff - 2026-07-24
+
+- GitHub issue #9 owns the typed compatibility and same-Checkpoint
+  recommendation resolver under `Sources/TextifyModels/`, plus the minimum
+  catalog-experience, Settings, onboarding, app-composition, and focused test
+  changes needed to keep incompatible Exact Artifacts visible and disclose a
+  signed fallback before installation.
+- A fallback may resolve only from the Checkpoint's signed
+  `fallbackArtifactIDs`, only when the signed recommendation is deterministically
+  incompatible, and only to a compatible Exact Artifact in that same
+  Checkpoint. Requires-update and indeterminate outcomes never authorize a
+  fallback.
+- Presentation order remains `artifactIDs`; fallback order is not revocation
+  recovery, runtime switching, or a hidden CPU/Runtime substitution. Persistent
+  queues, storage inventory, revocation, deletion transactions, and runtime
+  switching remain owned by later tickets.
+- Verification completed with focused compatibility/catalog tests, the staged
+  signed app-bundle launch, a native macOS grouped-variant visual smoke, clean
+  Standards and Spec reviews, and the full 519-test suite (11 opt-in native
+  smokes skipped, zero failures).

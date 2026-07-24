@@ -211,6 +211,13 @@ struct ModelCatalogVariantComparisonRow: View {
                             .foregroundStyle(TextifyVisualIdentity.voiceViolet)
                             .accessibilityLabel("Catalog recommendation")
                     }
+                    if presentation.isFallback {
+                        Text("SIGNED FALLBACK")
+                            .font(.system(size: 8, weight: .bold, design: .monospaced))
+                            .tracking(0.4)
+                            .foregroundStyle(TextifyVisualIdentity.warmWarning)
+                            .accessibilityLabel("Signed compatibility fallback")
+                    }
                 }
                 Text(presentation.runtime)
                     .font(.caption2)
@@ -245,7 +252,23 @@ struct ModelCatalogVariantComparisonRow: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+            if !presentation.isActionable {
+                Text(presentation.compatibilityExplanation)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
+        .help(
+            presentation.isActionable
+                ? presentation.state
+                : presentation.compatibilityExplanation
+        )
+        .accessibilityValue(
+            presentation.isActionable
+                ? presentation.state
+                : "\(presentation.state). \(presentation.compatibilityExplanation)"
+        )
     }
 
     private func metric(
@@ -342,7 +365,9 @@ struct ModelCatalogVariantComparisonRow: View {
                    presentation.primaryAction != .reinstall {
                     Button("Reinstall", systemImage: "arrow.clockwise", action: onInstall)
                         .disabled(
-                            isBusy || ProductionModelInstallConfiguration.current == nil
+                            isBusy
+                                || !presentation.isActionable
+                                || ProductionModelInstallConfiguration.current == nil
                         )
                 }
                 if actions.contains(.delete) {
@@ -369,25 +394,33 @@ struct ModelCatalogVariantComparisonRow: View {
         switch presentation.primaryAction {
         case .use:
             Button(model.useLabel, action: onUse)
-                .disabled(isBusy)
+                .disabled(isBusy || !presentation.isActionable)
+                .help(presentation.compatibilityExplanation)
         case .disable:
             Button("Disable", action: onDisable)
                 .disabled(isBusy)
         case .install:
             Button(model.installLabel, action: onInstall)
                 .disabled(
-                    isBusy || ProductionModelInstallConfiguration.current == nil
+                    isBusy
+                        || !presentation.isActionable
+                        || ProductionModelInstallConfiguration.current == nil
                 )
+                .help(presentation.compatibilityExplanation)
         case .reinstall:
             Button("Reinstall", action: onInstall)
                 .disabled(
-                    isBusy || ProductionModelInstallConfiguration.current == nil
+                    isBusy
+                        || !presentation.isActionable
+                        || ProductionModelInstallConfiguration.current == nil
                 )
+                .help(presentation.compatibilityExplanation)
         case .cancelInstall:
             Button("Cancel", action: onCancelInstall)
         case .retryInstall:
             Button("Retry", action: onRetryInstall)
-                .disabled(isBusy)
+                .disabled(isBusy || !presentation.isActionable)
+                .help(presentation.compatibilityExplanation)
         case .none:
             Text("—")
                 .foregroundStyle(.tertiary)
@@ -397,6 +430,9 @@ struct ModelCatalogVariantComparisonRow: View {
     private var stateColor: Color {
         if presentation.isActive {
             return TextifyVisualIdentity.readyMint
+        }
+        if !presentation.isActionable {
+            return TextifyVisualIdentity.warmWarning
         }
         switch install?.state.phase {
         case .failed, .interrupted:

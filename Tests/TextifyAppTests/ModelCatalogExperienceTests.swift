@@ -151,6 +151,104 @@ final class ModelCatalogExperienceTests: XCTestCase {
         XCTAssertFalse(onboarding.choices.contains { $0.id == "parakeet-rnnt-1.1b" })
     }
 
+    func testIncompatibleRecommendationStaysVisibleAndDisclosesExactSignedFallback() throws {
+        let manifest = try v3FixtureManifest(
+            recommendedMinimumMemoryBytes: 16_000_000_000
+        )
+        let resolver = ModelCatalogCompatibilityResolver(
+            context: ModelCatalogCompatibilityContext(
+                appVersion: "1.1.0",
+                macOSVersion: "14.0.0",
+                architecture: .arm64,
+                physicalMemoryBytes: 8_000_000_000
+            )
+        )
+        let experience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            compatibilityResolver: resolver,
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        let checkpoint = try XCTUnwrap(
+            experience.families.first?.checkpoints.first
+        )
+        let recommended = try XCTUnwrap(
+            checkpoint.artifacts.first { $0.id == "whisper-small-q5_1" }
+        )
+        let fallback = try XCTUnwrap(
+            checkpoint.artifacts.first { $0.id == "whisper-small-q8_0" }
+        )
+
+        XCTAssertEqual(
+            checkpoint.artifacts.map(\.id),
+            ["whisper-small-q5_1", "whisper-small-q8_0"],
+            "Fallback order must not replace signed presentation order."
+        )
+        XCTAssertEqual(
+            recommended.row.compatibility,
+            .incompatible(
+                .insufficientMemory(
+                    requiredBytes: 16_000_000_000,
+                    availableBytes: 8_000_000_000
+                )
+            )
+        )
+        XCTAssertFalse(recommended.row.compatibility.allowsModelOperations)
+        XCTAssertTrue(recommended.row.actions.contains(.install))
+        XCTAssertEqual(fallback.row.compatibility, .compatible)
+        XCTAssertEqual(
+            checkpoint.defaultInstallArtifact?.id,
+            "whisper-small-q8_0"
+        )
+        XCTAssertEqual(
+            checkpoint.resolution?.fallback?.fallbackArtifactID,
+            "whisper-small-q8_0"
+        )
+        let comparisons = checkpoint.variantComparisons
+        XCTAssertEqual(
+            comparisons.first { $0.id == recommended.id }?.isActionable,
+            false
+        )
+        XCTAssertEqual(
+            comparisons.first { $0.id == fallback.id }?.isFallback,
+            true
+        )
+
+        let inspector = try XCTUnwrap(
+            experience.inspectorPresentation(
+                for: .checkpoint("checkpoint.whisper.small")
+            )
+        )
+        guard case let .checkpoint(checkpointInspector) = inspector else {
+            return XCTFail("Checkpoint selection must disclose fallback resolution.")
+        }
+        XCTAssertEqual(checkpointInspector.referenceCompatibility, "Incompatible")
+        XCTAssertEqual(
+            checkpointInspector.defaultInstallArtifactID,
+            "whisper-small-q8_0"
+        )
+        XCTAssertEqual(checkpointInspector.defaultInstallArtifactName, "Q8_0")
+
+        let onboarding = OnboardingModelCatalog(experience: experience)
+        XCTAssertEqual(onboarding.selectedModelID, "whisper-small-q8_0")
+        XCTAssertEqual(onboarding.action(for: "whisper-small-q8_0"), .install)
+        XCTAssertEqual(
+            onboarding.action(for: "whisper-small-q5_1"),
+            .unavailable
+        )
+        XCTAssertTrue(
+            onboarding.selectionNotice?.contains("whisper-small-q5_1") == true
+        )
+        XCTAssertTrue(
+            onboarding.selectionNotice?.contains("whisper-small-q8_0") == true
+        )
+        XCTAssertTrue(
+            onboarding.selectionNotice?.contains("Whisper.cpp with GPU via Metal")
+                == true
+        )
+    }
+
     func testOnboardingUsesSignedRecommendationThenRequiresExplicitActivation() throws {
         let manifest = try productionManifest()
         let recommendedID = try XCTUnwrap(
@@ -1110,6 +1208,35 @@ final class ModelCatalogExperienceTests: XCTestCase {
             signatureData: Data(
                 contentsOf: fixtureDirectory.appendingPathComponent("manifest_v3.json.sig")
             )
+        )
+    }
+
+    private func v3FixtureManifest(
+        recommendedMinimumMemoryBytes: Int64
+    ) throws -> ModelManifest {
+        let fixtureURL = repositoryRoot
+            .appendingPathComponent("Tests/TextifyModelsTests/Fixtures/Models")
+            .appendingPathComponent("manifest_v3.json")
+        var root = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: fixtureURL))
+                as? [String: Any]
+        )
+        var graph = try XCTUnwrap(root["presentationGraph"] as? [String: Any])
+        var artifacts = try XCTUnwrap(graph["artifacts"] as? [[String: Any]])
+        let recommendedIndex = try XCTUnwrap(
+            artifacts.firstIndex {
+                $0["id"] as? String == "whisper-small-q5_1"
+            }
+        )
+        var compatibility = try XCTUnwrap(
+            artifacts[recommendedIndex]["compatibility"] as? [String: Any]
+        )
+        compatibility["minimumMemoryBytes"] = recommendedMinimumMemoryBytes
+        artifacts[recommendedIndex]["compatibility"] = compatibility
+        graph["artifacts"] = artifacts
+        root["presentationGraph"] = graph
+        return try ModelManifest.decode(
+            JSONSerialization.data(withJSONObject: root)
         )
     }
 

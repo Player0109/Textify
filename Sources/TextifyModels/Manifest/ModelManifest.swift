@@ -97,7 +97,7 @@ public enum ModelPurpose: String, Codable, Equatable, Sendable {
     case voiceCleaning = "voice_cleaning"
 }
 
-public enum TranscriptionEngine: String, Codable, Equatable, Sendable {
+public enum TranscriptionEngine: String, Codable, Equatable, CaseIterable, Sendable {
     case whisperCpp = "whisper_cpp"
     case fluidAudioParakeet = "fluid_audio_parakeet"
     case fluidAudioParaformer = "fluid_audio_paraformer"
@@ -113,7 +113,7 @@ public enum ModelAccelerator: String, Codable, Equatable, Sendable {
     case cpu
 }
 
-public enum ModelArtifactLayout: String, Codable, Equatable, Sendable {
+public enum ModelArtifactLayout: String, Codable, Equatable, CaseIterable, Sendable {
     case singleFile = "single_file"
     case modelDirectory = "model_directory"
 }

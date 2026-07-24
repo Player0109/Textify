@@ -217,7 +217,12 @@ struct OnboardingRootView: View {
                         selection: onboardingModelSelectionBinding
                     ) {
                         ForEach(onboardingModelCatalog.choices) { choice in
-                            Text(choice.model.catalogDisplayName)
+                            Text(
+                                choice.model.catalogDisplayName
+                                    + (choice.compatibility == .compatible
+                                        ? ""
+                                        : " — \(choice.compatibility.catalogTitle)")
+                            )
                                 .tag(Optional(choice.id))
                         }
                     }
@@ -236,6 +241,13 @@ struct OnboardingRootView: View {
                             )
                             .font(.caption)
                             .foregroundStyle(.tertiary)
+                        }
+
+                        if let notice = onboardingModelCatalog.selectionNotice {
+                            Label(notice, systemImage: "info.circle")
+                                .font(.caption)
+                                .foregroundStyle(TextifyVisualIdentity.warmWarning)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
 
                         HStack {
@@ -483,6 +495,10 @@ struct OnboardingRootView: View {
         case .active:
             Label("Active", systemImage: "checkmark.circle.fill")
                 .foregroundStyle(TextifyVisualIdentity.readyMint)
+        case .unavailable:
+            Button(row.isInstalled ? "Use Model" : row.model.installLabel) {}
+                .disabled(true)
+                .help(row.compatibility.catalogExplanation)
         case nil:
             EmptyView()
         }

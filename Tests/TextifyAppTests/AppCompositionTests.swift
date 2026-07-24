@@ -106,7 +106,19 @@ final class AppCompositionTests: XCTestCase {
             cleaning.rows.allSatisfy { $0.model.purpose == .voiceCleaning }
         )
         XCTAssertFalse(cleaning.rows.isEmpty)
-        XCTAssertFalse(transcription.rows.contains { $0.id == "parakeet-rnnt-1.1b" })
+        let incompatible = try XCTUnwrap(
+            transcription.rows.first { $0.id == "parakeet-rnnt-1.1b" }
+        )
+        XCTAssertEqual(
+            incompatible.compatibility,
+            .incompatible(
+                .insufficientMemory(
+                    requiredBytes: 17_179_869_184,
+                    availableBytes: 8_589_934_592
+                )
+            )
+        )
+        XCTAssertFalse(incompatible.compatibility.allowsModelOperations)
         XCTAssertTrue(
             services.modelCatalogCompatibilityResolver === compatibilityResolver
         )

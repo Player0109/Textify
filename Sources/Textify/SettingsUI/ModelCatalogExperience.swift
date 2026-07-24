@@ -210,11 +210,13 @@ enum OnboardingModelAction: Equatable {
     case retryInstall
     case activate
     case active
+    case unavailable
 }
 
 struct OnboardingModelCatalog: Equatable {
     let choices: [ModelCatalogRowPresentation]
     let selectedModelID: String?
+    let selectionNotice: String?
 
     init(
         experience: ModelCatalogExperience,
@@ -229,11 +231,18 @@ struct OnboardingModelCatalog: Equatable {
         } else {
             self.selectedModelID = experience.families
                 .flatMap(\.checkpoints)
-                .compactMap(\.referenceArtifact)
+                .compactMap(\.defaultInstallArtifact)
                 .first?
                 .id
+                ?? choices.first(where: {
+                    $0.compatibility.allowsModelOperations
+                })?.id
                 ?? choices.first?.id
         }
+        selectionNotice = Self.selectionNotice(
+            for: self.selectedModelID,
+            in: experience
+        )
     }
 
     func action(for modelID: String) -> OnboardingModelAction? {
@@ -243,11 +252,14 @@ struct OnboardingModelCatalog: Equatable {
         if row.actions.contains(.cancelInstall) {
             return .cancelInstall
         }
-        if row.actions.contains(.retryInstall) {
-            return .retryInstall
-        }
         if row.isActive {
             return .active
+        }
+        guard row.compatibility.allowsModelOperations else {
+            return .unavailable
+        }
+        if row.actions.contains(.retryInstall) {
+            return .retryInstall
         }
         return row.isInstalled ? .activate : .install
     }
@@ -257,6 +269,42 @@ struct OnboardingModelCatalog: Equatable {
             return nil
         }
         return choices.first { $0.id == modelID }?.installState
+    }
+
+    private static func selectionNotice(
+        for selectedModelID: String?,
+        in experience: ModelCatalogExperience
+    ) -> String? {
+        guard let selectedModelID else {
+            return nil
+        }
+        for checkpoint in experience.families.flatMap(\.checkpoints) {
+            if let resolution = checkpoint.resolution,
+               let fallback = resolution.fallback,
+               fallback.fallbackArtifactID == selectedModelID,
+               let recommended = checkpoint.referenceArtifact,
+               let selected = checkpoint.defaultInstallArtifact {
+                return "Recommended \(recommended.metadata.presentation.displayName) "
+                    + "(\(recommended.id)) is incompatible: "
+                    + resolution.recommendedCompatibility.catalogExplanation
+                    + " Textify will install signed fallback "
+                    + "\(selected.metadata.presentation.displayName) (\(selected.id)), using "
+                    + ModelCatalogVariantTerminology.runtime(selected.metadata.runtime)
+                    + " with "
+                    + ModelCatalogVariantTerminology.computeRoute(
+                        selected.metadata.computeRoute
+                    )
+                    + "."
+            }
+        }
+        guard let selected = experience.rows.first(
+            where: { $0.id == selectedModelID }
+        ),
+              !selected.compatibility.allowsModelOperations
+        else {
+            return nil
+        }
+        return selected.compatibility.catalogExplanation
     }
 }
 
@@ -364,6 +412,7 @@ struct ModelCatalogRowPresentation: Equatable, Identifiable {
     let model: ProductionModelPresentation
     let operationalModel: ModelEntry?
     let installedRecord: InstalledModelRecord?
+    let compatibility: ModelCatalogCompatibility
     let isInstalled: Bool
     let isActive: Bool
     let install: ModelCatalogInstallPresentation?
@@ -391,6 +440,8 @@ struct ModelCatalogCheckpointPresentation: Equatable, Identifiable {
     let metadata: ModelCheckpointPresentationNode
     let artifacts: [ModelCatalogExactArtifactPresentation]
     let referenceArtifact: ModelCatalogExactArtifactPresentation?
+    let defaultInstallArtifact: ModelCatalogExactArtifactPresentation?
+    let resolution: ModelCatalogCheckpointResolution?
 
     var id: String {
         metadata.id
@@ -602,14 +653,21 @@ struct ModelCatalogExperience: Equatable {
 
     init(
         trustedManifest: ModelManifest?,
+        compatibilityResolver: ModelCatalogCompatibilityResolver? = nil,
         installedRecords: [InstalledModelRecord],
         activePreferences: ModelCatalogActivePreferences,
         transferState: DownloadState?,
         query: ModelCatalogQuery = ModelCatalogQuery()
     ) {
+        let compatibilityByModelID = compatibilityResolver?
+            .compatibilityByModelID(in: trustedManifest) ?? [:]
+        let checkpointResolutions = compatibilityResolver?
+            .checkpointResolutions(in: trustedManifest) ?? [:]
         self.init(
             trustedModels: trustedManifest?.models ?? [],
             presentationGraph: trustedManifest?.presentationGraph,
+            compatibilityByModelID: compatibilityByModelID,
+            checkpointResolutions: checkpointResolutions,
             installedRecords: installedRecords,
             activePreferences: activePreferences,
             transferState: transferState,
@@ -620,6 +678,8 @@ struct ModelCatalogExperience: Equatable {
     private init(
         trustedModels: [ModelEntry],
         presentationGraph: ModelCatalogPresentationGraph?,
+        compatibilityByModelID: [String: ModelCatalogCompatibility] = [:],
+        checkpointResolutions: [String: ModelCatalogCheckpointResolution] = [:],
         installedRecords: [InstalledModelRecord],
         activePreferences: ModelCatalogActivePreferences,
         transferState: DownloadState?,
@@ -677,6 +737,7 @@ struct ModelCatalogExperience: Equatable {
                 model: model,
                 operationalModel: trustedModelsByID[model.id] ?? installedModel,
                 installedRecord: installedRecordsByID[model.id],
+                compatibility: compatibilityByModelID[model.id] ?? .compatible,
                 isInstalled: isInstalled,
                 isActive: isActive,
                 install: installState.map(ModelCatalogInstallPresentation.init),
@@ -699,14 +760,16 @@ struct ModelCatalogExperience: Equatable {
             Self.makeFamilyPresentations(
                 graph: $0,
                 rows: derivedRows,
-                referenceRows: allRows
+                referenceRows: allRows,
+                checkpointResolutions: checkpointResolutions
             )
         } ?? []
         inspectorFamilies = presentationGraph.map {
             Self.makeFamilyPresentations(
                 graph: $0,
                 rows: allRows,
-                referenceRows: allRows
+                referenceRows: allRows,
+                checkpointResolutions: checkpointResolutions
             )
         } ?? []
     }
@@ -789,6 +852,12 @@ struct ModelCatalogExperience: Equatable {
             referenceSpeedEvidence: referenceArtifact.row.model
                 .speedEvidenceDescription
                 ?? "No signed stable speed evidence",
+            referenceCompatibility: referenceArtifact.row.compatibility.catalogTitle,
+            referenceCompatibilityExplanation: referenceArtifact.row.compatibility
+                .catalogExplanation,
+            defaultInstallArtifactID: checkpoint.defaultInstallArtifact?.id,
+            defaultInstallArtifactName: checkpoint.defaultInstallArtifact?
+                .metadata.presentation.displayName,
             aggregateState: aggregateState,
             languages: checkpointLanguageDescription(checkpoint.artifacts),
             capabilities: capabilities.joined(separator: " • ")
@@ -850,6 +919,8 @@ struct ModelCatalogExperience: Equatable {
                 metadata.computeRoute
             ),
             compatibility: compatibilityParts.joined(separator: " • "),
+            compatibilityStatus: artifact.row.compatibility.catalogTitle,
+            compatibilityExplanation: artifact.row.compatibility.catalogExplanation,
             qualityEvidence: artifact.row.model.qualityEvidenceDescription ?? "Unrated",
             speedEvidence: artifact.row.model.speedEvidenceDescription ?? "Unrated",
             transferSize: ByteCountFormatter.string(
@@ -988,7 +1059,8 @@ struct ModelCatalogExperience: Equatable {
     private static func makeFamilyPresentations(
         graph: ModelCatalogPresentationGraph,
         rows: [ModelCatalogRowPresentation],
-        referenceRows: [ModelCatalogRowPresentation]
+        referenceRows: [ModelCatalogRowPresentation],
+        checkpointResolutions: [String: ModelCatalogCheckpointResolution]
     ) -> [ModelCatalogFamilyPresentation] {
         let checkpointsByID = graph.checkpoints.reduce(
             into: [String: ModelCheckpointPresentationNode]()
@@ -1044,10 +1116,30 @@ struct ModelCatalogExperience: Equatable {
                             row: row
                         )
                     }
+                    let resolution = checkpointResolutions[checkpoint.id]
+                    let defaultInstallArtifact = resolution?.installArtifactID
+                        .flatMap { artifactID in
+                            if let visible = artifacts.first(
+                                where: { $0.id == artifactID }
+                            ) {
+                                return visible
+                            }
+                            guard let metadata = artifactsByID[artifactID],
+                                  let row = referenceRowsByID[artifactID]
+                            else {
+                                return nil
+                            }
+                            return ModelCatalogExactArtifactPresentation(
+                                metadata: metadata,
+                                row: row
+                            )
+                        }
                     return ModelCatalogCheckpointPresentation(
                         metadata: checkpoint,
                         artifacts: artifacts,
-                        referenceArtifact: referenceArtifact
+                        referenceArtifact: referenceArtifact,
+                        defaultInstallArtifact: defaultInstallArtifact,
+                        resolution: resolution
                     )
                 }
             guard !checkpoints.isEmpty else {
@@ -1057,6 +1149,81 @@ struct ModelCatalogExperience: Equatable {
                 metadata: family,
                 checkpoints: checkpoints
             )
+        }
+    }
+}
+
+extension ModelCatalogCompatibility {
+    var catalogTitle: String {
+        switch self {
+        case .compatible:
+            return "Compatible"
+        case .requiresAppUpdate:
+            return "Requires Textify Update"
+        case .requiresMacOSUpdate:
+            return "Requires macOS Update"
+        case .incompatible:
+            return "Incompatible"
+        case .indeterminate:
+            return "Compatibility Indeterminate"
+        }
+    }
+
+    var catalogExplanation: String {
+        switch self {
+        case .compatible:
+            return "Compatible with this Mac and Textify build."
+        case let .requiresAppUpdate(minimumVersion):
+            return "Requires Textify \(minimumVersion) or later."
+        case let .requiresMacOSUpdate(minimumVersion):
+            return "Requires macOS \(minimumVersion) or later."
+        case let .incompatible(reason):
+            switch reason {
+            case let .unsupportedArchitecture(current, supported):
+                let currentName = current?.rawValue ?? "unsupported architecture"
+                return "This Mac uses \(currentName); requires "
+                    + supported.map(\.rawValue).joined(separator: ", ")
+                    + "."
+            case let .insufficientMemory(requiredBytes, availableBytes):
+                return "Requires "
+                    + ByteCountFormatter.string(
+                        fromByteCount: requiredBytes,
+                        countStyle: .memory
+                    )
+                    + " memory; this Mac reports "
+                    + ByteCountFormatter.string(
+                        fromByteCount: availableBytes,
+                        countStyle: .memory
+                    )
+                    + "."
+            case let .unsupportedRuntime(runtime):
+                return "\(ModelCatalogVariantTerminology.runtime(runtime)) is unavailable in this build."
+            case let .unsupportedArtifactLayout(layout):
+                return "The signed \(layout.rawValue) layout is unavailable in this build."
+            case let .unsupportedComputeRoute(route):
+                return "\(ModelCatalogVariantTerminology.computeRoute(route)) is unavailable on this Mac."
+            }
+        case let .indeterminate(reason):
+            switch reason {
+            case .trustedManifestUnavailable:
+                return "The trusted signed catalog is unavailable."
+            case let .signedPresentationUnavailable(modelID):
+                return "Signed compatibility metadata is unavailable for \(modelID)."
+            case let .operationalModelUnavailable(modelID):
+                return "Operational metadata is unavailable for \(modelID)."
+            case let .exactArtifactUnavailable(modelID):
+                return "Exact Artifact metadata is unavailable for \(modelID)."
+            case let .inconsistentSignedMetadata(modelID):
+                return "Signed runtime metadata is inconsistent for \(modelID)."
+            case .invalidCurrentAppVersion:
+                return "Textify could not determine the current app version."
+            case .invalidCurrentMacOSVersion:
+                return "Textify could not determine the current macOS version."
+            case let .invalidSignedRequirements(modelID):
+                return "Signed compatibility requirements are invalid for \(modelID)."
+            case .physicalMemoryUnavailable:
+                return "Textify could not determine this Mac's memory."
+            }
         }
     }
 }

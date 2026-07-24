@@ -383,13 +383,9 @@ final class AppServices {
     ) -> ModelCatalogExperience {
         var scopedQuery = query
         scopedQuery.purpose = purpose
-        let compatibleModelIDs = modelCatalogCompatibilityResolver
-            .compatibleModelIDs(in: modelCatalogCoordinator.manifest) ?? []
-        scopedQuery.compatibleModelIDs = compatibleModelIDs.union(
-            installedModelRecords.map(\.model.id)
-        )
         return ModelCatalogExperience(
             trustedManifest: modelCatalogCoordinator.manifest,
+            compatibilityResolver: modelCatalogCompatibilityResolver,
             installedRecords: installedModelRecords,
             activePreferences: ModelCatalogActivePreferences(
                 transcriptionModelID: preferences.activeModelID,

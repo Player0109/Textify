@@ -23,7 +23,7 @@ public enum ModelNumericFormat: String, Codable, Equatable, Sendable {
     case q4_k_m = "Q4_K_M"
 }
 
-public enum ModelComputeRoute: String, Codable, Equatable, Sendable {
+public enum ModelComputeRoute: String, Codable, Equatable, CaseIterable, Sendable {
     case gpuViaMetal = "gpu_via_metal"
     case coreMLNeuralEngine = "core_ml_neural_engine"
     case cpuOnly = "cpu_only"

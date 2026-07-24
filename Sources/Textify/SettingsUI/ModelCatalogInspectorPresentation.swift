@@ -15,6 +15,10 @@ struct ModelCatalogCheckpointInspectorPresentation: Equatable {
     let referenceSpeed: String
     let referenceQualityEvidence: String
     let referenceSpeedEvidence: String
+    let referenceCompatibility: String
+    let referenceCompatibilityExplanation: String
+    let defaultInstallArtifactID: String?
+    let defaultInstallArtifactName: String?
     let aggregateState: String
     let languages: String
     let capabilities: String
@@ -30,6 +34,8 @@ struct ModelCatalogExactArtifactInspectorPresentation: Equatable {
     let runtime: String
     let computeRoute: String
     let compatibility: String
+    let compatibilityStatus: String
+    let compatibilityExplanation: String
     let qualityEvidence: String
     let speedEvidence: String
     let transferSize: String
