@@ -2,6 +2,33 @@
 
 This file records cross-agent handoffs during implementation.
 
+## Installed Artifact Provenance Placement Handoff - 2026-07-24
+
+- GitHub issue #17 owns the narrow cross-task changes needed to place every
+  installed artifact exclusively as Curated, No Longer Curated, Legacy, or
+  Custom while preserving local import and naming history.
+- This slice may update Task 4 manifest/storage/import identity records, Task
+  11 catalog presentation and app reconciliation, Task 12 installer refresh
+  metadata preservation, Task 14 release guidance, Task 15 runtime receipt
+  resolution, and their focused tests. It must preserve the signed exact
+  artifact identities, trusted-catalog staging, persistent install queue,
+  storage inventory, and peak-space admission completed by issues #3–#16.
+- Content matching uses typed SHA-256 digests. A unique signed match may
+  canonicalize local content to one Exact Artifact; ambiguous duplicate
+  catalog digests remain unresolved unless optional signed v3 aliases identify
+  one canonical Exact Artifact.
+- Custom identifiers use the full content digest in a path-safe custom
+  namespace. Re-importing the same content reuses one installed record and
+  records additional local naming history instead of copying managed bytes.
+- Signed revocation ingestion and enforcement, safe active-model deletion
+  transactions, generalized runtime switching, and large-catalog
+  virtualization remain owned by issues #18–#22.
+- Verification completed with 669 Swift tests (11 explicit opt-in native/model
+  smokes skipped, zero failures), production signature verification for all 43
+  signed models, an arm64 SwiftPM Release build, and a native arm64 Xcode Debug
+  app build. Final Standards and issue-spec reviews reported no remaining
+  actionable findings.
+
 ## Peak Storage Admission Handoff - 2026-07-24
 
 - GitHub issue #16 owns the narrow cross-task changes needed to make signed

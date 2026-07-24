@@ -27,8 +27,12 @@ public struct InstalledModelManager: @unchecked Sendable {
             at: layout.downloadsDirectory,
             withIntermediateDirectories: true
         )
-        let installedDirectory = try layout.installedModelDirectory(modelID: modelID)
-        let removalDirectory = try layout.temporaryRemovalDirectory(modelID: modelID)
+        let installedDirectory = try layout.installedModelDirectory(
+            modelID: record.storageModelID
+        )
+        let removalDirectory = try layout.temporaryRemovalDirectory(
+            modelID: record.storageModelID
+        )
         let hadInstalledDirectory = fileManager.fileExists(atPath: installedDirectory.path)
         if hadInstalledDirectory {
             try fileManager.moveItem(at: installedDirectory, to: removalDirectory)

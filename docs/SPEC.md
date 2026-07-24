@@ -1626,14 +1626,36 @@ Select one manifest source wholesale. Do not merge sources.
 
 Already installed models keep working even if removed from current manifest.
 
-Deprecated installed model UI:
+Every Installation Receipt has exactly one catalog placement:
 
-- show cached metadata
-- badge: "No longer in curated list"
-- allow Set Active if installed and valid
-- allow Delete
-- no re-download button
-- no proactive notification
+- **Curated**: its canonical Exact Artifact ID is present in the current
+  verified catalog.
+- **No Longer Curated**: the receipt was previously Curated, but that Exact
+  Artifact ID is absent from the current verified catalog. It never regresses
+  to Legacy.
+- **Legacy**: a pre-v3 or otherwise unmatched receipt has no canonical Curated
+  or Custom identity.
+- **Custom**: user-imported local content has not resolved to a catalog Exact
+  Artifact.
+
+Custom single-file identities are `custom-sha256-<full lowercase SHA-256>`.
+The Installation Receipt retains a typed content digest, every user-supplied
+local name, and every source filename. Importing the same typed digest again
+updates that history without copying a second managed artifact. Custom
+artifacts remain `Unrated`, preserve the local display name, and disclose that
+Textify has not verified their user-supplied license.
+
+A unique typed-digest match in a later verified catalog canonicalizes a Custom
+or Legacy receipt to the signed Exact Artifact ID while retaining its storage
+identity and local import/name history. Multiple catalog artifacts with the
+same typed digest fail closed. Manifest v3 may resolve that ambiguity only with
+a signed `artifactAliases` entry whose alias and canonical artifacts both
+exist and have the same typed digest.
+
+All four placements appear in Installed scope and support the same receipt-
+backed storage accounting, inspection, on-demand checksum verification, Exact
+Artifact reveal, and deletion. A missing local file keeps the receipt visible
+as `Needs Repair`.
 
 Manifest schema shape:
 
@@ -1717,6 +1739,11 @@ one Family and purpose. It carries stable IDs, signed presentation order,
 checkpoint recommendation and fallback references, Artifact Format, Numeric
 Format, Runtime, Compute Route, compatibility requirements, and comparable
 evidence group identifiers without parsing filenames or display titles.
+Version 3 may also contain strict signed `artifactAliases`. Each entry names an
+existing duplicate-digest Exact Artifact as `aliasArtifactID` and the one
+existing equal-digest Exact Artifact selected as `canonicalArtifactID`.
+Self-aliases, duplicate alias IDs, alias chains, missing targets, and
+digest-mismatched pairs are rejected.
 
 The English benchmark schema-version-1 object is generated, not hand-calculated. It
 binds the policy and suite IDs, suite-index SHA-256, model ID, canonical

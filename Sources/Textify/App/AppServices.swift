@@ -128,7 +128,12 @@ final class AppServices {
         loadOperation: {
             throw ModelCatalogRefreshError.unavailable
         }
-    )
+    ) {
+        didSet {
+            reconcileInstalledModelsWithCatalog()
+            observeModelCatalogManifest()
+        }
+    }
 
     var preferences: AppPreferences
     var launchAtLoginStatus: LaunchAtLoginStatus
@@ -238,6 +243,8 @@ final class AppServices {
             await self?.refreshManagedModelReadiness()
         }
         modelCatalogCoordinator = makeProductionModelCatalogCoordinator()
+        reconcileInstalledModelsWithCatalog()
+        observeModelCatalogManifest()
         modelTransferNetworkObserver?.start { [weak self] in
             Task { @MainActor [weak self] in
                 self?.modelInstallCoordinator.networkDidBecomeAvailable()
@@ -604,6 +611,7 @@ final class AppServices {
 
     func refreshInstalledModels() {
         installedModelsStore = Self.loadInstalledModelsStore(paths: paths)
+        reconcileInstalledModelsWithCatalog()
         managedReadinessByModelID = Dictionary(
             uniqueKeysWithValues: installedModelsStore.records.map {
                 ($0.model.id, .installed)
@@ -725,8 +733,15 @@ final class AppServices {
         from sourceURL: URL,
         displayName: String
     ) async throws -> ModelEntry {
+        let previouslyInstalledStorageIDs = Set(
+            installedModelsStore.records.map(\.storageModelID)
+        )
+        let layout = ModelStorageLayout(
+            rootDirectory: paths.modelsDirectory
+        )
         let importer = CustomWhisperModelImporter(
-            layout: ModelStorageLayout(rootDirectory: paths.modelsDirectory)
+            layout: layout,
+            trustedManifest: modelCatalogCoordinator.manifest
         )
         let record = try await importer.importModel(
             from: sourceURL,
@@ -737,7 +752,11 @@ final class AppServices {
         )
         refreshInstalledModels()
         guard await activateInstalledModel(record.model.id) == .activated else {
-            try? importer.removeImportedModel(modelID: record.model.id)
+            if !previouslyInstalledStorageIDs.contains(record.storageModelID) {
+                _ = try? InstalledModelManager(layout: layout).remove(
+                    modelID: record.model.id
+                )
+            }
             refreshInstalledModels()
             throw ModelInstallCoordinatorError.modelPreparationFailed
         }
@@ -825,6 +844,87 @@ final class AppServices {
             return InstalledModelsStore()
         }
         return store
+    }
+
+    private func observeModelCatalogManifest() {
+        withObservationTracking {
+            _ = modelCatalogCoordinator.manifest
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else {
+                    return
+                }
+                self.reconcileInstalledModelsWithCatalog()
+                self.observeModelCatalogManifest()
+            }
+        }
+    }
+
+    private func reconcileInstalledModelsWithCatalog() {
+        let originalRecords = installedModelsStore.records
+        let snapshot = ModelArtifactPlacementResolver().reconcile(
+            records: originalRecords,
+            trustedManifest: modelCatalogCoordinator.manifest
+        )
+        guard snapshot.records != originalRecords else {
+            return
+        }
+
+        let originalIDByStorageID = originalRecords.reduce(
+            into: [String: String]()
+        ) { result, record in
+            if result[record.storageModelID] == nil {
+                result[record.storageModelID] = record.model.id
+            }
+        }
+        let canonicalIDByOriginalID = snapshot.records.reduce(
+            into: [String: String]()
+        ) { result, record in
+            if let originalID = originalIDByStorageID[record.storageModelID] {
+                result[originalID] = record.model.id
+            }
+        }
+        let updatedStore = InstalledModelsStore(records: snapshot.records)
+        let storeURL = ModelStorageLayout(
+            rootDirectory: paths.modelsDirectory
+        ).installedStoreURL
+        do {
+            try JSONEncoder().encode(updatedStore).write(
+                to: storeURL,
+                options: [.atomic]
+            )
+        } catch {
+            return
+        }
+
+        installedModelsStore = updatedStore
+        managedReadinessByModelID = Dictionary(
+            uniqueKeysWithValues: updatedStore.records.map { record in
+                let originalID = originalIDByStorageID[record.storageModelID]
+                return (
+                    record.model.id,
+                    originalID.flatMap { managedReadinessByModelID[$0] }
+                        ?? .installed
+                )
+            }
+        )
+        var didChangePreferences = false
+        if let activeModelID = preferences.activeModelID,
+           let canonicalID = canonicalIDByOriginalID[activeModelID],
+           canonicalID != activeModelID {
+            preferences.activeModelID = canonicalID
+            didChangePreferences = true
+        }
+        if let activeModelID = preferences.activeVoiceCleaningModelID,
+           let canonicalID = canonicalIDByOriginalID[activeModelID],
+           canonicalID != activeModelID {
+            preferences.activeVoiceCleaningModelID = canonicalID
+            didChangePreferences = true
+        }
+        if didChangePreferences {
+            savePreferences()
+        }
+        refreshModelStorageInventory()
     }
 
     var canChangeLaunchAtLogin: Bool {

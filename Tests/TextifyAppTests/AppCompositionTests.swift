@@ -1,3 +1,4 @@
+import CryptoKit
 import XCTest
 @testable import Textify
 import TextifyAudio
@@ -382,6 +383,148 @@ final class AppCompositionTests: XCTestCase {
         services.refreshInstalledModels()
         XCTAssertFalse(services.isModelInstalled(model.id))
         XCTAssertTrue(services.installedModels.isEmpty)
+    }
+
+    @MainActor
+    func testTrustedCatalogCanonicalizationPersistsRecordHistoryAndActivePreference() throws {
+        let paths = try Self.makeTemporaryPaths()
+        let manifestURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("models/manifest.json")
+        let manifest = try ModelManifest.decode(Data(contentsOf: manifestURL))
+        let signed = try XCTUnwrap(
+            manifest.models.first {
+                $0.id == ProductionModelPolicy.requiredModelID
+            }
+        )
+        let digest = try XCTUnwrap(signed.artifactTypedDigests().first)
+        let customID = CustomWhisperModelImporter.importedModelIDPrefix + digest.value
+        let custom = Self.copyModel(
+            signed,
+            id: customID,
+            displayName: "My Imported Name"
+        )
+        let record = InstalledModelRecord(
+            model: custom,
+            installedAt: "2026-07-24T00:00:00Z",
+            localFilesByManifestFilename: [
+                signed.files[0].filename: "/tmp/\(customID)/model.bin",
+            ],
+            identityHistory: InstalledModelIdentityHistory(
+                customImport: CustomModelImportHistory(
+                    contentDigest: digest,
+                    localNames: ["My Imported Name"],
+                    sourceFilenames: ["renamed.ggml"]
+                )
+            )
+        )
+        let storeURL = ModelStorageLayout(
+            rootDirectory: paths.modelsDirectory
+        ).installedStoreURL
+        try JSONEncoder().encode(
+            InstalledModelsStore(records: [record])
+        ).write(to: storeURL, options: .atomic)
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = customID
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths
+        )
+
+        services.modelCatalogCoordinator = ModelCatalogCoordinator(
+            initialManifest: manifest,
+            loadOperation: { manifest }
+        )
+
+        XCTAssertEqual(services.installedModelRecords.map(\.model.id), [signed.id])
+        XCTAssertEqual(services.preferences.activeModelID, signed.id)
+        let persisted = try JSONDecoder().decode(
+            InstalledModelsStore.self,
+            from: Data(contentsOf: storeURL)
+        )
+        XCTAssertEqual(persisted.records.first?.model.id, signed.id)
+        XCTAssertEqual(
+            persisted.records.first?.identityHistory.customImport?.localNames,
+            ["My Imported Name"]
+        )
+    }
+
+    @MainActor
+    func testFailedActivationRollsBackNewImmediatelyCanonicalizedImport() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let layout = ModelStorageLayout(rootDirectory: paths.modelsDirectory)
+        var sourceData = Data(
+            repeating: 0,
+            count: Int(CustomWhisperModelImporter.minimumFileSizeBytes)
+        )
+        sourceData.replaceSubrange(0..<4, with: Data("GGUF".utf8))
+        let digest = SHA256.hash(data: sourceData).map {
+            String(format: "%02x", $0)
+        }.joined()
+        let sourceURL = paths.settingsFileURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("local-import.gguf")
+        try FileManager.default.createDirectory(
+            at: sourceURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try sourceData.write(to: sourceURL)
+        let sourceModel = try Self.catalogModel(
+            id: ProductionModelPolicy.requiredModelID
+        )
+        let signedModel = Self.copyModel(
+            sourceModel,
+            id: "signed-local-import",
+            displayName: "Signed Local Match",
+            sizeBytes: Int64(sourceData.count),
+            files: [
+                ModelFile(
+                    filename: "canonical.gguf",
+                    url: "https://example.com/canonical.gguf",
+                    sha256: digest,
+                    sizeBytes: Int64(sourceData.count)
+                ),
+            ]
+        )
+        let manifest = ModelManifest(
+            manifestVersion: 1,
+            generatedAt: "2026-07-24T00:00:00Z",
+            models: [signedModel]
+        )
+        let services = try Self.makeServices(paths: paths)
+        services.modelCatalogCoordinator = ModelCatalogCoordinator(
+            initialManifest: manifest,
+            loadOperation: { manifest }
+        )
+
+        do {
+            _ = try await services.importCustomWhisperModel(
+                from: sourceURL,
+                displayName: "Local Import"
+            )
+            XCTFail("Expected activation to fail.")
+        } catch ModelInstallCoordinatorError.modelPreparationFailed {
+        } catch {
+            XCTFail("Unexpected import error: \(error)")
+        }
+
+        let storageModelID =
+            CustomWhisperModelImporter.importedModelIDPrefix + digest
+        XCTAssertFalse(services.isModelInstalled(signedModel.id))
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: try layout.installedModelDirectory(
+                    modelID: storageModelID
+                ).path
+            )
+        )
+        let store = try JSONDecoder().decode(
+            InstalledModelsStore.self,
+            from: Data(contentsOf: layout.installedStoreURL)
+        )
+        XCTAssertTrue(store.records.isEmpty)
     }
 
     @MainActor
@@ -1522,6 +1665,34 @@ final class AppCompositionTests: XCTestCase {
             artifactLayout: model.runtime.artifactLayout,
             runtimeParameters: model.runtimeParameters,
             purpose: model.purpose
+        )
+    }
+
+    private static func copyModel(
+        _ model: ModelEntry,
+        id: String,
+        displayName: String,
+        sizeBytes: Int64? = nil,
+        files: [ModelFile]? = nil
+    ) -> ModelEntry {
+        ModelEntry(
+            id: id,
+            displayName: displayName,
+            tier: model.tier,
+            description: model.description,
+            sizeBytes: sizeBytes ?? model.sizeBytes,
+            files: files ?? model.files,
+            licenses: model.licenses,
+            provenance: model.provenance,
+            runtimeParameters: model.runtimeParameters,
+            hallucinationThresholds: model.hallucinationThresholds,
+            minAppVersion: model.minAppVersion,
+            runtime: model.runtime,
+            capabilities: model.capabilities,
+            presentation: model.presentation,
+            purpose: model.purpose,
+            installationStorage: model.installationStorage,
+            benchmark: model.benchmark
         )
     }
 

@@ -160,7 +160,9 @@ public struct ModelInstaller {
             let refreshedRecord = InstalledModelRecord(
                 model: model,
                 installedAt: existingRecord.installedAt,
-                localFilesByManifestFilename: existingRecord.localFilesByManifestFilename
+                localFilesByManifestFilename: existingRecord.localFilesByManifestFilename,
+                storageModelID: existingRecord.storageModelID,
+                identityHistory: existingRecord.identityHistory
             )
             if refreshedRecord != existingRecord {
                 try upsertInstalledRecord(refreshedRecord)
@@ -317,7 +319,9 @@ public struct ModelInstaller {
             let refreshedRecord = InstalledModelRecord(
                 model: model,
                 installedAt: existingRecord.installedAt,
-                localFilesByManifestFilename: existingRecord.localFilesByManifestFilename
+                localFilesByManifestFilename: existingRecord.localFilesByManifestFilename,
+                storageModelID: existingRecord.storageModelID,
+                identityHistory: existingRecord.identityHistory
             )
             if refreshedRecord != existingRecord {
                 try upsertInstalledRecord(refreshedRecord)

@@ -52,7 +52,9 @@ public actor RuntimeModelResolverAdapter: RuntimeModelResolving {
         case .singleFile:
             localModelURL = firstInstalledFile.url
         case .modelDirectory:
-            guard let installedDirectory = try? layout.installedModelDirectory(modelID: record.model.id) else {
+            guard let installedDirectory = try? layout.installedModelDirectory(
+                modelID: record.storageModelID
+            ) else {
                 return nil
             }
             localModelURL = installedDirectory
@@ -105,7 +107,9 @@ public actor RuntimeModelResolverAdapter: RuntimeModelResolving {
               record.model.purpose == .voiceCleaning,
               let installedFiles = installedFiles(for: record),
               !installedFiles.isEmpty,
-              let installedDirectory = try? layout.installedModelDirectory(modelID: record.model.id)
+              let installedDirectory = try? layout.installedModelDirectory(
+                  modelID: record.storageModelID
+              )
         else {
             return nil
         }
@@ -143,7 +147,9 @@ public actor RuntimeModelResolverAdapter: RuntimeModelResolving {
         case .singleFile:
             expectedRuntimePath = firstInstalledFile.url.path
         case .modelDirectory:
-            guard let installedDirectory = try? layout.installedModelDirectory(modelID: model.id) else {
+            guard let installedDirectory = try? layout.installedModelDirectory(
+                modelID: record.storageModelID
+            ) else {
                 verifiedFilesByPath.removeAll()
                 return .failed(modelID: model.id, reason: .checksumFailed)
             }
@@ -194,25 +200,27 @@ public actor RuntimeModelResolverAdapter: RuntimeModelResolving {
     }
 
     private func installedFiles(for record: InstalledModelRecord) -> [InstalledFile]? {
+        guard let storageDirectory = try? layout.installedModelDirectory(
+            modelID: record.storageModelID
+        ) else {
+            return nil
+        }
+        let storagePath = storageDirectory.resolvingSymlinksInPath()
+            .standardizedFileURL.path + "/"
         let installedFiles = record.model.files.compactMap { manifestFile -> InstalledFile? in
-            let canonicalURL: URL?
-            if let relativePath = manifestFile.relativePath {
-                canonicalURL = try? layout.installedArtifactURL(
-                    modelID: record.model.id,
-                    relativePath: relativePath
-                )
-            } else {
-                canonicalURL = try? layout.installedFileURL(
-                    modelID: record.model.id,
-                    filename: manifestFile.filename
-                )
-            }
-            guard let canonicalURL,
-                  record.localFilesByManifestFilename[manifestFile.filename] == canonicalURL.path
+            guard let receiptPath = record.localFilesByManifestFilename[
+                manifestFile.filename
+            ]
             else {
                 return nil
             }
-            return InstalledFile(url: canonicalURL, manifestFile: manifestFile)
+            let receiptURL = URL(fileURLWithPath: receiptPath)
+                .resolvingSymlinksInPath()
+                .standardizedFileURL
+            guard receiptURL.path.hasPrefix(storagePath) else {
+                return nil
+            }
+            return InstalledFile(url: receiptURL, manifestFile: manifestFile)
         }
         guard installedFiles.count == record.model.files.count else {
             return nil

@@ -157,6 +157,14 @@ Textify GitHub Release assets or exact commit-pinned Hugging Face URLs.
    accuracy tradeoff, and requirements. Do not add near-duplicate choices that
    provide no measured advantage.
 
+   If manifest v3 intentionally contains multiple Exact Artifact IDs with the
+   same typed artifact digest, add a signed `artifactAliases` entry only when
+   one identity is the reviewed canonical target. The alias and canonical IDs
+   must both exist and have equal typed digests. Never use an alias to bridge
+   different bytes, a missing artifact, a self-reference, or an alias chain;
+   without a valid signed alias, installed-content matching remains ambiguous
+   and fails closed.
+
 7. For manifest v2 measured ratings, review the unsigned
    `english-catalog-rating-v2` candidate generated from three complete runs of
    the checksum-pinned `english-catalog-rating-v1` suite on the reference M4

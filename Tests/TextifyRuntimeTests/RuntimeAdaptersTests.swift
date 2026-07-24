@@ -765,6 +765,45 @@ final class RuntimeAdaptersTests: XCTestCase {
         XCTAssertEqual(missing, .missing(modelID: model.id))
     }
 
+    func testModelResolverUsesReceiptStorageIdentityAfterCatalogCanonicalization() async throws {
+        let directory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let layout = ModelStorageLayout(rootDirectory: directory)
+        let data = Data("canonicalized custom model".utf8)
+        let model = Self.modelEntry(filename: "signed-model.bin", data: data)
+        let storageID = "custom-sha256-\(Self.sha256Hex(data))"
+        let storedURL = try layout.installedFileURL(
+            modelID: storageID,
+            filename: "model.bin"
+        )
+        try FileManager.default.createDirectory(
+            at: storedURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try data.write(to: storedURL)
+        let store = InstalledModelsStore(records: [
+            InstalledModelRecord(
+                model: model,
+                installedAt: "2026-07-24T00:00:00Z",
+                localFilesByManifestFilename: [
+                    model.files[0].filename: storedURL.path,
+                ],
+                storageModelID: storageID,
+                identityHistory: InstalledModelIdentityHistory(wasCurated: true)
+            ),
+        ])
+        let resolver = Self.modelResolver(layout: layout, store: store)
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = model.id
+
+        let activeModel = await resolver.resolveActiveModel(preferences: preferences)
+        let readiness = await resolver.readiness(for: activeModel)
+
+        XCTAssertEqual(activeModel?.id, model.id)
+        XCTAssertEqual(activeModel?.localModelPath, storedURL.path)
+        XCTAssertEqual(readiness, .ready(modelID: model.id))
+    }
+
     func testModelResolverCachesVerifiedFileWhileMetadataIsUnchanged() async throws {
         let directory = Self.temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

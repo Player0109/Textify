@@ -959,6 +959,7 @@ struct ModelCatalogRowPresentation: Equatable, Identifiable {
     let sizeLabel: String
     let sizeDescription: String
     let compatibility: ModelCatalogCompatibility
+    let placement: ModelArtifactPlacement?
     let isInstalled: Bool
     let isActive: Bool
     let install: ModelCatalogInstallPresentation?
@@ -1429,6 +1430,7 @@ struct ModelCatalogExperience: Equatable {
     let pinnedReveal: ModelCatalogPinnedRevealPresentation?
     let sizeLabel: String
     private let inspectorFamilies: [ModelCatalogFamilyPresentation]
+    private let inspectorRowsByID: [String: ModelCatalogRowPresentation]
 
     init(
         trustedModels: [ModelEntry],
@@ -1444,6 +1446,7 @@ struct ModelCatalogExperience: Equatable {
         self.init(
             trustedModels: trustedModels,
             presentationGraph: nil,
+            artifactAliases: [],
             installedRecords: installedRecords,
             activePreferences: activePreferences,
             transferStatesByModelID: Self.transferStatesByModelID(
@@ -1476,6 +1479,7 @@ struct ModelCatalogExperience: Equatable {
         self.init(
             trustedModels: trustedManifest?.models ?? [],
             presentationGraph: trustedManifest?.presentationGraph,
+            artifactAliases: trustedManifest?.artifactAliases ?? [],
             compatibilityByModelID: compatibilityByModelID,
             checkpointResolutions: checkpointResolutions,
             installedRecords: installedRecords,
@@ -1510,6 +1514,7 @@ struct ModelCatalogExperience: Equatable {
         self.init(
             trustedModels: trustedManifest?.models ?? [],
             presentationGraph: trustedManifest?.presentationGraph,
+            artifactAliases: trustedManifest?.artifactAliases ?? [],
             compatibilityByModelID: compatibilityByModelID,
             checkpointResolutions: checkpointResolutions,
             installedRecords: installedRecords,
@@ -1526,6 +1531,7 @@ struct ModelCatalogExperience: Equatable {
     private init(
         trustedModels: [ModelEntry],
         presentationGraph: ModelCatalogPresentationGraph?,
+        artifactAliases: [ModelArtifactAlias],
         compatibilityByModelID: [String: ModelCatalogCompatibility] = [:],
         checkpointResolutions: [String: ModelCatalogCheckpointResolution] = [:],
         installedRecords: [InstalledModelRecord],
@@ -1537,9 +1543,17 @@ struct ModelCatalogExperience: Equatable {
         installedSizeStatus: ModelCatalogInstalledSizeStatus,
         query: ModelCatalogQuery
     ) {
-        let installedRecords = InstalledModelsStore(
-            records: installedRecords
-        ).records
+        let placementSnapshot = ModelArtifactPlacementResolver().reconcile(
+            records: installedRecords,
+            trustedManifest: ModelManifest(
+                manifestVersion: presentationGraph == nil ? 1 : 3,
+                generatedAt: "1970-01-01T00:00:00Z",
+                models: trustedModels,
+                presentationGraph: presentationGraph,
+                artifactAliases: artifactAliases
+            )
+        )
+        let installedRecords = placementSnapshot.records
         let sizeLabel = query.scope == .installed ? "On Disk" : "Download Size"
         self.sizeLabel = sizeLabel
         let signedArtifactsByID = presentationGraph?.artifacts.reduce(
@@ -1603,6 +1617,9 @@ struct ModelCatalogExperience: Equatable {
                     scope: query.scope
                 ),
                 compatibility: compatibilityByModelID[model.id] ?? .compatible,
+                placement: placementSnapshot.placement(
+                    forArtifactID: model.id
+                ),
                 isInstalled: isInstalled,
                 isActive: isActive,
                 install: installState.map(ModelCatalogInstallPresentation.init),
@@ -1630,6 +1647,11 @@ struct ModelCatalogExperience: Equatable {
             )
         } ?? []
         inspectorFamilies = allFamilies
+        inspectorRowsByID = allRows.reduce(
+            into: [String: ModelCatalogRowPresentation]()
+        ) {
+            $0[$1.id] = $1
+        }
         filterOptions = Self.makeFilterOptions(
             families: allFamilies,
             rows: allRows,
@@ -1731,8 +1753,33 @@ struct ModelCatalogExperience: Equatable {
                     )
                 )
             }
-            return nil
+            guard let row = inspectorRowsByID[artifactID] else {
+                return nil
+            }
+            return .exactArtifact(Self.standaloneArtifactInspector(row))
         }
+    }
+
+    private static func standaloneArtifactInspector(
+        _ row: ModelCatalogRowPresentation
+    ) -> ModelCatalogExactArtifactInspectorPresentation {
+        let model = row.operationalModel
+        return artifactInspector(
+            row: row,
+            identity: ArtifactInspectorIdentity(
+                checkpointName: row.placement?.title ?? "Standalone Artifact",
+                displayName: row.model.displayName,
+                description: row.model.description,
+                artifactFormat: row.model.artifactFormat.title,
+                numericFormat: row.model.artifactPrecision.title,
+                runtime: row.model.engineName,
+                computeRoute: row.model.acceleratorName,
+                compatibility: model.map {
+                    "Textify \($0.minAppVersion)+ • \(row.model.requirements)"
+                } ?? row.model.requirements,
+                provenanceFallback: "Artifact provenance unavailable"
+            )
+        )
     }
 
     private static func checkpointInspector(
@@ -1813,55 +1860,88 @@ struct ModelCatalogExperience: Equatable {
             compatibilityParts.append("\(minimumMemory) memory")
         }
 
+        return artifactInspector(
+            row: artifact.row,
+            identity: ArtifactInspectorIdentity(
+                checkpointName: checkpoint.metadata.presentation.displayName,
+                displayName: metadata.presentation.displayName,
+                description: model?.description ?? artifact.row.model.description,
+                artifactFormat: ModelCatalogVariantTerminology.artifactFormat(
+                    metadata.artifactFormat
+                ),
+                numericFormat: metadata.numericFormat.rawValue,
+                runtime: ModelCatalogVariantTerminology.runtime(metadata.runtime),
+                computeRoute: ModelCatalogVariantTerminology.computeRoute(
+                    metadata.computeRoute
+                ),
+                compatibility: compatibilityParts.joined(separator: " • "),
+                provenanceFallback: "Catalog provenance unavailable"
+            )
+        )
+    }
+
+    private static func artifactInspector(
+        row: ModelCatalogRowPresentation,
+        identity: ArtifactInspectorIdentity
+    ) -> ModelCatalogExactArtifactInspectorPresentation {
+        let model = row.operationalModel
         let provenance = model.map {
             "\($0.provenance.sourceName) • \($0.provenance.originalModelName) • "
                 + "revision \($0.provenance.sourceRevision.prefix(12)) • "
                 + $0.provenance.sourceFile
-        } ?? "Catalog provenance unavailable"
+        } ?? identity.provenanceFallback
         let license = model.map {
             $0.licenses.map {
                 "\($0.spdxId) — \($0.name) (\($0.scope))"
             }.joined(separator: " • ")
         } ?? "License metadata unavailable"
-        let verificationRequest = makeVerificationRequest(
-            artifactID: artifact.id,
-            model: model,
-            installedRecord: artifact.row.installedRecord
-        )
-
         return ModelCatalogExactArtifactInspectorPresentation(
-            id: artifact.id,
-            checkpointName: checkpoint.metadata.presentation.displayName,
-            displayName: metadata.presentation.displayName,
-            description: model?.description ?? artifact.row.model.description,
-            artifactFormat: ModelCatalogVariantTerminology.artifactFormat(
-                metadata.artifactFormat
-            ),
-            numericFormat: metadata.numericFormat.rawValue,
-            runtime: ModelCatalogVariantTerminology.runtime(metadata.runtime),
-            computeRoute: ModelCatalogVariantTerminology.computeRoute(
-                metadata.computeRoute
-            ),
-            compatibility: compatibilityParts.joined(separator: " • "),
-            compatibilityStatus: artifact.row.compatibility.catalogTitle,
-            compatibilityExplanation: artifact.row.compatibility.catalogExplanation,
-            qualityEvidence: artifact.row.model.qualityEvidenceDescription ?? "Unrated",
-            speedEvidence: artifact.row.model.speedEvidenceDescription ?? "Unrated",
-            transferSize: ByteCountFormatter.string(
-                fromByteCount: model?.sizeBytes ?? 0,
-                countStyle: .file
-            ),
-            localState: localState(for: artifact.row),
+            id: row.id,
+            checkpointName: identity.checkpointName,
+            displayName: identity.displayName,
+            description: identity.description,
+            artifactFormat: identity.artifactFormat,
+            numericFormat: identity.numericFormat,
+            runtime: identity.runtime,
+            computeRoute: identity.computeRoute,
+            compatibility: identity.compatibility,
+            compatibilityStatus: row.compatibility.catalogTitle,
+            compatibilityExplanation: row.compatibility.catalogExplanation,
+            qualityEvidence: row.model.qualityEvidenceDescription ?? "Unrated",
+            speedEvidence: row.model.speedEvidenceDescription ?? "Unrated",
+            transferSize: model.map {
+                ByteCountFormatter.string(
+                    fromByteCount: $0.sizeBytes,
+                    countStyle: .file
+                )
+            } ?? row.model.sizeDescription,
+            localState: localState(for: row),
             provenance: provenance,
             license: license,
-            sourceURL: artifact.row.model.sourceURL,
-            canVerify: artifact.row.isInstalled,
-            localDetails: artifact.row.storageInventory.map {
+            sourceURL: row.model.sourceURL,
+            canVerify: row.isInstalled,
+            localDetails: row.storageInventory.map {
                 ModelCatalogArtifactLocalDetails(inventory: $0)
             },
-            localDetailsStatus: artifact.row.installedSizeStatus,
-            verificationRequest: verificationRequest
+            localDetailsStatus: row.installedSizeStatus,
+            verificationRequest: makeVerificationRequest(
+                artifactID: row.id,
+                model: model,
+                installedRecord: row.installedRecord
+            )
         )
+    }
+
+    private struct ArtifactInspectorIdentity {
+        let checkpointName: String
+        let displayName: String
+        let description: String
+        let artifactFormat: String
+        let numericFormat: String
+        let runtime: String
+        let computeRoute: String
+        let compatibility: String
+        let provenanceFallback: String
     }
 
     private static func makeVerificationRequest(

@@ -49,6 +49,64 @@ final class ModelStorageInventoryTests: XCTestCase {
         XCTAssertEqual(snapshot.summary.installedArtifactCount, 1)
     }
 
+    func testCanonicalizedArtifactInventoriesOriginalStorageAndRetainsMissingReceipt() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let canonical = try fixture.record(id: "canonical-artifact")
+        let storageID = "custom-sha256-\(canonical.model.files[0].sha256)"
+        let storedURL = try fixture.layout.installedFileURL(
+            modelID: storageID,
+            filename: canonical.model.files[0].filename
+        )
+        try FileManager.default.createDirectory(
+            at: storedURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let fixtureURL = try XCTUnwrap(
+            Bundle.module.url(
+                forResource: "model.bin",
+                withExtension: nil,
+                subdirectory: "Fixtures/Models"
+            )
+        )
+        try Data(contentsOf: fixtureURL).write(to: storedURL)
+        let record = InstalledModelRecord(
+            model: canonical.model,
+            installedAt: canonical.installedAt,
+            localFilesByManifestFilename: [
+                canonical.model.files[0].filename: storedURL.path,
+            ],
+            storageModelID: storageID,
+            identityHistory: InstalledModelIdentityHistory(
+                wasCurated: true,
+                customImport: CustomModelImportHistory(
+                    contentDigest: canonical.model.artifactTypedDigests()[0],
+                    localNames: ["Imported Name"],
+                    sourceFilenames: ["local.ggml"]
+                )
+            )
+        )
+
+        let complete = try await fixture.scanner.scan(installedRecords: [record])
+        XCTAssertEqual(
+            complete.artifact(for: canonical.model.id)?.condition,
+            .complete
+        )
+        XCTAssertGreaterThan(
+            try XCTUnwrap(complete.artifact(for: canonical.model.id)?.onDiskBytes),
+            0
+        )
+
+        try FileManager.default.removeItem(at: storedURL)
+        let missing = try await fixture.scanner.scan(installedRecords: [record])
+        let missingArtifact = try XCTUnwrap(
+            missing.artifact(for: canonical.model.id)
+        )
+        XCTAssertTrue(missingArtifact.installationReceiptPresent)
+        XCTAssertEqual(missingArtifact.condition, .needsRepair)
+        XCTAssertEqual(missingArtifact.missingExpectedRelativePaths, ["model.bin"])
+    }
+
     func testSymlinkInsideArtifactNeverCountsExternalTargetBytes() async throws {
         let fixture = try Fixture()
         defer { fixture.remove() }

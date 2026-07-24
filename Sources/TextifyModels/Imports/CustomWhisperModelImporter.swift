@@ -38,12 +38,13 @@ public enum CustomWhisperModelImportError: Error, Equatable, CustomStringConvert
 }
 
 public struct CustomWhisperModelImporter {
-    public static let importedModelIDPrefix = "custom-whisper-"
+    public static let importedModelIDPrefix = "custom-sha256-"
     public static let minimumFileSizeBytes: Int64 = 1_048_576
     public static let maximumFileSizeBytes: Int64 = 8_589_934_592
 
     private let layout: ModelStorageLayout
     private let fileManager: FileManager
+    private let trustedManifest: ModelManifest?
     private let nowISO8601: @Sendable () -> String
 
     public init(
@@ -53,8 +54,25 @@ public struct CustomWhisperModelImporter {
             ISO8601DateFormatter().string(from: Date())
         }
     ) {
+        self.init(
+            layout: layout,
+            trustedManifest: nil,
+            fileManager: fileManager,
+            nowISO8601: nowISO8601
+        )
+    }
+
+    public init(
+        layout: ModelStorageLayout,
+        trustedManifest: ModelManifest?,
+        fileManager: FileManager = .default,
+        nowISO8601: @escaping @Sendable () -> String = {
+            ISO8601DateFormatter().string(from: Date())
+        }
+    ) {
         self.layout = layout
         self.fileManager = fileManager
+        self.trustedManifest = trustedManifest
         self.nowISO8601 = nowISO8601
     }
 
@@ -88,7 +106,47 @@ public struct CustomWhisperModelImporter {
         }
 
         let checksum = try Self.sha256Hex(fileURL: sourceURL)
-        let modelID = Self.importedModelIDPrefix + String(checksum.prefix(16))
+        let digest = ModelArtifactTypedDigest(
+            type: .singleFileSHA256,
+            value: checksum
+        )
+        let modelID = Self.importedModelIDPrefix + checksum
+        let existingStore = try loadStore()
+        let matchingRecords = existingStore.records.filter {
+            $0.identityHistory.customImport?.contentDigest == digest
+                || $0.model.artifactTypedDigests().contains(digest)
+        }
+        if let existingRecord = matchingRecords.first(
+            where: { $0.model.id == modelID }
+        ) ?? matchingRecords.first {
+            let updatedRecord = recordByAppendingImportHistory(
+                to: existingRecord,
+                digest: digest,
+                displayName: displayName,
+                sourceFilename: sourceURL.lastPathComponent
+            )
+            var prospectiveStore = existingStore
+            _ = prospectiveStore.remove(modelID: existingRecord.model.id)
+            prospectiveStore.upsert(updatedRecord)
+            let reconciledStore = InstalledModelsStore(
+                records: ModelArtifactPlacementResolver().reconcile(
+                    records: prospectiveStore.records,
+                    trustedManifest: trustedManifest
+                ).records
+            )
+            guard let reconciledRecord = reconciledStore.records.first(
+                where: { $0.storageModelID == existingRecord.storageModelID }
+            ) else {
+                throw CustomWhisperModelImportError.importedModelNotFound(
+                    updatedRecord.model.id
+                )
+            }
+            try JSONEncoder().encode(reconciledStore).write(
+                to: layout.installedStoreURL,
+                options: [.atomic]
+            )
+            return reconciledRecord
+        }
         let installedFilename = "model.bin"
         let installedURL = try layout.installedFileURL(
             modelID: modelID,
@@ -200,10 +258,21 @@ public struct CustomWhisperModelImporter {
         let record = InstalledModelRecord(
             model: model,
             installedAt: nowISO8601(),
-            localFilesByManifestFilename: [installedFilename: installedURL.path]
+            localFilesByManifestFilename: [installedFilename: installedURL.path],
+            storageModelID: modelID,
+            identityHistory: InstalledModelIdentityHistory(
+                customImport: CustomModelImportHistory(
+                    contentDigest: digest,
+                    localNames: [displayName],
+                    sourceFilenames: [sourceURL.lastPathComponent]
+                )
+            )
         )
-        try upsertInstalledRecord(record)
-        return record
+        let canonicalRecord = ModelArtifactPlacementResolver()
+            .reconcile(records: [record], trustedManifest: trustedManifest)
+            .records[0]
+        try upsertInstalledRecord(canonicalRecord)
+        return canonicalRecord
     }
 
     public func removeImportedModel(modelID: String) throws {
@@ -267,5 +336,51 @@ public struct CustomWhisperModelImporter {
             hasher.update(data: data)
         }
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func appendingUnique(_ value: String, to values: [String]) -> [String] {
+        values.contains(value) ? values : values + [value]
+    }
+
+    private func recordByAppendingImportHistory(
+        to record: InstalledModelRecord,
+        digest: ModelArtifactTypedDigest,
+        displayName: String,
+        sourceFilename: String
+    ) -> InstalledModelRecord {
+        let priorHistory = record.identityHistory.customImport
+        let isCurrentCuratedIdentity = trustedManifest?.models.contains {
+            $0.id == record.model.id
+        } == true
+        let model = isCurrentCuratedIdentity
+            ? record.model
+            : record.model.copying(
+                id: Self.importedModelIDPrefix + digest.value,
+                displayName: displayName
+            )
+        let priorLocalNames = priorHistory?.localNames
+            ?? (isCurrentCuratedIdentity ? [] : [record.model.displayName])
+        let priorSourceFilenames = priorHistory?.sourceFilenames
+            ?? (isCurrentCuratedIdentity ? [] : [record.model.provenance.sourceFile])
+        return InstalledModelRecord(
+            model: model,
+            installedAt: record.installedAt,
+            localFilesByManifestFilename: record.localFilesByManifestFilename,
+            storageModelID: record.storageModelID,
+            identityHistory: InstalledModelIdentityHistory(
+                wasCurated: record.identityHistory.wasCurated,
+                customImport: CustomModelImportHistory(
+                    contentDigest: digest,
+                    localNames: Self.appendingUnique(
+                        displayName,
+                        to: priorLocalNames
+                    ),
+                    sourceFilenames: Self.appendingUnique(
+                        sourceFilename,
+                        to: priorSourceFilenames
+                    )
+                )
+            )
+        )
     }
 }

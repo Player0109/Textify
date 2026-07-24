@@ -1,5 +1,16 @@
 import Foundation
 
+public enum ModelArtifactAliasValidationError: Error, Equatable, Sendable {
+    case missingArtifact(String)
+    case selfAlias(String)
+    case duplicateAlias(String)
+    case canonicalArtifactIsAlias(String)
+    case digestMismatch(
+        aliasArtifactID: String,
+        canonicalArtifactID: String
+    )
+}
+
 public enum ProductionModelPolicyError: Error, Equatable {
     case unsupportedManifestVersion(Int)
     case expectedSingleModel(count: Int)
@@ -31,6 +42,7 @@ public enum ProductionModelPolicyError: Error, Equatable {
     case invalidBenchmark(modelID: String)
     case benchmarkArtifactMismatch(modelID: String)
     case invalidPresentationGraph(ModelCatalogGraphValidationError)
+    case invalidArtifactAlias(ModelArtifactAliasValidationError)
 }
 
 public enum ProductionModelPolicy {
@@ -248,6 +260,55 @@ public enum ProductionModelPolicy {
                 try presentationGraph.validate(operationalModels: manifest.models)
             } catch let error as ModelCatalogGraphValidationError {
                 throw ProductionModelPolicyError.invalidPresentationGraph(error)
+            }
+            try validateArtifactAliases(in: manifest)
+        }
+    }
+
+    private static func validateArtifactAliases(
+        in manifest: ModelManifest
+    ) throws {
+        let modelsByID = Dictionary(
+            uniqueKeysWithValues: manifest.models.map { ($0.id, $0) }
+        )
+        var aliasIDs = Set<String>()
+        for alias in manifest.artifactAliases {
+            guard aliasIDs.insert(alias.aliasArtifactID).inserted else {
+                throw ProductionModelPolicyError.invalidArtifactAlias(
+                    .duplicateAlias(alias.aliasArtifactID)
+                )
+            }
+        }
+        for alias in manifest.artifactAliases {
+            guard alias.aliasArtifactID != alias.canonicalArtifactID else {
+                throw ProductionModelPolicyError.invalidArtifactAlias(
+                    .selfAlias(alias.aliasArtifactID)
+                )
+            }
+            guard let aliasModel = modelsByID[alias.aliasArtifactID] else {
+                throw ProductionModelPolicyError.invalidArtifactAlias(
+                    .missingArtifact(alias.aliasArtifactID)
+                )
+            }
+            guard let canonicalModel = modelsByID[alias.canonicalArtifactID] else {
+                throw ProductionModelPolicyError.invalidArtifactAlias(
+                    .missingArtifact(alias.canonicalArtifactID)
+                )
+            }
+            guard !aliasIDs.contains(alias.canonicalArtifactID) else {
+                throw ProductionModelPolicyError.invalidArtifactAlias(
+                    .canonicalArtifactIsAlias(alias.canonicalArtifactID)
+                )
+            }
+            let aliasDigests = Set(aliasModel.artifactTypedDigests())
+            let canonicalDigests = Set(canonicalModel.artifactTypedDigests())
+            guard !aliasDigests.isDisjoint(with: canonicalDigests) else {
+                throw ProductionModelPolicyError.invalidArtifactAlias(
+                    .digestMismatch(
+                        aliasArtifactID: alias.aliasArtifactID,
+                        canonicalArtifactID: alias.canonicalArtifactID
+                    )
+                )
             }
         }
     }

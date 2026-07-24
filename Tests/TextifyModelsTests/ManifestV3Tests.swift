@@ -449,6 +449,165 @@ final class ManifestV3Tests: XCTestCase {
         )
     }
 
+    func testV3AliasRejectsUnknownCanonicalArtifact() throws {
+        var json = try fixtureJSON()
+        json["artifactAliases"] = [
+            [
+                "aliasArtifactID": "whisper-small-q5_1",
+                "canonicalArtifactID": "missing-artifact",
+            ],
+        ]
+        let manifest = try ModelManifest.decode(
+            JSONSerialization.data(withJSONObject: json)
+        )
+
+        XCTAssertThrowsError(
+            try ProductionModelPolicy.validateProductionManifest(manifest)
+        ) { error in
+            XCTAssertEqual(
+                error as? ProductionModelPolicyError,
+                .invalidArtifactAlias(
+                    .missingArtifact("missing-artifact")
+                )
+            )
+        }
+    }
+
+    func testV3AliasRejectsSelfAlias() throws {
+        var json = try fixtureJSON()
+        let models = try XCTUnwrap(json["models"] as? [[String: Any]])
+        let artifactID = try XCTUnwrap(models[0]["id"] as? String)
+        json["artifactAliases"] = [
+            [
+                "aliasArtifactID": artifactID,
+                "canonicalArtifactID": artifactID,
+            ],
+        ]
+
+        assertAliasPolicyError(
+            json,
+            equals: .selfAlias(artifactID)
+        )
+    }
+
+    func testV3AliasRejectsDuplicateAliasIdentity() throws {
+        var json = try fixtureJSON()
+        let models = try XCTUnwrap(json["models"] as? [[String: Any]])
+        let aliasID = try XCTUnwrap(models[0]["id"] as? String)
+        let canonicalID = try XCTUnwrap(models[1]["id"] as? String)
+        json["artifactAliases"] = [
+            [
+                "aliasArtifactID": aliasID,
+                "canonicalArtifactID": canonicalID,
+            ],
+            [
+                "aliasArtifactID": aliasID,
+                "canonicalArtifactID": canonicalID,
+            ],
+        ]
+
+        assertAliasPolicyError(
+            json,
+            equals: .duplicateAlias(aliasID)
+        )
+    }
+
+    func testV3AliasRejectsAliasChain() throws {
+        var json = try fixtureJSON()
+        let models = try XCTUnwrap(json["models"] as? [[String: Any]])
+        let firstID = try XCTUnwrap(models[0]["id"] as? String)
+        let secondID = try XCTUnwrap(models[1]["id"] as? String)
+        let thirdID = try XCTUnwrap(models[2]["id"] as? String)
+        json["artifactAliases"] = [
+            [
+                "aliasArtifactID": firstID,
+                "canonicalArtifactID": secondID,
+            ],
+            [
+                "aliasArtifactID": secondID,
+                "canonicalArtifactID": thirdID,
+            ],
+        ]
+
+        assertAliasPolicyError(
+            json,
+            equals: .canonicalArtifactIsAlias(secondID)
+        )
+    }
+
+    func testV3AliasRejectsDigestMismatch() throws {
+        var json = try fixtureJSON()
+        var models = try XCTUnwrap(json["models"] as? [[String: Any]])
+        let aliasID = try XCTUnwrap(models[0]["id"] as? String)
+        let canonicalID = try XCTUnwrap(models[1]["id"] as? String)
+        var canonicalModel = models[1]
+        var files = try XCTUnwrap(
+            canonicalModel["files"] as? [[String: Any]]
+        )
+        files[0]["sha256"] = String(repeating: "f", count: 64)
+        canonicalModel["files"] = files
+        models[1] = canonicalModel
+        json["models"] = models
+        json["artifactAliases"] = [
+            [
+                "aliasArtifactID": aliasID,
+                "canonicalArtifactID": canonicalID,
+            ],
+        ]
+
+        assertAliasPolicyError(
+            json,
+            equals: .digestMismatch(
+                aliasArtifactID: aliasID,
+                canonicalArtifactID: canonicalID
+            )
+        )
+    }
+
+    func testV3AliasMayDesignateCanonicalIdentityForEqualTypedDigest() throws {
+        var json = try fixtureJSON()
+        var models = try XCTUnwrap(json["models"] as? [[String: Any]])
+        var aliasModel = models[0]
+        aliasModel["id"] = "whisper-small-q5_1-alias"
+        models.append(aliasModel)
+        json["models"] = models
+
+        var graph = try presentationGraph(in: json)
+        var artifacts = try XCTUnwrap(graph["artifacts"] as? [[String: Any]])
+        var aliasArtifact = artifacts[0]
+        aliasArtifact["id"] = "whisper-small-q5_1-alias"
+        var aliasPresentation = try XCTUnwrap(
+            aliasArtifact["presentation"] as? [String: Any]
+        )
+        aliasPresentation["curatedRank"] = 99
+        aliasArtifact["presentation"] = aliasPresentation
+        artifacts.append(aliasArtifact)
+        graph["artifacts"] = artifacts
+        var checkpoints = try XCTUnwrap(
+            graph["checkpoints"] as? [[String: Any]]
+        )
+        var artifactIDs = try XCTUnwrap(
+            checkpoints[0]["artifactIDs"] as? [String]
+        )
+        artifactIDs.append("whisper-small-q5_1-alias")
+        checkpoints[0]["artifactIDs"] = artifactIDs
+        graph["checkpoints"] = checkpoints
+        json["presentationGraph"] = graph
+        json["artifactAliases"] = [
+            [
+                "aliasArtifactID": "whisper-small-q5_1-alias",
+                "canonicalArtifactID": "whisper-small-q5_1",
+            ],
+        ]
+
+        let manifest = try ModelManifest.decode(
+            JSONSerialization.data(withJSONObject: json)
+        )
+        XCTAssertNoThrow(
+            try ProductionModelPolicy.validateProductionManifest(manifest)
+        )
+    }
+
     private func assertGraphPolicyError(
         _ json: [String: Any],
         equals expected: ModelCatalogGraphValidationError,
@@ -471,6 +630,30 @@ final class ManifestV3Tests: XCTestCase {
             XCTAssertEqual(
                 error as? ProductionModelPolicyError,
                 .invalidPresentationGraph(expected),
+                file: file,
+                line: line
+            )
+        }
+    }
+
+    private func assertAliasPolicyError(
+        _ json: [String: Any],
+        equals expected: ModelArtifactAliasValidationError,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertThrowsError(
+            try ProductionModelPolicy.validateProductionManifest(
+                ModelManifest.decode(
+                    JSONSerialization.data(withJSONObject: json)
+                )
+            ),
+            file: file,
+            line: line
+        ) { error in
+            XCTAssertEqual(
+                error as? ProductionModelPolicyError,
+                .invalidArtifactAlias(expected),
                 file: file,
                 line: line
             )

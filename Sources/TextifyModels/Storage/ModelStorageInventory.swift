@@ -132,7 +132,7 @@ public struct ModelStorageInventoryScanner: @unchecked Sendable {
         let artifactRoots = installedRecords.compactMap {
             record -> ArtifactRoot? in
             guard let url = try? layout.installedModelDirectory(
-                modelID: record.model.id
+                modelID: record.storageModelID
             ) else {
                 return nil
             }
@@ -214,8 +214,7 @@ public struct ModelStorageInventoryScanner: @unchecked Sendable {
             let relativePath = file.relativePath ?? file.filename
             guard let expectedURL = expectedURL(
                 record: record,
-                filename: file.filename,
-                relativePath: relativePath
+                filename: file.filename
             ) else {
                 missingExpectedRelativePaths.append(relativePath)
                 continue
@@ -282,20 +281,21 @@ public struct ModelStorageInventoryScanner: @unchecked Sendable {
 
     private func expectedURL(
         record: InstalledModelRecord,
-        filename: String,
-        relativePath: String
+        filename: String
     ) -> URL? {
         guard let receiptPath = record.localFilesByManifestFilename[filename],
-              let managedURL = try? layout.installedArtifactURL(
-                  modelID: record.model.id,
-                  relativePath: relativePath
-              ),
-              URL(fileURLWithPath: receiptPath).standardizedFileURL.path
-              == managedURL.standardizedFileURL.path
+              let storageRoot = try? layout.installedModelDirectory(
+                  modelID: record.storageModelID
+              )
         else {
             return nil
         }
-        return managedURL
+        let receiptURL = URL(fileURLWithPath: receiptPath).standardizedFileURL
+        let rootPath = storageRoot.standardizedFileURL.path + "/"
+        guard receiptURL.path.hasPrefix(rootPath) else {
+            return nil
+        }
+        return receiptURL
     }
 
     private func nodesInManagedRoot() throws -> [FileNode] {

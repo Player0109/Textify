@@ -562,7 +562,8 @@ final class ModelInstallerTests: XCTestCase {
         let existingRecord = InstalledModelRecord(
             model: originalModel,
             installedAt: "2026-07-03T00:00:00Z",
-            localFilesByManifestFilename: [file.filename: installedURL.path]
+            localFilesByManifestFilename: [file.filename: installedURL.path],
+            identityHistory: InstalledModelIdentityHistory(wasCurated: true)
         )
         try JSONEncoder()
             .encode(InstalledModelsStore(records: [existingRecord]))
@@ -578,6 +579,10 @@ final class ModelInstallerTests: XCTestCase {
         XCTAssertEqual(transport.downloadFileCallCount, 0)
         XCTAssertEqual(refreshed.model, updatedModel)
         XCTAssertEqual(refreshed.installedAt, existingRecord.installedAt)
+        XCTAssertEqual(
+            refreshed.identityHistory,
+            existingRecord.identityHistory
+        )
         let stored = try JSONDecoder().decode(
             InstalledModelsStore.self,
             from: Data(contentsOf: layout.installedStoreURL)

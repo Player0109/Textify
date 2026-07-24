@@ -844,7 +844,20 @@ private struct ModelsSettingsPane: View {
             onReset: performEmptyStateAction,
             emptyPresentation: emptyPresentation
         ) { row, context in
-            catalogRow(row, context: context)
+            catalogRow(
+                row,
+                context: context,
+                onInspect: context == nil ? {
+                    let selection = ModelCatalogHierarchySelection
+                        .exactArtifact(row.id)
+                    hierarchyState.select(selection)
+                    inspectorController.select(
+                        selection,
+                        in: catalogExperience
+                    )
+                    showsInspector = true
+                } : nil
+            )
         }
     }
 
@@ -950,7 +963,20 @@ private struct ModelsSettingsPane: View {
             pinnedRevealCard(
                 title: "\(row.model.displayName) (\(row.id))"
             ) {
-                catalogRow(row, context: nil)
+                catalogRow(
+                    row,
+                    context: nil,
+                    onInspect: {
+                        let selection = ModelCatalogHierarchySelection
+                            .exactArtifact(row.id)
+                        hierarchyState.select(selection)
+                        inspectorController.select(
+                            selection,
+                            in: catalogExperience
+                        )
+                        showsInspector = true
+                    }
+                )
             }
         case let .unavailableArtifact(artifactID):
             pinnedRevealCard(title: artifactID) {
@@ -1023,7 +1049,8 @@ private struct ModelsSettingsPane: View {
     @ViewBuilder
     private func catalogRow(
         _ row: ModelCatalogRowPresentation,
-        context: ModelCatalogArtifactRowContext?
+        context: ModelCatalogArtifactRowContext?,
+        onInspect: (() -> Void)? = nil
     ) -> some View {
         let onUse: () -> Void = {
             activatingModelID = row.id
@@ -1090,6 +1117,7 @@ private struct ModelsSettingsPane: View {
                 sizeDescription: row.sizeDescription,
                 hierarchyContext: context,
                 compatibility: row.compatibility,
+                placement: row.placement,
                 isInstalled: row.isInstalled,
                 isActive: row.isActive,
                 isActivating: activatingModelID == row.id,
@@ -1103,7 +1131,8 @@ private struct ModelsSettingsPane: View {
                 onInstall: onInstall,
                 onCancelInstall: onCancelInstall,
                 onRetryInstall: onRetryInstall,
-                onDelete: onDelete
+                onDelete: onDelete,
+                onInspect: onInspect
             )
         }
     }
@@ -2710,6 +2739,7 @@ private struct TextifyModelCard: View {
     let sizeDescription: String
     let hierarchyContext: ModelCatalogArtifactRowContext?
     let compatibility: ModelCatalogCompatibility
+    let placement: ModelArtifactPlacement?
     let isInstalled: Bool
     let isActive: Bool
     let isActivating: Bool
@@ -2722,6 +2752,7 @@ private struct TextifyModelCard: View {
     let onCancelInstall: () -> Void
     let onRetryInstall: () -> Void
     let onDelete: () -> Void
+    let onInspect: (() -> Void)?
 
     @State private var showsDetails = false
     @Environment(\.colorScheme) private var colorScheme
@@ -2754,8 +2785,11 @@ private struct TextifyModelCard: View {
                             TextifyStatusBadge(title: "SIGNED FALLBACK", tone: .warning)
                         }
                         TextifyStatusBadge(title: model.supportTier.uppercased(), tone: tierTone)
-                        if !model.isCurated {
-                            TextifyStatusBadge(title: "NO LONGER CURATED", tone: .warning)
+                        if let placement, placement != .curated {
+                            TextifyStatusBadge(
+                                title: placement.title.uppercased(),
+                                tone: placement == .custom ? .neutral : .warning
+                            )
                         }
                     }
                     Text(hierarchyContext?.description ?? model.description)
@@ -2826,12 +2860,16 @@ private struct TextifyModelCard: View {
                 if actions.contains(.details) {
                     Button(
                         hierarchyContext == nil
-                            ? (showsDetails ? "Hide Details" : "Details")
+                            ? onInspect == nil
+                                ? (showsDetails ? "Hide Details" : "Details")
+                                : "Inspect"
                             : "Inspect",
                         systemImage: "info.circle"
                     ) {
                         if let hierarchyContext {
                             hierarchyContext.onSelect()
+                        } else if let onInspect {
+                            onInspect()
                         } else {
                             withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
                                 showsDetails.toggle()

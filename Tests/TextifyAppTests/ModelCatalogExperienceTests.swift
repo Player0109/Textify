@@ -145,6 +145,86 @@ final class ModelCatalogExperienceTests: XCTestCase {
         XCTAssertEqual(localRow.actions, [.use, .reinstall, .delete, .details])
     }
 
+    func testInstalledRowsExposeExclusiveCuratedCustomLegacyAndFormerlyCuratedPlacement() throws {
+        let curatedModel = model(id: "curated", sha256: String(repeating: "a", count: 64))
+        let customDigest = String(repeating: "b", count: 64)
+        let customModel = model(
+            id: "custom-sha256-\(customDigest)",
+            sha256: customDigest
+        )
+        let legacyModel = model(id: "legacy", sha256: String(repeating: "c", count: 64))
+        let removedModel = model(id: "removed", sha256: String(repeating: "d", count: 64))
+        let custom = InstalledModelRecord(
+            model: customModel,
+            installedAt: "2026-07-24T00:00:00Z",
+            localFilesByManifestFilename: [
+                customModel.files[0].filename: "/Models/custom/model.bin",
+            ],
+            identityHistory: InstalledModelIdentityHistory(
+                customImport: CustomModelImportHistory(
+                    contentDigest: ModelArtifactTypedDigest(
+                        type: .singleFileSHA256,
+                        value: customDigest
+                    ),
+                    localNames: ["Local Name"],
+                    sourceFilenames: ["local.ggml"]
+                )
+            )
+        )
+        let removed = InstalledModelRecord(
+            model: removedModel,
+            installedAt: "2026-07-24T00:00:00Z",
+            localFilesByManifestFilename: [
+                removedModel.files[0].filename: "/Models/removed/model.bin",
+            ],
+            identityHistory: InstalledModelIdentityHistory(wasCurated: true)
+        )
+
+        let experience = ModelCatalogExperience(
+            trustedModels: [curatedModel],
+            installedRecords: [
+                installed(curatedModel),
+                custom,
+                installed(legacyModel),
+                removed,
+            ],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            query: ModelCatalogQuery(scope: .installed)
+        )
+
+        XCTAssertEqual(
+            Set(experience.rows.map(\.id)),
+            [curatedModel.id, customModel.id, legacyModel.id, removedModel.id]
+        )
+        let placements: [String: ModelArtifactPlacement] = Dictionary(
+            uniqueKeysWithValues: experience.rows.compactMap { row in
+                row.placement.map { (row.id, $0) }
+            }
+        )
+        XCTAssertEqual(
+            placements,
+            [
+                curatedModel.id: .curated,
+                customModel.id: .custom,
+                legacyModel.id: .legacy,
+                removedModel.id: .noLongerCurated,
+            ]
+        )
+        let customPresentation = try XCTUnwrap(
+            experience.rows.first { $0.id == customModel.id }
+        )
+        XCTAssertEqual(customPresentation.model.qualityLabel, "Unrated")
+        XCTAssertEqual(customPresentation.model.speedLabel, "Unrated")
+        guard case let .exactArtifact(inspector) = experience.inspectorPresentation(
+            for: .exactArtifact(customModel.id)
+        ) else {
+            return XCTFail("Expected Custom artifact inspector.")
+        }
+        XCTAssertEqual(inspector.id, customModel.id)
+        XCTAssertNotNil(inspector.verificationRequest)
+    }
+
     func testQueueProjectionUpdatesOnlyAffectedArtifactsAndCheckpointRollups() throws {
         let manifest = try signedV3FixtureManifest()
         let unrelated = model(id: "unrelated-local")
@@ -2262,7 +2342,8 @@ final class ModelCatalogExperienceTests: XCTestCase {
     private func model(
         id: String,
         purpose: ModelPurpose = .transcription,
-        engine: TranscriptionEngine = .whisperCpp
+        engine: TranscriptionEngine = .whisperCpp,
+        sha256: String = String(repeating: "a", count: 64)
     ) -> ModelEntry {
         let filename = engine == .mlxAudio ? "weights.safetensors" : "\(id).gguf"
         return ModelEntry(
@@ -2275,7 +2356,7 @@ final class ModelCatalogExperienceTests: XCTestCase {
                 ModelFile(
                     filename: filename,
                     url: "https://example.com/\(filename)",
-                    sha256: String(repeating: "a", count: 64),
+                    sha256: sha256,
                     sizeBytes: 100
                 ),
             ],

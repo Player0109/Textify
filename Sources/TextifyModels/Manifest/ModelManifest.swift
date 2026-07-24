@@ -5,6 +5,37 @@ public enum ModelManifestDecodingError: Error, Equatable {
     case unsupportedManifestVersion(Int)
 }
 
+public struct ModelArtifactAlias: Codable, Equatable, Sendable {
+    public let aliasArtifactID: String
+    public let canonicalArtifactID: String
+
+    public init(aliasArtifactID: String, canonicalArtifactID: String) {
+        self.aliasArtifactID = aliasArtifactID
+        self.canonicalArtifactID = canonicalArtifactID
+    }
+
+    public init(from decoder: Decoder) throws {
+        try StrictJSONKeys.validate(
+            decoder: decoder,
+            allowedKeys: CodingKeys.allCases.map(\.stringValue)
+        )
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        aliasArtifactID = try container.decode(
+            String.self,
+            forKey: .aliasArtifactID
+        )
+        canonicalArtifactID = try container.decode(
+            String.self,
+            forKey: .canonicalArtifactID
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case aliasArtifactID
+        case canonicalArtifactID
+    }
+}
+
 enum ModelManifestSchemaVersion: Int, CaseIterable {
     case v1 = 1
     case v2 = 2
@@ -31,6 +62,7 @@ public struct ModelManifest: Codable, Equatable, Sendable {
     public let generatedAt: String
     public let models: [ModelEntry]
     public let presentationGraph: ModelCatalogPresentationGraph?
+    public let artifactAliases: [ModelArtifactAlias]
 
     public static func decode(_ data: Data) throws -> ModelManifest {
         try JSONDecoder().decode(ModelManifest.self, from: data)
@@ -46,6 +78,21 @@ public struct ModelManifest: Codable, Equatable, Sendable {
         self.generatedAt = generatedAt
         self.models = models
         self.presentationGraph = presentationGraph
+        artifactAliases = []
+    }
+
+    public init(
+        manifestVersion: Int,
+        generatedAt: String,
+        models: [ModelEntry],
+        presentationGraph: ModelCatalogPresentationGraph?,
+        artifactAliases: [ModelArtifactAlias]
+    ) {
+        self.manifestVersion = manifestVersion
+        self.generatedAt = generatedAt
+        self.models = models
+        self.presentationGraph = presentationGraph
+        self.artifactAliases = artifactAliases
     }
 
     public init(from decoder: Decoder) throws {
@@ -54,12 +101,17 @@ public struct ModelManifest: Codable, Equatable, Sendable {
         guard let schemaVersion = ModelManifestSchemaVersion(rawValue: decodedVersion) else {
             throw ModelManifestDecodingError.unsupportedManifestVersion(decodedVersion)
         }
-        let requiredKeys: [CodingKeys] = schemaVersion.requiresPresentationGraph
+        let allowedKeys: [CodingKeys] = schemaVersion.requiresPresentationGraph
             ? CodingKeys.allCases
             : [.manifestVersion, .generatedAt, .models]
         try StrictJSONKeys.validate(
             decoder: decoder,
-            allowedKeys: requiredKeys.map(\.stringValue)
+            allowedKeys: allowedKeys.map(\.stringValue),
+            requiredKeys: [
+                CodingKeys.manifestVersion,
+                .generatedAt,
+                .models,
+            ].map(\.stringValue)
         )
         manifestVersion = decodedVersion
         generatedAt = try container.decode(String.self, forKey: .generatedAt)
@@ -72,6 +124,12 @@ public struct ModelManifest: Codable, Equatable, Sendable {
         } else {
             presentationGraph = nil
         }
+        artifactAliases = schemaVersion.requiresPresentationGraph
+            ? try container.decodeIfPresent(
+                [ModelArtifactAlias].self,
+                forKey: .artifactAliases
+            ) ?? []
+            : []
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -81,6 +139,9 @@ public struct ModelManifest: Codable, Equatable, Sendable {
         try container.encode(models, forKey: .models)
         if ModelManifestSchemaVersion(rawValue: manifestVersion)?.requiresPresentationGraph == true {
             try container.encode(presentationGraph, forKey: .presentationGraph)
+            if !artifactAliases.isEmpty {
+                try container.encode(artifactAliases, forKey: .artifactAliases)
+            }
         }
     }
 
@@ -89,6 +150,7 @@ public struct ModelManifest: Codable, Equatable, Sendable {
         case generatedAt
         case models
         case presentationGraph
+        case artifactAliases
     }
 }
 
