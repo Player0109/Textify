@@ -1442,23 +1442,50 @@ Model storage:
 Downloads:
 
 - one at a time
-- check disk space before starting
+- check peak installation capacity before starting and at storage-growth
+  boundaries
 - stage in `.downloading/`
 - verify SHA-256 before install
 - atomically move into final model directory
-- clean partial downloads on failure/cancel/launch cleanup
+- retain only validator-bound resumable bytes after retryable failures
 - best-effort resume
 - quitting during download asks confirmation
 
-Minimum free-space rule before starting a model download:
+Every production model declares signed `installationStorage` bounds:
 
 ```text
-modelSizeBytes + max(500 MB, 20% of modelSizeBytes)
+completeTransferBytes = model.sizeBytes
+finalArtifactBytes = installationStorage.finalArtifactBytes
+peakInstallationBytes = installationStorage.peakInstallationBytes
+
+reusableCreditBytes =
+  min(validatedReusableLogicalBytes, allocatedBytesForThatValidatedState)
+
+safetyMarginBytes =
+  max(500 MB, ceil(20% × max(completeTransferBytes, finalArtifactBytes)))
+
+requiredAdditionalCapacityBytes =
+  max(0, peakInstallationBytes - reusableCreditBytes) + safetyMarginBytes
 ```
 
-Check available space on the volume that contains Textify Application Support.
-Because staging and final install live on the same volume, do not require 2x
-model size.
+The signed peak bound must cover the artifact layout and every declared
+installation transformation, including directory staging, archive expansion,
+conversion, and atomic replacement. A production entry with a missing,
+invalid, or unbounded peak is ineligible. Direct downloads normally use the
+complete final artifact size; transformed artifacts declare the larger measured
+peak.
+
+Check the volume containing Textify Application Support using the capacity for
+important usage, with ordinary available capacity as the fallback. If neither
+measurement is available, fail closed. Recheck at attempt start, periodically
+during large transfers, before expansion or final staging, after restoring an
+attempt, and after an out-of-space error.
+
+Only validator-bound reusable state receives credit. Sparse holes,
+preallocated but unvalidated ranges, invalid metadata, and unverified tails
+receive no credit. A storage failure ends the current attempt retryably so the
+next FIFO attempt can proceed. A user retry is appended at the queue tail and
+may reuse only the still-valid partial prefix.
 
 Download progress UI shows:
 
@@ -1486,11 +1513,12 @@ Download phases:
 
 Retry/cancel behavior:
 
-- Only one active download in V1.
-- No download queue.
+- The durable FIFO queue permits one active attempt at a time.
+- A terminal failure releases the head so the next authorized attempt proceeds.
 - Transient network failures auto-retry up to 3 times with short backoff.
 - After automatic retries fail, show Retry.
-- Retry resumes if safe, otherwise restarts.
+- Retry appends a new tail attempt and resumes validator-bound bytes when safe;
+  otherwise it restarts.
 - Cancel stops the download and deletes the partial file.
 - Checksum, signature, or manifest mismatch failures delete the partial and
   require a clean retry.
@@ -1622,13 +1650,17 @@ must contain real byte sizes and SHA-256 values.
       "displayName": "Fast - Whisper base.en",
       "tier": "fast",
       "description": "Fast local English dictation with better first-run quality than tiny.en.",
-      "sizeBytes": 0,
+      "sizeBytes": 190000000,
+      "installationStorage": {
+        "finalArtifactBytes": 190000000,
+        "peakInstallationBytes": 190000000
+      },
       "files": [
         {
           "filename": "ggml-base.en-q5_1.bin",
           "url": "https://github.com/Player0109/Textify/releases/download/models-v1/ggml-base.en-q5_1.bin",
           "sha256": "lowercase-hex-sha256",
-          "sizeBytes": 0
+          "sizeBytes": 190000000
         }
       ],
       "licenses": [

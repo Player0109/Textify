@@ -23,6 +23,8 @@ public enum ProductionModelPolicyError: Error, Equatable {
     case unsupportedTier(modelID: String, tier: String)
     case invalidMinimumAppVersion(modelID: String, version: String)
     case invalidRuntimeParameters(modelID: String)
+    case missingInstallationStorage(modelID: String)
+    case invalidInstallationStorage(modelID: String)
     case invalidModelFileURL(modelID: String, url: String)
     case invalidGeneratedAt(String)
     case benchmarkNotAllowedInV1(modelID: String)
@@ -58,6 +60,7 @@ public enum ProductionModelPolicy {
         guard model.runtimeParameters.language == "en" else {
             throw ProductionModelPolicyError.languageNotEnglish
         }
+        try validateInstallationStorage(for: model)
     }
 
     public static func validateProductionManifest(_ manifest: ModelManifest) throws {
@@ -87,6 +90,7 @@ public enum ProductionModelPolicy {
             guard model.sizeBytes > 0 else {
                 throw ProductionModelPolicyError.invalidModelSize(modelID: model.id)
             }
+            try validateInstallationStorage(for: model)
             guard !model.capabilities.languages.isEmpty,
                   model.capabilities.languages.allSatisfy({ !$0.isEmpty })
             else {
@@ -257,6 +261,27 @@ public enum ProductionModelPolicy {
             return false
         }
         return current.lexicographicallyPrecedes(minimum) == false
+    }
+
+    private static func validateInstallationStorage(
+        for model: ModelEntry
+    ) throws {
+        guard let storage = model.installationStorage else {
+            throw ProductionModelPolicyError.missingInstallationStorage(
+                modelID: model.id
+            )
+        }
+        guard storage.finalArtifactBytes > 0,
+              storage.finalArtifactBytes < .max,
+              storage.peakInstallationBytes > 0,
+              storage.peakInstallationBytes < .max,
+              storage.peakInstallationBytes >= model.sizeBytes,
+              storage.peakInstallationBytes >= storage.finalArtifactBytes
+        else {
+            throw ProductionModelPolicyError.invalidInstallationStorage(
+                modelID: model.id
+            )
+        }
     }
 
     private static func parsedVersion(_ version: String) -> [Int]? {

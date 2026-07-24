@@ -14,6 +14,15 @@ public protocol DownloadTransport {
         maximumBytes: Int64,
         progress: @escaping @Sendable (DownloadFileProgress) -> Void
     ) async throws -> DownloadFileResponse
+    func downloadFile(
+        _ request: URLRequest,
+        to temporaryURL: URL,
+        maximumBytes: Int64,
+        admissionCheck: @escaping @Sendable (
+            DownloadFileProgress
+        ) throws -> Void,
+        progress: @escaping @Sendable (DownloadFileProgress) -> Void
+    ) async throws -> DownloadFileResponse
 }
 
 public protocol ResumableDownloadTransport: DownloadTransport {
@@ -24,6 +33,18 @@ public protocol ResumableDownloadTransport: DownloadTransport {
         modelID: String,
         expectedSHA256: String,
         maximumBytes: Int64,
+        progress: @escaping @Sendable (DownloadFileProgress) -> Void
+    ) async throws -> DownloadFileResponse
+    func downloadFileResuming(
+        _ request: URLRequest,
+        to temporaryURL: URL,
+        metadataURL: URL,
+        modelID: String,
+        expectedSHA256: String,
+        maximumBytes: Int64,
+        admissionCheck: @escaping @Sendable (
+            DownloadFileProgress
+        ) throws -> Void,
         progress: @escaping @Sendable (DownloadFileProgress) -> Void
     ) async throws -> DownloadFileResponse
 }
@@ -45,6 +66,7 @@ public extension DownloadTransport {
     ) async throws -> DownloadFileResponse {
         try await downloadFile(request, to: temporaryURL, progress: progress)
     }
+
 }
 
 public struct DownloadResponse: Equatable, Sendable {
@@ -216,6 +238,24 @@ public final class URLSessionDownloadTransport: ResumableDownloadTransport {
         maximumBytes: Int64,
         progress: @escaping @Sendable (DownloadFileProgress) -> Void
     ) async throws -> DownloadFileResponse {
+        try await downloadFile(
+            request,
+            to: temporaryURL,
+            maximumBytes: maximumBytes,
+            admissionCheck: { _ in },
+            progress: progress
+        )
+    }
+
+    public func downloadFile(
+        _ request: URLRequest,
+        to temporaryURL: URL,
+        maximumBytes: Int64,
+        admissionCheck: @escaping @Sendable (
+            DownloadFileProgress
+        ) throws -> Void,
+        progress: @escaping @Sendable (DownloadFileProgress) -> Void
+    ) async throws -> DownloadFileResponse {
         try await streamDownload(
             request,
             to: temporaryURL,
@@ -223,6 +263,7 @@ public final class URLSessionDownloadTransport: ResumableDownloadTransport {
             initialBytes: 0,
             expectedRangeStart: nil,
             preservePartialOnFailure: false,
+            admissionCheck: admissionCheck,
             progress: progress
         )
     }
@@ -234,6 +275,30 @@ public final class URLSessionDownloadTransport: ResumableDownloadTransport {
         modelID: String,
         expectedSHA256: String,
         maximumBytes: Int64,
+        progress: @escaping @Sendable (DownloadFileProgress) -> Void
+    ) async throws -> DownloadFileResponse {
+        try await downloadFileResuming(
+            request,
+            to: temporaryURL,
+            metadataURL: metadataURL,
+            modelID: modelID,
+            expectedSHA256: expectedSHA256,
+            maximumBytes: maximumBytes,
+            admissionCheck: { _ in },
+            progress: progress
+        )
+    }
+
+    public func downloadFileResuming(
+        _ request: URLRequest,
+        to temporaryURL: URL,
+        metadataURL: URL,
+        modelID: String,
+        expectedSHA256: String,
+        maximumBytes: Int64,
+        admissionCheck: @escaping @Sendable (
+            DownloadFileProgress
+        ) throws -> Void,
         progress: @escaping @Sendable (DownloadFileProgress) -> Void
     ) async throws -> DownloadFileResponse {
         guard let url = request.url else {
@@ -292,6 +357,7 @@ public final class URLSessionDownloadTransport: ResumableDownloadTransport {
                 initialBytes: initialBytes,
                 expectedRangeStart: initialBytes > 0 ? initialBytes : nil,
                 preservePartialOnFailure: true,
+                admissionCheck: admissionCheck,
                 progress: progress
             )
             try? FileManager.default.removeItem(at: metadataURL)
@@ -328,6 +394,9 @@ public final class URLSessionDownloadTransport: ResumableDownloadTransport {
         initialBytes: Int64,
         expectedRangeStart: Int64?,
         preservePartialOnFailure: Bool,
+        admissionCheck: @escaping @Sendable (
+            DownloadFileProgress
+        ) throws -> Void,
         progress: @escaping @Sendable (DownloadFileProgress) -> Void
     ) async throws -> DownloadFileResponse {
         if initialBytes == 0 {
@@ -353,6 +422,7 @@ public final class URLSessionDownloadTransport: ResumableDownloadTransport {
             maximumBytes: max(0, maximumBytes),
             initialBytes: max(0, initialBytes),
             expectedRangeStart: expectedRangeStart,
+            admissionCheck: admissionCheck,
             progress: progress
         )
         let delegateQueue = OperationQueue()
@@ -450,6 +520,9 @@ private final class URLSessionStreamingDownloadDelegate: NSObject, URLSessionDat
     private let maximumBytes: Int64
     private let initialBytes: Int64
     private let expectedRangeStart: Int64?
+    private let admissionCheck: @Sendable (
+        DownloadFileProgress
+    ) throws -> Void
     private let progress: @Sendable (DownloadFileProgress) -> Void
     private let lock = NSLock()
     private var bytesDownloaded: Int64
@@ -464,6 +537,9 @@ private final class URLSessionStreamingDownloadDelegate: NSObject, URLSessionDat
         maximumBytes: Int64,
         initialBytes: Int64,
         expectedRangeStart: Int64?,
+        admissionCheck: @escaping @Sendable (
+            DownloadFileProgress
+        ) throws -> Void,
         progress: @escaping @Sendable (DownloadFileProgress) -> Void
     ) {
         self.fileHandle = fileHandle
@@ -471,6 +547,7 @@ private final class URLSessionStreamingDownloadDelegate: NSObject, URLSessionDat
         self.initialBytes = initialBytes
         self.expectedRangeStart = expectedRangeStart
         self.bytesDownloaded = initialBytes
+        self.admissionCheck = admissionCheck
         self.progress = progress
     }
 
@@ -601,6 +678,15 @@ private final class URLSessionStreamingDownloadDelegate: NSObject, URLSessionDat
         )
         lock.unlock()
 
+        do {
+            try admissionCheck(event)
+        } catch {
+            lock.withLock {
+                completionError = error
+            }
+            dataTask.cancel()
+            return
+        }
         progress(event)
     }
 

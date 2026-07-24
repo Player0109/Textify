@@ -402,7 +402,17 @@ final class ModelInstallQueueTests: XCTestCase {
 
         let reusable = try ModelInstallResumableDataInspector(
             layout: layout
-        ).inspect(for: attempt)
+        ).inspect(
+            for: attempt,
+            expectedFiles: [
+                ModelFile(
+                    filename: "model.bin",
+                    url: "https://github.com/Player0109/Textify/releases/download/models-v3/model.bin",
+                    sha256: String(repeating: "a", count: 64),
+                    sizeBytes: 1_024
+                ),
+            ]
+        )
 
         XCTAssertEqual(
             reusable,
@@ -418,7 +428,97 @@ final class ModelInstallQueueTests: XCTestCase {
         XCTAssertNil(
             try ModelInstallResumableDataInspector(
                 layout: layout
-            ).inspect(for: attempt)
+            ).inspect(
+                for: attempt,
+                expectedFiles: [
+                    ModelFile(
+                        filename: "model.bin",
+                        url: "https://github.com/Player0109/Textify/releases/download/models-v3/model.bin",
+                        sha256: String(repeating: "a", count: 64),
+                        sizeBytes: 1_024
+                    ),
+                ]
+            )
+        )
+
+        try Data(repeating: 1, count: 512).write(to: partialURL)
+        XCTAssertNil(
+            try ModelInstallResumableDataInspector(
+                layout: layout
+            ).inspect(
+                for: attempt,
+                expectedFiles: [
+                    ModelFile(
+                        filename: "model.bin",
+                        url: "https://github.com/Player0109/Textify/releases/download/models-v3/model.bin",
+                        sha256: String(repeating: "b", count: 64),
+                        sizeBytes: 1_024
+                    ),
+                ]
+            )
+        )
+    }
+
+    func testResumeInspectorDoesNotCreditSparsePreallocation() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let layout = ModelStorageLayout(rootDirectory: directory)
+        try FileManager.default.createDirectory(
+            at: layout.downloadsDirectory,
+            withIntermediateDirectories: true
+        )
+        let partialURL = try layout.temporaryDownloadURL(
+            modelID: "artifact-a",
+            filename: "model.bin"
+        )
+        let metadataURL = try layout.downloadResumeMetadataURL(
+            modelID: "artifact-a",
+            filename: "model.bin"
+        )
+        FileManager.default.createFile(
+            atPath: partialURL.path,
+            contents: nil
+        )
+        let handle = try FileHandle(forWritingTo: partialURL)
+        try handle.truncate(atOffset: 1_048_576)
+        try handle.close()
+        try JSONEncoder().encode(
+            DownloadResumeMetadata(
+                modelID: "artifact-a",
+                url: "https://github.com/Player0109/Textify/releases/download/models-v3/model.bin",
+                expectedSize: 2_097_152,
+                sha256: String(repeating: "a", count: 64),
+                eTag: "\"fixture\"",
+                lastModified: nil,
+                bytesDownloaded: 1_048_576
+            )
+        ).write(to: metadataURL)
+        let attempt = ModelInstallQueueAttempt(
+            id: "attempt-1",
+            artifactID: "artifact-a",
+            purpose: .transcription,
+            action: .install,
+            createdAt: "2026-07-24T10:00:00Z",
+            state: DownloadState(
+                modelID: "artifact-a",
+                phase: .failed
+            )
+        )
+
+        XCTAssertNil(
+            try ModelInstallResumableDataInspector(
+                layout: layout
+            ).inspect(
+                for: attempt,
+                expectedFiles: [
+                    ModelFile(
+                        filename: "model.bin",
+                        url: "https://github.com/Player0109/Textify/releases/download/models-v3/model.bin",
+                        sha256: String(repeating: "a", count: 64),
+                        sizeBytes: 2_097_152
+                    ),
+                ]
+            )
         )
     }
 

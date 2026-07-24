@@ -191,6 +191,10 @@ public struct CustomWhisperModelImporter {
                 expectedFinalization: "Depends on the imported checkpoint",
                 accuracyTradeoff: "Quality and speed are determined by the model you supplied.",
                 requirements: "Apple Silicon and a Whisper-compatible GGML or GGUF file"
+            ),
+            installationStorage: ModelInstallationStorage(
+                finalArtifactBytes: sizeBytes,
+                peakInstallationBytes: sizeBytes
             )
         )
         let record = InstalledModelRecord(

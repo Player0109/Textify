@@ -144,13 +144,20 @@ Textify GitHub Release assets or exact commit-pinned Hugging Face URLs.
    stat -f %z path/to/final-uploaded-asset
    ```
 
-5. Complete every catalog field: unique model id, tier, languages, runtime
+5. Record exact signed `installationStorage.finalArtifactBytes` and
+   `installationStorage.peakInstallationBytes` for every artifact. Measure the
+   peak across directory staging, expansion, conversion, and atomic replacement
+   when those transformations apply; direct artifacts normally use
+   `model.sizeBytes` for both values. Do not publish an unknown or unbounded
+   peak.
+
+6. Complete every catalog field: unique model id, tier, languages, runtime
    engine/variant/accelerator/layout, minimum app version, decoding parameters,
    hallucination thresholds, licenses, provenance, expected finalization,
    accuracy tradeoff, and requirements. Do not add near-duplicate choices that
    provide no measured advantage.
 
-6. For manifest v2 measured ratings, review the unsigned
+7. For manifest v2 measured ratings, review the unsigned
    `english-catalog-rating-v2` candidate generated from three complete runs of
    the checksum-pinned `english-catalog-rating-v1` suite on the reference M4
    Max. Confirm its artifact fingerprint matches the final signed file list,
@@ -160,7 +167,7 @@ Textify GitHub Release assets or exact commit-pinned Hugging Face URLs.
    `Unrated`; do not substitute their tier. Nightly output is candidate
    evidence only and must never sign or rewrite the production manifest.
 
-7. Create or reuse the Keychain signing key and sign the canonical envelope for
+8. Create or reuse the Keychain signing key and sign the canonical envelope for
    the exact raw `manifest.json` bytes. The generated envelope binds the
    manifest SHA-256, content type, filename, algorithm, and key ID before
    signing.
@@ -173,7 +180,7 @@ Textify GitHub Release assets or exact commit-pinned Hugging Face URLs.
      script/models/sign_model_manifest.sh path/to/manifest.json
    ```
 
-8. Verify the detached signature and production manifest policy with the public
+9. Verify the detached signature and production manifest policy with the public
    key before publishing.
 
    ```bash
@@ -182,18 +189,18 @@ Textify GitHub Release assets or exact commit-pinned Hugging Face URLs.
    script/models/verify_model_manifest.sh path/to/manifest.json path/to/manifest.json.sig
    ```
 
-9. Replace the tracked `models/manifest.json` and `.sig`, build the app, and
+10. Replace the tracked `models/manifest.json` and `.sig`, build the app, and
    verify the exact same bytes are embedded under
    `Contents/Resources/ModelCatalog/`. A valid remote catalog older than this
    bundled baseline cannot downgrade it.
 
-10. Publish both manifest files to GitHub Pages when updating the remote
+11. Publish both manifest files to GitHub Pages when updating the remote
    catalog for installed builds:
 
    - `https://player0109.github.io/Textify/models/manifest.json`
    - `https://player0109.github.io/Textify/models/manifest.json.sig`
 
-11. On a clean machine, install and dictate once with every catalog backend
+12. On a clean machine, install and dictate once with every catalog backend
    from the final signed arm64 app. Confirm diagnostics prove Metal, Neural
    Engine, or the explicitly declared CPU provider and that offline dictation
    still works after network access is disabled.

@@ -2,6 +2,42 @@
 
 This file records cross-agent handoffs during implementation.
 
+## Peak Storage Admission Handoff - 2026-07-24
+
+- GitHub issue #16 owns the narrow cross-task changes needed to make signed
+  installation peak bounds authoritative for Task 4 catalog validation and
+  Task 12 installer/queue admission.
+- This slice may update the operational manifest schema and signed production
+  catalog, storage-capacity and resumable-data accounting, the installer
+  transfer monitor, the Task 11 queue coordinator's storage-failure
+  presentation, release documentation, and their focused tests.
+- The admission calculation uses the signed complete-transfer, final-artifact,
+  and peak-installation requirements. It subtracts only the lesser of
+  validator-bound reusable logical bytes and their allocated filesystem bytes,
+  then adds the greater of 500 MB or 20 percent of the larger complete transfer
+  or final artifact.
+- Capacity must prefer the model volume's important-usage value, fall back to
+  ordinary available capacity, and fail closed when neither is available.
+  Checks occur before transfer, at bounded intervals during large transfers,
+  immediately before storage-growing expansion, conversion, staging, or
+  replacement, after relaunch through the same start gate, and again when the
+  filesystem reports an out-of-space error.
+- Storage admission failure remains a terminal retryable Queue Attempt. It must
+  not mutate installed ownership, consume a later FIFO authorization, or grant
+  credit to sparse holes, invalid metadata, unverified tails, or mere
+  preallocation.
+- The completed implementation caps reusable credit per validated,
+  filesystem-deduplicated file before aggregation, preserves validator-bound
+  partials only for a new tail Retry attempt, and lets the next FIFO
+  authorization proceed after a storage failure.
+- Deletion transactions, signed revocation ingestion, generalized runtime
+  switching, and large-catalog virtualization remain owned by later tickets.
+- Verification completed with 646 Swift tests (11 explicit opt-in native/model
+  smokes skipped, zero failures), production signature verification for all 43
+  signed models, an arm64 SwiftPM Release build, and a native arm64 Xcode Debug
+  app build. The final Standards and issue-spec reviews reported no remaining
+  actionable findings.
+
 ## Installed Storage Inventory Handoff - 2026-07-24
 
 - GitHub issue #15 owns the narrow cross-task changes needed to replace signed

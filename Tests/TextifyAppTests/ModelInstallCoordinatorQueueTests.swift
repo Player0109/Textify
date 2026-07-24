@@ -174,6 +174,64 @@ final class ModelInstallCoordinatorQueueTests: XCTestCase {
     }
 
     @MainActor
+    func testStorageFailureEndsAttemptAndLaterFIFOAndTailRetryProceed() async {
+        let operation = FirstStorageFailureOperation()
+        let ids = SequentialAttemptIDs([
+            "attempt-1",
+            "attempt-2",
+            "attempt-3",
+        ])
+        let coordinator = ModelInstallCoordinator(
+            installOperation: { artifactID, _ in
+                try await operation.install(artifactID)
+            },
+            makeAttemptID: { ids.next() }
+        )
+
+        _ = coordinator.start(modelID: "artifact-a")
+        _ = coordinator.start(modelID: "artifact-b")
+        await waitUntil { !coordinator.isActive }
+
+        let failure = ModelInstallError.insufficientDiskSpace(
+            requiredBytes: 750_000_000,
+            availableBytes: 100_000_000
+        )
+        XCTAssertEqual(
+            coordinator.attempts.map(\.state.phase),
+            [.failed, .installed]
+        )
+        XCTAssertEqual(
+            coordinator.attempt(id: "attempt-1")?.state.message,
+            failure.description
+        )
+        let firstPassStarted = await operation.startedArtifacts()
+        XCTAssertEqual(
+            firstPassStarted,
+            ["artifact-a", "artifact-b"]
+        )
+
+        XCTAssertEqual(
+            coordinator.retry(attemptID: "attempt-1"),
+            "attempt-3"
+        )
+        await waitUntil { !coordinator.isActive }
+
+        XCTAssertEqual(
+            coordinator.attempts.map(\.state.phase),
+            [.failed, .installed, .installed]
+        )
+        XCTAssertEqual(
+            coordinator.attempt(id: "attempt-3")?.retryOfAttemptID,
+            "attempt-1"
+        )
+        let allStarted = await operation.startedArtifacts()
+        XCTAssertEqual(
+            allStarted,
+            ["artifact-a", "artifact-b", "artifact-a"]
+        )
+    }
+
+    @MainActor
     func testWaitingHeadPersistsAndBlocksLaterFIFOAttemptUntilNetworkRecovers() async throws {
         let readiness = InstallReadinessProbe()
         let gate = InstallExecutionGate()
@@ -785,6 +843,26 @@ private actor InstallReadinessProbe {
 
     func setNetworkAvailable(for artifactID: String) {
         waitingArtifacts.remove(artifactID)
+    }
+}
+
+private actor FirstStorageFailureOperation {
+    private var started: [String] = []
+    private var didFailFirstArtifact = false
+
+    func install(_ artifactID: String) throws {
+        started.append(artifactID)
+        if artifactID == "artifact-a", !didFailFirstArtifact {
+            didFailFirstArtifact = true
+            throw ModelInstallError.insufficientDiskSpace(
+                requiredBytes: 750_000_000,
+                availableBytes: 100_000_000
+            )
+        }
+    }
+
+    func startedArtifacts() -> [String] {
+        started
     }
 }
 

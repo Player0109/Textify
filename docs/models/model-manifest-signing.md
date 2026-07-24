@@ -88,6 +88,10 @@ Verification checks the detached signature and the production catalog policy:
 - positive per-file sizes and 64-character lowercase SHA-256 values
 - exact model-size totals, unique filenames, and safe unique relative paths for
   multi-file model directories
+- signed positive `installationStorage.finalArtifactBytes` and
+  `installationStorage.peakInstallationBytes` bounds for every production
+  artifact; the peak must be at least both the transfer total and final
+  artifact size so unknown or unbounded installation layouts fail closed
 - non-empty language capabilities for new catalog entries
 - optional picker metadata for finalization speed, accuracy tradeoff, and
   hardware/runtime requirements; when present, every field must be non-empty
@@ -155,8 +159,10 @@ or an exact public Hugging Face file, for example:
 `https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/parakeet_vocab.json`
 
 Every manifest file record still requires the exact byte size and lowercase
-SHA-256. A repository being public does not make `main`, a tag, or an unpinned
-download eligible for production.
+SHA-256. Every model record also requires precise signed final-artifact and
+peak-installation byte bounds appropriate to direct staging, directory
+assembly, expansion, conversion, or replacement. A repository being public
+does not make `main`, a tag, or an unpinned download eligible for production.
 
 For a selected Hugging Face runtime directory, generate the reproducible
 `sizeBytes` and `files` fragment from the downloaded bytes with:

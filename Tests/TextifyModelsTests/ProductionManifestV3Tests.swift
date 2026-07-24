@@ -46,14 +46,25 @@ final class ProductionManifestV3Tests: XCTestCase {
         XCTAssertEqual(whisperGGML.computeRoute, .gpuViaMetal)
     }
 
-    func testProductionV3PreservesEveryV2OperationalArtifactRecordExactly() throws {
+    func testProductionV3PreservesV2OperationalRecordsExceptSignedPeakStorageBounds() throws {
         let v2Data = try fixtureData("manifest_v2.production-migration.json")
         let v3Data = try Data(
             contentsOf: repositoryRoot.appendingPathComponent("models/manifest.json")
         )
+        let v2Models = try rawModels(in: v2Data)
+        var v3Models = try rawModels(in: v3Data)
+        for index in v3Models.indices {
+            v3Models[index].removeValue(forKey: "installationStorage")
+        }
         XCTAssertEqual(
-            try rawModelsArray(in: v3Data, terminator: "\n  ],\n  \"presentationGraph\""),
-            try rawModelsArray(in: v2Data, terminator: "\n  ]\n}")
+            try JSONSerialization.data(
+                withJSONObject: v3Models,
+                options: [.sortedKeys]
+            ),
+            try JSONSerialization.data(
+                withJSONObject: v2Models,
+                options: [.sortedKeys]
+            )
         )
 
         let v2 = try ModelManifest.decode(v2Data)
@@ -61,7 +72,19 @@ final class ProductionManifestV3Tests: XCTestCase {
 
         XCTAssertEqual(v2.manifestVersion, 2)
         XCTAssertEqual(v2.models.count, 43)
-        XCTAssertEqual(v3.models, v2.models)
+        XCTAssertEqual(
+            v3.models.map(removingInstallationStorage),
+            v2.models
+        )
+        XCTAssertTrue(
+            v3.models.allSatisfy {
+                $0.installationStorage
+                    == ModelInstallationStorage(
+                        finalArtifactBytes: $0.sizeBytes,
+                        peakInstallationBytes: $0.sizeBytes
+                    )
+            }
+        )
     }
 
     func testV2MigrationFixtureResolvesAllLocalConditionsWithoutChangingActiveIdentity() throws {
@@ -95,7 +118,10 @@ final class ProductionManifestV3Tests: XCTestCase {
             let expectedFile = try XCTUnwrap(
                 previousArtifact.files.first { $0.filename == record.filename }
             )
-            XCTAssertEqual(currentArtifact, previousArtifact)
+            XCTAssertEqual(
+                removingInstallationStorage(currentArtifact),
+                previousArtifact
+            )
             XCTAssertEqual(
                 graph.artifacts.filter { $0.id == record.artifactID }.count,
                 1
@@ -163,20 +189,35 @@ final class ProductionManifestV3Tests: XCTestCase {
         return try Data(contentsOf: url)
     }
 
-    private func rawModelsArray(
-        in data: Data,
-        terminator: String
-    ) throws -> String {
-        let json = String(decoding: data, as: UTF8.self)
-        let start = try XCTUnwrap(json.range(of: "  \"models\": [")?.lowerBound)
-        let end = try XCTUnwrap(
-            json.range(
-                of: terminator,
-                range: start..<json.endIndex
-            )?.lowerBound
+    private func rawModels(in data: Data) throws -> [[String: Any]] {
+        let json = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
         )
-        let closingBracketEnd = json.index(end, offsetBy: "\n  ]".count)
-        return String(json[start..<closingBracketEnd])
+        return try XCTUnwrap(json["models"] as? [[String: Any]])
+    }
+
+    private func removingInstallationStorage(
+        _ model: ModelEntry
+    ) -> ModelEntry {
+        ModelEntry(
+            id: model.id,
+            displayName: model.displayName,
+            tier: model.tier,
+            description: model.description,
+            sizeBytes: model.sizeBytes,
+            files: model.files,
+            licenses: model.licenses,
+            provenance: model.provenance,
+            runtimeParameters: model.runtimeParameters,
+            hallucinationThresholds: model.hallucinationThresholds,
+            minAppVersion: model.minAppVersion,
+            runtime: model.runtime,
+            capabilities: model.capabilities,
+            presentation: model.presentation,
+            purpose: model.purpose,
+            installationStorage: nil,
+            benchmark: model.benchmark
+        )
     }
 
     private var repositoryRoot: URL {

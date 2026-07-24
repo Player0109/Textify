@@ -1,4 +1,5 @@
 import CryptoKit
+import Darwin
 import Foundation
 
 public protocol InstalledModelFileReplacing {
@@ -22,6 +23,33 @@ public struct FileManagerInstalledModelFileReplacer: InstalledModelFileReplacing
     }
 }
 
+private final class ModelCapacityRecheckGate: @unchecked Sendable {
+    private let intervalBytes: Int64
+    private let lock = NSLock()
+    private var lastCheckedBytes: Int64 = 0
+
+    init(intervalBytes: Int64) {
+        self.intervalBytes = max(1, intervalBytes)
+    }
+
+    func shouldCheck(progress: DownloadFileProgress) -> Bool {
+        lock.withLock {
+            let advanced = progress.bytesDownloaded - lastCheckedBytes
+            guard advanced >= intervalBytes
+                    || (
+                        progress.totalBytes > 0
+                            && progress.bytesDownloaded
+                                >= progress.totalBytes
+                    )
+            else {
+                return false
+            }
+            lastCheckedBytes = progress.bytesDownloaded
+            return true
+        }
+    }
+}
+
 public struct ModelInstaller {
     private let layout: ModelStorageLayout
     private let transport: any DownloadTransport
@@ -29,6 +57,7 @@ public struct ModelInstaller {
     private let fileReplacer: any InstalledModelFileReplacing
     private let currentAppVersion: String
     private let nowISO8601: @Sendable () -> String
+    private let capacityRecheckIntervalBytes: Int64
     private let availableCapacity: @Sendable (URL) throws -> Int64
 
     public init(
@@ -38,12 +67,9 @@ public struct ModelInstaller {
         fileReplacer: (any InstalledModelFileReplacing)? = nil,
         currentAppVersion: String = "1.1.0",
         nowISO8601: @escaping @Sendable () -> String = { ISO8601DateFormatter().string(from: Date()) },
+        capacityRecheckIntervalBytes: Int64 = 64_000_000,
         availableCapacity: @escaping @Sendable (URL) throws -> Int64 = { url in
-            let values = try url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-            guard let capacity = values.volumeAvailableCapacityForImportantUsage else {
-                throw ModelInstallError.filesystem("Textify could not determine available disk space.")
-            }
-            return capacity
+            try ModelVolumeCapacityProvider().availableCapacity(at: url)
         }
     ) {
         self.layout = layout
@@ -52,6 +78,10 @@ public struct ModelInstaller {
         self.fileReplacer = fileReplacer ?? FileManagerInstalledModelFileReplacer(fileManager: fileManager)
         self.currentAppVersion = currentAppVersion
         self.nowISO8601 = nowISO8601
+        self.capacityRecheckIntervalBytes = max(
+            1,
+            capacityRecheckIntervalBytes
+        )
         self.availableCapacity = availableCapacity
     }
 
@@ -67,12 +97,17 @@ public struct ModelInstaller {
                 onStateChange: onStateChange
             )
         } catch {
+            let reportedError = storageAdjustedError(
+                error,
+                modelID: modelID,
+                manifest: manifest
+            )
             onStateChange(DownloadState(
                 modelID: modelID,
                 phase: .failed,
-                message: String(describing: error)
+                message: String(describing: reportedError)
             ))
-            throw error
+            throw reportedError
         }
     }
 
@@ -148,25 +183,38 @@ public struct ModelInstaller {
             totalBytes: file.sizeBytes,
             message: "Preparing model download."
         ))
-        let requiredCapacity = ModelDownloader.requiredFreeBytes(modelSizeBytes: file.sizeBytes)
-        let currentCapacity = try availableCapacity(layout.rootDirectory)
-        guard currentCapacity >= requiredCapacity else {
-            throw ModelInstallError.insufficientDiskSpace(
-                requiredBytes: requiredCapacity,
-                availableBytes: currentCapacity
-            )
-        }
+        try requireCapacity(for: model)
         onStateChange(DownloadState(
             modelID: model.id,
             phase: .downloading,
             totalBytes: file.sizeBytes,
             message: "Downloading model."
         ))
+        let recheckGate = ModelCapacityRecheckGate(
+            intervalBytes: capacityRecheckIntervalBytes
+        )
         _ = try await downloadFile(
             file,
             modelID: model.id,
             from: url,
             to: temporaryURL,
+            admissionCheck: { progress in
+                guard recheckGate.shouldCheck(progress: progress) else {
+                    return
+                }
+                try requireCapacity(
+                    for: model,
+                    additionalValidatedFiles: [
+                        (
+                            url: temporaryURL,
+                            logicalBytes: min(
+                                file.sizeBytes,
+                                progress.bytesDownloaded
+                            )
+                        ),
+                    ]
+                )
+            },
             progress: { progress in
             onStateChange(DownloadState(
                 modelID: model.id,
@@ -198,6 +246,12 @@ public struct ModelInstaller {
         }
 
         try Task.checkCancellation()
+        try requireCapacity(
+            for: model,
+            additionalValidatedFiles: [
+                (url: temporaryURL, logicalBytes: file.sizeBytes),
+            ]
+        )
         onStateChange(DownloadState(
             modelID: model.id,
             phase: .installing,
@@ -291,17 +345,11 @@ public struct ModelInstaller {
             totalBytes: model.sizeBytes,
             message: "Preparing model download."
         ))
-        let requiredCapacity = ModelDownloader.requiredFreeBytes(modelSizeBytes: model.sizeBytes)
-        let currentCapacity = try availableCapacity(layout.rootDirectory)
-        guard currentCapacity >= requiredCapacity else {
-            throw ModelInstallError.insufficientDiskSpace(
-                requiredBytes: requiredCapacity,
-                availableBytes: currentCapacity
-            )
-        }
+        try requireCapacity(for: model)
 
         var completedBytes: Int64 = 0
         var installedPaths: [String: String] = [:]
+        var validatedStagingFiles: [(url: URL, logicalBytes: Int64)] = []
         for (file, url) in downloads {
             try Task.checkCancellation()
             let temporaryURL = try layout.temporaryDownloadURL(
@@ -316,11 +364,33 @@ public struct ModelInstaller {
                 message: "Downloading model files."
             ))
             let completedBytesBeforeFile = completedBytes
+            let recheckGate = ModelCapacityRecheckGate(
+                intervalBytes: capacityRecheckIntervalBytes
+            )
+            let validatedFilesBeforeDownload = validatedStagingFiles
             _ = try await downloadFile(
                 file,
                 modelID: model.id,
                 from: url,
                 to: temporaryURL,
+                admissionCheck: { progress in
+                    guard recheckGate.shouldCheck(progress: progress) else {
+                        return
+                    }
+                    try requireCapacity(
+                        for: model,
+                        additionalValidatedFiles:
+                            validatedFilesBeforeDownload + [
+                                (
+                                    url: temporaryURL,
+                                    logicalBytes: min(
+                                        file.sizeBytes,
+                                        progress.bytesDownloaded
+                                    )
+                                ),
+                            ]
+                    )
+                },
                 progress: { progress in
                 onStateChange(DownloadState(
                     modelID: model.id,
@@ -357,6 +427,16 @@ public struct ModelInstaller {
                     actual: actualChecksum
                 )
             }
+            try requireCapacity(
+                for: model,
+                additionalValidatedFiles:
+                    validatedFilesBeforeDownload + [
+                        (
+                            url: temporaryURL,
+                            logicalBytes: file.sizeBytes
+                        ),
+                    ]
+            )
 
             let relativePath = file.relativePath ?? file.filename
             let stagingURL = try layout.artifactURL(
@@ -368,6 +448,9 @@ public struct ModelInstaller {
                 withIntermediateDirectories: true
             )
             try fileManager.moveItem(at: temporaryURL, to: stagingURL)
+            validatedStagingFiles.append(
+                (url: stagingURL, logicalBytes: file.sizeBytes)
+            )
             installedPaths[file.filename] = try layout.installedArtifactURL(
                 modelID: model.id,
                 relativePath: relativePath
@@ -376,6 +459,10 @@ public struct ModelInstaller {
         }
 
         try Task.checkCancellation()
+        try requireCapacity(
+            for: model,
+            additionalValidatedFiles: validatedStagingFiles
+        )
         onStateChange(DownloadState(
             modelID: model.id,
             phase: .installing,
@@ -424,6 +511,9 @@ public struct ModelInstaller {
         modelID: String,
         from url: URL,
         to temporaryURL: URL,
+        admissionCheck: @escaping @Sendable (
+            DownloadFileProgress
+        ) throws -> Void,
         progress: @escaping @Sendable (DownloadFileProgress) -> Void
     ) async throws -> DownloadFileResponse {
         let metadataURL = try layout.downloadResumeMetadataURL(
@@ -438,6 +528,7 @@ public struct ModelInstaller {
                 modelID: modelID,
                 expectedSHA256: file.sha256,
                 maximumBytes: file.sizeBytes,
+                admissionCheck: admissionCheck,
                 progress: progress
             )
         }
@@ -448,7 +539,80 @@ public struct ModelInstaller {
             URLRequest(url: url),
             to: temporaryURL,
             maximumBytes: file.sizeBytes,
+            admissionCheck: admissionCheck,
             progress: progress
+        )
+    }
+
+    private func requireCapacity(
+        for model: ModelEntry,
+        additionalValidatedFiles: [(url: URL, logicalBytes: Int64)] = []
+    ) throws {
+        guard let storage = model.installationStorage else {
+            throw ProductionModelPolicyError.missingInstallationStorage(
+                modelID: model.id
+            )
+        }
+        let reusable: ModelReusableStorage
+        do {
+            reusable = try ModelReusableStorageInspector.inspect(
+                layout: layout,
+                modelID: model.id,
+                expectedFiles: model.files,
+                additionalValidatedFiles: additionalValidatedFiles,
+                fileManager: fileManager
+            ).storage
+        } catch {
+            throw ModelInstallError.storageCapacityUnavailable
+        }
+        let requirement = ModelStorageAdmissionRequirement(
+            completeTransferBytes: model.sizeBytes,
+            finalArtifactBytes: storage.finalArtifactBytes,
+            peakInstallationBytes: storage.peakInstallationBytes
+        )
+        let currentCapacity: Int64
+        do {
+            currentCapacity = try availableCapacity(layout.rootDirectory)
+        } catch {
+            throw ModelInstallError.storageCapacityUnavailable
+        }
+        try requirement.requireCapacity(
+            availableBytes: currentCapacity,
+            reusable: reusable
+        )
+    }
+
+    private func storageAdjustedError(
+        _ error: any Error,
+        modelID: String,
+        manifest: ModelManifest
+    ) -> any Error {
+        guard Self.isOutOfSpace(error),
+              let model = manifest.models.first(
+                where: { $0.id == modelID }
+              )
+        else {
+            return error
+        }
+        do {
+            try requireCapacity(for: model)
+            return ModelInstallError.filesystem(
+                "The model volume ran out of space. Free storage and try again."
+            )
+        } catch {
+            return error
+        }
+    }
+
+    private static func isOutOfSpace(_ error: any Error) -> Bool {
+        let nsError = error as NSError
+        return (
+            nsError.domain == NSPOSIXErrorDomain
+                && nsError.code == Int(ENOSPC)
+        ) || (
+            nsError.domain == NSCocoaErrorDomain
+                && nsError.code
+                    == CocoaError.fileWriteOutOfSpace.rawValue
         )
     }
 

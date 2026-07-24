@@ -86,6 +86,7 @@ enum ModelDownloadStorageValidation {
     static func validatedPartialURL(
         for metadataURL: URL,
         expectedModelID: String? = nil,
+        expectedFiles: [ModelFile]? = nil,
         fileManager: FileManager = .default
     ) -> URL? {
         guard let metadata = try? JSONDecoder().decode(
@@ -93,6 +94,11 @@ enum ModelDownloadStorageValidation {
             from: Data(contentsOf: metadataURL)
         ),
         expectedModelID == nil || metadata.modelID == expectedModelID,
+        expectedFiles == nil || expectedFiles?.contains(where: { file in
+            metadata.url == file.url
+                && metadata.expectedSize == file.sizeBytes
+                && metadata.sha256.lowercased() == file.sha256.lowercased()
+        }) == true,
         metadata.bytesDownloaded > 0,
         metadata.bytesDownloaded < metadata.expectedSize,
         isSHA256(metadata.sha256),

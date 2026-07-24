@@ -156,7 +156,7 @@ final class DownloadTests: XCTestCase {
             )
             XCTFail("Expected manifest verification to reject tampered bytes")
         } catch let error as ManifestVerificationError {
-            XCTAssertEqual(error, .legacyEnvelopeRejected)
+            XCTAssertEqual(error, .contentHashMismatch)
         }
     }
 
@@ -452,6 +452,31 @@ private final class FixtureDownloadTransport: DownloadTransport {
     func downloadFile(_ request: URLRequest, to temporaryURL: URL) async throws -> DownloadFileResponse {
         let response = try await fetch(request)
         try response.data.write(to: temporaryURL)
+        return DownloadFileResponse(
+            fileURL: temporaryURL,
+            eTag: response.eTag,
+            lastModified: response.lastModified,
+            statusCode: response.statusCode
+        )
+    }
+
+    func downloadFile(
+        _ request: URLRequest,
+        to temporaryURL: URL,
+        maximumBytes: Int64,
+        admissionCheck: @escaping @Sendable (
+            DownloadFileProgress
+        ) throws -> Void,
+        progress: @escaping @Sendable (DownloadFileProgress) -> Void
+    ) async throws -> DownloadFileResponse {
+        let response = try await fetch(request)
+        try response.data.write(to: temporaryURL)
+        let event = DownloadFileProgress(
+            bytesDownloaded: Int64(response.data.count),
+            totalBytes: Int64(response.data.count)
+        )
+        try admissionCheck(event)
+        progress(event)
         return DownloadFileResponse(
             fileURL: temporaryURL,
             eTag: response.eTag,

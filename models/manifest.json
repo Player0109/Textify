@@ -1,6 +1,6 @@
 {
   "manifestVersion": 3,
-  "generatedAt": "2026-07-24T02:53:19Z",
+  "generatedAt": "2026-07-24T11:02:38Z",
   "models": [
     {
       "id": "ggml-small.en-q5_1",
@@ -128,6 +128,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 190098681,
+        "peakInstallationBytes": 190098681
       }
     },
     {
@@ -262,6 +266,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 1080732091,
+        "peakInstallationBytes": 1080732091
       }
     },
     {
@@ -388,6 +396,10 @@
         "speedUnratedReason": "unstable-p95",
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 1081140203,
+        "peakInstallationBytes": 1081140203
       }
     },
     {
@@ -523,6 +535,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 574041195,
+        "peakInstallationBytes": 574041195
       }
     },
     {
@@ -605,6 +621,10 @@
         "expectedFinalization": "255.5 ms median and 373 ms p95 release-to-final on the fixed M4 Max English sample",
         "accuracyTradeoff": "0.95% English WER with punctuation on Textify's fixed 210-word sample; larger than the existing English defaults",
         "requirements": "Apple Silicon with Metal; about 1.74 GB disk, 3.16 GB peak process memory, and a 40-second recording limit"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 1737575808,
+        "peakInstallationBytes": 1737575808
       }
     },
     {
@@ -904,6 +924,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 483105645,
+        "peakInstallationBytes": 483105645
       }
     },
     {
@@ -1144,6 +1168,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 227466209,
+        "peakInstallationBytes": 227466209
       }
     },
     {
@@ -1419,6 +1447,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 464413247,
+        "peakInstallationBytes": 464413247
       }
     },
     {
@@ -1588,6 +1620,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 4282559760,
+        "peakInstallationBytes": 4282559760
       }
     },
     {
@@ -1750,6 +1786,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 2418577135,
+        "peakInstallationBytes": 2418577135
       }
     },
     {
@@ -1954,6 +1994,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 1618594759,
+        "peakInstallationBytes": 1618594759
       }
     },
     {
@@ -2171,6 +2215,10 @@
         "expectedFinalization": "About 61 ms median and 406 ms p95 on the fixed JSUT sample on M4 Max",
         "accuracyTradeoff": "Japanese-only specialist; 13.11% corpus CER on Textify's fixed JSUT sample",
         "requirements": "Apple Silicon, macOS 14.4+, about 619 MB disk; first preparation took about 37 seconds on M4 Max"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 619065246,
+        "peakInstallationBytes": 619065246
       }
     },
     {
@@ -2360,6 +2408,10 @@
         "expectedFinalization": "Typically under 100 ms after release on M4-class Apple Silicon",
         "accuracyTradeoff": "Mandarin specialist; not intended as a general multilingual model",
         "requirements": "Apple Silicon, macOS 14.4+, about 222 MB disk, 29-second recording limit; first preparation can take several minutes"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 222136057,
+        "peakInstallationBytes": 222136057
       }
     },
     {
@@ -2464,6 +2516,10 @@
         "expectedFinalization": "About 86 ms median and 413 ms p95 on the fixed JSUT sample on M4 Max",
         "accuracyTradeoff": "Japanese-only fast tier; 14.61% corpus CER versus 13.11% for the larger Parakeet Japanese model",
         "requirements": "Apple Silicon, about 160 MB disk, 29-second recording limit; first preparation took about 1.3 seconds and a 29-second stress clip finalized in about 954 ms on M4 Max"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 160372200,
+        "peakInstallationBytes": 160372200
       }
     },
     {
@@ -2616,6 +2672,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 239549735,
+        "peakInstallationBytes": 239549735
       }
     },
     {
@@ -2842,6 +2902,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 1010771234,
+        "peakInstallationBytes": 1010771234
       }
     },
     {
@@ -3068,6 +3132,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 2467856503,
+        "peakInstallationBytes": 2467856503
       }
     },
     {
@@ -3231,6 +3299,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 1571490016,
+        "peakInstallationBytes": 1571490016
       }
     },
     {
@@ -3394,6 +3466,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 850423456,
+        "peakInstallationBytes": 850423456
       }
     },
     {
@@ -3557,6 +3633,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 645356192,
+        "peakInstallationBytes": 645356192
       }
     },
     {
@@ -3720,6 +3800,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 4083087904,
+        "peakInstallationBytes": 4083087904
       }
     },
     {
@@ -3883,6 +3967,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 2185030624,
+        "peakInstallationBytes": 2185030624
       }
     },
     {
@@ -4046,6 +4134,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 1517290464,
+        "peakInstallationBytes": 1517290464
       }
     },
     {
@@ -4215,6 +4307,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 2471862935,
+        "peakInstallationBytes": 2471862935
       }
     },
     {
@@ -4408,6 +4504,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 2509041541,
+        "peakInstallationBytes": 2509041541
       }
     },
     {
@@ -4597,6 +4697,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 1276703116,
+        "peakInstallationBytes": 1276703116
       }
     },
     {
@@ -4731,6 +4835,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 1237334592,
+        "peakInstallationBytes": 1237334592
       }
     },
     {
@@ -4865,6 +4973,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 729574912,
+        "peakInstallationBytes": 729574912
       }
     },
     {
@@ -4999,6 +5111,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 539012608,
+        "peakInstallationBytes": 539012608
       }
     },
     {
@@ -5157,6 +5273,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 1255869856,
+        "peakInstallationBytes": 1255869856
       }
     },
     {
@@ -5315,6 +5435,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 739508576,
+        "peakInstallationBytes": 739508576
       }
     },
     {
@@ -5473,6 +5597,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 548946272,
+        "peakInstallationBytes": 548946272
       }
     },
     {
@@ -5634,6 +5762,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 1277750240,
+        "peakInstallationBytes": 1277750240
       }
     },
     {
@@ -5795,6 +5927,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 751094240,
+        "peakInstallationBytes": 751094240
       }
     },
     {
@@ -5956,6 +6092,10 @@
         },
         "suiteID": "english-catalog-rating-v1",
         "suiteIndexSHA256": "77637f85b4e3fde7b15f5481804e231d720c0337d11153dc5867dee2587ddde8"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 559647200,
+        "peakInstallationBytes": 559647200
       }
     },
     {
@@ -6037,6 +6177,10 @@
         "expectedFinalization": "Unrated in Textify; the pinned runtime's M4 Max publication measured about 1.0 seconds for 35.3 seconds of audio",
         "accuracyTradeoff": "Six-language autoregressive model; the selected Q5_K_M artifact measured 1.33% LibriSpeech test-clean WER upstream",
         "requirements": "Apple Silicon with Metal; about 1.83 GB disk, automatic language detection, and a 60-second Textify recording limit"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 1829704544,
+        "peakInstallationBytes": 1829704544
       }
     },
     {
@@ -6117,6 +6261,10 @@
         "expectedFinalization": "Unrated in Textify; the pinned runtime's M4 Max publication measured about 664 ms for 35.3 seconds of audio",
         "accuracyTradeoff": "Fast single-pass editor without translation or timestamps; the selected Q5_K_M artifact measured 1.25% LibriSpeech test-clean WER upstream",
         "requirements": "Apple Silicon with Metal; about 1.78 GB disk, implicit language detection, and a 60-second Textify recording limit"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 1782089344,
+        "peakInstallationBytes": 1782089344
       }
     },
     {
@@ -6205,6 +6353,10 @@
         "expectedFinalization": "Unrated in Textify; the pinned runtime's M4 Max publication measured about 3.91 seconds for 35.3 seconds of audio",
         "accuracyTradeoff": "13-language automatic recognition; the selected Q4_K_M artifact matched the 2.08% LibriSpeech test-clean reference WER upstream",
         "requirements": "Apple Silicon with Metal; about 2.83 GB disk, automatic language detection, and Textify currently uses the offline final-result path"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 2830493984,
+        "peakInstallationBytes": 2830493984
       }
     },
     {
@@ -6282,6 +6434,10 @@
         "expectedFinalization": "Unrated in Textify; the pinned runtime's M4 Max publication measured about 1.27 seconds for 35.3 seconds of audio",
         "accuracyTradeoff": "English and Chinese with generated inline speaker/timestamp spans; the selected Q5_K_M artifact measured 1.99% LibriSpeech test-clean WER upstream",
         "requirements": "Apple Silicon with Metal; about 700 MB disk, automatic language selection, and a 60-second Textify recording limit"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 700313760,
+        "peakInstallationBytes": 700313760
       }
     },
     {
@@ -6372,6 +6528,10 @@
         "expectedFinalization": "Unrated in Textify; runs locally through the pinned sherpa-onnx CPU runtime",
         "accuracyTradeoff": "Broadest language coverage in the catalog via a compact CTC model; accuracy varies substantially by language",
         "requirements": "Apple Silicon CPU; about 365 MB disk, automatic language-agnostic decoding, and a 40-second recording limit"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 365438543,
+        "peakInstallationBytes": 365438543
       }
     },
     {
@@ -6451,7 +6611,11 @@
         "accuracyTradeoff": "Full-precision enhancement with the largest download of the three cleaner variants",
         "requirements": "Apple Silicon with Metal; about 221 MB disk; internally processes 48 kHz mono audio"
       },
-      "purpose": "voice_cleaning"
+      "purpose": "voice_cleaning",
+      "installationStorage": {
+        "finalArtifactBytes": 221178344,
+        "peakInstallationBytes": 221178344
+      }
     },
     {
       "id": "mossformer2-se-fp16",
@@ -6530,7 +6694,11 @@
         "accuracyTradeoff": "Recommended balance of enhancement precision and download size",
         "requirements": "Apple Silicon with Metal; about 111 MB disk; internally processes 48 kHz mono audio"
       },
-      "purpose": "voice_cleaning"
+      "purpose": "voice_cleaning",
+      "installationStorage": {
+        "finalArtifactBytes": 110652884,
+        "peakInstallationBytes": 110652884
+      }
     },
     {
       "id": "mossformer2-se-int8",
@@ -6609,7 +6777,11 @@
         "accuracyTradeoff": "Smallest download; 8-bit quantization can trade enhancement fidelity for size",
         "requirements": "Apple Silicon with Metal; about 90 MB disk; internally processes 48 kHz mono audio"
       },
-      "purpose": "voice_cleaning"
+      "purpose": "voice_cleaning",
+      "installationStorage": {
+        "finalArtifactBytes": 90089718,
+        "peakInstallationBytes": 90089718
+      }
     }
   ],
   "presentationGraph": {

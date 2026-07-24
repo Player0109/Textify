@@ -74,14 +74,22 @@ final class AppServices {
             )
         },
         resumableDataProvider: { [weak self] attempt in
-            guard let self else {
+            guard let self,
+                  let expectedFiles = self.modelCatalogCoordinator
+                    .authoritativeManifest?.models.first(
+                        where: { $0.id == attempt.artifactID }
+                    )?.files
+            else {
                 return nil
             }
             return try? ModelInstallResumableDataInspector(
                 layout: ModelStorageLayout(
                     rootDirectory: self.paths.modelsDirectory
                 )
-            ).inspect(for: attempt)
+            ).inspect(
+                for: attempt,
+                expectedFiles: expectedFiles
+            )
         },
         lastSuccessfulCatalogIntegrityCheckAt: { [weak self] in
             self?.modelCatalogCoordinator
@@ -1501,6 +1509,12 @@ final class ModelInstallCoordinator {
                     attemptID: attempt.id,
                     phase: .waitingForCatalogCheck,
                     message: "Waiting for catalog check."
+                )
+            } catch let error as ModelInstallError {
+                finish(
+                    attemptID: attempt.id,
+                    phase: .failed,
+                    message: error.description
                 )
             } catch {
                 finish(

@@ -8,6 +8,10 @@
       "tier": "recommended",
       "description": "A compact Whisper Small exact artifact.",
       "sizeBytes": 33,
+      "installationStorage": {
+        "finalArtifactBytes": 33,
+        "peakInstallationBytes": 33
+      },
       "files": [
         {
           "filename": "model.bin",
@@ -60,6 +64,10 @@
       "tier": "accurate",
       "description": "A higher precision Whisper Small exact artifact.",
       "sizeBytes": 33,
+      "installationStorage": {
+        "finalArtifactBytes": 33,
+        "peakInstallationBytes": 33
+      },
       "files": [
         {
           "filename": "model.bin",
@@ -112,6 +120,10 @@
       "tier": "fast",
       "description": "The sole exact artifact for Whisper Tiny.",
       "sizeBytes": 33,
+      "installationStorage": {
+        "finalArtifactBytes": 33,
+        "peakInstallationBytes": 33
+      },
       "files": [
         {
           "filename": "model.bin",

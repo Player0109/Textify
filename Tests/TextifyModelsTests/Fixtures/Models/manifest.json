@@ -8,6 +8,10 @@
       "tier": "balanced",
       "description": "Balanced local English dictation for Textify V1.1.",
       "sizeBytes": 33,
+      "installationStorage": {
+        "finalArtifactBytes": 33,
+        "peakInstallationBytes": 33
+      },
       "files": [
         {
           "filename": "model.bin",

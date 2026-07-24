@@ -98,13 +98,7 @@ public struct ModelStorageInventoryScanner: @unchecked Sendable {
         layout: ModelStorageLayout,
         fileManager: FileManager = .default,
         availableCapacity: @escaping AvailableCapacity = { url in
-            let values = try url.resourceValues(
-                forKeys: [.volumeAvailableCapacityForImportantUsageKey]
-            )
-            guard let capacity = values.volumeAvailableCapacityForImportantUsage else {
-                throw ModelStorageInventoryError.filesystemReadFailed(url.path)
-            }
-            return capacity
+            try ModelVolumeCapacityProvider().availableCapacity(at: url)
         }
     ) {
         self.layout = layout

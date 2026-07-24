@@ -35,6 +35,58 @@ final class ManifestTests: XCTestCase {
         XCTAssertEqual(manifest.models.first?.runtime, .legacyWhisper)
         XCTAssertEqual(manifest.models.first?.capabilities, .legacyEnglishWhisper)
         XCTAssertEqual(manifest.models.first?.purpose, .transcription)
+        XCTAssertEqual(
+            manifest.models.first?.installationStorage,
+            ModelInstallationStorage(
+                finalArtifactBytes: 33,
+                peakInstallationBytes: 33
+            )
+        )
+    }
+
+    func testProductionPolicyRejectsMissingOrUnboundedInstallationPeak() throws {
+        var json = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Self.validManifestData)
+                as? [String: Any]
+        )
+        var models = try XCTUnwrap(json["models"] as? [[String: Any]])
+        models[0].removeValue(forKey: "installationStorage")
+        json["models"] = models
+        let missing = try ModelManifest.decode(
+            JSONSerialization.data(withJSONObject: json)
+        )
+
+        XCTAssertThrowsError(
+            try ProductionModelPolicy.validateProductionManifest(missing)
+        ) { error in
+            XCTAssertEqual(
+                error as? ProductionModelPolicyError,
+                .missingInstallationStorage(
+                    modelID: ProductionModelPolicy.requiredModelID
+                )
+            )
+        }
+
+        for invalidPeak in [Int64(0), Int64.max] {
+            models[0]["installationStorage"] = [
+                "finalArtifactBytes": 33,
+                "peakInstallationBytes": invalidPeak,
+            ]
+            json["models"] = models
+            let invalid = try ModelManifest.decode(
+                JSONSerialization.data(withJSONObject: json)
+            )
+            XCTAssertThrowsError(
+                try ProductionModelPolicy.validateProductionManifest(invalid)
+            ) { error in
+                XCTAssertEqual(
+                    error as? ProductionModelPolicyError,
+                    .invalidInstallationStorage(
+                        modelID: ProductionModelPolicy.requiredModelID
+                    )
+                )
+            }
+        }
     }
 
     func testManifestParsesVoiceCleaningPurpose() throws {

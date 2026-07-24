@@ -118,6 +118,40 @@ public enum ModelArtifactLayout: String, Codable, Equatable, CaseIterable, Senda
     case modelDirectory = "model_directory"
 }
 
+public struct ModelInstallationStorage: Codable, Equatable, Sendable {
+    public let finalArtifactBytes: Int64
+    public let peakInstallationBytes: Int64
+
+    public init(
+        finalArtifactBytes: Int64,
+        peakInstallationBytes: Int64
+    ) {
+        self.finalArtifactBytes = finalArtifactBytes
+        self.peakInstallationBytes = peakInstallationBytes
+    }
+
+    public init(from decoder: Decoder) throws {
+        try StrictJSONKeys.validate(
+            decoder: decoder,
+            allowedKeys: CodingKeys.allCases.map(\.stringValue)
+        )
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        finalArtifactBytes = try container.decode(
+            Int64.self,
+            forKey: .finalArtifactBytes
+        )
+        peakInstallationBytes = try container.decode(
+            Int64.self,
+            forKey: .peakInstallationBytes
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case finalArtifactBytes
+        case peakInstallationBytes
+    }
+}
+
 public struct ModelRuntimeDescriptor: Codable, Equatable, Sendable {
     public let engine: TranscriptionEngine
     public let variant: String
@@ -251,6 +285,7 @@ public struct ModelEntry: Codable, Equatable, Sendable {
     public let capabilities: ModelCapabilities
     public let presentation: ModelUserPresentation?
     public let purpose: ModelPurpose
+    public let installationStorage: ModelInstallationStorage?
     public let benchmark: ModelBenchmarkRating?
 
     public init(
@@ -352,6 +387,46 @@ public struct ModelEntry: Codable, Equatable, Sendable {
             capabilities: capabilities,
             presentation: presentation,
             purpose: purpose,
+            installationStorage: nil,
+            benchmark: nil
+        )
+    }
+
+    public init(
+        id: String,
+        displayName: String,
+        tier: String,
+        description: String,
+        sizeBytes: Int64,
+        files: [ModelFile],
+        licenses: [ModelLicense],
+        provenance: ModelProvenance,
+        runtimeParameters: RuntimeParameters,
+        hallucinationThresholds: HallucinationThresholds,
+        minAppVersion: String,
+        runtime: ModelRuntimeDescriptor,
+        capabilities: ModelCapabilities,
+        presentation: ModelUserPresentation?,
+        purpose: ModelPurpose = .transcription,
+        installationStorage: ModelInstallationStorage
+    ) {
+        self.init(
+            id: id,
+            displayName: displayName,
+            tier: tier,
+            description: description,
+            sizeBytes: sizeBytes,
+            files: files,
+            licenses: licenses,
+            provenance: provenance,
+            runtimeParameters: runtimeParameters,
+            hallucinationThresholds: hallucinationThresholds,
+            minAppVersion: minAppVersion,
+            runtime: runtime,
+            capabilities: capabilities,
+            presentation: presentation,
+            purpose: purpose,
+            installationStorage: installationStorage,
             benchmark: nil
         )
     }
@@ -372,6 +447,7 @@ public struct ModelEntry: Codable, Equatable, Sendable {
         capabilities: ModelCapabilities,
         presentation: ModelUserPresentation?,
         purpose: ModelPurpose,
+        installationStorage: ModelInstallationStorage? = nil,
         benchmark: ModelBenchmarkRating?
     ) {
         self.id = id
@@ -389,6 +465,7 @@ public struct ModelEntry: Codable, Equatable, Sendable {
         self.capabilities = capabilities
         self.presentation = presentation
         self.purpose = purpose
+        self.installationStorage = installationStorage
         self.benchmark = benchmark
     }
 
@@ -414,6 +491,10 @@ public struct ModelEntry: Codable, Equatable, Sendable {
         capabilities = try container.decodeIfPresent(ModelCapabilities.self, forKey: .capabilities) ?? .legacyEnglishWhisper
         presentation = try container.decodeIfPresent(ModelUserPresentation.self, forKey: .presentation)
         purpose = try container.decodeIfPresent(ModelPurpose.self, forKey: .purpose) ?? .transcription
+        installationStorage = try container.decodeIfPresent(
+            ModelInstallationStorage.self,
+            forKey: .installationStorage
+        )
         benchmark = try container.decodeIfPresent(ModelBenchmarkRating.self, forKey: .benchmark)
     }
 
@@ -433,6 +514,7 @@ public struct ModelEntry: Codable, Equatable, Sendable {
         case capabilities
         case presentation
         case purpose
+        case installationStorage
         case benchmark
 
         static let legacyRequired: [CodingKeys] = [

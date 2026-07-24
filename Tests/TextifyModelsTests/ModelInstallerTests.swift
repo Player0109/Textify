@@ -180,6 +180,293 @@ final class ModelInstallerTests: XCTestCase {
         XCTAssertEqual(recorder.states().map(\.phase), [.checkingSpace, .failed])
     }
 
+    func testInstallerSubtractsOnlyAllocatedValidatorBoundResumeCredit() async throws {
+        let manifest = try Self.fixtureManifest()
+        let model = try XCTUnwrap(manifest.models.first)
+        let file = try XCTUnwrap(model.files.first)
+        let rootDirectory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectory) }
+        let layout = ModelStorageLayout(rootDirectory: rootDirectory)
+        try FileManager.default.createDirectory(
+            at: layout.downloadsDirectory,
+            withIntermediateDirectories: true
+        )
+        let partialURL = try layout.temporaryDownloadURL(
+            modelID: model.id,
+            filename: file.filename
+        )
+        let metadataURL = try layout.downloadResumeMetadataURL(
+            modelID: model.id,
+            filename: file.filename
+        )
+        try Data(repeating: 1, count: 10).write(to: partialURL)
+        try JSONEncoder().encode(
+            DownloadResumeMetadata(
+                modelID: model.id,
+                url: file.url,
+                expectedSize: file.sizeBytes,
+                sha256: file.sha256,
+                eTag: "\"fixture\"",
+                lastModified: nil,
+                bytesDownloaded: 10
+            )
+        ).write(to: metadataURL)
+        let requirement = ModelStorageAdmissionRequirement(
+            completeTransferBytes: model.sizeBytes,
+            finalArtifactBytes: 33,
+            peakInstallationBytes: 33
+        )
+        let available = requirement.requiredAdditionalCapacity(
+            reusable: ModelReusableStorage(
+                validatedLogicalBytes: 10,
+                allocatedBytes: 10
+            )
+        )
+        let transport = FixtureFileDownloadTransport(dataByURL: [
+            try XCTUnwrap(URL(string: file.url)): try Self.fixtureData("model.bin"),
+        ])
+        let installer = ModelInstaller(
+            layout: layout,
+            transport: transport,
+            availableCapacity: { _ in available }
+        )
+
+        _ = try await installer.install(modelID: model.id, from: manifest)
+
+        XCTAssertEqual(transport.downloadFileCallCount, 1)
+    }
+
+    func testInstallerDoesNotCreditPartialFromOlderArtifactRevision() async throws {
+        let manifest = try Self.fixtureManifest()
+        let model = try XCTUnwrap(manifest.models.first)
+        let file = try XCTUnwrap(model.files.first)
+        let rootDirectory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectory) }
+        let layout = ModelStorageLayout(rootDirectory: rootDirectory)
+        try FileManager.default.createDirectory(
+            at: layout.downloadsDirectory,
+            withIntermediateDirectories: true
+        )
+        let partialURL = try layout.temporaryDownloadURL(
+            modelID: model.id,
+            filename: file.filename
+        )
+        let metadataURL = try layout.downloadResumeMetadataURL(
+            modelID: model.id,
+            filename: file.filename
+        )
+        try Data(repeating: 1, count: 10).write(to: partialURL)
+        try JSONEncoder().encode(
+            DownloadResumeMetadata(
+                modelID: model.id,
+                url: file.url,
+                expectedSize: file.sizeBytes,
+                sha256: String(repeating: "0", count: 64),
+                eTag: "\"old-revision\"",
+                lastModified: nil,
+                bytesDownloaded: 10
+            )
+        ).write(to: metadataURL)
+        let requirement = ModelStorageAdmissionRequirement(
+            completeTransferBytes: model.sizeBytes,
+            finalArtifactBytes: model.sizeBytes,
+            peakInstallationBytes: model.sizeBytes
+        )
+        let capacityWithUnsafeCredit = requirement
+            .requiredAdditionalCapacity(
+                reusable: ModelReusableStorage(
+                    validatedLogicalBytes: 10,
+                    allocatedBytes: 10
+                )
+            )
+        let transport = FixtureFileDownloadTransport(dataByURL: [
+            try XCTUnwrap(URL(string: file.url)):
+                try Self.fixtureData("model.bin"),
+        ])
+        let installer = ModelInstaller(
+            layout: layout,
+            transport: transport,
+            availableCapacity: { _ in capacityWithUnsafeCredit }
+        )
+
+        do {
+            _ = try await installer.install(
+                modelID: model.id,
+                from: manifest
+            )
+            XCTFail("Expected stale partial credit to be rejected.")
+        } catch let error as ModelInstallError {
+            XCTAssertEqual(
+                error,
+                .insufficientDiskSpace(
+                    requiredBytes: requirement
+                        .requiredAdditionalCapacity(reusable: .none),
+                    availableBytes: capacityWithUnsafeCredit
+                )
+            )
+        }
+        XCTAssertEqual(transport.downloadFileCallCount, 0)
+    }
+
+    func testInstallerRechecksCapacityDuringTransferAndPreservesRetryablePartial() async throws {
+        let manifest = try Self.fixtureManifest()
+        let model = try XCTUnwrap(manifest.models.first)
+        let file = try XCTUnwrap(model.files.first)
+        let rootDirectory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectory) }
+        let layout = ModelStorageLayout(rootDirectory: rootDirectory)
+        let capacities = CapacitySequence([
+            1_000_000_000,
+            0,
+        ])
+        let transport = AdmissionCheckingDownloadTransport(
+            data: try Self.fixtureData("model.bin"),
+            expectedSHA256: file.sha256
+        )
+        let installer = ModelInstaller(
+            layout: layout,
+            transport: transport,
+            capacityRecheckIntervalBytes: 1,
+            availableCapacity: { _ in capacities.next() }
+        )
+
+        do {
+            _ = try await installer.install(modelID: model.id, from: manifest)
+            XCTFail("Expected transfer-time storage rejection")
+        } catch let error as ModelInstallError {
+            guard case .insufficientDiskSpace = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
+
+        XCTAssertEqual(transport.admissionCheckCount, 1)
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: layout.installedStoreURL.path
+            )
+        )
+        let reusable = try ModelInstallResumableDataInspector(
+            layout: layout
+        ).inspect(
+            for: ModelInstallQueueAttempt(
+                id: "retry",
+                artifactID: model.id,
+                purpose: model.purpose,
+                action: .install,
+                createdAt: "2026-07-24T00:00:00Z",
+                state: DownloadState(
+                    modelID: model.id,
+                    phase: .failed
+                )
+            ),
+            expectedFiles: model.files
+        )
+        XCTAssertGreaterThan(reusable?.validatedBytes ?? 0, 0)
+        XCTAssertLessThan(reusable?.validatedBytes ?? .max, file.sizeBytes)
+    }
+
+    func testInstallerRechecksCapacityBeforeDirectoryStaging() async throws {
+        let first = Data("first".utf8)
+        let second = Data("second".utf8)
+        let manifest = try Self.directoryModelManifest(files: [
+            (
+                filename: "first.bin",
+                relativePath: "Model/first.bin",
+                data: first
+            ),
+            (
+                filename: "second.bin",
+                relativePath: "Model/second.bin",
+                data: second
+            ),
+        ])
+        let model = try XCTUnwrap(manifest.models.first)
+        let capacities = CapacitySequence([
+            1_000_000_000,
+            1_000_000_000,
+            1_000_000_000,
+            1_000_000_000,
+            0,
+        ])
+        let rootDirectory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectory) }
+        let transport = FixtureFileDownloadTransport(
+            dataByURL: Dictionary(
+                uniqueKeysWithValues: try model.files.map {
+                    (
+                        try XCTUnwrap(URL(string: $0.url)),
+                        $0.filename == "first.bin" ? first : second
+                    )
+                }
+            )
+        )
+        let installer = ModelInstaller(
+            layout: ModelStorageLayout(rootDirectory: rootDirectory),
+            transport: transport,
+            availableCapacity: { _ in capacities.next() }
+        )
+
+        do {
+            _ = try await installer.install(modelID: model.id, from: manifest)
+            XCTFail("Expected pre-staging storage rejection")
+        } catch let error as ModelInstallError {
+            guard case .insufficientDiskSpace = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
+
+        XCTAssertEqual(transport.downloadFileCallCount, 2)
+    }
+
+    func testInstallerRechecksCapacityAfterOutOfSpaceFailure() async throws {
+        let manifest = try Self.fixtureManifest()
+        let model = try XCTUnwrap(manifest.models.first)
+        let capacities = CapacitySequence([
+            1_000_000_000,
+            10,
+        ])
+        let rootDirectory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectory) }
+        let installer = ModelInstaller(
+            layout: ModelStorageLayout(rootDirectory: rootDirectory),
+            transport: OutOfSpaceDownloadTransport(),
+            availableCapacity: { _ in capacities.next() }
+        )
+
+        do {
+            _ = try await installer.install(modelID: model.id, from: manifest)
+            XCTFail("Expected out-of-space storage rejection")
+        } catch let error as ModelInstallError {
+            guard case let .insufficientDiskSpace(_, availableBytes) = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+            XCTAssertEqual(availableBytes, 10)
+        }
+
+        XCTAssertEqual(capacities.callCount, 2)
+    }
+
+    func testInstallerFailsClosedWhenCapacityCannotBeMeasured() async throws {
+        let manifest = try Self.fixtureManifest()
+        let model = try XCTUnwrap(manifest.models.first)
+        let installer = ModelInstaller(
+            layout: ModelStorageLayout(
+                rootDirectory: Self.temporaryDirectory()
+            ),
+            transport: FixtureFileDownloadTransport(dataByURL: [:]),
+            availableCapacity: { _ in
+                throw ModelStorageAdmissionError.capacityUnavailable
+            }
+        )
+
+        do {
+            _ = try await installer.install(modelID: model.id, from: manifest)
+            XCTFail("Expected unavailable capacity rejection")
+        } catch let error as ModelInstallError {
+            XCTAssertEqual(error, .storageCapacityUnavailable)
+        }
+    }
+
     func testInstallerRejectsModelRequiringNewerAppVersionBeforeDownload() async throws {
         let manifest = try Self.fixtureManifest(replacingMinimumAppVersion: "1.2.0")
         let model = try XCTUnwrap(manifest.models.first)
@@ -510,6 +797,63 @@ final class ModelInstallerTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: installedURL), try Self.fixtureData("model.bin"))
     }
 
+    func testReinstallRechecksSignedPeakBeforeReplacement() async throws {
+        let manifest = try Self.fixtureManifest()
+        let model = try XCTUnwrap(manifest.models.first)
+        let file = try XCTUnwrap(model.files.first)
+        let rootDirectory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectory) }
+        let layout = ModelStorageLayout(rootDirectory: rootDirectory)
+        let installedURL = try layout.installedFileURL(
+            modelID: model.id,
+            filename: file.filename
+        )
+        try FileManager.default.createDirectory(
+            at: installedURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let existingData = Data("existing model bytes".utf8)
+        try existingData.write(to: installedURL)
+        let fileReplacer = AtomicReplacementSpy(
+            expectedInstalledURL: installedURL,
+            expectedExistingData: existingData
+        )
+        let capacities = CapacitySequence([
+            1_000_000_000,
+            1_000_000_000,
+            0,
+        ])
+        let installer = ModelInstaller(
+            layout: layout,
+            transport: FixtureFileDownloadTransport(dataByURL: [
+                try XCTUnwrap(URL(string: file.url)):
+                    try Self.fixtureData("model.bin"),
+            ]),
+            fileReplacer: fileReplacer,
+            availableCapacity: { _ in capacities.next() }
+        )
+
+        do {
+            _ = try await installer.install(
+                modelID: model.id,
+                from: manifest
+            )
+            XCTFail("Expected the pre-replacement capacity check to fail.")
+        } catch let error as ModelInstallError {
+            XCTAssertEqual(
+                error,
+                .insufficientDiskSpace(
+                    requiredBytes: 500_000_000,
+                    availableBytes: 0
+                )
+            )
+        }
+
+        XCTAssertEqual(capacities.callCount, 3)
+        XCTAssertEqual(fileReplacer.replacementCalls, 0)
+        XCTAssertEqual(try Data(contentsOf: installedURL), existingData)
+    }
+
     func testExistingInstalledFileSurvivesFailedAtomicReplacement() async throws {
         let manifest = try Self.fixtureManifest()
         let model = try XCTUnwrap(manifest.models.first)
@@ -636,7 +980,13 @@ final class ModelInstallerTests: XCTestCase {
                 provenance: model.provenance,
                 runtimeParameters: model.runtimeParameters,
                 hallucinationThresholds: model.hallucinationThresholds,
-                minAppVersion: minimumAppVersion ?? model.minAppVersion
+                minAppVersion: minimumAppVersion ?? model.minAppVersion,
+                runtime: model.runtime,
+                capabilities: model.capabilities,
+                presentation: model.presentation,
+                purpose: model.purpose,
+                installationStorage: model.installationStorage,
+                benchmark: model.benchmark
             )
         }
         return ModelManifest(
@@ -682,7 +1032,14 @@ final class ModelInstallerTests: XCTestCase {
                 languages: ["en", "es", "de", "fr"],
                 supportsTranslation: false,
                 supportsCustomVocabulary: false
-            )
+            ),
+            presentation: nil,
+            purpose: .transcription,
+            installationStorage: ModelInstallationStorage(
+                finalArtifactBytes: sizeBytes,
+                peakInstallationBytes: sizeBytes
+            ),
+            benchmark: nil
         )
         return ModelManifest(
             manifestVersion: 1,
@@ -749,10 +1106,139 @@ private final class FixtureFileDownloadTransport: DownloadTransport {
         try response.data.write(to: temporaryURL)
         return DownloadFileResponse(fileURL: temporaryURL)
     }
+
+    func downloadFile(
+        _ request: URLRequest,
+        to temporaryURL: URL,
+        maximumBytes: Int64,
+        admissionCheck: @escaping @Sendable (
+            DownloadFileProgress
+        ) throws -> Void,
+        progress: @escaping @Sendable (DownloadFileProgress) -> Void
+    ) async throws -> DownloadFileResponse {
+        downloadFileCallCount += 1
+        let response = try await fetch(request)
+        try response.data.write(to: temporaryURL)
+        for event in progressEvents {
+            try admissionCheck(event)
+            progress(event)
+        }
+        let finalEvent = DownloadFileProgress(
+            bytesDownloaded: Int64(response.data.count),
+            totalBytes: Int64(response.data.count)
+        )
+        if progressEvents.last != finalEvent {
+            try admissionCheck(finalEvent)
+        }
+        return DownloadFileResponse(fileURL: temporaryURL)
+    }
 }
 
 private enum FixtureFileDownloadTransportError: Error {
     case missingResponse
+}
+
+private final class CapacitySequence: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [Int64]
+    private(set) var callCount = 0
+
+    init(_ values: [Int64]) {
+        self.values = values
+    }
+
+    func next() -> Int64 {
+        lock.withLock {
+            callCount += 1
+            return values.isEmpty ? 0 : values.removeFirst()
+        }
+    }
+}
+
+private final class AdmissionCheckingDownloadTransport: DownloadTransport {
+    private let data: Data
+    private let expectedSHA256: String
+    private(set) var admissionCheckCount = 0
+
+    init(data: Data, expectedSHA256: String) {
+        self.data = data
+        self.expectedSHA256 = expectedSHA256
+    }
+
+    func fetch(_ request: URLRequest) async throws -> DownloadResponse {
+        DownloadResponse(data: data)
+    }
+
+    func downloadFile(
+        _ request: URLRequest,
+        to temporaryURL: URL
+    ) async throws -> DownloadFileResponse {
+        try data.write(to: temporaryURL)
+        return DownloadFileResponse(fileURL: temporaryURL)
+    }
+
+    func downloadFile(
+        _ request: URLRequest,
+        to temporaryURL: URL,
+        maximumBytes: Int64,
+        admissionCheck: @escaping @Sendable (
+            DownloadFileProgress
+        ) throws -> Void,
+        progress: @escaping @Sendable (DownloadFileProgress) -> Void
+    ) async throws -> DownloadFileResponse {
+        let partialData = data.prefix(max(1, data.count / 2))
+        try Data(partialData).write(to: temporaryURL)
+        let event = DownloadFileProgress(
+            bytesDownloaded: Int64(partialData.count),
+            totalBytes: Int64(data.count)
+        )
+        admissionCheckCount += 1
+        do {
+            try admissionCheck(event)
+        } catch {
+            let metadata = DownloadResumeMetadata(
+                modelID: ProductionModelPolicy.requiredModelID,
+                url: request.url?.absoluteString ?? "",
+                expectedSize: maximumBytes,
+                sha256: expectedSHA256,
+                eTag: "\"fixture\"",
+                lastModified: nil,
+                bytesDownloaded: Int64(partialData.count)
+            )
+            let metadataURL = temporaryURL.appendingPathExtension(
+                "resume.json"
+            )
+            try JSONEncoder().encode(metadata).write(to: metadataURL)
+            throw error
+        }
+        progress(event)
+        return DownloadFileResponse(fileURL: temporaryURL)
+    }
+}
+
+private struct OutOfSpaceDownloadTransport: DownloadTransport {
+    func fetch(_ request: URLRequest) async throws -> DownloadResponse {
+        throw POSIXError(.ENOSPC)
+    }
+
+    func downloadFile(
+        _ request: URLRequest,
+        to temporaryURL: URL
+    ) async throws -> DownloadFileResponse {
+        throw POSIXError(.ENOSPC)
+    }
+
+    func downloadFile(
+        _ request: URLRequest,
+        to temporaryURL: URL,
+        maximumBytes: Int64,
+        admissionCheck: @escaping @Sendable (
+            DownloadFileProgress
+        ) throws -> Void,
+        progress: @escaping @Sendable (DownloadFileProgress) -> Void
+    ) async throws -> DownloadFileResponse {
+        throw POSIXError(.ENOSPC)
+    }
 }
 
 private struct CancellationDownloadTransport: DownloadTransport {
@@ -763,6 +1249,18 @@ private struct CancellationDownloadTransport: DownloadTransport {
     func downloadFile(
         _ request: URLRequest,
         to temporaryURL: URL
+    ) async throws -> DownloadFileResponse {
+        throw CancellationError()
+    }
+
+    func downloadFile(
+        _ request: URLRequest,
+        to temporaryURL: URL,
+        maximumBytes: Int64,
+        admissionCheck: @escaping @Sendable (
+            DownloadFileProgress
+        ) throws -> Void,
+        progress: @escaping @Sendable (DownloadFileProgress) -> Void
     ) async throws -> DownloadFileResponse {
         throw CancellationError()
     }

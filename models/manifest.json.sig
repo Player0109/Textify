@@ -1,10 +1,10 @@
 {
   "algorithm" : "Ed25519",
-  "contentSHA256" : "df5b690bfdfbc8098097858fcc7d72d27dd60931ade875807c2ee373398ba620",
+  "contentSHA256" : "aafc52f5acb0bd1fac22c81bb05223422f949378dae4c12589fd0c158360c8e0",
   "contentType" : "application\/vnd.textify.model-manifest+json;version=3",
   "keyId" : "textify-model-manifest-2026-huggingface",
   "manifestFile" : "manifest.json",
-  "signature" : "gQ47cj0qDUkCcVYM2tzxO4_-LkeZDoTpCNr_7Yuwy1ie0rBjtHwzMNwn7B_fD0x0eiDbt7IclAtOy2TKzda4Ag",
+  "signature" : "UxkXm5XjrtGCNqTxXZmrOlbgbClZYKHT59giK1Qd6EYHycKjRjUTQeHAtt4c2uB8smR3D-owhn1mbvC13iWgDQ",
   "signatureType" : "io.github.Player0109.Textify.model-manifest",
   "signatureVersion" : 1
 }

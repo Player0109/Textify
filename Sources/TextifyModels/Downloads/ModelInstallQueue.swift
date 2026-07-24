@@ -431,57 +431,25 @@ public struct ModelInstallResumableDataInspector: @unchecked Sendable {
     }
 
     public func inspect(
-        for attempt: ModelInstallQueueAttempt
+        for attempt: ModelInstallQueueAttempt,
+        expectedFiles: [ModelFile]
     ) throws -> ModelInstallResumableData? {
-        guard fileManager.fileExists(atPath: layout.downloadsDirectory.path) else {
-            return nil
-        }
-        let metadataURLs = try fileManager.contentsOfDirectory(
-            at: layout.downloadsDirectory,
-            includingPropertiesForKeys: [
-                .isRegularFileKey,
-                .isSymbolicLinkKey,
-                .fileSizeKey,
-            ],
-            options: [.skipsHiddenFiles]
-        ).filter {
-            $0.lastPathComponent.hasSuffix(".resume.json")
-        }
-
-        var validatedBytes: Int64 = 0
-        var fileCount = 0
-        for metadataURL in metadataURLs {
-            guard let partialURL = ModelDownloadStorageValidation
-                .validatedPartialURL(
-                    for: metadataURL,
-                    expectedModelID: attempt.artifactID,
-                    fileManager: fileManager
-                ),
-            let fileSize = try? partialURL.resourceValues(
-                forKeys: [.fileSizeKey]
-            ).fileSize
-            else {
-                continue
-            }
-
-            let addition = validatedBytes.addingReportingOverflow(
-                Int64(fileSize)
-            )
-            guard !addition.overflow else {
-                continue
-            }
-            validatedBytes = addition.partialValue
-            fileCount += 1
-        }
-
-        guard validatedBytes > 0, fileCount > 0 else {
+        let reusable = try ModelReusableStorageInspector.inspect(
+            layout: layout,
+            modelID: attempt.artifactID,
+            expectedFiles: expectedFiles,
+            fileManager: fileManager
+        )
+        guard reusable.storage.creditBytes > 0,
+              reusable.fileCount > 0
+        else {
             return nil
         }
         return ModelInstallResumableData(
             sourceAttemptID: attempt.id,
             associatedAttemptID: attempt.id,
-            validatedBytes: validatedBytes,
-            fileCount: fileCount
+            validatedBytes: reusable.storage.creditBytes,
+            fileCount: reusable.fileCount
         )
     }
 
