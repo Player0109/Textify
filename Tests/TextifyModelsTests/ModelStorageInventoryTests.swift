@@ -49,6 +49,45 @@ final class ModelStorageInventoryTests: XCTestCase {
         XCTAssertEqual(snapshot.summary.installedArtifactCount, 1)
     }
 
+    func testPendingRemovalBytesRemainAttributedAcrossRelaunch() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let record = try fixture.installModel(id: "pending-removal")
+        let installedRoot = try fixture.layout.installedModelDirectory(
+            modelID: record.storageModelID
+        )
+        let pendingRoot = try fixture.layout.pendingRemovalDirectory(
+            modelID: record.storageModelID
+        )
+        try FileManager.default.createDirectory(
+            at: fixture.layout.downloadsDirectory,
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.moveItem(
+            at: installedRoot,
+            to: pendingRoot
+        )
+
+        let relaunchedScanner = ModelStorageInventoryScanner(
+            layout: fixture.layout,
+            availableCapacity: { _ in 123_456_789 }
+        )
+        let snapshot = try await relaunchedScanner.scan(
+            installedRecords: [record]
+        )
+        let artifact = try XCTUnwrap(
+            snapshot.artifact(for: record.model.id)
+        )
+
+        XCTAssertEqual(artifact.condition, .needsRepair)
+        XCTAssertGreaterThan(try XCTUnwrap(artifact.onDiskBytes), 0)
+        XCTAssertEqual(snapshot.summary.otherModelDataBytes, 0)
+        XCTAssertEqual(
+            snapshot.summary.installedModelStorageBytes,
+            artifact.onDiskBytes
+        )
+    }
+
     func testCanonicalizedArtifactInventoriesOriginalStorageAndRetainsMissingReceipt() async throws {
         let fixture = try Fixture()
         defer { fixture.remove() }

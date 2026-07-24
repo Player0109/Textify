@@ -531,7 +531,7 @@ extension TranscriptionLanguage {
     }
 }
 
-private struct ModelsSettingsPane: View {
+struct ModelsSettingsPane: View {
     @Environment(AppServices.self) private var services
     let destination: ModelCatalogPurposeDestination
 
@@ -540,7 +540,8 @@ private struct ModelsSettingsPane: View {
     @State private var pendingImportURL: URL?
     @State private var showsImportConfirmation = false
     @State private var isImporting = false
-    @State private var pendingRemovalModel: ProductionModelPresentation?
+    @State private var pendingRemoval:
+        ModelRemovalConfirmationPresentation?
     @State private var discoveryQuery = ModelCatalogQuery()
     @State private var hierarchyState = ModelCatalogHierarchyState()
     @State private var inspectorController = ModelCatalogInspectorController()
@@ -550,6 +551,10 @@ private struct ModelsSettingsPane: View {
     @State private var showsModelVariantsHelp = false
     @State private var showsDownloads = false
     @FocusState private var focusedCatalogRowID: ModelCatalogHierarchyRowID?
+
+    init(destination: ModelCatalogPurposeDestination) {
+        self.destination = destination
+    }
 
     var body: some View {
         let catalogExperience = services.modelCatalogExperience(
@@ -578,7 +583,16 @@ private struct ModelsSettingsPane: View {
                 .foregroundStyle(.orange)
             }
 
-            if let modelMessage {
+            if let removalStatus = services.modelRemovalStatus {
+                Label(
+                    removalStatus.phase == .finishingCurrentDictation
+                        ? "Finishing Current Dictation before removing this Exact Artifact."
+                        : "Removing the selected Exact Artifact…",
+                    systemImage: "hourglass"
+                )
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            } else if let modelMessage {
                 Text(modelMessage)
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -695,6 +709,13 @@ private struct ModelsSettingsPane: View {
                 break
             }
         }
+        .onKeyPress(.delete, phases: .down) { keyPress in
+            guard keyPress.modifiers.contains(.command) else {
+                return .ignored
+            }
+            beginSelectedRemoval(in: catalogExperience)
+            return .handled
+        }
         .alert("Import local Whisper model?", isPresented: $showsImportConfirmation) {
             Button("Cancel", role: .cancel) {
                 pendingImportURL = nil
@@ -706,29 +727,32 @@ private struct ModelsSettingsPane: View {
             Text("Textify validates the file and loads it locally with Whisper.cpp. Only continue if you trust the file and its license permits your use. Textify cannot verify third-party model licenses.")
         }
         .alert(
-            "Delete installed model?",
+            pendingRemoval.map {
+                "Delete \($0.exactArtifactName)?"
+            } ?? "Delete Exact Artifact?",
             isPresented: Binding(
-                get: { pendingRemovalModel != nil },
-                set: { if !$0 { pendingRemovalModel = nil } }
+                get: { pendingRemoval != nil },
+                set: { if !$0 { pendingRemoval = nil } }
             ),
-            presenting: pendingRemovalModel
-        ) { model in
+            presenting: pendingRemoval
+        ) { confirmation in
             Button("Cancel", role: .cancel) {
-                pendingRemovalModel = nil
+                resolveRemoval(
+                    confirmation,
+                    confirmed: false
+                )
             }
-            Button("Delete", role: .destructive) {
-                pendingRemovalModel = nil
-                Task {
-                    do {
-                        try await services.removeInstalledModel(model.id)
-                        modelMessage = "\(model.displayName) was deleted."
-                    } catch {
-                        modelMessage = error.localizedDescription
-                    }
-                }
+            Button(
+                confirmation.destructiveActionTitle,
+                role: .destructive
+            ) {
+                resolveRemoval(
+                    confirmation,
+                    confirmed: true
+                )
             }
-        } message: { model in
-            Text("This removes \(model.displayName) from this Mac. You can download it again later.")
+        } message: { confirmation in
+            Text(confirmation.message)
         }
     }
 
@@ -1129,8 +1153,11 @@ private struct ModelsSettingsPane: View {
             services.modelInstallCoordinator.retry(attemptID: attemptID)
         }
         let onDelete: () -> Void = {
-            pendingRemovalModel = row.model
+            beginSelectedRemoval()
         }
+        let visibleActions = row.visibleActions(
+            for: hierarchyState.selection
+        )
 
         if let context, let comparison = context.comparison {
             ModelCatalogVariantComparisonRow(
@@ -1142,7 +1169,7 @@ private struct ModelsSettingsPane: View {
                     || isImporting
                     || !services.dictation.allowsModelTransactions,
                 install: row.install,
-                actions: row.actions,
+                actions: visibleActions,
                 onSelect: context.onSelect,
                 onUse: onUse,
                 onDisable: onDisable,
@@ -1167,7 +1194,7 @@ private struct ModelsSettingsPane: View {
                     || isImporting
                     || !services.dictation.allowsModelTransactions,
                 install: row.install,
-                actions: row.actions,
+                actions: visibleActions,
                 onUse: onUse,
                 onDisable: onDisable,
                 onInstall: onInstall,
@@ -1176,6 +1203,41 @@ private struct ModelsSettingsPane: View {
                 onDelete: onDelete,
                 onInspect: onInspect
             )
+        }
+    }
+
+    private func beginSelectedRemoval(
+        in experience: ModelCatalogExperience? = nil
+    ) {
+        let experience = experience ?? services.modelCatalogExperience(
+            for: destination.purpose,
+            query: catalogQuery
+        )
+        pendingRemoval = experience.removalConfirmation(
+            for: hierarchyState.selection
+        )
+    }
+
+    func resolveRemoval(
+        _ confirmation: ModelRemovalConfirmationPresentation,
+        confirmed: Bool
+    ) {
+        pendingRemoval = nil
+        guard confirmed else {
+            return
+        }
+        Task {
+            do {
+                try await services.removeInstalledModel(
+                    confirmation.artifactID,
+                    activeResolution:
+                        confirmation.activeResolution
+                )
+                modelMessage =
+                    "\(confirmation.exactArtifactName) was deleted."
+            } catch {
+                modelMessage = error.localizedDescription
+            }
         }
     }
 

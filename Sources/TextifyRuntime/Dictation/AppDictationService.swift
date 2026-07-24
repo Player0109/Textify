@@ -15,7 +15,11 @@ public final class AppDictationService {
     public private(set) var status: DictationRuntimeStatus
     public private(set) var readiness: ReadinessSnapshot
     public private(set) var voiceCleaningStatus: VoiceCleaningRuntimeStatus
-    public private(set) var currentSegment: RuntimeCurrentSegment?
+    public private(set) var currentSegment: RuntimeCurrentSegment? {
+        didSet {
+            resumeCurrentSegmentWaiters()
+        }
+    }
 
     private let dependencies: RuntimeDependencies
     private var triggerStateMachine: TriggerStateMachine
@@ -34,8 +38,13 @@ public final class AppDictationService {
     private var insertionSessionID: UUID?
     private var revokedArtifactIDs: Set<String> = []
     private var modelTransactionInProgress = false
+    private var pendingPurposeRuntimeTransactions = 0
+    private var purposeRuntimeBoundaryReserved = false
+    private var purposeRuntimeBoundaryWaiters:
+        [CheckedContinuation<Void, Never>] = []
     private var modelTransactionWaiters:
         [CheckedContinuation<Void, Never>] = []
+    private var currentSegmentWaiters: [CurrentSegmentWaiter] = []
 
     public init(
         dependencies: RuntimeDependencies,
@@ -61,13 +70,46 @@ public final class AppDictationService {
     }
 
     public var allowsModelTransactions: Bool {
-        if modelTransactionInProgress {
+        if modelTransactionInProgress
+            || pendingPurposeRuntimeTransactions > 0 {
             return false
         }
         if case .processing = status {
             return false
         }
         return true
+    }
+
+    public func performPurposeRuntimeTransaction<Result>(
+        waitingForCurrentSegmentUsing artifactID: String? = nil,
+        waitingForCurrentSegmentIn purpose: ModelPurpose? = nil,
+        _ operation: @MainActor () async throws -> Result
+    ) async rethrows -> Result {
+        pendingPurposeRuntimeTransactions += 1
+        await reservePurposeRuntimeBoundary()
+        defer {
+            pendingPurposeRuntimeTransactions -= 1
+            releasePurposeRuntimeBoundary()
+        }
+        let ownedArtifactID: String? = if let artifactID {
+            artifactID
+        } else {
+            switch purpose {
+            case .transcription:
+                currentSegment?.transcriptionArtifactID
+            case .voiceCleaning:
+                currentSegment?.voiceCleaningArtifactID
+            case nil:
+                nil
+            }
+        }
+        if let ownedArtifactID {
+            await waitForCurrentSegmentToRelease(ownedArtifactID)
+        }
+        await waitForModelTransaction()
+        modelTransactionInProgress = true
+        defer { finishModelTransaction() }
+        return try await operation()
     }
 
     @discardableResult
@@ -92,8 +134,17 @@ public final class AppDictationService {
         guard allowsModelTransactions else {
             return readiness
         }
-        modelTransactionInProgress = true
-        defer { finishModelTransaction() }
+        return await performPurposeRuntimeTransaction {
+            await self.prepareActiveModelAtPurposeRuntimeBoundary()
+        }
+    }
+
+    @discardableResult
+    public func prepareActiveModelAtPurposeRuntimeBoundary()
+        async -> ReadinessSnapshot {
+        guard modelTransactionInProgress else {
+            return readiness
+        }
         let preferences = await dependencies.settings.loadPreferences()
         let activeModel = await dependencies.models.resolveActiveModel(preferences: preferences)
         let installedReadiness = await dependencies.models.readiness(for: activeModel)
@@ -148,8 +199,23 @@ public final class AppDictationService {
         guard allowsModelTransactions else {
             return .busy(modelID: modelID)
         }
-        modelTransactionInProgress = true
-        defer { finishModelTransaction() }
+        return await performPurposeRuntimeTransaction {
+            await self.prepareModelSelectionAtPurposeRuntimeBoundary(
+                modelID: modelID,
+                purpose: purpose,
+                preferences: preferences
+            )
+        }
+    }
+
+    public func prepareModelSelectionAtPurposeRuntimeBoundary(
+        modelID: String,
+        purpose: ModelPurpose,
+        preferences: AppPreferences
+    ) async -> RuntimeModelPreparationResult {
+        guard modelTransactionInProgress else {
+            return .busy(modelID: modelID)
+        }
         guard let model = await resolvedModelSelection(
             purpose: purpose,
             preferences: preferences
@@ -192,6 +258,44 @@ public final class AppDictationService {
             return .ready(modelID: modelID)
         } catch {
             return .failed(modelID: modelID)
+        }
+    }
+
+    public func releaseArtifactForRemovalAtPurposeRuntimeBoundary(
+        artifactID: String,
+        purpose: ModelPurpose,
+        wasPurposeActive: Bool
+    ) async {
+        guard modelTransactionInProgress,
+              currentSegment?.owns(artifactID: artifactID) != true
+        else {
+            return
+        }
+        switch purpose {
+        case .transcription:
+            let readiness = await dependencies.transcriber.readiness
+            let loadedArtifactMatches: Bool
+            if case let .ready(modelID) = readiness {
+                loadedArtifactMatches = modelID == artifactID
+            } else {
+                loadedArtifactMatches = false
+            }
+            if wasPurposeActive || loadedArtifactMatches {
+                await dependencies.transcriber.unload()
+            }
+        case .voiceCleaning:
+            let loadedModelID: String? = switch voiceCleaningStatus {
+            case let .preparing(modelID),
+                 let .ready(modelID),
+                 let .warning(modelID, _):
+                modelID
+            case .disabled:
+                nil
+            }
+            if wasPurposeActive || loadedModelID == artifactID {
+                await dependencies.voiceCleaner.unload()
+                voiceCleaningStatus = .disabled
+            }
         }
     }
 
@@ -400,7 +504,9 @@ public final class AppDictationService {
     }
 
     private func beginRecording() async {
-        guard !hasActiveDictationWork else {
+        guard pendingPurposeRuntimeTransactions == 0,
+              !modelTransactionInProgress,
+              !hasActiveDictationWork else {
             return
         }
 
@@ -886,7 +992,11 @@ public final class AppDictationService {
     }
 
     private var canStartActivation: Bool {
-        targetCaptureToken == nil && !hasActiveDictationWork && status != .waitingForActivation
+        targetCaptureToken == nil
+            && !modelTransactionInProgress
+            && pendingPurposeRuntimeTransactions == 0
+            && !hasActiveDictationWork
+            && status != .waitingForActivation
     }
 
     private func captureTargetAtKeyDown() async -> Bool {
@@ -954,11 +1064,60 @@ public final class AppDictationService {
         }
     }
 
+    private func reservePurposeRuntimeBoundary() async {
+        guard purposeRuntimeBoundaryReserved else {
+            purposeRuntimeBoundaryReserved = true
+            return
+        }
+        await withCheckedContinuation { continuation in
+            purposeRuntimeBoundaryWaiters.append(continuation)
+        }
+    }
+
+    private func releasePurposeRuntimeBoundary() {
+        guard !purposeRuntimeBoundaryWaiters.isEmpty else {
+            purposeRuntimeBoundaryReserved = false
+            return
+        }
+        let next = purposeRuntimeBoundaryWaiters.removeFirst()
+        next.resume()
+    }
+
     private func finishModelTransaction() {
         modelTransactionInProgress = false
         let waiters = modelTransactionWaiters
         modelTransactionWaiters.removeAll()
         waiters.forEach { $0.resume() }
+    }
+
+    private func waitForCurrentSegmentToRelease(
+        _ artifactID: String
+    ) async {
+        while currentSegment?.owns(artifactID: artifactID) == true {
+            await withCheckedContinuation { continuation in
+                currentSegmentWaiters.append(
+                    CurrentSegmentWaiter(
+                        artifactID: artifactID,
+                        continuation: continuation
+                    )
+                )
+            }
+        }
+    }
+
+    private func resumeCurrentSegmentWaiters() {
+        guard !currentSegmentWaiters.isEmpty else {
+            return
+        }
+        var retained: [CurrentSegmentWaiter] = []
+        for waiter in currentSegmentWaiters {
+            if currentSegment?.owns(artifactID: waiter.artifactID) == true {
+                retained.append(waiter)
+            } else {
+                waiter.continuation.resume()
+            }
+        }
+        currentSegmentWaiters = retained
     }
 
     private func effectiveModelReadiness(
@@ -1087,4 +1246,9 @@ public final class AppDictationService {
             return .failed(.audioFinishFailed)
         }
     }
+}
+
+private struct CurrentSegmentWaiter {
+    let artifactID: String
+    let continuation: CheckedContinuation<Void, Never>
 }

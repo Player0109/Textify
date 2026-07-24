@@ -48,9 +48,10 @@ release-blocking.
 - [ ] 28. Switching among Whisper, Parakeet, and any published Specialist model
   unloads the previous backend, warms the new one, and never inserts a result
   from an old in-flight session.
-- [ ] 29. A failed model switch restores the previously active working model;
-  deleting an inactive model removes it, while deleting the active model is
-  refused until another model is selected.
+- [ ] 29. A failed model switch restores the previously active working model
+  and leaves it protected from inactive deletion. Deleting the selected active
+  Exact Artifact names the purpose consequence and requires an explicit
+  Disable Dictation or Disable Voice Cleaning confirmation.
 - [ ] 30. Accelerator verification fails closed when Metal or Neural Engine
   execution is unavailable; Textify never silently accepts a CPU fallback.
 - [ ] 31. Install MossFormer2 SE FP16; it becomes the active voice cleaner
@@ -70,6 +71,21 @@ release-blocking.
 - [ ] 36. Accept an exact higher-revision signed restoration; the old selection
   does not reactivate, Use/Enable remains unavailable until Verify Integrity
   succeeds, and the verification acknowledgment survives relaunch.
+- [ ] 37. Select one installed Exact Artifact and verify its row Delete action
+  and Command-Delete show the same Exact Artifact, Checkpoint, measured local
+  size, and active consequence. Delete stays unavailable while size
+  measurement is pending. Cancel makes no change; selecting a multi-variant
+  Checkpoint offers no deletion.
+- [ ] 38. Start deleting the Exact Artifact owned by Current Segment. Settings
+  shows Finishing Current Dictation, the admitted segment completes, and no new
+  segment starts before deletion finishes. Inject rename, permission, and
+  partial-removal failures; no success is shown, the Installation Receipt and
+  remaining managed bytes stay attributable, and Retry after relaunch
+  completes deletion.
+- [ ] 39. Make preference persistence fail while switching models and while
+  confirming Disable Purpose and Delete. The previous active identity remains
+  selected after switch failure; deletion stops before filesystem mutation,
+  and relaunch never restores an active identity whose bytes were removed.
 
 ## Supporting Commands
 

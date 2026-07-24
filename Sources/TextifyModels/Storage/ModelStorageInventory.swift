@@ -129,17 +129,27 @@ public struct ModelStorageInventoryScanner: @unchecked Sendable {
         let nodesByPath = Dictionary(uniqueKeysWithValues: nodes.map {
             ($0.url.standardizedFileURL.path, $0)
         })
-        let artifactRoots = installedRecords.compactMap {
-            record -> ArtifactRoot? in
-            guard let url = try? layout.installedModelDirectory(
-                modelID: record.storageModelID
-            ) else {
-                return nil
+        let artifactRoots = installedRecords.flatMap {
+            record -> [ArtifactRoot] in
+            guard let installedURL =
+                try? layout.installedModelDirectory(
+                    modelID: record.storageModelID
+                )
+            else {
+                return []
             }
-            return ArtifactRoot(
-                artifactID: record.model.id,
-                url: url.standardizedFileURL
-            )
+            let storageURLs = [installedURL]
+                + [
+                    try? layout.pendingRemovalDirectory(
+                        modelID: record.storageModelID
+                    ),
+                ].compactMap { $0 }
+            return storageURLs.map {
+                ArtifactRoot(
+                    artifactID: record.model.id,
+                    url: $0.standardizedFileURL
+                )
+            }
         }
         let validPartialPaths = validPartialPaths()
         let ownedNodes = nodes.map {

@@ -701,6 +701,98 @@ final class AppCompositionTests: XCTestCase {
     }
 
     @MainActor
+    func testActivationWaitsForTheCurrentSegmentBoundary() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let previous = try Self.catalogModel(
+            id: ProductionModelPolicy.requiredModelID
+        )
+        let candidate = try Self.catalogModel(id: "whisper-large-v2-q5_0")
+        try Self.writeInstalledStore(
+            models: [previous, candidate],
+            to: paths
+        )
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = previous.id
+        let transcriber = ActivationTranscriberSpy()
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths,
+            models: CandidateRuntimeModelResolver(models: [
+                Self.runtimeModel(previous),
+                Self.runtimeModel(candidate),
+            ]),
+            transcriber: transcriber
+        )
+
+        await services.dictation.handleTriggerAction(.beginRecording)
+        let activation = Task { @MainActor in
+            await services.activateInstalledModel(candidate.id)
+        }
+        for _ in 0..<100
+        where services.dictation.allowsModelTransactions {
+            await Task.yield()
+        }
+
+        XCTAssertFalse(services.dictation.allowsModelTransactions)
+        XCTAssertEqual(services.preferences.activeModelID, previous.id)
+        let preparedBeforeBoundary =
+            await transcriber.preparedModelIDs()
+        XCTAssertTrue(preparedBeforeBoundary.isEmpty)
+
+        await services.dictation.handleTriggerAction(.finishRecording)
+        let result = await activation.value
+
+        XCTAssertEqual(result, .activated)
+        XCTAssertEqual(services.preferences.activeModelID, candidate.id)
+    }
+
+    @MainActor
+    func testFailedActivationPreferenceWriteRestoresPreviousIdentity() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let previous = try Self.catalogModel(
+            id: ProductionModelPolicy.requiredModelID
+        )
+        let candidate = try Self.catalogModel(id: "whisper-large-v2-q5_0")
+        try Self.writeInstalledStore(
+            models: [previous, candidate],
+            to: paths
+        )
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = previous.id
+        SettingsStore(storage: .file(paths.settingsFileURL))
+            .save(preferences)
+        let transcriber = ActivationTranscriberSpy()
+        let services = try Self.makeServices(
+            preferences: nil,
+            paths: paths,
+            settingsStore: SettingsStore(
+                storage: .file(paths.settingsFileURL),
+                fileManager: FailingSettingsSaveFileManager()
+            ),
+            models: CandidateRuntimeModelResolver(models: [
+                Self.runtimeModel(previous),
+                Self.runtimeModel(candidate),
+            ]),
+            transcriber: transcriber
+        )
+
+        let result = await services.activateInstalledModel(candidate.id)
+
+        XCTAssertEqual(result, .persistenceFailed)
+        XCTAssertEqual(services.preferences.activeModelID, previous.id)
+        XCTAssertEqual(
+            SettingsStore(storage: .file(paths.settingsFileURL))
+                .load().activeModelID,
+            previous.id
+        )
+        let preparedModelIDs = await transcriber.preparedModelIDs()
+        XCTAssertEqual(
+            preparedModelIDs,
+            [candidate.id, previous.id]
+        )
+    }
+
+    @MainActor
     func testFailedUseKeepsPersistedIdentityAndRestoresPreviousRuntime() async throws {
         let paths = try Self.makeTemporaryPaths()
         let previous = try Self.catalogModel(id: ProductionModelPolicy.requiredModelID)
@@ -730,6 +822,374 @@ final class AppCompositionTests: XCTestCase {
         XCTAssertEqual(services.preferences.activeModelID, previous.id)
         XCTAssertEqual(services.settingsStore.load().activeModelID, previous.id)
         XCTAssertEqual(preparedModelIDs, [candidate.id, previous.id])
+    }
+
+    @MainActor
+    func testInactiveExactArtifactDeletionRemovesBytesBeforeReceipt() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let model = try Self.catalogModel(
+            id: ProductionModelPolicy.requiredModelID
+        )
+        let installedDirectory = try Self.writeInstalledArtifact(
+            model,
+            to: paths
+        )
+        let services = try Self.makeServices(
+            paths: paths,
+            models: CandidateRuntimeModelResolver(
+                models: [Self.runtimeModel(model)]
+            )
+        )
+
+        try await services.removeInstalledModel(
+            model.id,
+            activeResolution: .requireInactive
+        )
+
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: installedDirectory.path)
+        )
+        XCTAssertFalse(services.isModelInstalled(model.id))
+        let persisted = try JSONDecoder().decode(
+            InstalledModelsStore.self,
+            from: Data(
+                contentsOf: ModelStorageLayout(
+                    rootDirectory: paths.modelsDirectory
+                ).installedStoreURL
+            )
+        )
+        XCTAssertNil(persisted.record(forModelID: model.id))
+    }
+
+    @MainActor
+    func testActiveExactArtifactDeletionRequiresExplicitPurposeResolution() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let model = try Self.catalogModel(
+            id: ProductionModelPolicy.requiredModelID
+        )
+        let installedDirectory = try Self.writeInstalledArtifact(
+            model,
+            to: paths
+        )
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = model.id
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths,
+            models: CandidateRuntimeModelResolver(
+                models: [Self.runtimeModel(model)]
+            )
+        )
+
+        do {
+            try await services.removeInstalledModel(
+                model.id,
+                activeResolution: .requireInactive
+            )
+            XCTFail("An active Exact Artifact needs an explicit user choice.")
+        } catch {
+            XCTAssertEqual(
+                error as? AppModelRemovalError,
+                .activePurposeResolutionRequired(.transcription)
+            )
+        }
+
+        XCTAssertEqual(services.preferences.activeModelID, model.id)
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: installedDirectory.path)
+        )
+        XCTAssertTrue(services.isModelInstalled(model.id))
+    }
+
+    @MainActor
+    func testCancelledRemovalConfirmationMutatesNothing() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let model = try Self.catalogModel(
+            id: ProductionModelPolicy.requiredModelID
+        )
+        let installedDirectory = try Self.writeInstalledArtifact(
+            model,
+            to: paths
+        )
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = model.id
+        let transcriber = ActivationTranscriberSpy()
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths,
+            models: CandidateRuntimeModelResolver(
+                models: [Self.runtimeModel(model)]
+            ),
+            transcriber: transcriber
+        )
+        let confirmation = try XCTUnwrap(
+            services.modelCatalogExperience(
+                for: .transcription,
+                onDiskBytesByModelID: [model.id: 4_096]
+            ).removalConfirmation(
+                for: .exactArtifact(model.id)
+            )
+        )
+
+        ModelsSettingsPane(destination: .transcription)
+            .resolveRemoval(confirmation, confirmed: false)
+
+        XCTAssertEqual(services.preferences.activeModelID, model.id)
+        XCTAssertEqual(
+            services.settingsStore.load().activeModelID,
+            model.id
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: installedDirectory.path)
+        )
+        XCTAssertTrue(services.isModelInstalled(model.id))
+        let unloadCount = await transcriber.unloadCount()
+        XCTAssertEqual(unloadCount, 0)
+        XCTAssertNil(services.modelRemovalStatus)
+    }
+
+    @MainActor
+    func testActiveDeletionStopsWhenPurposeDisableCannotPersist() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let model = try Self.catalogModel(
+            id: ProductionModelPolicy.requiredModelID
+        )
+        let installedDirectory = try Self.writeInstalledArtifact(
+            model,
+            to: paths
+        )
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = model.id
+        SettingsStore(storage: .file(paths.settingsFileURL))
+            .save(preferences)
+        let services = try Self.makeServices(
+            preferences: nil,
+            paths: paths,
+            settingsStore: SettingsStore(
+                storage: .file(paths.settingsFileURL),
+                fileManager: FailingSettingsSaveFileManager()
+            ),
+            models: CandidateRuntimeModelResolver(
+                models: [Self.runtimeModel(model)]
+            )
+        )
+
+        do {
+            try await services.removeInstalledModel(
+                model.id,
+                activeResolution: .disablePurpose
+            )
+            XCTFail("Deletion must stop if purpose disablement is not durable.")
+        } catch {
+            XCTAssertEqual(
+                error as? AppModelRemovalError,
+                .purposeDisablePersistenceFailed(.transcription)
+            )
+        }
+
+        XCTAssertEqual(services.preferences.activeModelID, model.id)
+        XCTAssertEqual(
+            SettingsStore(storage: .file(paths.settingsFileURL))
+                .load().activeModelID,
+            model.id
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: installedDirectory.path)
+        )
+        XCTAssertTrue(services.isModelInstalled(model.id))
+    }
+
+    @MainActor
+    func testActiveDeletionWaitsForCurrentSegmentThenDisablesPurpose() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let model = try Self.catalogModel(
+            id: ProductionModelPolicy.requiredModelID
+        )
+        let installedDirectory = try Self.writeInstalledArtifact(
+            model,
+            to: paths
+        )
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = model.id
+        let transcriber = ActivationTranscriberSpy()
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths,
+            models: CandidateRuntimeModelResolver(
+                models: [Self.runtimeModel(model)]
+            ),
+            transcriber: transcriber
+        )
+
+        await services.dictation.handleTriggerAction(.beginRecording)
+        let removal = Task { @MainActor in
+            try await services.removeInstalledModel(
+                model.id,
+                activeResolution: .disablePurpose
+            )
+        }
+        for _ in 0..<100
+        where services.modelRemovalStatus
+            != AppModelRemovalStatus(
+                artifactID: model.id,
+                phase: .finishingCurrentDictation
+            ) {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(
+            services.modelRemovalStatus,
+            AppModelRemovalStatus(
+                artifactID: model.id,
+                phase: .finishingCurrentDictation
+            )
+        )
+        XCTAssertEqual(services.preferences.activeModelID, model.id)
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: installedDirectory.path)
+        )
+
+        await services.dictation.handleTriggerAction(.finishRecording)
+        try await removal.value
+
+        XCTAssertNil(services.modelRemovalStatus)
+        XCTAssertNil(services.preferences.activeModelID)
+        XCTAssertNil(services.settingsStore.load().activeModelID)
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: installedDirectory.path)
+        )
+        let unloadCount = await transcriber.unloadCount()
+        XCTAssertEqual(unloadCount, 1)
+    }
+
+    @MainActor
+    func testActiveCleanerDeletionDisablesOnlyVoiceCleaning() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let transcription = try Self.catalogModel(
+            id: ProductionModelPolicy.requiredModelID
+        )
+        let cleaner = try Self.catalogModel(id: "mossformer2-se-fp16")
+        _ = try Self.writeInstalledArtifacts(
+            [transcription, cleaner],
+            to: paths
+        )
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = transcription.id
+        preferences.activeVoiceCleaningModelID = cleaner.id
+        let voiceCleaner = ActivationVoiceCleanerSpy()
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths,
+            models: CandidateRuntimeModelResolver(models: [
+                Self.runtimeModel(transcription),
+                Self.runtimeModel(cleaner),
+            ]),
+            voiceCleaner: voiceCleaner
+        )
+
+        try await services.removeInstalledModel(
+            cleaner.id,
+            activeResolution: .disablePurpose
+        )
+
+        XCTAssertEqual(services.preferences.activeModelID, transcription.id)
+        XCTAssertNil(services.preferences.activeVoiceCleaningModelID)
+        XCTAssertFalse(services.isModelInstalled(cleaner.id))
+        let unloadCount = await voiceCleaner.unloadCount()
+        XCTAssertEqual(unloadCount, 1)
+    }
+
+    @MainActor
+    func testRevokedInstalledExactArtifactRemainsExplicitlyDeletable() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let model = try Self.catalogModel(
+            id: ProductionModelPolicy.requiredModelID
+        )
+        let installedDirectory = try Self.writeInstalledArtifact(
+            model,
+            to: paths
+        )
+        let manifest = ModelManifest(
+            manifestVersion: 1,
+            generatedAt: "2026-07-24T00:00:00Z",
+            models: [model]
+        )
+        let services = try Self.makeServices(
+            paths: paths,
+            models: CandidateRuntimeModelResolver(
+                models: [Self.runtimeModel(model)]
+            )
+        )
+        services.modelCatalogCoordinator = ModelCatalogCoordinator(
+            initialManifest: manifest,
+            loadOperation: { manifest },
+            initialRevocationState: try ModelRevocationTestFixture.state(
+                records: [
+                    ModelRevocationRecord(
+                        recordID: "delete-revoked-artifact",
+                        exactArtifactID: model.id
+                    ),
+                ]
+            )
+        )
+
+        try await services.removeInstalledModel(
+            model.id,
+            activeResolution: .requireInactive
+        )
+
+        XCTAssertFalse(services.isModelInstalled(model.id))
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: installedDirectory.path)
+        )
+    }
+
+    @MainActor
+    func testFailedReplacementLeavesActiveArtifactProtectedFromDeletion() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let active = try Self.catalogModel(
+            id: ProductionModelPolicy.requiredModelID
+        )
+        let candidate = try Self.catalogModel(id: "whisper-large-v2-q5_0")
+        let activeDirectory = try Self.writeInstalledArtifacts(
+            [active, candidate],
+            to: paths
+        )[active.id]
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = active.id
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths,
+            models: CandidateRuntimeModelResolver(models: [
+                Self.runtimeModel(active),
+                Self.runtimeModel(candidate),
+            ]),
+            transcriber: ActivationTranscriberSpy(
+                failingModelIDs: [candidate.id]
+            )
+        )
+
+        let activation = await services.activateInstalledModel(candidate.id)
+        XCTAssertEqual(activation, .preparationFailed)
+        do {
+            try await services.removeInstalledModel(
+                active.id,
+                activeResolution: .requireInactive
+            )
+            XCTFail("A failed replacement must keep the active bytes protected.")
+        } catch {
+            XCTAssertEqual(
+                error as? AppModelRemovalError,
+                .activePurposeResolutionRequired(.transcription)
+            )
+        }
+
+        XCTAssertEqual(services.preferences.activeModelID, active.id)
+        XCTAssertTrue(
+            activeDirectory.map {
+                FileManager.default.fileExists(atPath: $0.path)
+            } ?? false
+        )
     }
 
     @MainActor
@@ -1303,6 +1763,52 @@ final class AppCompositionTests: XCTestCase {
                 records: services.installedModelRecords
             ).record(forModelID: cleaner.id)
         )
+    }
+
+    @MainActor
+    func testDisableVoiceCleaningWaitsForTheCurrentSegmentBoundary() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let transcription = try Self.catalogModel(
+            id: ProductionModelPolicy.requiredModelID
+        )
+        let cleaner = try Self.catalogModel(id: "mossformer2-se-fp16")
+        try Self.writeInstalledStore(
+            models: [transcription, cleaner],
+            to: paths
+        )
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = transcription.id
+        preferences.activeVoiceCleaningModelID = cleaner.id
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths,
+            models: CandidateRuntimeModelResolver(models: [
+                Self.runtimeModel(transcription),
+                Self.runtimeModel(cleaner),
+            ]),
+            voiceCleaner: ActivationVoiceCleanerSpy()
+        )
+
+        await services.dictation.handleTriggerAction(.beginRecording)
+        let disablement = Task { @MainActor in
+            await services.disableVoiceCleaning()
+        }
+        for _ in 0..<100
+        where services.dictation.allowsModelTransactions {
+            await Task.yield()
+        }
+
+        XCTAssertFalse(services.dictation.allowsModelTransactions)
+        XCTAssertEqual(
+            services.preferences.activeVoiceCleaningModelID,
+            cleaner.id
+        )
+
+        await services.dictation.handleTriggerAction(.finishRecording)
+        let disabled = await disablement.value
+
+        XCTAssertTrue(disabled)
+        XCTAssertNil(services.preferences.activeVoiceCleaningModelID)
     }
 
     @MainActor
@@ -2111,6 +2617,7 @@ final class AppCompositionTests: XCTestCase {
     private static func makeServices(
         preferences: AppPreferences? = .defaults,
         paths providedPaths: AppPaths? = nil,
+        settingsStore providedSettingsStore: SettingsStore? = nil,
         hotkeyMonitor: GlobalHotkeyMonitor? = nil,
         launchAtLogin: FakeLaunchAtLoginManager? = nil,
         launchAtLoginLocation: any LaunchAtLoginLocationChecking = FixedLaunchAtLoginLocation(isSupported: true),
@@ -2122,7 +2629,8 @@ final class AppCompositionTests: XCTestCase {
         waitBeforeProcessingIndicator: @escaping @Sendable () async -> Void = {}
     ) throws -> AppServices {
         let paths = try providedPaths ?? makeTemporaryPaths()
-        let settingsStore = SettingsStore(storage: .file(paths.settingsFileURL))
+        let settingsStore = providedSettingsStore
+            ?? SettingsStore(storage: .file(paths.settingsFileURL))
         if let preferences {
             settingsStore.save(preferences)
         }
@@ -2185,6 +2693,59 @@ final class AppCompositionTests: XCTestCase {
         try JSONEncoder().encode(
             InstalledModelsStore(records: records)
         ).write(to: storeURL, options: .atomic)
+    }
+
+    @discardableResult
+    private static func writeInstalledArtifact(
+        _ model: ModelEntry,
+        to paths: AppPaths
+    ) throws -> URL {
+        try XCTUnwrap(
+            writeInstalledArtifacts([model], to: paths)[model.id]
+        )
+    }
+
+    private static func writeInstalledArtifacts(
+        _ models: [ModelEntry],
+        to paths: AppPaths
+    ) throws -> [String: URL] {
+        let layout = ModelStorageLayout(
+            rootDirectory: paths.modelsDirectory
+        )
+        var records: [InstalledModelRecord] = []
+        var directories: [String: URL] = [:]
+        for model in models {
+            let directory = try layout.installedModelDirectory(
+                modelID: model.id
+            )
+            try FileManager.default.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true
+            )
+            var localFiles: [String: String] = [:]
+            for file in model.files {
+                let relativePath = file.relativePath ?? file.filename
+                let fileURL = directory.appendingPathComponent(relativePath)
+                try FileManager.default.createDirectory(
+                    at: fileURL.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
+                )
+                try Data("model".utf8).write(to: fileURL)
+                localFiles[file.filename] = fileURL.path
+            }
+            records.append(
+                InstalledModelRecord(
+                    model: model,
+                    installedAt: "2026-07-24T00:00:00Z",
+                    localFilesByManifestFilename: localFiles
+                )
+            )
+            directories[model.id] = directory
+        }
+        try JSONEncoder().encode(
+            InstalledModelsStore(records: records)
+        ).write(to: layout.installedStoreURL, options: .atomic)
+        return directories
     }
 
     private static func runtimeModel(_ model: ModelEntry) -> RuntimeActiveModel {
@@ -2429,9 +2990,22 @@ private enum ActivationPreparationError: Error {
     case rejected
 }
 
+private final class FailingSettingsSaveFileManager:
+    FileManager,
+    @unchecked Sendable {
+    override func createDirectory(
+        at url: URL,
+        withIntermediateDirectories createIntermediates: Bool,
+        attributes: [FileAttributeKey: Any]? = nil
+    ) throws {
+        throw CocoaError(.fileWriteNoPermission)
+    }
+}
+
 private actor ActivationTranscriberSpy: RuntimeTranscribing {
     private let failingModelIDs: Set<String>
     private var preparedIDs: [String] = []
+    private var unloadCountValue = 0
 
     init(failingModelIDs: Set<String> = []) {
         self.failingModelIDs = failingModelIDs
@@ -2464,14 +3038,24 @@ private actor ActivationTranscriberSpy: RuntimeTranscribing {
         )
     }
 
+    func unload() async {
+        unloadCountValue += 1
+        preparedIDs.removeAll()
+    }
+
     func preparedModelIDs() -> [String] {
         preparedIDs
+    }
+
+    func unloadCount() -> Int {
+        unloadCountValue
     }
 }
 
 private actor ActivationVoiceCleanerSpy: RuntimeVoiceCleaning {
     private let failingModelIDs: Set<String>
     private var preparedIDs: [String] = []
+    private var unloadCountValue = 0
 
     init(failingModelIDs: Set<String> = []) {
         self.failingModelIDs = failingModelIDs
@@ -2490,10 +3074,17 @@ private actor ActivationVoiceCleanerSpy: RuntimeVoiceCleaning {
         audio
     }
 
-    func unload() async {}
+    func unload() async {
+        unloadCountValue += 1
+        preparedIDs.removeAll()
+    }
 
     func preparedModelIDs() -> [String] {
         preparedIDs
+    }
+
+    func unloadCount() -> Int {
+        unloadCountValue
     }
 }
 
@@ -2569,6 +3160,8 @@ private actor FakeRuntimeTranscriber: RuntimeTranscribing {
             compressionRatio: 1
         )
     }
+
+    func unload() async {}
 }
 
 private actor FakeInsertionService: InsertionService {

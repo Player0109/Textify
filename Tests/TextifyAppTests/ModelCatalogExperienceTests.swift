@@ -1478,6 +1478,202 @@ final class ModelCatalogExperienceTests: XCTestCase {
         XCTAssertEqual(artifact.row.actions, [.install, .details])
     }
 
+    func testRemovalConfirmationRequiresOneSelectedInstalledExactArtifact() throws {
+        let manifest = try signedV3FixtureManifest()
+        let installedModel = try XCTUnwrap(
+            manifest.models.first { $0.id == "whisper-small-q5_1" }
+        )
+        let experience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [installed(installedModel)],
+            activePreferences: ModelCatalogActivePreferences(
+                transcriptionModelID: installedModel.id
+            ),
+            transferState: nil,
+            onDiskBytesByModelID: [installedModel.id: 4_096]
+        )
+        var state = ModelCatalogHierarchyState()
+        state.select(.checkpoint("checkpoint.whisper.small"))
+
+        XCTAssertNil(
+            experience.removalConfirmation(for: state.selection)
+        )
+
+        state.select(.exactArtifact(installedModel.id))
+        let confirmation = try XCTUnwrap(
+            experience.removalConfirmation(for: state.selection)
+        )
+
+        XCTAssertEqual(confirmation.artifactID, installedModel.id)
+        XCTAssertEqual(confirmation.exactArtifactName, "Q5_1")
+        XCTAssertEqual(confirmation.checkpointName, "Whisper Small")
+        XCTAssertEqual(
+            confirmation.measuredLocalSize,
+            ByteCountFormatter.string(
+                fromByteCount: 4_096,
+                countStyle: .file
+            )
+        )
+        XCTAssertEqual(
+            confirmation.activeConsequence,
+            .disableDictation
+        )
+    }
+
+    func testDeleteActionOnlyAppearsForTheSelectedExactArtifact() throws {
+        let manifest = try signedV3FixtureManifest()
+        let installedModel = try XCTUnwrap(
+            manifest.models.first { $0.id == "whisper-small-q5_1" }
+        )
+        let experience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [installed(installedModel)],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            onDiskBytesByModelID: [installedModel.id: 4_096]
+        )
+        let row = try XCTUnwrap(
+            experience.rows.first { $0.id == installedModel.id }
+        )
+
+        XCTAssertFalse(row.visibleActions(for: nil).contains(.delete))
+        XCTAssertFalse(
+            row.visibleActions(
+                for: .exactArtifact("another-artifact")
+            ).contains(.delete)
+        )
+        XCTAssertTrue(
+            row.visibleActions(
+                for: .exactArtifact(installedModel.id)
+            ).contains(.delete)
+        )
+    }
+
+    func testDeletionWaitsForACompletedLocalSizeMeasurement() throws {
+        let manifest = try signedV3FixtureManifest()
+        let installedModel = try XCTUnwrap(
+            manifest.models.first { $0.id == "whisper-small-q5_1" }
+        )
+        let calculating = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [installed(installedModel)],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            installedSizeStatus: .calculating
+        )
+        let calculatingRow = try XCTUnwrap(
+            calculating.rows.first { $0.id == installedModel.id }
+        )
+
+        XCTAssertFalse(
+            calculatingRow.visibleActions(
+                for: .exactArtifact(installedModel.id)
+            ).contains(.delete)
+        )
+        XCTAssertNil(
+            calculating.removalConfirmation(
+                for: .exactArtifact(installedModel.id)
+            )
+        )
+
+        let measuredMissingDirectory = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [installed(installedModel)],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            onDiskBytesByModelID: [installedModel.id: 0],
+            installedSizeStatus: .measured
+        )
+        let confirmation = try XCTUnwrap(
+            measuredMissingDirectory.removalConfirmation(
+                for: .exactArtifact(installedModel.id)
+            )
+        )
+
+        XCTAssertEqual(
+            confirmation.measuredLocalSize,
+            ByteCountFormatter.string(
+                fromByteCount: 0,
+                countStyle: .file
+            )
+        )
+    }
+
+    func testSingleVariantSemanticRowResolvesToExactDeletionTarget() throws {
+        let manifest = try signedV3FixtureManifest()
+        let installedModel = try XCTUnwrap(
+            manifest.models.first { $0.id == "whisper-tiny-f16" }
+        )
+        let experience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [installed(installedModel)],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            onDiskBytesByModelID: [installedModel.id: 2_048]
+        )
+        var state = ModelCatalogHierarchyState()
+        state.select(.exactArtifact(installedModel.id))
+
+        let confirmation = try XCTUnwrap(
+            experience.removalConfirmation(for: state.selection)
+        )
+
+        XCTAssertEqual(confirmation.artifactID, installedModel.id)
+        XCTAssertEqual(confirmation.checkpointName, "Whisper Tiny")
+        XCTAssertEqual(confirmation.activeConsequence, .none)
+    }
+
+    func testUninstalledExactArtifactHasNoDeletionConfirmation() throws {
+        let experience = ModelCatalogExperience(
+            trustedManifest: try signedV3FixtureManifest(),
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+
+        XCTAssertNil(
+            experience.removalConfirmation(
+                for: .exactArtifact("whisper-small-q5_1")
+            )
+        )
+    }
+
+    func testActiveCleanerConfirmationNamesVoiceCleaningConsequence() throws {
+        let cleaner = model(
+            id: "cleaner",
+            purpose: .voiceCleaning,
+            engine: .mlxAudio
+        )
+        let experience = ModelCatalogExperience(
+            trustedModels: [cleaner],
+            installedRecords: [installed(cleaner)],
+            activePreferences: ModelCatalogActivePreferences(
+                voiceCleaningModelID: cleaner.id
+            ),
+            transferState: nil,
+            onDiskBytesByModelID: [cleaner.id: 8_192]
+        )
+
+        let confirmation = try XCTUnwrap(
+            experience.removalConfirmation(
+                for: .exactArtifact(cleaner.id)
+            )
+        )
+
+        XCTAssertEqual(
+            confirmation.activeConsequence,
+            .disableVoiceCleaning
+        )
+        XCTAssertTrue(confirmation.message.contains(cleaner.id))
+        XCTAssertTrue(
+            confirmation.message.contains("Measured local size")
+        )
+        XCTAssertEqual(
+            confirmation.destructiveActionTitle,
+            "Disable Voice Cleaning & Delete"
+        )
+    }
+
     func testDisclosureDoesNotSelectAndExpandedChildrenExposeExactSelection() throws {
         let experience = ModelCatalogExperience(
             trustedManifest: try signedV3FixtureManifest(),

@@ -215,6 +215,115 @@ final class AppDictationServiceTests: XCTestCase {
         XCTAssertEqual(startCount, 1)
     }
 
+    func testPurposeRuntimeTransactionWaitsForOwnedCurrentSegment() async {
+        let fakes = RuntimeFakes.ready()
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        var crossedBoundary = false
+
+        await service.handleTriggerAction(.beginRecording)
+        let transaction = Task { @MainActor in
+            await service.performPurposeRuntimeTransaction(
+                waitingForCurrentSegmentUsing:
+                    RuntimeActiveModel.fixture.id
+            ) {
+                crossedBoundary = true
+            }
+        }
+        await settle()
+
+        XCTAssertFalse(crossedBoundary)
+        XCTAssertEqual(
+            service.currentSegment?.transcriptionArtifactID,
+            RuntimeActiveModel.fixture.id
+        )
+
+        await service.handleTriggerAction(.finishRecording)
+        await transaction.value
+
+        XCTAssertTrue(crossedBoundary)
+        XCTAssertNil(service.currentSegment)
+    }
+
+    func testPurposeRuntimeTransactionPreventsNewSegmentAdmission() async {
+        let fakes = RuntimeFakes.ready()
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        let gate = PurposeRuntimeBoundaryGate()
+
+        let transaction = Task { @MainActor in
+            await service.performPurposeRuntimeTransaction {
+                await gate.wait()
+            }
+        }
+        await waitUntil { await gate.isWaiting() }
+
+        await service.handleTriggerAction(.beginRecording)
+
+        XCTAssertNil(service.currentSegment)
+        XCTAssertEqual(service.status, .idle)
+
+        await gate.release()
+        await transaction.value
+    }
+
+    func testPurposeRuntimeTransactionsSerialize() async {
+        let fakes = RuntimeFakes.ready()
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        let gate = PurposeRuntimeBoundaryGate()
+        var enteredSecondTransaction = false
+
+        let first = Task { @MainActor in
+            await service.performPurposeRuntimeTransaction {
+                await gate.wait()
+            }
+        }
+        await waitUntil { await gate.isWaiting() }
+        let second = Task { @MainActor in
+            await service.performPurposeRuntimeTransaction {
+                enteredSecondTransaction = true
+            }
+        }
+        await settle()
+
+        XCTAssertFalse(enteredSecondTransaction)
+
+        await gate.release()
+        await first.value
+        await second.value
+
+        XCTAssertTrue(enteredSecondTransaction)
+    }
+
+    func testWaitingRemovalBoundaryCannotBeOvertakenByLaterTransaction() async {
+        let fakes = RuntimeFakes.ready()
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        var entryOrder: [String] = []
+
+        await service.handleTriggerAction(.beginRecording)
+        let removal = Task { @MainActor in
+            await service.performPurposeRuntimeTransaction(
+                waitingForCurrentSegmentUsing:
+                    RuntimeActiveModel.fixture.id
+            ) {
+                entryOrder.append("removal")
+            }
+        }
+        await settle()
+        let activation = Task { @MainActor in
+            await service.performPurposeRuntimeTransaction {
+                entryOrder.append("activation")
+            }
+        }
+        await settle()
+
+        XCTAssertTrue(entryOrder.isEmpty)
+
+        await service.handleTriggerAction(.finishRecording)
+        await removal.value
+        await activation.value
+
+        XCTAssertEqual(entryOrder, ["removal", "activation"])
+    }
+
     func testRevokedCleanerIsExcludedFromLaterSegmentWithoutBlockingTranscription() async {
         var preferences = AppPreferences.defaults
         preferences.activeModelID = RuntimeActiveModel.fixture.id
@@ -1230,6 +1339,26 @@ final class AppDictationServiceTests: XCTestCase {
     }
 }
 
+private actor PurposeRuntimeBoundaryGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func isWaiting() -> Bool {
+        continuation != nil
+    }
+
+    func release() {
+        let continuation = continuation
+        self.continuation = nil
+        continuation?.resume()
+    }
+}
+
 private struct RuntimeFakes {
     let settings: FakeRuntimeSettings
     let permissions: FakeRuntimePermissions
@@ -1735,6 +1864,10 @@ private actor FakeRuntimeTranscriber: RuntimeTranscribing {
             throw transcribeError
         }
         return result
+    }
+
+    func unload() async {
+        readinessValue = .noActiveModel
     }
 
     func lastAudio() -> TranscriptionAudioBuffer? {

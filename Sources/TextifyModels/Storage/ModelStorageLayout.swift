@@ -91,11 +91,11 @@ public struct ModelStorageLayout: Equatable, Sendable {
         )
     }
 
-    func temporaryRemovalDirectory(modelID: String) throws -> URL {
+    func pendingRemovalDirectory(modelID: String) throws -> URL {
         let safeModelID = try Self.validatePathComponent(modelID)
         return try containedURL(
             downloadsDirectory.appendingPathComponent(
-                ".\(safeModelID).removing-\(UUID().uuidString)",
+                ".\(safeModelID).removing",
                 isDirectory: true
             ),
             in: downloadsDirectory

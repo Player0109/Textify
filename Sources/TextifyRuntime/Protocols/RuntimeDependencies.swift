@@ -149,6 +149,7 @@ public protocol RuntimeTranscribing: Sendable {
     var readiness: RuntimeModelReadiness { get async }
     func prepare(model: RuntimeActiveModel) async throws
     func transcribe(_ audio: TranscriptionAudioBuffer) async throws -> TranscriptionResult
+    func unload() async
 }
 
 public protocol RuntimeVoiceCleaning: Sendable {

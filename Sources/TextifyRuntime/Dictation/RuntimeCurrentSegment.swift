@@ -9,4 +9,9 @@ public struct RuntimeCurrentSegment: Equatable, Sendable {
         self.transcriptionArtifactID = transcriptionArtifactID
         self.voiceCleaningArtifactID = voiceCleaningArtifactID
     }
+
+    public func owns(artifactID: String) -> Bool {
+        transcriptionArtifactID == artifactID
+            || voiceCleaningArtifactID == artifactID
+    }
 }

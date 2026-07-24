@@ -2,6 +2,33 @@
 
 This file records cross-agent handoffs during implementation.
 
+## Exact Artifact Deletion Transaction Handoff - 2026-07-24
+
+- GitHub issue #20 owns the narrow cross-task changes needed to delete one
+  explicitly selected installed Exact Artifact at the shared Purpose Runtime
+  Boundary.
+- This slice may update Task 11 Models-destination selection, confirmation,
+  Command-Delete, and focused app tests; Task 15 runtime transaction
+  serialization and Current Segment ownership waiting; and Task 4 managed
+  storage removal/relaunch recovery plus focused model tests.
+- The selected Exact Artifact remains the sole deletion identity. A
+  multi-variant Checkpoint is never a deletion target, while the existing
+  single-variant semantic row remains an Exact Artifact selection.
+- Activation, Voice Cleaning disablement, and deletion share one serialized
+  runtime boundary. Deletion waits while the target is owned by Current
+  Segment, reports Finishing Current Dictation, and revalidates active and
+  revocation state before filesystem mutation.
+- Managed bytes must be gone before the Installation Receipt is removed.
+  Interrupted rename/removal or receipt persistence retains a diagnosable,
+  retryable ownership record across relaunch. This ticket adds no Undo,
+  automatic replacement, broad storage cleanup, generalized runtime switching,
+  or catalog virtualization.
+- Final verification completed with 738 Swift tests (11 explicit opt-in
+  native/model smokes skipped, zero failures), a 212-test focused deletion
+  gate, an arm64 SwiftPM Release build, and a native Xcode Debug app build.
+  Independent Standards and issue-spec reviews report no remaining actionable
+  findings.
+
 ## Runtime Revocation Enforcement And Restoration Handoff - 2026-07-24
 
 - GitHub issue #19 owns the narrow cross-task changes needed to enforce the

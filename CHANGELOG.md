@@ -19,6 +19,9 @@
 - Added signed model-revocation enforcement across current dictation segments,
   active selections, persistent install queues, retained partial data, and
   exact restoration records that require fresh integrity verification.
+- Added exact-artifact deletion with shared runtime-boundary serialization,
+  current-dictation draining, purpose-aware confirmation, and retryable
+  filesystem recovery that removes receipts only after managed bytes.
 - Added Fast Parakeet TDT-CTC 110M and Accurate Parakeet V2 English choices,
   both using the existing offline Core ML/Neural Engine runtime.
 - Added Parakeet Japanese as a Specialist choice after a fixed public-corpus

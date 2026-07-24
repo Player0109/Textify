@@ -257,6 +257,7 @@ final class AppServices {
     var runtimeIssue: AppRuntimeIssue?
     private(set) var revokedActiveTranscriptionModelID: String?
     private(set) var revokedActiveVoiceCleaningModelID: String?
+    private(set) var modelRemovalStatus: AppModelRemovalStatus?
 
     @ObservationIgnored private var runtimeStarted = false
     @ObservationIgnored private var diagnosticsStarted = false
@@ -676,8 +677,10 @@ final class AppServices {
         return status
     }
 
-    func savePreferences() {
+    @discardableResult
+    func savePreferences() -> Bool {
         settingsStore.save(preferences)
+        return settingsStore.lastError == nil
     }
 
     func isModelInstalled(_ modelID: String) -> Bool {
@@ -872,9 +875,22 @@ final class AppServices {
     func activateInstalledModel(
         _ modelID: String
     ) async -> AppModelActivationResult {
-        guard dictation.allowsModelTransactions else {
+        guard let model = installedModel(modelID)?.model else {
+            return .notInstalled
+        }
+        guard dictation.status != .processing else {
             return .dictationInProgress
         }
+        return await dictation.performPurposeRuntimeTransaction(
+            waitingForCurrentSegmentIn: model.purpose
+        ) {
+            await self.activateInstalledModelAtPurposeRuntimeBoundary(modelID)
+        }
+    }
+
+    private func activateInstalledModelAtPurposeRuntimeBoundary(
+        _ modelID: String
+    ) async -> AppModelActivationResult {
         guard let installedRecord = installedModel(modelID) else {
             return .notInstalled
         }
@@ -898,7 +914,8 @@ final class AppServices {
 
         let candidatePreferences = preferencesSelecting(model)
 
-        let preparation = await dictation.prepareModelSelection(
+        let preparation =
+            await dictation.prepareModelSelectionAtPurposeRuntimeBoundary(
             modelID: modelID,
             purpose: model.purpose,
             preferences: candidatePreferences
@@ -910,21 +927,29 @@ final class AppServices {
                       record: preparedRecord,
                       trustedManifest:
                           modelCatalogCoordinator.authoritativeManifest
-                  )
+            )
             else {
-                _ = await dictation.prepareActiveModelIfAvailable()
+                _ = await dictation
+                    .prepareActiveModelAtPurposeRuntimeBoundary()
                 return .revoked
             }
             guard pendingRestorationVerificationIDs(
                 for: preparedRecord
             ).isEmpty else {
                 managedReadinessByModelID[modelID] = .verificationRequired
-                _ = await dictation.prepareActiveModelIfAvailable()
+                _ = await dictation
+                    .prepareActiveModelAtPurposeRuntimeBoundary()
                 return .integrityVerificationRequired
             }
             managedReadinessByModelID[modelID] = .ready
+            let previousPreferences = preferences
             preferences = candidatePreferences
-            savePreferences()
+            guard savePreferences() else {
+                preferences = previousPreferences
+                _ = await dictation
+                    .prepareActiveModelAtPurposeRuntimeBoundary()
+                return .persistenceFailed
+            }
             switch model.purpose {
             case .transcription:
                 revokedActiveTranscriptionModelID = nil
@@ -934,17 +959,17 @@ final class AppServices {
             settingsRouter.dismissModelReplacement(
                 purpose: model.purpose
             )
-            _ = await dictation.prepareActiveModelIfAvailable()
+            _ = await dictation.prepareActiveModelAtPurposeRuntimeBoundary()
             return .activated
         case .needsRepair:
             managedReadinessByModelID[modelID] = .needsRepair
-            _ = await dictation.prepareActiveModelIfAvailable()
+            _ = await dictation.prepareActiveModelAtPurposeRuntimeBoundary()
             return .needsRepair
         case .failed:
-            _ = await dictation.prepareActiveModelIfAvailable()
+            _ = await dictation.prepareActiveModelAtPurposeRuntimeBoundary()
             return .preparationFailed
         case .revoked:
-            _ = await dictation.prepareActiveModelIfAvailable()
+            _ = await dictation.prepareActiveModelAtPurposeRuntimeBoundary()
             return .revoked
         case .busy:
             return .dictationInProgress
@@ -953,13 +978,22 @@ final class AppServices {
 
     @discardableResult
     func disableVoiceCleaning() async -> Bool {
-        guard dictation.allowsModelTransactions else {
+        guard dictation.status != .processing else {
             return false
         }
-        preferences.activeVoiceCleaningModelID = nil
-        savePreferences()
-        _ = await dictation.prepareActiveModelIfAvailable()
-        return true
+        return await dictation.performPurposeRuntimeTransaction(
+            waitingForCurrentSegmentIn: .voiceCleaning
+        ) {
+            let previousPreferences = self.preferences
+            self.preferences.activeVoiceCleaningModelID = nil
+            guard self.savePreferences() else {
+                self.preferences = previousPreferences
+                return false
+            }
+            _ = await self.dictation
+                .prepareActiveModelAtPurposeRuntimeBoundary()
+            return true
+        }
     }
 
     func importCustomWhisperModel(
@@ -996,20 +1030,76 @@ final class AppServices {
         return record.model
     }
 
-    func removeInstalledModel(_ modelID: String) async throws {
-        guard preferences.activeModelID != modelID,
-              preferences.activeVoiceCleaningModelID != modelID else {
-            throw AppModelRemovalError.activeModelMustBeSwitchedFirst
+    func removeInstalledModel(
+        _ modelID: String,
+        activeResolution: AppModelRemovalActiveResolution =
+            .requireInactive
+    ) async throws {
+        guard installedModel(modelID) != nil else {
+            throw InstalledModelManagerError.modelNotInstalled(modelID)
         }
-        let manager = InstalledModelManager(
-            layout: ModelStorageLayout(rootDirectory: paths.modelsDirectory)
-        )
-        _ = try await Task.detached(priority: .utility) {
-            try manager.remove(modelID: modelID)
-        }.value
-        refreshInstalledModels()
-        managedReadinessByModelID[modelID] = nil
-        _ = await dictation.refreshReadiness()
+        let waitsForCurrentSegment =
+            dictation.currentSegment?.owns(artifactID: modelID) == true
+        if waitsForCurrentSegment {
+            modelRemovalStatus = AppModelRemovalStatus(
+                artifactID: modelID,
+                phase: .finishingCurrentDictation
+            )
+        }
+        defer {
+            modelRemovalStatus = nil
+        }
+
+        try await dictation.performPurposeRuntimeTransaction(
+            waitingForCurrentSegmentUsing: modelID
+        ) {
+            guard let record = self.installedModel(modelID) else {
+                throw InstalledModelManagerError.modelNotInstalled(modelID)
+            }
+            let purpose = record.model.purpose
+            let isActive = self.isModelActive(modelID)
+            if isActive {
+                guard activeResolution == .disablePurpose else {
+                    throw AppModelRemovalError
+                        .activePurposeResolutionRequired(purpose)
+                }
+                let previousPreferences = self.preferences
+                switch purpose {
+                case .transcription:
+                    self.preferences.activeModelID = nil
+                case .voiceCleaning:
+                    self.preferences.activeVoiceCleaningModelID = nil
+                }
+                guard self.savePreferences() else {
+                    self.preferences = previousPreferences
+                    throw AppModelRemovalError
+                        .purposeDisablePersistenceFailed(purpose)
+                }
+            }
+
+            self.modelRemovalStatus = AppModelRemovalStatus(
+                artifactID: modelID,
+                phase: .removing
+            )
+            await self.dictation
+                .releaseArtifactForRemovalAtPurposeRuntimeBoundary(
+                    artifactID: modelID,
+                    purpose: purpose,
+                    wasPurposeActive: isActive
+                )
+
+            let manager = InstalledModelManager(
+                layout: ModelStorageLayout(
+                    rootDirectory: self.paths.modelsDirectory
+                )
+            )
+            _ = try await Task.detached(priority: .utility) {
+                try manager.remove(modelID: modelID)
+            }.value
+            self.refreshInstalledModels()
+            self.managedReadinessByModelID[modelID] = nil
+            _ = await self.dictation.refreshReadiness()
+        }
     }
 
     private func installedModel(_ modelID: String) -> InstalledModelRecord? {
@@ -1158,32 +1248,46 @@ final class AppServices {
             modelRevocationEnforcementDeferred = true
             return
         }
-        modelRevocationEnforcementDeferred = false
 
-        var didChangePreferences = false
-        if let modelID = preferences.activeModelID,
-           isInstalledArtifactRuntimeBlocked(
-               modelID,
-               overlay: overlay,
-               trustedManifest: manifest
-           ) {
-            preferences.activeModelID = nil
-            revokedActiveTranscriptionModelID = modelID
-            didChangePreferences = true
-        }
-        if let modelID = preferences.activeVoiceCleaningModelID,
-           isInstalledArtifactRuntimeBlocked(
-               modelID,
-               overlay: overlay,
-               trustedManifest: manifest
-           ) {
-            preferences.activeVoiceCleaningModelID = nil
-            revokedActiveVoiceCleaningModelID = modelID
-            didChangePreferences = true
-        }
-        if didChangePreferences {
-            savePreferences()
-            _ = await dictation.prepareActiveModelIfAvailable()
+        await dictation.performPurposeRuntimeTransaction {
+            guard self.dictation.currentSegment == nil else {
+                self.modelRevocationEnforcementDeferred = true
+                return
+            }
+            self.modelRevocationEnforcementDeferred = false
+
+            let previousPreferences = self.preferences
+            var didChangePreferences = false
+            if let modelID = self.preferences.activeModelID,
+               self.isInstalledArtifactRuntimeBlocked(
+                   modelID,
+                   overlay: overlay,
+                   trustedManifest: manifest
+               ) {
+                self.preferences.activeModelID = nil
+                self.revokedActiveTranscriptionModelID = modelID
+                didChangePreferences = true
+            }
+            if let modelID =
+                self.preferences.activeVoiceCleaningModelID,
+               self.isInstalledArtifactRuntimeBlocked(
+                   modelID,
+                   overlay: overlay,
+                   trustedManifest: manifest
+               ) {
+                self.preferences.activeVoiceCleaningModelID = nil
+                self.revokedActiveVoiceCleaningModelID = modelID
+                didChangePreferences = true
+            }
+            if didChangePreferences {
+                guard self.savePreferences() else {
+                    self.preferences = previousPreferences
+                    self.modelRevocationEnforcementDeferred = true
+                    return
+                }
+                _ = await self.dictation
+                    .prepareActiveModelAtPurposeRuntimeBoundary()
+            }
         }
         await refreshManagedModelReadiness()
     }
@@ -1607,6 +1711,7 @@ enum AppModelActivationResult: Equatable {
     case incompatible(ModelCatalogCompatibility)
     case needsRepair
     case preparationFailed
+    case persistenceFailed
 
     func message(for model: ProductionModelPresentation) -> String {
         switch self {
@@ -1626,17 +1731,47 @@ enum AppModelActivationResult: Equatable {
             return "\(model.displayName) needs repair. Reinstall it and try again."
         case .preparationFailed:
             return "Textify kept the previous model because \(model.displayName) could not be prepared."
+        case .persistenceFailed:
+            return "Textify kept the previous model because the new selection could not be saved."
         }
     }
 }
 
-enum AppModelRemovalError: Error, LocalizedError {
-    case activeModelMustBeSwitchedFirst
+enum AppModelRemovalActiveResolution: Equatable {
+    case requireInactive
+    case disablePurpose
+}
+
+enum AppModelRemovalPhase: Equatable {
+    case finishingCurrentDictation
+    case removing
+}
+
+struct AppModelRemovalStatus: Equatable {
+    let artifactID: String
+    let phase: AppModelRemovalPhase
+}
+
+enum AppModelRemovalError: Error, Equatable, LocalizedError {
+    case activePurposeResolutionRequired(ModelPurpose)
+    case purposeDisablePersistenceFailed(ModelPurpose)
 
     var errorDescription: String? {
         switch self {
-        case .activeModelMustBeSwitchedFirst:
-            return "Select another model or disable voice cleaning before deleting the active model."
+        case let .activePurposeResolutionRequired(purpose):
+            switch purpose {
+            case .transcription:
+                return "Select another transcription model or explicitly disable Dictation before deleting this Exact Artifact."
+            case .voiceCleaning:
+                return "Select another cleaner or explicitly disable Voice Cleaning before deleting this Exact Artifact."
+            }
+        case let .purposeDisablePersistenceFailed(purpose):
+            switch purpose {
+            case .transcription:
+                return "Textify could not disable Dictation, so the Exact Artifact was not deleted."
+            case .voiceCleaning:
+                return "Textify could not disable Voice Cleaning, so the Exact Artifact was not deleted."
+            }
         }
     }
 }

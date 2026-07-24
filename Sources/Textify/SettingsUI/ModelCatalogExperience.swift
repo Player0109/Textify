@@ -986,6 +986,76 @@ struct ModelCatalogRowPresentation: Equatable, Identifiable {
     var installState: DownloadState? {
         install?.state
     }
+
+    var measuredLocalBytes: Int64? {
+        guard installedSizeStatus == .measured else {
+            return nil
+        }
+        return onDiskBytes
+    }
+
+    func visibleActions(
+        for selection: ModelCatalogHierarchySelection?
+    ) -> Set<ModelCatalogRowAction> {
+        return actions.subtracting(
+            selection == .exactArtifact(id)
+                && measuredLocalBytes != nil
+                ? []
+                : [.delete]
+        )
+    }
+}
+
+enum ModelRemovalActiveConsequence: Equatable {
+    case none
+    case disableDictation
+    case disableVoiceCleaning
+
+    var description: String {
+        switch self {
+        case .none:
+            return "The active model selection will not change."
+        case .disableDictation:
+            return "Dictation will be disabled until you explicitly use another transcription model."
+        case .disableVoiceCleaning:
+            return "Voice Cleaning will be disabled before this Exact Artifact is removed."
+        }
+    }
+}
+
+struct ModelRemovalConfirmationPresentation: Equatable {
+    let artifactID: String
+    let exactArtifactName: String
+    let checkpointName: String
+    let measuredLocalSize: String
+    let activeConsequence: ModelRemovalActiveConsequence
+
+    var message: String {
+        "Exact Artifact: \(exactArtifactName) (\(artifactID))\n"
+            + "Checkpoint: \(checkpointName)\n"
+            + "Measured local size: \(measuredLocalSize)\n\n"
+            + activeConsequence.description
+    }
+
+    var destructiveActionTitle: String {
+        switch activeConsequence {
+        case .none:
+            return "Delete"
+        case .disableDictation:
+            return "Disable Dictation & Delete"
+        case .disableVoiceCleaning:
+            return "Disable Voice Cleaning & Delete"
+        }
+    }
+
+    var activeResolution: AppModelRemovalActiveResolution {
+        switch activeConsequence {
+        case .none:
+            return .requireInactive
+        case .disableDictation, .disableVoiceCleaning:
+            return .disablePurpose
+        }
+    }
 }
 
 struct ModelCatalogFilterOptions: Equatable {
@@ -1002,6 +1072,75 @@ struct ModelCatalogFilterOptions: Equatable {
         computeRoutes: [],
         languages: []
     )
+}
+
+extension ModelCatalogExperience {
+    func removalConfirmation(
+        for selection: ModelCatalogHierarchySelection?
+    ) -> ModelRemovalConfirmationPresentation? {
+        guard case let .exactArtifact(artifactID) = selection else {
+            return nil
+        }
+
+        for checkpoint in families.flatMap(\.checkpoints) {
+            guard let artifact = checkpoint.artifacts.first(
+                where: { $0.id == artifactID }
+            ) else {
+                continue
+            }
+            return Self.removalConfirmation(
+                row: artifact.row,
+                exactArtifactName:
+                    artifact.metadata.presentation.displayName,
+                checkpointName:
+                    checkpoint.metadata.presentation.displayName
+            )
+        }
+
+        guard let row = rows.first(where: { $0.id == artifactID }) else {
+            return nil
+        }
+        return Self.removalConfirmation(
+            row: row,
+            exactArtifactName: row.model.displayName,
+            checkpointName: row.placement?.title ?? "Standalone Artifact"
+        )
+    }
+
+    private static func removalConfirmation(
+        row: ModelCatalogRowPresentation,
+        exactArtifactName: String,
+        checkpointName: String
+    ) -> ModelRemovalConfirmationPresentation? {
+        guard row.isInstalled,
+              row.actions.contains(.delete),
+              let onDiskBytes = row.measuredLocalBytes
+        else {
+            return nil
+        }
+        let measuredLocalSize = ByteCountFormatter.string(
+            fromByteCount: onDiskBytes,
+            countStyle: .file
+        )
+        let consequence: ModelRemovalActiveConsequence
+        if !row.isActive {
+            consequence = .none
+        } else {
+            switch row.model.purpose {
+            case .transcription:
+                consequence = .disableDictation
+            case .voiceCleaning:
+                consequence = .disableVoiceCleaning
+            }
+        }
+        return ModelRemovalConfirmationPresentation(
+            artifactID: row.id,
+            exactArtifactName: exactArtifactName,
+            checkpointName: checkpointName,
+            measuredLocalSize: measuredLocalSize,
+            activeConsequence: consequence
+        )
+    }
 }
 
 struct ModelCatalogFamilyPresentation: Equatable, Identifiable {

@@ -1416,9 +1416,30 @@ Model load errors:
 
 Model deletion:
 
-- allowed
-- confirmation required
-- active model deletion unloads runtime and leaves app with no active model
+- Delete is available only for one selected installed Exact Artifact, including
+  a single-variant Checkpoint's semantic Exact Artifact row. A multi-variant
+  Checkpoint is never a deletion target.
+- The row action and Command-Delete use the same confirmation. It names the
+  Exact Artifact, its Checkpoint, the measured local size, and any active
+  purpose consequence. Deletion is unavailable until local-size measurement
+  completes; a confirmed missing managed directory is measured as zero bytes,
+  not reported as an unknown size. Cancel performs no mutation, and deletion
+  has no Undo.
+- Activation, purpose disablement, and deletion serialize at the Purpose
+  Runtime Boundary. If Current Segment owns the target, Settings reports
+  "Finishing Current Dictation" and deletion waits for that segment to finish.
+- An active artifact must be explicitly replaced by the user or its purpose
+  explicitly and durably disabled before removal. Failed replacement or
+  preference persistence keeps the previous in-memory and durable active
+  identity and cannot make that artifact eligible for inactive deletion.
+- Managed storage first renames the artifact directory to its deterministic
+  pending-removal identity, removes all attributed bytes, and only then removes
+  the Installation Receipt. A missing managed directory may still clear its
+  stale receipt.
+- Rename, permission, partial-removal, and receipt-persistence failures never
+  report success. The receipt and any remaining pending-removal bytes stay
+  attributed to the Exact Artifact, included in its measured local size, and
+  diagnosable and retryable across relaunch.
 
 Model storage:
 
