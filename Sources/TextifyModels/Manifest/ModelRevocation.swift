@@ -176,19 +176,22 @@ public struct ModelRevocationRecord: Codable, Equatable, Sendable {
     }
 }
 
-public struct ModelRevocationEnvelope: Codable, Equatable, Sendable {
-    public let revocationVersion: Int
-    public let generatedAt: String
-    public let records: [ModelRevocationRecord]
+public struct ModelRestorationRecord: Codable, Equatable, Sendable {
+    public let restorationID: String
+    public let revocationRecordID: String
+    public let exactArtifactID: String?
+    public let contentDigest: ModelRevocationDigestTarget?
 
     public init(
-        revocationVersion: Int,
-        generatedAt: String,
-        records: [ModelRevocationRecord]
+        restorationID: String,
+        revocationRecordID: String,
+        exactArtifactID: String? = nil,
+        contentDigest: ModelRevocationDigestTarget? = nil
     ) {
-        self.revocationVersion = revocationVersion
-        self.generatedAt = generatedAt
-        self.records = records
+        self.restorationID = restorationID
+        self.revocationRecordID = revocationRecordID
+        self.exactArtifactID = exactArtifactID
+        self.contentDigest = contentDigest
     }
 
     public init(from decoder: Decoder) throws {
@@ -197,21 +200,113 @@ public struct ModelRevocationEnvelope: Codable, Equatable, Sendable {
             allowedKeys: CodingKeys.allCases.map(\.stringValue)
         )
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        revocationVersion = try container.decode(
+        restorationID = try container.decode(
+            String.self,
+            forKey: .restorationID
+        )
+        revocationRecordID = try container.decode(
+            String.self,
+            forKey: .revocationRecordID
+        )
+        exactArtifactID = try container.decodeIfPresent(
+            String.self,
+            forKey: .exactArtifactID
+        )
+        contentDigest = try container.decodeIfPresent(
+            ModelRevocationDigestTarget.self,
+            forKey: .contentDigest
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(restorationID, forKey: .restorationID)
+        try container.encode(revocationRecordID, forKey: .revocationRecordID)
+        if let exactArtifactID {
+            try container.encode(exactArtifactID, forKey: .exactArtifactID)
+        } else {
+            try container.encodeNil(forKey: .exactArtifactID)
+        }
+        if let contentDigest {
+            try container.encode(contentDigest, forKey: .contentDigest)
+        } else {
+            try container.encodeNil(forKey: .contentDigest)
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case restorationID
+        case revocationRecordID
+        case exactArtifactID
+        case contentDigest
+    }
+}
+
+public struct ModelRevocationEnvelope: Codable, Equatable, Sendable {
+    public let revocationVersion: Int
+    public let generatedAt: String
+    public let records: [ModelRevocationRecord]
+    public let restorations: [ModelRestorationRecord]
+
+    public init(
+        revocationVersion: Int,
+        generatedAt: String,
+        records: [ModelRevocationRecord],
+        restorations: [ModelRestorationRecord] = []
+    ) {
+        self.revocationVersion = revocationVersion
+        self.generatedAt = generatedAt
+        self.records = records
+        self.restorations = restorations
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let version = try container.decode(
             Int.self,
             forKey: .revocationVersion
         )
+        var allowedKeys = [
+            CodingKeys.revocationVersion.stringValue,
+            CodingKeys.generatedAt.stringValue,
+            CodingKeys.records.stringValue,
+        ]
+        if version == 2 {
+            allowedKeys.append(CodingKeys.restorations.stringValue)
+        }
+        try StrictJSONKeys.validate(
+            decoder: decoder,
+            allowedKeys: allowedKeys
+        )
+        revocationVersion = version
         generatedAt = try container.decode(String.self, forKey: .generatedAt)
         records = try container.decode(
             [ModelRevocationRecord].self,
             forKey: .records
         )
+        restorations = version == 2
+            ? try container.decode(
+                [ModelRestorationRecord].self,
+                forKey: .restorations
+            )
+            : []
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(revocationVersion, forKey: .revocationVersion)
+        try container.encode(generatedAt, forKey: .generatedAt)
+        try container.encode(records, forKey: .records)
+        if revocationVersion == 2 {
+            try container.encode(restorations, forKey: .restorations)
+        }
     }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
         case revocationVersion
         case generatedAt
         case records
+        case restorations
     }
 }
 
@@ -225,14 +320,24 @@ public enum ModelRevocationPolicyError: Error, Equatable {
     case invalidDigest(String)
     case unsupportedCanonicalLayoutVersion(Int)
     case unsafeManagedRelativePath(String)
+    case restorationRequiresVersion2
+    case duplicateRestorationID(String)
+    case invalidRestorationID(String)
+    case invalidRestorationRecordID(String)
+    case missingRestorationTarget(String)
 }
 
 public enum ModelRevocationPolicy {
     public static func validate(_ envelope: ModelRevocationEnvelope) throws {
-        guard envelope.revocationVersion == 1 else {
+        guard [1, 2].contains(envelope.revocationVersion) else {
             throw ModelRevocationPolicyError.unsupportedVersion(
                 envelope.revocationVersion
             )
+        }
+        guard envelope.revocationVersion == 2
+                || envelope.restorations.isEmpty
+        else {
+            throw ModelRevocationPolicyError.restorationRequiresVersion2
         }
         guard ISO8601DateFormatter().date(from: envelope.generatedAt) != nil else {
             throw ModelRevocationPolicyError.invalidGeneratedAt(
@@ -286,6 +391,67 @@ public enum ModelRevocationPolicy {
                             .unsafeManagedRelativePath(relativePath)
                     }
                 }
+            }
+        }
+        var restorationIDs = Set<String>()
+        for restoration in envelope.restorations {
+            guard isPathSafeIdentifier(restoration.restorationID) else {
+                throw ModelRevocationPolicyError.invalidRestorationID(
+                    restoration.restorationID
+                )
+            }
+            guard restorationIDs.insert(restoration.restorationID).inserted
+            else {
+                throw ModelRevocationPolicyError.duplicateRestorationID(
+                    restoration.restorationID
+                )
+            }
+            guard isPathSafeIdentifier(restoration.revocationRecordID) else {
+                throw ModelRevocationPolicyError.invalidRestorationRecordID(
+                    restoration.revocationRecordID
+                )
+            }
+            guard restoration.exactArtifactID != nil
+                    || restoration.contentDigest != nil
+            else {
+                throw ModelRevocationPolicyError.missingRestorationTarget(
+                    restoration.restorationID
+                )
+            }
+            if let artifactID = restoration.exactArtifactID,
+               !isPathSafeIdentifier(artifactID) {
+                throw ModelRevocationPolicyError.invalidArtifactID(artifactID)
+            }
+            if let digest = restoration.contentDigest {
+                try validate(digest)
+            }
+        }
+    }
+
+    private static func validate(
+        _ digest: ModelRevocationDigestTarget
+    ) throws {
+        guard digest.value.count == 64,
+              digest.value.unicodeScalars.allSatisfy({
+                  CharacterSet(
+                    charactersIn: "0123456789abcdef"
+                  ).contains($0)
+              })
+        else {
+            throw ModelRevocationPolicyError.invalidDigest(digest.value)
+        }
+        switch digest.scope {
+        case .singleFilePayload:
+            break
+        case let .canonicalLayout(version):
+            guard version == 1 else {
+                throw ModelRevocationPolicyError
+                    .unsupportedCanonicalLayoutVersion(version)
+            }
+        case let .managedFile(relativePath):
+            guard isSafeRelativePath(relativePath) else {
+                throw ModelRevocationPolicyError
+                    .unsafeManagedRelativePath(relativePath)
             }
         }
     }
@@ -392,6 +558,8 @@ public struct ModelRevocationVerifier: Sendable {
     public static let revocationFile = "revocations.json"
     public static let contentTypeV1 =
         "application/vnd.textify.model-revocations+json;version=1"
+    public static let contentTypeV2 =
+        "application/vnd.textify.model-revocations+json;version=2"
 
     private let trustedKeys: [TrustedModelManifestKey]
 
@@ -624,6 +792,17 @@ public struct ModelRevocationOverlay: Equatable, Sendable {
         ).isEmpty == false
     }
 
+    public func matchingRecordIDs(
+        artifactID: String,
+        trustedManifest: ModelManifest?
+    ) -> [String] {
+        matchingRecordIDs(
+            artifactIDs: [artifactID],
+            digests: [],
+            trustedManifest: trustedManifest
+        )
+    }
+
     public func isRevoked(
         model: ModelEntry,
         trustedManifest: ModelManifest?
@@ -631,6 +810,17 @@ public struct ModelRevocationOverlay: Equatable, Sendable {
         matchingRecordIDs(
             artifactIDs: [model.id],
             digests: Self.digests(for: model),
+            trustedManifest: trustedManifest
+        ).isEmpty == false
+    }
+
+    public func isRevoked(
+        installIdentity: ModelInstallArtifactIdentity,
+        trustedManifest: ModelManifest?
+    ) -> Bool {
+        matchingRecordIDs(
+            artifactIDs: [installIdentity.artifactID],
+            digests: installIdentity.contentDigests,
             trustedManifest: trustedManifest
         ).isEmpty == false
     }
@@ -782,6 +972,15 @@ public enum TrustedModelRevocationStateError: Error, Equatable {
     )
     case conflictingRevision(String)
     case conflictingRecord(String)
+    case conflictingRestoration(String)
+    case unknownRestorationRecord(
+        restorationID: String,
+        revocationRecordID: String
+    )
+    case restorationTargetMismatch(
+        restorationID: String,
+        revocationRecordID: String
+    )
 }
 
 public struct TrustedModelRevocationState: Equatable, Sendable {
@@ -820,11 +1019,51 @@ public struct TrustedModelRevocationState: Equatable, Sendable {
             }
             recordsByID[record.recordID] = record
         }
+        for restoration in snapshots.flatMap(\.envelope.restorations) {
+            guard let record = recordsByID[restoration.revocationRecordID]
+            else {
+                continue
+            }
+            let exactArtifactID = restoration.exactArtifactID == nil
+                ? record.exactArtifactID
+                : nil
+            let contentDigest = restoration.contentDigest == nil
+                ? record.contentDigest
+                : nil
+            recordsByID[record.recordID] =
+                exactArtifactID == nil && contentDigest == nil
+                ? nil
+                : ModelRevocationRecord(
+                    recordID: record.recordID,
+                    exactArtifactID: exactArtifactID,
+                    contentDigest: contentDigest
+                )
+        }
         return ModelRevocationOverlay(
             records: orderedRecordIDs.compactMap { recordsByID[$0] },
             retainedArtifactAliases: aliasSnapshots.flatMap {
                 $0.manifest.artifactAliases
             }
+        )
+    }
+
+    public func restorationIDsRequiringIntegrityVerification(
+        artifactID: String,
+        trustedManifest: ModelManifest?
+    ) -> [String] {
+        restorationOverlay.matchingRecordIDs(
+            artifactID: artifactID,
+            trustedManifest: trustedManifest
+        )
+    }
+
+    public func restorationIDsRequiringIntegrityVerification(
+        for record: InstalledModelRecord,
+        trustedManifest: ModelManifest?
+    ) -> [String] {
+        restorationOverlay.matchingRecordIDs(
+            for: record,
+            trustedManifest: trustedManifest
         )
     }
 
@@ -865,6 +1104,10 @@ public struct TrustedModelRevocationState: Equatable, Sendable {
         into snapshots: [TrustedModelRevocationSnapshot]
     ) throws -> [TrustedModelRevocationSnapshot] {
         guard let current = snapshots.last else {
+            try validateRestorations(
+                candidate.envelope.restorations,
+                priorSnapshots: []
+            )
             return [candidate]
         }
         if candidate.revisionDate < current.revisionDate {
@@ -893,7 +1136,77 @@ public struct TrustedModelRevocationState: Equatable, Sendable {
                     .conflictingRecord(record.recordID)
             }
         }
+        let restorationsByID = snapshots
+            .flatMap(\.envelope.restorations)
+            .reduce(into: [String: ModelRestorationRecord]()) {
+                $0[$1.restorationID] = $1
+            }
+        for restoration in candidate.envelope.restorations {
+            if let existing = restorationsByID[restoration.restorationID],
+               existing != restoration {
+                throw TrustedModelRevocationStateError
+                    .conflictingRestoration(restoration.restorationID)
+            }
+        }
+        try validateRestorations(
+            candidate.envelope.restorations,
+            priorSnapshots: snapshots
+        )
         return snapshots + [candidate]
+    }
+
+    private static func validateRestorations(
+        _ restorations: [ModelRestorationRecord],
+        priorSnapshots: [TrustedModelRevocationSnapshot]
+    ) throws {
+        let priorRecordsByID = priorSnapshots
+            .flatMap(\.envelope.records)
+            .reduce(into: [String: ModelRevocationRecord]()) {
+                $0[$1.recordID] = $1
+            }
+        for restoration in restorations {
+            guard let record =
+                    priorRecordsByID[restoration.revocationRecordID]
+            else {
+                throw TrustedModelRevocationStateError
+                    .unknownRestorationRecord(
+                        restorationID: restoration.restorationID,
+                        revocationRecordID:
+                            restoration.revocationRecordID
+                    )
+            }
+            let exactTargetMatches =
+                restoration.exactArtifactID == nil
+                || restoration.exactArtifactID == record.exactArtifactID
+            let digestTargetMatches =
+                restoration.contentDigest == nil
+                || restoration.contentDigest == record.contentDigest
+            guard exactTargetMatches, digestTargetMatches else {
+                throw TrustedModelRevocationStateError
+                    .restorationTargetMismatch(
+                        restorationID: restoration.restorationID,
+                        revocationRecordID:
+                            restoration.revocationRecordID
+                    )
+            }
+        }
+    }
+
+    private var restorationOverlay: ModelRevocationOverlay {
+        ModelRevocationOverlay(
+            records: snapshots
+                .flatMap(\.envelope.restorations)
+                .map {
+                    ModelRevocationRecord(
+                        recordID: $0.restorationID,
+                        exactArtifactID: $0.exactArtifactID,
+                        contentDigest: $0.contentDigest
+                    )
+                },
+            retainedArtifactAliases: aliasSnapshots.flatMap {
+                $0.manifest.artifactAliases
+            }
+        )
     }
 
     private static func aliasSnapshotsAddingEvidence(

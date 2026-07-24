@@ -50,6 +50,7 @@ public struct InstalledModelRecord: Codable, Equatable, Sendable {
     public let localFilesByManifestFilename: [String: String]
     public let storageModelID: String
     public let identityHistory: InstalledModelIdentityHistory
+    public let verifiedRestorationIDs: [String]
 
     public init(
         model: ModelEntry,
@@ -87,11 +88,32 @@ public struct InstalledModelRecord: Codable, Equatable, Sendable {
         storageModelID: String,
         identityHistory: InstalledModelIdentityHistory
     ) {
+        self.init(
+            model: model,
+            installedAt: installedAt,
+            localFilesByManifestFilename: localFilesByManifestFilename,
+            storageModelID: storageModelID,
+            identityHistory: identityHistory,
+            verifiedRestorationIDs: []
+        )
+    }
+
+    public init(
+        model: ModelEntry,
+        installedAt: String,
+        localFilesByManifestFilename: [String: String],
+        storageModelID: String,
+        identityHistory: InstalledModelIdentityHistory,
+        verifiedRestorationIDs: [String]
+    ) {
         self.model = model
         self.installedAt = installedAt
         self.localFilesByManifestFilename = localFilesByManifestFilename
         self.storageModelID = storageModelID
         self.identityHistory = identityHistory
+        self.verifiedRestorationIDs = Array(
+            Set(verifiedRestorationIDs)
+        ).sorted()
     }
 
     public init(from decoder: Decoder) throws {
@@ -110,6 +132,10 @@ public struct InstalledModelRecord: Codable, Equatable, Sendable {
             InstalledModelIdentityHistory.self,
             forKey: .identityHistory
         ) ?? InstalledModelIdentityHistory()
+        verifiedRestorationIDs = try container.decodeIfPresent(
+            [String].self,
+            forKey: .verifiedRestorationIDs
+        ) ?? []
     }
 }
 

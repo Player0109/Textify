@@ -929,6 +929,7 @@ enum ModelCatalogManagedReadiness: Equatable {
     case installed
     case ready
     case needsRepair
+    case verificationRequired
 }
 
 enum ModelCatalogStateToken: Equatable {
@@ -938,6 +939,7 @@ enum ModelCatalogStateToken: Equatable {
     case active
     case incompatible
     case needsRepair
+    case verificationRequired
 
     var title: String {
         switch self {
@@ -953,6 +955,8 @@ enum ModelCatalogStateToken: Equatable {
             return "Incompatible"
         case .needsRepair:
             return "Needs Repair"
+        case .verificationRequired:
+            return "Verify Required"
         }
     }
 }
@@ -1293,6 +1297,16 @@ struct ModelCatalogInstallPresentation: Equatable {
 
 struct ModelDownloadAttemptPresentation: Equatable, Identifiable {
     let attempt: ModelInstallQueueAttempt
+    private let retainedDataRemovalIsBlocked: Bool
+
+    init(
+        attempt: ModelInstallQueueAttempt,
+        retainedDataRemovalIsBlocked: Bool = false
+    ) {
+        self.attempt = attempt
+        self.retainedDataRemovalIsBlocked =
+            retainedDataRemovalIsBlocked
+    }
 
     var id: String {
         attempt.id
@@ -1311,7 +1325,15 @@ struct ModelDownloadAttemptPresentation: Equatable, Identifiable {
     }
 
     var detailText: String {
-        ModelInstallProgressPresentation.detailText(for: state)
+        if let retainedData = attempt.resumableData,
+           state.phase == .revoked {
+            let size = ByteCountFormatter.string(
+                fromByteCount: retainedData.validatedBytes,
+                countStyle: .file
+            )
+            return "\(size) of retained partial data is not resumable and can be removed."
+        }
+        return ModelInstallProgressPresentation.detailText(for: state)
     }
 
     var progressValue: Double {
@@ -1344,6 +1366,12 @@ struct ModelDownloadAttemptPresentation: Equatable, Identifiable {
     var canRetry: Bool {
         ModelInstallRowPresentation.offersRetry(for: state)
     }
+
+    var canRemoveRetainedData: Bool {
+        state.phase == .revoked
+            && attempt.resumableData != nil
+            && !retainedDataRemovalIsBlocked
+    }
 }
 
 struct ModelDownloadsPresentation: Equatable {
@@ -1352,7 +1380,18 @@ struct ModelDownloadsPresentation: Equatable {
     let history: [ModelDownloadAttemptPresentation]
 
     init(attempts: [ModelInstallQueueAttempt]) {
-        let rows = attempts.map(ModelDownloadAttemptPresentation.init)
+        let nonterminalArtifactIDs = Set(
+            attempts.lazy.filter {
+                !$0.state.phase.isTerminal
+            }.map(\.artifactID)
+        )
+        let rows = attempts.map {
+            ModelDownloadAttemptPresentation(
+                attempt: $0,
+                retainedDataRemovalIsBlocked:
+                    nonterminalArtifactIDs.contains($0.artifactID)
+            )
+        }
         active = rows.filter { $0.state.phase.isPipelineActive }
         pending = rows.filter {
             !$0.state.phase.isTerminal && !$0.state.phase.isPipelineActive
@@ -2256,6 +2295,9 @@ struct ModelCatalogExperience: Equatable {
         if installState == nil {
             actions.insert(isInstalled ? .reinstall : .install)
         } else if let installState {
+            if installState.phase == .revoked {
+                actions.insert(isInstalled ? .reinstall : .install)
+            }
             if ModelInstallRowPresentation.offersCancel(for: installState) {
                 actions.insert(.cancelInstall)
             }
@@ -2290,6 +2332,8 @@ struct ModelCatalogExperience: Equatable {
             tokens.append(.ready)
         case .needsRepair:
             tokens.append(.needsRepair)
+        case .verificationRequired:
+            tokens.append(.verificationRequired)
         case .installed, nil:
             break
         }

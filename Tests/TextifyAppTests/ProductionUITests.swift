@@ -574,7 +574,15 @@ final class ProductionUITests: XCTestCase {
                     phase: phase,
                     bytesDownloaded: phase == .downloading ? 25 : 0,
                     totalBytes: phase == .downloading ? 100 : 0
-                )
+                ),
+                resumableData: phase == .revoked
+                    ? ModelInstallResumableData(
+                        sourceAttemptID: "attempt-\(index)",
+                        associatedAttemptID: "attempt-\(index)",
+                        validatedBytes: 1_024,
+                        fileCount: 1
+                    )
+                    : nil
             )
         }
 
@@ -598,6 +606,14 @@ final class ProductionUITests: XCTestCase {
         XCTAssertTrue(presentation.pending[3].canCancel)
         XCTAssertTrue(presentation.history[1].canRetry)
         XCTAssertFalse(presentation.history[3].canRetry)
+        XCTAssertTrue(
+            presentation.history[3].canRemoveRetainedData
+        )
+        XCTAssertTrue(
+            presentation.history[3].detailText.contains(
+                "not resumable"
+            )
+        )
         XCTAssertEqual(
             presentation.pending[2].revealRequest,
             ModelCatalogRevealRequest(
@@ -607,6 +623,51 @@ final class ProductionUITests: XCTestCase {
         )
         XCTAssertEqual(presentation.history[0].statusTitle, "Model installed")
         XCTAssertEqual(presentation.history[3].statusTitle, "Install revoked")
+    }
+
+    func testDownloadsHidesRetainedRemovalWhileSameArtifactAttemptIsActive() {
+        let retained = ModelInstallQueueAttempt(
+            id: "attempt-1",
+            artifactID: "artifact-a",
+            purpose: .transcription,
+            action: .install,
+            createdAt: "2026-07-24T10:00:00Z",
+            state: DownloadState(
+                modelID: "artifact-a",
+                phase: .revoked
+            ),
+            resumableData: ModelInstallResumableData(
+                sourceAttemptID: "attempt-1",
+                associatedAttemptID: "attempt-1",
+                validatedBytes: 1_024,
+                fileCount: 1
+            )
+        )
+        let active = ModelInstallQueueAttempt(
+            id: "attempt-2",
+            artifactID: "artifact-a",
+            purpose: .transcription,
+            action: .reinstall,
+            createdAt: "2026-07-24T10:01:00Z",
+            state: DownloadState(
+                modelID: "artifact-a",
+                phase: .downloading
+            )
+        )
+
+        let activePresentation = ModelDownloadsPresentation(
+            attempts: [retained, active]
+        )
+        let idlePresentation = ModelDownloadsPresentation(
+            attempts: [retained]
+        )
+
+        XCTAssertFalse(
+            activePresentation.history[0].canRemoveRetainedData
+        )
+        XCTAssertTrue(
+            idlePresentation.history[0].canRemoveRetainedData
+        )
     }
 
     func testLaunchAtLoginToggleUsesLiveStatus() {

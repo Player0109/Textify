@@ -425,6 +425,169 @@ final class ModelRevocationTests: XCTestCase {
         )
     }
 
+    func testRestorationSchemaRejectsVersionKeyMismatches() throws {
+        let privateKey = Curve25519.Signing.PrivateKey()
+        let v1WithRestorations = Data(
+            """
+            {
+              "revocationVersion": 1,
+              "generatedAt": "2026-07-24T12:00:00Z",
+              "records": [],
+              "restorations": []
+            }
+            """.utf8
+        )
+        let v2WithoutRestorations = Data(
+            """
+            {
+              "revocationVersion": 2,
+              "generatedAt": "2026-07-24T12:00:00Z",
+              "records": []
+            }
+            """.utf8
+        )
+
+        XCTAssertThrowsError(
+            try TrustedModelRevocationSnapshot(
+                revocationData: v1WithRestorations,
+                signatureData: signedEnvelope(
+                    revocationData: v1WithRestorations,
+                    privateKey: privateKey
+                ),
+                verifier: verifier(for: privateKey)
+            )
+        )
+        XCTAssertThrowsError(
+            try TrustedModelRevocationSnapshot(
+                revocationData: v2WithoutRestorations,
+                signatureData: signedEnvelope(
+                    revocationData: v2WithoutRestorations,
+                    privateKey: privateKey,
+                    contentTypeVersion: 2
+                ),
+                verifier: verifier(for: privateKey)
+            )
+        )
+    }
+
+    func testRestorationPolicyRejectsInvalidDuplicateAndMissingIdentity() {
+        let validTarget = ModelRestorationRecord(
+            restorationID: "restoration-a",
+            revocationRecordID: "revocation-a",
+            exactArtifactID: "artifact-a"
+        )
+        let invalidID = ModelRevocationEnvelope(
+            revocationVersion: 2,
+            generatedAt: "2026-07-24T12:00:00Z",
+            records: [],
+            restorations: [
+                ModelRestorationRecord(
+                    restorationID: "invalid/id",
+                    revocationRecordID: "revocation-a",
+                    exactArtifactID: "artifact-a"
+                ),
+            ]
+        )
+        let duplicateID = ModelRevocationEnvelope(
+            revocationVersion: 2,
+            generatedAt: "2026-07-24T12:00:00Z",
+            records: [],
+            restorations: [validTarget, validTarget]
+        )
+        let missingTarget = ModelRevocationEnvelope(
+            revocationVersion: 2,
+            generatedAt: "2026-07-24T12:00:00Z",
+            records: [],
+            restorations: [
+                ModelRestorationRecord(
+                    restorationID: "restoration-missing-target",
+                    revocationRecordID: "revocation-a"
+                ),
+            ]
+        )
+
+        XCTAssertThrowsError(
+            try ModelRevocationPolicy.validate(invalidID)
+        ) { error in
+            XCTAssertEqual(
+                error as? ModelRevocationPolicyError,
+                .invalidRestorationID("invalid/id")
+            )
+        }
+        XCTAssertThrowsError(
+            try ModelRevocationPolicy.validate(duplicateID)
+        ) { error in
+            XCTAssertEqual(
+                error as? ModelRevocationPolicyError,
+                .duplicateRestorationID("restoration-a")
+            )
+        }
+        XCTAssertThrowsError(
+            try ModelRevocationPolicy.validate(missingTarget)
+        ) { error in
+            XCTAssertEqual(
+                error as? ModelRevocationPolicyError,
+                .missingRestorationTarget("restoration-missing-target")
+            )
+        }
+    }
+
+    func testRestorationIdentityIsImmutableAcrossSignedRevisions() throws {
+        let privateKey = Curve25519.Signing.PrivateKey()
+        let revoked = try snapshot(
+            revision: "2026-07-24T10:00:00Z",
+            records: [
+                ModelRevocationRecord(
+                    recordID: "revocation-a",
+                    exactArtifactID: "artifact-a"
+                ),
+                ModelRevocationRecord(
+                    recordID: "revocation-b",
+                    exactArtifactID: "artifact-a"
+                ),
+            ],
+            privateKey: privateKey
+        )
+        let firstRestoration = try snapshot(
+            revision: "2026-07-24T11:00:00Z",
+            version: 2,
+            records: [],
+            restorations: [
+                ModelRestorationRecord(
+                    restorationID: "restoration-a",
+                    revocationRecordID: "revocation-a",
+                    exactArtifactID: "artifact-a"
+                ),
+            ],
+            privateKey: privateKey
+        )
+        let conflictingRestoration = try snapshot(
+            revision: "2026-07-24T12:00:00Z",
+            version: 2,
+            records: [],
+            restorations: [
+                ModelRestorationRecord(
+                    restorationID: "restoration-a",
+                    revocationRecordID: "revocation-b",
+                    exactArtifactID: "artifact-a"
+                ),
+            ],
+            privateKey: privateKey
+        )
+        let state = try TrustedModelRevocationState()
+            .accepting(revoked)
+            .accepting(firstRestoration)
+
+        XCTAssertThrowsError(
+            try state.accepting(conflictingRestoration)
+        ) { error in
+            XCTAssertEqual(
+                error as? TrustedModelRevocationStateError,
+                .conflictingRestoration("restoration-a")
+            )
+        }
+    }
+
     func testAcceptedRevocationsAreStickyAcrossOmissionStoreReloadAndRollback() throws {
         let privateKey = Curve25519.Signing.PrivateKey()
         let first = try snapshot(
@@ -484,6 +647,127 @@ final class ModelRevocationTests: XCTestCase {
             restored.overlay.records.map(\.recordID),
             ["first", "second"]
         )
+    }
+
+    func testHigherSignedRevisionRestoresOnlyReferencedExactTargets() throws {
+        let privateKey = Curve25519.Signing.PrivateKey()
+        let digest = ModelRevocationDigestTarget(
+            algorithm: .sha256,
+            value: String(repeating: "a", count: 64),
+            scope: .singleFilePayload
+        )
+        let first = try snapshot(
+            revision: "2026-07-24T10:00:00Z",
+            records: [
+                ModelRevocationRecord(
+                    recordID: "revocation-a",
+                    exactArtifactID: "artifact-a",
+                    contentDigest: digest
+                ),
+                ModelRevocationRecord(
+                    recordID: "overlapping-revocation",
+                    exactArtifactID: "artifact-a"
+                ),
+            ],
+            privateKey: privateKey
+        )
+        let restoration = try snapshot(
+            revision: "2026-07-24T11:00:00Z",
+            version: 2,
+            records: [],
+            restorations: [
+                ModelRestorationRecord(
+                    restorationID: "restoration-a",
+                    revocationRecordID: "revocation-a",
+                    exactArtifactID: "artifact-a",
+                    contentDigest: digest
+                ),
+            ],
+            privateKey: privateKey
+        )
+
+        let state = try TrustedModelRevocationState()
+            .accepting(first)
+            .accepting(restoration)
+
+        XCTAssertTrue(
+            state.overlay.isRevoked(
+                artifactID: "artifact-a",
+                trustedManifest: nil
+            ),
+            "Restoring one record must not clear another matching revocation."
+        )
+        XCTAssertEqual(
+            state.restorationIDsRequiringIntegrityVerification(
+                artifactID: "artifact-a",
+                trustedManifest: nil
+            ),
+            ["restoration-a"]
+        )
+        XCTAssertEqual(
+            state.overlay.records.map(\.recordID),
+            ["overlapping-revocation"]
+        )
+    }
+
+    func testRestorationRejectsUnknownRecordAndNonExactTarget() throws {
+        let privateKey = Curve25519.Signing.PrivateKey()
+        let first = try snapshot(
+            revision: "2026-07-24T10:00:00Z",
+            records: [
+                ModelRevocationRecord(
+                    recordID: "revocation-a",
+                    exactArtifactID: "artifact-a"
+                ),
+            ],
+            privateKey: privateKey
+        )
+        let unknown = try snapshot(
+            revision: "2026-07-24T11:00:00Z",
+            version: 2,
+            records: [],
+            restorations: [
+                ModelRestorationRecord(
+                    restorationID: "unknown-restoration",
+                    revocationRecordID: "missing-record",
+                    exactArtifactID: "artifact-a"
+                ),
+            ],
+            privateKey: privateKey
+        )
+        let mismatched = try snapshot(
+            revision: "2026-07-24T12:00:00Z",
+            version: 2,
+            records: [],
+            restorations: [
+                ModelRestorationRecord(
+                    restorationID: "mismatched-restoration",
+                    revocationRecordID: "revocation-a",
+                    exactArtifactID: "artifact-b"
+                ),
+            ],
+            privateKey: privateKey
+        )
+        let state = try TrustedModelRevocationState().accepting(first)
+
+        XCTAssertThrowsError(try state.accepting(unknown)) { error in
+            XCTAssertEqual(
+                error as? TrustedModelRevocationStateError,
+                .unknownRestorationRecord(
+                    restorationID: "unknown-restoration",
+                    revocationRecordID: "missing-record"
+                )
+            )
+        }
+        XCTAssertThrowsError(try state.accepting(mismatched)) { error in
+            XCTAssertEqual(
+                error as? TrustedModelRevocationStateError,
+                .restorationTargetMismatch(
+                    restorationID: "mismatched-restoration",
+                    revocationRecordID: "revocation-a"
+                )
+            )
+        }
     }
 
     func testSignedAliasEvidenceSurvivesCatalogOmissionAndStoreReload() throws {
@@ -591,23 +875,27 @@ final class ModelRevocationTests: XCTestCase {
 
     private func snapshot(
         revision: String,
+        version: Int = 1,
         records: [ModelRevocationRecord],
+        restorations: [ModelRestorationRecord] = [],
         privateKey: Curve25519.Signing.PrivateKey
     ) throws -> TrustedModelRevocationSnapshot {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let revocationData = try encoder.encode(
             ModelRevocationEnvelope(
-                revocationVersion: 1,
+                revocationVersion: version,
                 generatedAt: revision,
-                records: records
+                records: records,
+                restorations: restorations
             )
         )
         return try TrustedModelRevocationSnapshot(
             revocationData: revocationData,
             signatureData: signedEnvelope(
                 revocationData: revocationData,
-                privateKey: privateKey
+                privateKey: privateKey,
+                contentTypeVersion: version
             ),
             verifier: verifier(for: privateKey)
         )

@@ -576,19 +576,634 @@ final class ModelInstallCoordinatorQueueTests: XCTestCase {
             integrityCheckOperation: { artifactID in
                 authority.check(artifactID: artifactID)
             },
-            isArtifactKnownRevoked: { $0 == "artifact-a" },
+            isArtifactKnownRevoked: { artifactID, _ in
+                artifactID == "artifact-a"
+            },
             makeAttemptID: { "attempt-1" },
             now: { now }
         )
 
-        _ = coordinator.start(modelID: "artifact-a")
-        await waitUntil {
-            coordinator.attempt(id: "attempt-1")?.state.phase == .revoked
-        }
+        let attemptID = coordinator.start(modelID: "artifact-a")
+        await Task.yield()
 
+        XCTAssertNil(attemptID)
+        XCTAssertEqual(coordinator.attempts, [])
         XCTAssertEqual(authority.checkCount, 0)
         let startedArtifacts = await gate.startedArtifacts()
         XCTAssertEqual(startedArtifacts, [])
+    }
+
+    @MainActor
+    func testPersistedArtifactDigestStopsAttemptAfterCatalogOmission() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = ModelInstallQueueStore(
+            fileURL: directory.appendingPathComponent("install-queue.json")
+        )
+        let digest = ModelRevocationDigestTarget(
+            algorithm: .sha256,
+            value: String(repeating: "a", count: 64),
+            scope: .singleFilePayload
+        )
+        let identity = ModelInstallArtifactIdentity(
+            artifactID: "artifact-a",
+            contentDigests: [digest]
+        )
+        let revocations = KnownDigestRevocationProbe()
+        let gate = InstallExecutionGate()
+        let coordinator = ModelInstallCoordinator(
+            queueStore: store,
+            installOperation: { artifactID, _ in
+                await gate.begin(artifactID)
+                try await Task.sleep(nanoseconds: .max)
+            },
+            artifactIdentityProvider: { _ in identity },
+            isArtifactKnownRevoked: { _, authorizedIdentity in
+                revocations.contains(authorizedIdentity)
+            },
+            makeAttemptID: { "attempt-1" }
+        )
+
+        _ = coordinator.start(modelID: "artifact-a")
+        await waitUntilAsync {
+            await gate.startedArtifacts().contains("artifact-a")
+        }
+        revocations.revoke(digest)
+        coordinator.enforceKnownRevocations()
+        await waitUntil {
+            coordinator.attempt(id: "attempt-1")?.state.phase
+                == .revoked
+        }
+
+        XCTAssertEqual(
+            coordinator.attempt(id: "attempt-1")?
+                .authorizedArtifactIdentity,
+            identity
+        )
+        XCTAssertEqual(
+            try store.load().attempt(id: "attempt-1")?
+                .authorizedArtifactIdentity,
+            identity
+        )
+    }
+
+    @MainActor
+    func testRelaunchDiscoversRetainedStagingAfterDigestRevocationAndCatalogOmission() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let layout = ModelStorageLayout(rootDirectory: directory)
+        let store = ModelInstallQueueStore(
+            fileURL: layout.installQueueURL
+        )
+        let expectedFile = ModelFile(
+            filename: "model.bin",
+            url: "https://models.textify.example/model.bin",
+            sha256: String(repeating: "a", count: 64),
+            sizeBytes: 4
+        )
+        let identity = ModelInstallArtifactIdentity(
+            artifactID: "artifact-a",
+            contentDigests: [
+                ModelRevocationDigestTarget(
+                    algorithm: .sha256,
+                    value: expectedFile.sha256,
+                    scope: .singleFilePayload
+                ),
+            ],
+            expectedFiles: [expectedFile]
+        )
+        var queue = ModelInstallQueue()
+        _ = try queue.authorize(
+            artifactID: "artifact-a",
+            authorizedArtifactIdentity: identity,
+            purpose: .transcription,
+            action: .install,
+            attemptID: "attempt-1",
+            createdAt: "2026-07-24T10:00:00Z"
+        )
+        try queue.transition(
+            attemptID: "attempt-1",
+            to: DownloadState(
+                modelID: "artifact-a",
+                phase: .checkingSpace
+            )
+        )
+        try store.save(queue)
+        let stagingDirectory = layout.downloadsDirectory
+            .appendingPathComponent(
+                ".artifact-a.installing-crash",
+                isDirectory: true
+            )
+        try FileManager.default.createDirectory(
+            at: stagingDirectory,
+            withIntermediateDirectories: true
+        )
+        try Data("data".utf8).write(
+            to: stagingDirectory.appendingPathComponent("model.bin")
+        )
+        let started = InstallStartProbe()
+
+        let coordinator = ModelInstallCoordinator(
+            queueStore: store,
+            installOperation: { artifactID, _ in
+                await started.record(artifactID)
+            },
+            resumableDataProvider: { attempt in
+                guard let expectedFiles =
+                    attempt.authorizedArtifactIdentity?.expectedFiles
+                else {
+                    return nil
+                }
+                return try? ModelInstallResumableDataInspector(
+                    layout: layout
+                ).inspect(
+                    for: attempt,
+                    expectedFiles: expectedFiles
+                )
+            },
+            isArtifactKnownRevoked: { _, authorizedIdentity in
+                authorizedIdentity?.contentDigests.contains(
+                    identity.contentDigests[0]
+                ) == true
+            }
+        )
+        await waitUntil {
+            coordinator.attempt(id: "attempt-1")?
+                .resumableData?.validatedBytes == 4
+        }
+
+        XCTAssertEqual(
+            coordinator.attempt(id: "attempt-1")?.state.phase,
+            .revoked
+        )
+        let startedArtifacts = await started.values()
+        XCTAssertEqual(startedArtifacts, [])
+        XCTAssertEqual(
+            try store.load().attempt(id: "attempt-1")?
+                .resumableData?.validatedBytes,
+            4
+        )
+    }
+
+    @MainActor
+    func testAcceptedRevocationStopsActiveAndQueuedAttemptsThenRunsUnaffectedTail() async {
+        let started = InstallStartProbe()
+        let revocations = KnownRevocationProbe()
+        let ids = SequentialAttemptIDs([
+            "attempt-1",
+            "attempt-2",
+            "attempt-3",
+        ])
+        let coordinator = ModelInstallCoordinator(
+            installOperation: { artifactID, _ in
+                await started.record(artifactID)
+                if artifactID == "artifact-a" {
+                    try await Task.sleep(nanoseconds: .max)
+                }
+            },
+            resumableDataProvider: { attempt in
+                guard attempt.artifactID == "artifact-a" else {
+                    return nil
+                }
+                return ModelInstallResumableData(
+                    sourceAttemptID: attempt.id,
+                    associatedAttemptID: attempt.id,
+                    validatedBytes: 256,
+                    fileCount: 1
+                )
+            },
+            isArtifactKnownRevoked: { artifactID, _ in
+                revocations.contains(artifactID)
+            },
+            makeAttemptID: { ids.next() }
+        )
+        _ = coordinator.start(modelID: "artifact-a")
+        _ = coordinator.start(modelID: "artifact-b")
+        _ = coordinator.start(modelID: "artifact-c")
+        await waitUntilAsync {
+            await started.values().contains("artifact-a")
+        }
+
+        revocations.replace(with: ["artifact-a", "artifact-b"])
+        coordinator.enforceKnownRevocations()
+        await waitUntil {
+            coordinator.attempt(id: "attempt-3")?.state.phase == .installed
+        }
+
+        XCTAssertEqual(
+            coordinator.attempts.map(\.state.phase),
+            [.revoked, .revoked, .installed]
+        )
+        XCTAssertEqual(
+            coordinator.attempt(id: "attempt-1")?
+                .resumableData?.validatedBytes,
+            256
+        )
+        XCTAssertNil(coordinator.retry(attemptID: "attempt-1"))
+        coordinator.removeRetainedData(attemptID: "attempt-1")
+        XCTAssertNil(
+            coordinator.attempt(id: "attempt-1")?.resumableData
+        )
+        let startedArtifacts = await started.values()
+        XCTAssertEqual(
+            startedArtifacts,
+            ["artifact-a", "artifact-c"]
+        )
+    }
+
+    @MainActor
+    func testRetainedDataIsNotDeletedWhenQueuePersistenceFails() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = ModelInstallQueueStore(
+            fileURL: directory.appendingPathComponent("install-queue.json")
+        )
+        let retainedData = ModelInstallResumableData(
+            sourceAttemptID: "attempt-1",
+            associatedAttemptID: "attempt-1",
+            validatedBytes: 256,
+            fileCount: 1,
+            filenames: ["model.bin"]
+        )
+        let queue = ModelInstallQueue(
+            attempts: [
+                ModelInstallQueueAttempt(
+                    id: "attempt-1",
+                    artifactID: "artifact-a",
+                    purpose: .transcription,
+                    action: .install,
+                    createdAt: "2026-07-24T10:00:00Z",
+                    state: DownloadState(
+                        modelID: "artifact-a",
+                        phase: .revoked
+                    ),
+                    resumableData: retainedData
+                ),
+            ]
+        )
+        try store.save(queue)
+        let saveProbe = QueueSaveProbe(store: store)
+        let removalProbe = RetainedDataRemovalProbe()
+        let coordinator = ModelInstallCoordinator(
+            queueStore: store,
+            queueSaveOperation: { queue in
+                try saveProbe.save(queue)
+            },
+            installOperation: { _, _ in },
+            removeRetainedDataOperation: { attempt in
+                removalProbe.record(attempt.id)
+            }
+        )
+        saveProbe.shouldFail = true
+
+        coordinator.removeRetainedData(attemptID: "attempt-1")
+
+        XCTAssertEqual(removalProbe.attemptIDs, [])
+        XCTAssertEqual(
+            coordinator.attempt(id: "attempt-1")?.resumableData,
+            retainedData
+        )
+        XCTAssertEqual(
+            try store.load().attempt(id: "attempt-1")?.resumableData,
+            retainedData
+        )
+        XCTAssertEqual(
+            coordinator.persistenceErrorMessage,
+            "Textify could not save the Downloads queue."
+        )
+    }
+
+    @MainActor
+    func testRetainedDataRemovalDeletesUnionForSameArtifactAttempts() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = ModelInstallQueueStore(
+            fileURL: directory.appendingPathComponent("install-queue.json")
+        )
+        let queue = ModelInstallQueue(
+            attempts: [
+                ModelInstallQueueAttempt(
+                    id: "attempt-1",
+                    artifactID: "artifact-a",
+                    purpose: .transcription,
+                    action: .install,
+                    createdAt: "2026-07-24T10:00:00Z",
+                    state: DownloadState(
+                        modelID: "artifact-a",
+                        phase: .revoked
+                    ),
+                    resumableData: ModelInstallResumableData(
+                        sourceAttemptID: "attempt-1",
+                        associatedAttemptID: "attempt-1",
+                        validatedBytes: 256,
+                        fileCount: 1,
+                        filenames: ["old-model.bin"]
+                    )
+                ),
+                ModelInstallQueueAttempt(
+                    id: "attempt-2",
+                    artifactID: "artifact-a",
+                    purpose: .transcription,
+                    action: .reinstall,
+                    createdAt: "2026-07-24T11:00:00Z",
+                    state: DownloadState(
+                        modelID: "artifact-a",
+                        phase: .revoked
+                    ),
+                    resumableData: ModelInstallResumableData(
+                        sourceAttemptID: "attempt-2",
+                        associatedAttemptID: "attempt-2",
+                        validatedBytes: 512,
+                        fileCount: 1,
+                        filenames: ["new-model.bin"]
+                    )
+                ),
+            ]
+        )
+        try store.save(queue)
+        let removalProbe = RetainedDataRemovalProbe()
+        let coordinator = ModelInstallCoordinator(
+            queueStore: store,
+            installOperation: { _, _ in },
+            removeRetainedDataOperation: { attempt in
+                removalProbe.record(attempt.id)
+            }
+        )
+
+        coordinator.removeRetainedData(attemptID: "attempt-1")
+
+        XCTAssertEqual(
+            removalProbe.attemptIDs,
+            ["attempt-1", "attempt-2"]
+        )
+        XCTAssertNil(
+            coordinator.attempt(id: "attempt-1")?.resumableData
+        )
+        XCTAssertNil(
+            coordinator.attempt(id: "attempt-2")?.resumableData
+        )
+        XCTAssertTrue(
+            try store.load().attempts.allSatisfy {
+                $0.resumableData == nil
+            }
+        )
+    }
+
+    @MainActor
+    func testCancellingFreshRestoredInstallPreservesIsolatedRevokedBytes() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let layout = ModelStorageLayout(rootDirectory: directory)
+        try FileManager.default.createDirectory(
+            at: layout.downloadsDirectory,
+            withIntermediateDirectories: true
+        )
+        let partialURL = try layout.temporaryDownloadURL(
+            modelID: "artifact-a",
+            filename: "model.bin"
+        )
+        let metadataURL = try layout.downloadResumeMetadataURL(
+            modelID: "artifact-a",
+            filename: "model.bin"
+        )
+        try Data("retained partial".utf8).write(to: partialURL)
+        try Data("retained metadata".utf8).write(to: metadataURL)
+        let oldStaging = layout.downloadsDirectory.appendingPathComponent(
+            ".artifact-a.installing-old",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: oldStaging,
+            withIntermediateDirectories: true
+        )
+        try Data("staged model".utf8).write(
+            to: oldStaging.appendingPathComponent("model.bin")
+        )
+        let store = ModelInstallQueueStore(
+            fileURL: layout.installQueueURL
+        )
+        let retainedData = ModelInstallResumableData(
+            sourceAttemptID: "attempt-1",
+            associatedAttemptID: "attempt-1",
+            validatedBytes: 16,
+            fileCount: 1,
+            filenames: ["model.bin"]
+        )
+        let queue = ModelInstallQueue(
+            attempts: [
+                ModelInstallQueueAttempt(
+                    id: "attempt-1",
+                    artifactID: "artifact-a",
+                    purpose: .transcription,
+                    action: .install,
+                    createdAt: "2026-07-24T10:00:00Z",
+                    state: DownloadState(
+                        modelID: "artifact-a",
+                        phase: .revoked
+                    ),
+                    resumableData: retainedData
+                ),
+            ]
+        )
+        try store.save(queue)
+        let started = InstallStartProbe()
+        let remover = ModelInstallRetainedDataRemover(layout: layout)
+        let isolator = ModelInstallRetainedDataIsolator(layout: layout)
+        let coordinator = ModelInstallCoordinator(
+            queueStore: store,
+            installOperation: { artifactID, _ in
+                await started.record(artifactID)
+                try await Task.sleep(nanoseconds: .max)
+            },
+            removeStagingDataOperation: { attempt in
+                try remover.removeDirectoryStaging(
+                    modelID: attempt.artifactID
+                )
+            },
+            isolateRetainedDataOperation: { attempts in
+                try isolator.isolate(
+                    modelID: "artifact-a",
+                    filenames: attempts.flatMap {
+                        $0.resumableData?.filenames ?? []
+                    }
+                )
+            },
+            makeAttemptID: { "attempt-2" }
+        )
+
+        XCTAssertEqual(
+            coordinator.start(
+                modelID: "artifact-a",
+                action: .reinstall
+            ),
+            "attempt-2"
+        )
+        await waitUntilAsync {
+            await started.values().contains("artifact-a")
+        }
+        let liveStaging = layout.downloadsDirectory.appendingPathComponent(
+            ".artifact-a.installing-live",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: liveStaging,
+            withIntermediateDirectories: true
+        )
+        try Data("live model".utf8).write(
+            to: liveStaging.appendingPathComponent("model.bin")
+        )
+
+        XCTAssertNil(
+            coordinator.start(
+                modelID: "artifact-a",
+                action: .reinstall
+            )
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: liveStaging.path)
+        )
+        coordinator.removeRetainedData(attemptID: "attempt-1")
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: liveStaging.path)
+        )
+        XCTAssertEqual(
+            coordinator.attempt(id: "attempt-1")?.resumableData,
+            retainedData
+        )
+
+        coordinator.cancel(attemptID: "attempt-2")
+        await waitUntil {
+            coordinator.attempt(id: "attempt-2")?.state.phase
+                == .cancelled
+        }
+
+        let retainedArchives =
+            try FileManager.default.contentsOfDirectory(
+                at: layout.downloadsDirectory,
+                includingPropertiesForKeys: nil
+            ).filter {
+                $0.lastPathComponent.hasPrefix(
+                    ".artifact-a.retained-"
+                )
+            }
+        let partialArchive = try XCTUnwrap(
+            retainedArchives.first {
+                FileManager.default.fileExists(
+                    atPath: $0.appendingPathComponent(
+                        partialURL.lastPathComponent
+                    ).path
+                )
+            }
+        )
+        let stagingArchive = try XCTUnwrap(
+            retainedArchives.first {
+                FileManager.default.fileExists(
+                    atPath: $0.appendingPathComponent("model.bin").path
+                )
+            }
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: partialArchive.appendingPathComponent(
+                    partialURL.lastPathComponent
+                ).path
+            )
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: stagingArchive.appendingPathComponent(
+                    "model.bin"
+                ).path
+            )
+        )
+        XCTAssertEqual(
+            coordinator.attempt(id: "attempt-1")?.resumableData,
+            retainedData
+        )
+    }
+
+    @MainActor
+    func testRelaunchTerminatesEveryKnownRevokedAttemptWithoutStartingInstall() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = ModelInstallQueueStore(
+            fileURL: directory.appendingPathComponent("install-queue.json")
+        )
+        var queue = ModelInstallQueue()
+        _ = try queue.authorize(
+            artifactID: "artifact-a",
+            purpose: .transcription,
+            action: .install,
+            attemptID: "attempt-1",
+            createdAt: "2026-07-24T10:00:00Z"
+        )
+        try queue.transition(
+            attemptID: "attempt-1",
+            to: DownloadState(
+                modelID: "artifact-a",
+                phase: .checkingSpace
+            )
+        )
+        _ = try queue.authorize(
+            artifactID: "artifact-b",
+            purpose: .voiceCleaning,
+            action: .install,
+            attemptID: "attempt-2",
+            createdAt: "2026-07-24T10:01:00Z"
+        )
+        _ = try queue.authorize(
+            artifactID: "artifact-c",
+            purpose: .transcription,
+            action: .install,
+            attemptID: "attempt-3",
+            createdAt: "2026-07-24T10:02:00Z"
+        )
+        try queue.transition(
+            attemptID: "attempt-3",
+            to: DownloadState(
+                modelID: "artifact-c",
+                phase: .revoked
+            )
+        )
+        try store.save(queue)
+        let started = InstallStartProbe()
+
+        let coordinator = ModelInstallCoordinator(
+            queueStore: store,
+            installOperation: { artifactID, _ in
+                await started.record(artifactID)
+            },
+            resumableDataProvider: { attempt in
+                ModelInstallResumableData(
+                    sourceAttemptID: attempt.id,
+                    associatedAttemptID: attempt.id,
+                    validatedBytes: 128,
+                    fileCount: 1,
+                    filenames: ["model.bin"]
+                )
+            },
+            isArtifactKnownRevoked: { artifactID, _ in
+                ["artifact-a", "artifact-b"].contains(artifactID)
+            }
+        )
+        await waitUntil {
+            coordinator.attempts.allSatisfy {
+                $0.state.phase == .revoked
+            }
+        }
+
+        let startedArtifacts = await started.values()
+        XCTAssertEqual(startedArtifacts, [])
+        XCTAssertEqual(
+            try store.load().attempts.map(\.state.phase),
+            [.revoked, .revoked, .revoked]
+        )
+        XCTAssertEqual(
+            try store.load().attempts.map {
+                $0.resumableData?.validatedBytes
+            },
+            [128, 128, 128]
+        )
     }
 
     @MainActor
@@ -784,6 +1399,32 @@ private final class ModelInventoryRefreshProbe {
     }
 }
 
+@MainActor
+private final class QueueSaveProbe {
+    let store: ModelInstallQueueStore
+    var shouldFail = false
+
+    init(store: ModelInstallQueueStore) {
+        self.store = store
+    }
+
+    func save(_ queue: ModelInstallQueue) throws {
+        if shouldFail {
+            throw QueueCoordinatorFixtureError.failed
+        }
+        try store.save(queue)
+    }
+}
+
+@MainActor
+private final class RetainedDataRemovalProbe {
+    private(set) var attemptIDs: [String] = []
+
+    func record(_ attemptID: String) {
+        attemptIDs.append(attemptID)
+    }
+}
+
 private enum QueueCoordinatorFixtureError: Error {
     case failed
 }
@@ -831,6 +1472,49 @@ private actor InstallExecutionGate {
 
     func startedArtifacts() -> [String] {
         started
+    }
+}
+
+private actor InstallStartProbe {
+    private var started: [String] = []
+
+    func record(_ artifactID: String) {
+        started.append(artifactID)
+    }
+
+    func values() -> [String] {
+        started
+    }
+}
+
+@MainActor
+private final class KnownRevocationProbe {
+    private var artifactIDs = Set<String>()
+
+    func contains(_ artifactID: String) -> Bool {
+        artifactIDs.contains(artifactID)
+    }
+
+    func replace(with artifactIDs: Set<String>) {
+        self.artifactIDs = artifactIDs
+    }
+}
+
+@MainActor
+private final class KnownDigestRevocationProbe {
+    private var digest: ModelRevocationDigestTarget?
+
+    func contains(
+        _ identity: ModelInstallArtifactIdentity?
+    ) -> Bool {
+        guard let digest else {
+            return false
+        }
+        return identity?.contentDigests.contains(digest) == true
+    }
+
+    func revoke(_ digest: ModelRevocationDigestTarget) {
+        self.digest = digest
     }
 }
 

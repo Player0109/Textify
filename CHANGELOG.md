@@ -16,6 +16,9 @@
 - Added a bundled signed nine-model catalog with immutable commit-pinned
   Hugging Face downloads, per-file size/SHA-256 verification, signed catalog
   anti-downgrade selection, and Keychain-backed manifest signing.
+- Added signed model-revocation enforcement across current dictation segments,
+  active selections, persistent install queues, retained partial data, and
+  exact restoration records that require fresh integrity verification.
 - Added Fast Parakeet TDT-CTC 110M and Accurate Parakeet V2 English choices,
   both using the existing offline Core ML/Neural Engine runtime.
 - Added Parakeet Japanese as a Specialist choice after a fixed public-corpus

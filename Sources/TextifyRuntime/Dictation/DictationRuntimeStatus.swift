@@ -20,6 +20,7 @@ public enum VoiceCleaningRuntimeStatus: Equatable, Sendable {
 public enum VoiceCleaningWarningReason: String, Equatable, Sendable {
     case modelUnavailable
     case processingFailed
+    case revoked
 }
 
 public enum DictationCancellationReason: Equatable, Sendable {

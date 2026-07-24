@@ -15,6 +15,7 @@ public final class AppDictationService {
     public private(set) var status: DictationRuntimeStatus
     public private(set) var readiness: ReadinessSnapshot
     public private(set) var voiceCleaningStatus: VoiceCleaningRuntimeStatus
+    public private(set) var currentSegment: RuntimeCurrentSegment?
 
     private let dependencies: RuntimeDependencies
     private var triggerStateMachine: TriggerStateMachine
@@ -25,7 +26,13 @@ public final class AppDictationService {
     private var activeSessionID: UUID?
     private var activeSessionPreferences:
         (sessionID: UUID, preferences: AppPreferences)?
+    private var activeSegmentContext: (
+        sessionID: UUID,
+        transcriptionModel: RuntimeActiveModel,
+        voiceCleaningModel: RuntimeActiveModel?
+    )?
     private var insertionSessionID: UUID?
+    private var revokedArtifactIDs: Set<String> = []
     private var modelTransactionInProgress = false
     private var modelTransactionWaiters:
         [CheckedContinuation<Void, Never>] = []
@@ -38,6 +45,7 @@ public final class AppDictationService {
         self.triggerStateMachine = triggerStateMachine
         self.status = .idle
         self.voiceCleaningStatus = .disabled
+        self.currentSegment = nil
         self.readiness = ReadinessSnapshot(
             permissions: RuntimePermissionSnapshot(
                 microphone: .unknown,
@@ -91,6 +99,10 @@ public final class AppDictationService {
         let installedReadiness = await dependencies.models.readiness(for: activeModel)
 
         if let activeModel, case .ready = installedReadiness {
+            guard !revokedArtifactIDs.contains(activeModel.id) else {
+                await prepareVoiceCleaner(preferences: preferences)
+                return await refreshReadiness()
+            }
             let startedAt = dependencies.clock.nowMilliseconds()
             do {
                 try await dependencies.transcriber.prepare(model: activeModel)
@@ -150,6 +162,9 @@ public final class AppDictationService {
                 readiness: .missing(modelID: modelID)
             )
         }
+        guard !revokedArtifactIDs.contains(model.id) else {
+            return .revoked(modelID: modelID)
+        }
 
         let installedReadiness = await dependencies.models.readiness(for: model)
         guard case .ready(modelID: modelID) = installedReadiness else {
@@ -171,6 +186,9 @@ public final class AppDictationService {
             case .voiceCleaning:
                 try await dependencies.voiceCleaner.prepare(model: model)
             }
+            guard !revokedArtifactIDs.contains(model.id) else {
+                return .revoked(modelID: modelID)
+            }
             return .ready(modelID: modelID)
         } catch {
             return .failed(modelID: modelID)
@@ -191,7 +209,30 @@ public final class AppDictationService {
         else {
             return .missing(modelID: modelID)
         }
+        guard !revokedArtifactIDs.contains(model.id) else {
+            return .revoked(modelID: modelID)
+        }
         return await dependencies.models.readiness(for: model)
+    }
+
+    public func updateRevokedArtifactIDs(
+        _ artifactIDs: Set<String>
+    ) async {
+        guard artifactIDs != revokedArtifactIDs else {
+            return
+        }
+        revokedArtifactIDs = artifactIDs
+        let preferences = await dependencies.settings.loadPreferences()
+        if let cleanerID = preferences.activeVoiceCleaningModelID,
+           artifactIDs.contains(cleanerID),
+           currentSegment?.voiceCleaningArtifactID != cleanerID {
+            await dependencies.voiceCleaner.unload()
+            voiceCleaningStatus = .warning(
+                modelID: cleanerID,
+                reason: .revoked
+            )
+        }
+        _ = await refreshReadiness()
     }
 
     private func resolvedModelSelection(
@@ -295,6 +336,8 @@ public final class AppDictationService {
             activationTarget = nil
             activeSessionID = nil
             activeSessionPreferences = nil
+            activeSegmentContext = nil
+            currentSegment = nil
             resetTriggerStateMachine()
             await dependencies.audio.discardRecording()
             status = .cancelled(.noSpeechDetected)
@@ -315,6 +358,8 @@ public final class AppDictationService {
 
         activeSessionID = nil
         activeSessionPreferences = nil
+        activeSegmentContext = nil
+        currentSegment = nil
         resetTriggerStateMachine()
         await dependencies.audio.discardRecording()
         status = .cancelled(reason)
@@ -403,9 +448,53 @@ public final class AppDictationService {
             status = .blocked(.readinessBlocked(.noActiveModel))
             return
         }
+        guard !revokedArtifactIDs.contains(activeModel.id) else {
+            activeSessionID = nil
+            activationTarget = nil
+            resetTriggerStateMachine()
+            status = .blocked(
+                .readinessBlocked(
+                    .activeModelRevoked(modelID: activeModel.id)
+                )
+            )
+            return
+        }
+        let voiceCleaningModel =
+            await admittedVoiceCleaningModel(preferences: preferences)
+        guard !revokedArtifactIDs.contains(activeModel.id) else {
+            activeSessionID = nil
+            activationTarget = nil
+            resetTriggerStateMachine()
+            status = .blocked(
+                .readinessBlocked(
+                    .activeModelRevoked(modelID: activeModel.id)
+                )
+            )
+            return
+        }
+        let admittedVoiceCleaningModel: RuntimeActiveModel?
+        if let voiceCleaningModel,
+           revokedArtifactIDs.contains(voiceCleaningModel.id) {
+            voiceCleaningStatus = .warning(
+                modelID: voiceCleaningModel.id,
+                reason: .revoked
+            )
+            admittedVoiceCleaningModel = nil
+        } else {
+            admittedVoiceCleaningModel = voiceCleaningModel
+        }
         activeSessionPreferences = (
             sessionID: sessionID,
             preferences: preferences
+        )
+        activeSegmentContext = (
+            sessionID: sessionID,
+            transcriptionModel: activeModel,
+            voiceCleaningModel: admittedVoiceCleaningModel
+        )
+        currentSegment = RuntimeCurrentSegment(
+            transcriptionArtifactID: activeModel.id,
+            voiceCleaningArtifactID: admittedVoiceCleaningModel?.id
         )
 
         do {
@@ -444,6 +533,8 @@ public final class AppDictationService {
             }
             activeSessionID = nil
             activeSessionPreferences = nil
+            activeSegmentContext = nil
+            currentSegment = nil
             activationTarget = nil
             resetTriggerStateMachine()
             status = .failed(.audioStartFailed)
@@ -467,9 +558,13 @@ public final class AppDictationService {
             }
         }
         guard let sessionPreferences = activeSessionPreferences,
-              sessionPreferences.sessionID == sessionID
+              sessionPreferences.sessionID == sessionID,
+              let segmentContext = activeSegmentContext,
+              segmentContext.sessionID == sessionID
         else {
             activeSessionID = nil
+            activeSegmentContext = nil
+            currentSegment = nil
             activationTarget = nil
             status = .failed(.transcriptionFailed)
             return
@@ -477,6 +572,10 @@ public final class AppDictationService {
         defer {
             if activeSessionPreferences?.sessionID == sessionID {
                 activeSessionPreferences = nil
+            }
+            if activeSegmentContext?.sessionID == sessionID {
+                activeSegmentContext = nil
+                currentSegment = nil
             }
         }
         let preferences = sessionPreferences.preferences
@@ -496,12 +595,7 @@ public final class AppDictationService {
                 return
             }
 
-            guard let activeModel = await dependencies.models.resolveActiveModel(preferences: preferences) else {
-                activeSessionID = nil
-                activationTarget = nil
-                status = .blocked(.readinessBlocked(.noActiveModel))
-                return
-            }
+            let activeModel = segmentContext.transcriptionModel
 
             do {
                 try await dependencies.transcriber.prepare(model: activeModel)
@@ -524,7 +618,7 @@ public final class AppDictationService {
             )
             let preparedAudio = await voiceCleanedAudio(
                 transcriptionAudio,
-                preferences: preferences
+                model: segmentContext.voiceCleaningModel
             )
             let inferenceStartedAt = dependencies.clock.nowMilliseconds()
             let result: TranscriptionResult
@@ -666,6 +760,14 @@ public final class AppDictationService {
             )
             return
         }
+        guard !revokedArtifactIDs.contains(model.id) else {
+            await dependencies.voiceCleaner.unload()
+            voiceCleaningStatus = .warning(
+                modelID: model.id,
+                reason: .revoked
+            )
+            return
+        }
 
         voiceCleaningStatus = .preparing(modelID: model.id)
         let startedAt = dependencies.clock.nowMilliseconds()
@@ -693,20 +795,16 @@ public final class AppDictationService {
 
     private func voiceCleanedAudio(
         _ audio: TranscriptionAudioBuffer,
-        preferences: AppPreferences
+        model: RuntimeActiveModel?
     ) async -> TranscriptionAudioBuffer {
-        guard let selectedModelID = preferences.activeVoiceCleaningModelID else {
+        guard let model else {
+            if case .warning(_, reason: .revoked) = voiceCleaningStatus {
+                return audio
+            }
             if voiceCleaningStatus != .disabled {
                 await dependencies.voiceCleaner.unload()
                 voiceCleaningStatus = .disabled
             }
-            return audio
-        }
-        guard let model = await dependencies.models.resolveActiveVoiceCleaningModel(
-            preferences: preferences
-        ), case .ready = await dependencies.models.readiness(for: model) else {
-            await dependencies.voiceCleaner.unload()
-            voiceCleaningStatus = .warning(modelID: selectedModelID, reason: .modelUnavailable)
             return audio
         }
 
@@ -734,6 +832,41 @@ public final class AppDictationService {
             )
             return audio
         }
+    }
+
+    private func admittedVoiceCleaningModel(
+        preferences: AppPreferences
+    ) async -> RuntimeActiveModel? {
+        guard let selectedModelID =
+                preferences.activeVoiceCleaningModelID
+        else {
+            return nil
+        }
+        guard !revokedArtifactIDs.contains(selectedModelID) else {
+            await dependencies.voiceCleaner.unload()
+            voiceCleaningStatus = .warning(
+                modelID: selectedModelID,
+                reason: .revoked
+            )
+            return nil
+        }
+        guard let model =
+                await dependencies.models.resolveActiveVoiceCleaningModel(
+                    preferences: preferences
+                ),
+              case .ready = await dependencies.models.readiness(for: model)
+        else {
+            return nil
+        }
+        guard !revokedArtifactIDs.contains(model.id) else {
+            await dependencies.voiceCleaner.unload()
+            voiceCleaningStatus = .warning(
+                modelID: model.id,
+                reason: .revoked
+            )
+            return nil
+        }
+        return model
     }
 
     private func logRuntimeFailure(
@@ -835,6 +968,9 @@ public final class AppDictationService {
         guard let activeModel else {
             return .noActiveModel
         }
+        guard !revokedArtifactIDs.contains(activeModel.id) else {
+            return .revoked(modelID: activeModel.id)
+        }
 
         guard case .ready = installedReadiness else {
             return installedReadiness
@@ -849,7 +985,7 @@ public final class AppDictationService {
             return modelID == activeModel.id ? transcriberReadiness : installedReadiness
         case let .ready(modelID):
             return modelID == activeModel.id ? transcriberReadiness : installedReadiness
-        case .noActiveModel, .missing:
+        case .noActiveModel, .missing, .revoked:
             return installedReadiness
         }
     }

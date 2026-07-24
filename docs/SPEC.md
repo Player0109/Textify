@@ -1937,12 +1937,20 @@ The revocation body is strict JSON:
 
 ```json
 {
-  "revocationVersion": 1,
+  "revocationVersion": 2,
   "generatedAt": "2026-07-24T12:00:00Z",
   "records": [
     {
       "recordID": "security-advisory-1",
       "exactArtifactID": "exact-artifact-id",
+      "contentDigest": null
+    }
+  ],
+  "restorations": [
+    {
+      "restorationID": "restoration-1",
+      "revocationRecordID": "earlier-security-advisory",
+      "exactArtifactID": "restored-exact-artifact-id",
       "contentDigest": null
     }
   ]
@@ -1959,7 +1967,7 @@ domain:
   "algorithm": "Ed25519",
   "keyId": "model-manifest-v1",
   "revocationFile": "revocations.json",
-  "contentType": "application/vnd.textify.model-revocations+json;version=1",
+  "contentType": "application/vnd.textify.model-revocations+json;version=2",
   "contentSHA256": "lowercase-hex-sha256-of-exact-revocation-json-bytes",
   "signature": "base64url-no-padding-ed25519-signature"
 }
@@ -1969,7 +1977,10 @@ The signed canonical payload begins with
 `TEXTIFY-MODEL-REVOCATIONS-SIGNATURE-V1` and binds every envelope field in the
 same line-oriented form as the model-manifest signature. Textify verifies the
 strict signature envelope, exact content hash, and Ed25519 signature before
-decoding or applying the revocation body.
+decoding or applying the revocation body. Revocation body versions 1 and 2 are
+supported; version 1 has only `records`, while version 2 requires the
+`restorations` array. The detached content-type version must equal the body
+version.
 
 Each revocation record has a stable `recordID` and targets an Exact Artifact ID,
 a typed immutable content digest, or both. When both are present, either match
@@ -1995,6 +2006,39 @@ artifact alias, Textify also persists that exact signed catalog evidence and
 re-verifies it on load so a later catalog omission cannot break the identity
 relationship.
 
+A restoration is valid only in a higher signed revision. It has an immutable
+`restorationID`, references a revocation record from an already accepted prior
+revision, and repeats one or both exact targets from that record byte-for-byte.
+A restoration removes only those repeated predicates from that referenced
+record. It cannot clear a different overlapping record, refer to a record first
+introduced in the same revision, or substitute a compatible/fallback artifact.
+Restoration does not activate, retry, repair, reinstall, or switch back to
+content. Restored installed content remains `Verify Required`; Use or Enable is
+unavailable until an explicit integrity verification succeeds for the current
+set of applicable restoration IDs. That acknowledgment is persisted in the
+Installation Receipt.
+
+At Current Segment admission, Textify captures the transcription Exact Artifact
+identity and the optional Voice Cleaning Exact Artifact identity. A segment
+already admitted may finish after a matching revocation is accepted. No later
+segment may admit that identity. At the segment boundary, a revoked active
+transcription identity disables Dictation and a revoked active cleaner disables
+Voice Cleaning. Textify exposes an explicit purpose-specific replacement picker
+and never activates an incompatibility fallback as a revocation replacement.
+
+An accepted revocation terminates every affected current or queued installation
+attempt as `Revoked`, with no Retry action. Download, resume, extraction,
+compilation, repair, and activation stop at the next durable boundary. A
+read-only integrity hash already in progress may finish, but Textify yields and
+rechecks revocation before crossing into installation or activation. Each
+authorized Queue Attempt persists its trusted Exact Artifact identity, typed
+digest targets, and expected file layout, so a later catalog omission cannot
+prevent an accepted revocation from matching it or its retained data from being
+discovered. On relaunch, Textify rediscovers validated partial and staging data
+for every revoked attempt and records that data as retained and nonresumable
+until the user explicitly removes it; removal deletes its attributed partial,
+resume metadata, and staging paths.
+
 Revocation never changes an Installation Receipt's Curated, No Longer Curated,
 Legacy, or Custom placement and never erases license, provenance, local import
 history, or diagnostic evidence. A revoked Exact Artifact stays visible with
@@ -2002,7 +2046,16 @@ history, or diagnostic evidence. A revoked Exact Artifact stays visible with
 reveal, on-demand verification, deletion, and diagnostic copying remain
 available. Use, Enable, Install, Reinstall, Repair, Export, activation, and
 recommendation/fallback presentation are unavailable. Compatibility and
-integrity evidence remain visible as independent facts.
+integrity evidence remain visible as independent facts. After an exact signed
+restoration, Install/Reinstall and verification can again be explicitly
+requested, but neither action retries the revoked Queue Attempt. Before a fresh
+transfer, Textify moves any retained partial and resume data into a dedicated
+archive outside live transfer and staging-cleanup paths without deleting it or
+consuming it as resume credit. Those isolated bytes remain visible until an
+explicit Remove Data action. While a fresh attempt for the same Exact Artifact
+is nonterminal, Textify neither authorizes a duplicate attempt nor offers or
+executes retained-data removal. Activation remains gated by successful
+integrity verification.
 
 Matching is local. Revocation fetches are anonymous HTTPS GETs for only the two
 configured files. Textify never sends installed Artifact IDs, Custom content

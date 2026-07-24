@@ -544,6 +544,8 @@ private struct ModelsSettingsPane: View {
     @State private var discoveryQuery = ModelCatalogQuery()
     @State private var hierarchyState = ModelCatalogHierarchyState()
     @State private var inspectorController = ModelCatalogInspectorController()
+    @State private var verificationRestorationIDsByArtifact:
+        [String: [String]] = [:]
     @State private var showsInspector = false
     @State private var showsModelVariantsHelp = false
     @State private var showsDownloads = false
@@ -565,6 +567,16 @@ private struct ModelsSettingsPane: View {
             )
         ) {
             catalogStatus(hasRows: !catalogExperience.rows.isEmpty)
+
+            if services.settingsRouter.modelReplacementPurpose
+                == destination.purpose {
+                Label(
+                    "The previous selection was revoked. Choose and explicitly activate a replacement.",
+                    systemImage: "exclamationmark.shield"
+                )
+                .font(.callout)
+                .foregroundStyle(.orange)
+            }
 
             if let modelMessage {
                 Text(modelMessage)
@@ -633,7 +645,7 @@ private struct ModelsSettingsPane: View {
                     presentation: inspectorController.presentation,
                     localDetailsState: inspectorController.localDetailsState,
                     verificationState: inspectorController.verificationState,
-                    onVerify: inspectorController.verifySelectedArtifact
+                    onVerify: verifySelectedArtifact
                 )
             }
             .scrollContentBackground(.hidden)
@@ -663,7 +675,21 @@ private struct ModelsSettingsPane: View {
         }
         .onChange(of: inspectorController.verificationState) { _, state in
             switch state {
-            case .verified, .failed:
+            case let .verified(artifactID):
+                let expectedRestorationIDs =
+                    verificationRestorationIDsByArtifact[artifactID]
+                        ?? []
+                verificationRestorationIDsByArtifact[artifactID] = nil
+                Task {
+                    await services.acknowledgeRestoredModelIntegrity(
+                        artifactID,
+                        expectedRestorationIDs:
+                            expectedRestorationIDs
+                    )
+                    services.refreshModelStorageInventory()
+                }
+            case let .failed(artifactID):
+                verificationRestorationIDsByArtifact[artifactID] = nil
                 services.refreshModelStorageInventory()
             case .unavailable, .available, .verifying:
                 break
@@ -816,6 +842,22 @@ private struct ModelsSettingsPane: View {
             services.refreshModelStorageInventory()
             modelMessage = services.dictation.readiness.model.settingsModelStatus
         }
+    }
+
+    private func verifySelectedArtifact() {
+        guard case let .exactArtifact(artifact) =
+                inspectorController.presentation
+        else {
+            return
+        }
+        let record = services.installedModelRecords.first {
+            $0.model.id == artifact.id
+        }
+        verificationRestorationIDsByArtifact[artifact.id] =
+            record.map {
+                services.pendingRestorationVerificationIDs(for: $0)
+            } ?? []
+        inspectorController.verifySelectedArtifact()
     }
 
     private func catalogSurface(
@@ -1488,6 +1530,10 @@ private struct ModelDownloadsPopover: View {
                             services.modelInstallCoordinator.retry(
                                 attemptID: row.id
                             )
+                        },
+                        onRemoveRetainedData: {
+                            services.modelInstallCoordinator
+                                .removeRetainedData(attemptID: row.id)
                         }
                     )
                 }
@@ -1503,6 +1549,7 @@ private struct ModelDownloadAttemptRow: View {
     let onResume: () -> Void
     let onCancel: () -> Void
     let onRetry: () -> Void
+    let onRemoveRetainedData: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -1562,6 +1609,13 @@ private struct ModelDownloadAttemptRow: View {
                 }
                 if row.canCancel {
                     Button("Cancel", role: .destructive, action: onCancel)
+                }
+                if row.canRemoveRetainedData {
+                    Button(
+                        "Remove Data",
+                        role: .destructive,
+                        action: onRemoveRetainedData
+                    )
                 }
             }
             .buttonStyle(.borderless)
@@ -4213,6 +4267,8 @@ extension RuntimeModelReadiness {
             return "Ready"
         case .failed:
             return "Unavailable"
+        case .revoked:
+            return "Revoked"
         }
     }
 }

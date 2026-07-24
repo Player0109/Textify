@@ -380,7 +380,8 @@ public struct CustomWhisperModelImporter {
                         to: priorSourceFilenames
                     )
                 )
-            )
+            ),
+            verifiedRestorationIDs: record.verifiedRestorationIDs
         )
     }
 }

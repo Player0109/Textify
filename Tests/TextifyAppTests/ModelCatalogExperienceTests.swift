@@ -155,6 +155,39 @@ final class ModelCatalogExperienceTests: XCTestCase {
         )
     }
 
+    func testRestoredArtifactOffersFreshInstallWithoutRetryingRevokedAttempt() throws {
+        let restored = model(id: "restored")
+        let revokedHistory = DownloadState(
+            modelID: restored.id,
+            phase: .revoked,
+            attemptID: "revoked-attempt"
+        )
+        let uninstalled = ModelCatalogExperience(
+            trustedModels: [restored],
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: revokedHistory
+        )
+        let installedExperience = ModelCatalogExperience(
+            trustedModels: [restored],
+            installedRecords: [installed(restored)],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: revokedHistory,
+            managedReadinessByModelID: [restored.id: .ready]
+        )
+        let uninstalledRow = try XCTUnwrap(
+            uninstalled.rows.first { $0.id == restored.id }
+        )
+        let installedRow = try XCTUnwrap(
+            installedExperience.rows.first { $0.id == restored.id }
+        )
+
+        XCTAssertTrue(uninstalledRow.actions.contains(.install))
+        XCTAssertFalse(uninstalledRow.actions.contains(.retryInstall))
+        XCTAssertTrue(installedRow.actions.contains(.reinstall))
+        XCTAssertFalse(installedRow.actions.contains(.retryInstall))
+    }
+
     func testCombinesTrustedInstalledActiveAndTransferStateIntoRows() throws {
         let downloadable = model(id: "downloadable")
         let active = model(id: "active")

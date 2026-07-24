@@ -230,6 +230,109 @@ final class ModelInstallQueueTests: XCTestCase {
         }
     }
 
+    func testRevokedAttemptRetainsVisibleNonresumableDataUntilExplicitRemoval() throws {
+        var queue = ModelInstallQueue()
+        _ = try queue.authorize(
+            artifactID: "artifact-a",
+            purpose: .transcription,
+            action: .install,
+            attemptID: "attempt-1",
+            createdAt: "2026-07-24T10:00:00Z"
+        )
+        try queue.transition(
+            attemptID: "attempt-1",
+            to: DownloadState(
+                modelID: "artifact-a",
+                phase: .revoked,
+                bytesDownloaded: 512,
+                totalBytes: 1_024
+            )
+        )
+        try queue.associateResumableData(
+            ModelInstallResumableData(
+                sourceAttemptID: "attempt-1",
+                associatedAttemptID: "attempt-1",
+                validatedBytes: 512,
+                fileCount: 1
+            ),
+            with: "attempt-1"
+        )
+
+        XCTAssertEqual(
+            queue.attempt(id: "attempt-1")?.resumableData?.validatedBytes,
+            512
+        )
+        XCTAssertThrowsError(
+            try queue.retry(
+                attemptID: "attempt-1",
+                newAttemptID: "retry",
+                createdAt: "2026-07-24T10:01:00Z"
+            )
+        )
+
+        try queue.discardRetainedData(attemptID: "attempt-1")
+
+        XCTAssertNil(queue.attempt(id: "attempt-1")?.resumableData)
+        XCTAssertEqual(
+            queue.attempt(id: "attempt-1")?.state.bytesDownloaded,
+            512,
+            "History remains truthful after retained bytes are removed."
+        )
+    }
+
+    func testRetainedDataRemovalTargetsOnlyTheSelectedAttempt() throws {
+        let firstData = ModelInstallResumableData(
+            sourceAttemptID: "attempt-1",
+            associatedAttemptID: "attempt-1",
+            validatedBytes: 512,
+            fileCount: 1,
+            filenames: ["old-model.bin"]
+        )
+        let secondData = ModelInstallResumableData(
+            sourceAttemptID: "attempt-2",
+            associatedAttemptID: "attempt-2",
+            validatedBytes: 1_024,
+            fileCount: 1,
+            filenames: ["new-model.bin"]
+        )
+        var queue = ModelInstallQueue(
+            attempts: [
+                ModelInstallQueueAttempt(
+                    id: "attempt-1",
+                    artifactID: "artifact-a",
+                    purpose: .transcription,
+                    action: .install,
+                    createdAt: "2026-07-24T10:00:00Z",
+                    state: DownloadState(
+                        modelID: "artifact-a",
+                        phase: .revoked
+                    ),
+                    resumableData: firstData
+                ),
+                ModelInstallQueueAttempt(
+                    id: "attempt-2",
+                    artifactID: "artifact-a",
+                    purpose: .transcription,
+                    action: .reinstall,
+                    createdAt: "2026-07-24T11:00:00Z",
+                    state: DownloadState(
+                        modelID: "artifact-a",
+                        phase: .revoked
+                    ),
+                    resumableData: secondData
+                ),
+            ]
+        )
+
+        try queue.discardRetainedData(attemptID: "attempt-1")
+
+        XCTAssertNil(queue.attempt(id: "attempt-1")?.resumableData)
+        XCTAssertEqual(
+            queue.attempt(id: "attempt-2")?.resumableData,
+            secondData
+        )
+    }
+
     func testCancelTargetsExactAttempt() throws {
         var queue = try twoAttemptQueue()
 
@@ -420,7 +523,8 @@ final class ModelInstallQueueTests: XCTestCase {
                 sourceAttemptID: "attempt-1",
                 associatedAttemptID: "attempt-1",
                 validatedBytes: 512,
-                fileCount: 1
+                fileCount: 1,
+                filenames: ["model.bin"]
             )
         )
 
@@ -457,6 +561,54 @@ final class ModelInstallQueueTests: XCTestCase {
                 ]
             )
         )
+    }
+
+    func testRevokedAttemptReportsValidatedDirectoryStagingAsRetainedData() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let layout = ModelStorageLayout(rootDirectory: directory)
+        let stagingDirectory = layout.downloadsDirectory
+            .appendingPathComponent(
+                ".artifact-a.installing-fixture",
+                isDirectory: true
+            )
+        let stagedFile = stagingDirectory
+            .appendingPathComponent("encoder/model.bin")
+        try FileManager.default.createDirectory(
+            at: stagedFile.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data(repeating: 7, count: 512).write(to: stagedFile)
+        let attempt = ModelInstallQueueAttempt(
+            id: "attempt-1",
+            artifactID: "artifact-a",
+            purpose: .transcription,
+            action: .install,
+            createdAt: "2026-07-24T10:00:00Z",
+            state: DownloadState(
+                modelID: "artifact-a",
+                phase: .revoked
+            )
+        )
+
+        let retained = try ModelInstallResumableDataInspector(
+            layout: layout
+        ).inspect(
+            for: attempt,
+            expectedFiles: [
+                ModelFile(
+                    filename: "model.bin",
+                    relativePath: "encoder/model.bin",
+                    url: "https://github.com/Player0109/Textify/releases/download/models-v3/model.bin",
+                    sha256: String(repeating: "a", count: 64),
+                    sizeBytes: 512
+                ),
+            ]
+        )
+
+        XCTAssertEqual(retained?.validatedBytes, 512)
+        XCTAssertEqual(retained?.fileCount, 1)
+        XCTAssertEqual(retained?.filenames, ["model.bin"])
     }
 
     func testResumeInspectorDoesNotCreditSparsePreallocation() throws {
@@ -519,6 +671,183 @@ final class ModelInstallQueueTests: XCTestCase {
                     ),
                 ]
             )
+        )
+    }
+
+    func testExplicitRetainedDataRemovalDeletesPartialMetadataAndStagingBytes() throws {
+        let root = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let layout = ModelStorageLayout(rootDirectory: root)
+        let installedDirectory = try layout.installedModelDirectory(
+            modelID: "artifact-a"
+        )
+        try FileManager.default.createDirectory(
+            at: layout.downloadsDirectory,
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: installedDirectory,
+            withIntermediateDirectories: true
+        )
+        let partialURL = try layout.temporaryDownloadURL(
+            modelID: "artifact-a",
+            filename: "model.bin"
+        )
+        let metadataURL = try layout.downloadResumeMetadataURL(
+            modelID: "artifact-a",
+            filename: "model.bin"
+        )
+        let directoryStagingURL = layout.downloadsDirectory
+            .appendingPathComponent(".artifact-a.installing-fixture")
+        let fileStagingURL = installedDirectory
+            .appendingPathComponent(".model.bin.installing-fixture")
+        try Data("partial".utf8).write(to: partialURL)
+        try Data("metadata".utf8).write(to: metadataURL)
+        try FileManager.default.createDirectory(
+            at: directoryStagingURL,
+            withIntermediateDirectories: true
+        )
+        try Data("staged".utf8).write(to: fileStagingURL)
+
+        try ModelInstallRetainedDataRemover(layout: layout).remove(
+            modelID: "artifact-a",
+            expectedFiles: [
+                ModelFile(
+                    filename: "model.bin",
+                    url: "https://github.com/Player0109/Textify/releases/download/models-v3/model.bin",
+                    sha256: String(repeating: "a", count: 64),
+                    sizeBytes: 7
+                ),
+            ]
+        )
+
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: partialURL.path)
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: metadataURL.path)
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: directoryStagingURL.path
+            )
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: fileStagingURL.path)
+        )
+    }
+
+    func testFreshAttemptIsolationSurvivesStagingCleanupUntilExplicitRemoval() throws {
+        let root = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let layout = ModelStorageLayout(rootDirectory: root)
+        try FileManager.default.createDirectory(
+            at: layout.downloadsDirectory,
+            withIntermediateDirectories: true
+        )
+        let partialURL = try layout.temporaryDownloadURL(
+            modelID: "artifact-a",
+            filename: "model.bin"
+        )
+        let metadataURL = try layout.downloadResumeMetadataURL(
+            modelID: "artifact-a",
+            filename: "model.bin"
+        )
+        try Data("retained partial".utf8).write(to: partialURL)
+        try Data("retained metadata".utf8).write(to: metadataURL)
+        let oldStaging = layout.downloadsDirectory.appendingPathComponent(
+            ".artifact-a.installing-old",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: oldStaging,
+            withIntermediateDirectories: true
+        )
+        try Data("staged model".utf8).write(
+            to: oldStaging.appendingPathComponent("model.bin")
+        )
+
+        try ModelInstallRetainedDataIsolator(layout: layout).isolate(
+            modelID: "artifact-a",
+            filenames: ["model.bin"]
+        )
+
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: partialURL.path)
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: metadataURL.path)
+        )
+        let archives = try FileManager.default.contentsOfDirectory(
+            at: layout.downloadsDirectory,
+            includingPropertiesForKeys: nil
+        ).filter {
+            $0.lastPathComponent.hasPrefix(
+                ".artifact-a.retained-"
+            )
+        }
+        let partialArchive = try XCTUnwrap(
+            archives.first {
+                FileManager.default.fileExists(
+                    atPath: $0.appendingPathComponent(
+                        partialURL.lastPathComponent
+                    ).path
+                )
+            }
+        )
+        let stagingArchive = try XCTUnwrap(
+            archives.first {
+                FileManager.default.fileExists(
+                    atPath: $0.appendingPathComponent("model.bin").path
+                )
+            }
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: partialArchive.appendingPathComponent(
+                    partialURL.lastPathComponent
+                ).path
+            )
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: partialArchive.appendingPathComponent(
+                    metadataURL.lastPathComponent
+                ).path
+            )
+        )
+
+        let liveStaging = layout.downloadsDirectory.appendingPathComponent(
+            ".artifact-a.installing-fresh",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: liveStaging,
+            withIntermediateDirectories: true
+        )
+        let remover = ModelInstallRetainedDataRemover(layout: layout)
+        try remover.removeDirectoryStaging(modelID: "artifact-a")
+
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: liveStaging.path)
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: partialArchive.path)
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: stagingArchive.path)
+        )
+
+        try remover.remove(
+            modelID: "artifact-a",
+            filenames: ["model.bin"]
+        )
+
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: partialArchive.path)
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: stagingArchive.path)
         )
     }
 

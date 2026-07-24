@@ -59,6 +59,7 @@ public struct ModelInstaller {
     private let nowISO8601: @Sendable () -> String
     private let capacityRecheckIntervalBytes: Int64
     private let availableCapacity: @Sendable (URL) throws -> Int64
+    private let retainsValidatedStagingOnCancellation: Bool
 
     public init(
         layout: ModelStorageLayout,
@@ -68,6 +69,7 @@ public struct ModelInstaller {
         currentAppVersion: String = "1.1.0",
         nowISO8601: @escaping @Sendable () -> String = { ISO8601DateFormatter().string(from: Date()) },
         capacityRecheckIntervalBytes: Int64 = 64_000_000,
+        retainsValidatedStagingOnCancellation: Bool = false,
         availableCapacity: @escaping @Sendable (URL) throws -> Int64 = { url in
             try ModelVolumeCapacityProvider().availableCapacity(at: url)
         }
@@ -82,6 +84,8 @@ public struct ModelInstaller {
             1,
             capacityRecheckIntervalBytes
         )
+        self.retainsValidatedStagingOnCancellation =
+            retainsValidatedStagingOnCancellation
         self.availableCapacity = availableCapacity
     }
 
@@ -157,12 +161,16 @@ public struct ModelInstaller {
             file: file,
             installedURL: installedURL
         ) {
+            await Task.yield()
+            try Task.checkCancellation()
             let refreshedRecord = InstalledModelRecord(
                 model: model,
                 installedAt: existingRecord.installedAt,
                 localFilesByManifestFilename: existingRecord.localFilesByManifestFilename,
                 storageModelID: existingRecord.storageModelID,
-                identityHistory: existingRecord.identityHistory
+                identityHistory: existingRecord.identityHistory,
+                verifiedRestorationIDs:
+                    existingRecord.verifiedRestorationIDs
             )
             if refreshedRecord != existingRecord {
                 try upsertInstalledRecord(refreshedRecord)
@@ -247,6 +255,7 @@ public struct ModelInstaller {
             throw ModelInstallError.checksumMismatch(expected: file.sha256, actual: actualChecksum)
         }
 
+        await Task.yield()
         try Task.checkCancellation()
         try requireCapacity(
             for: model,
@@ -316,12 +325,16 @@ public struct ModelInstaller {
             model: model,
             installedDirectory: installedDirectory
         ) {
+            await Task.yield()
+            try Task.checkCancellation()
             let refreshedRecord = InstalledModelRecord(
                 model: model,
                 installedAt: existingRecord.installedAt,
                 localFilesByManifestFilename: existingRecord.localFilesByManifestFilename,
                 storageModelID: existingRecord.storageModelID,
-                identityHistory: existingRecord.identityHistory
+                identityHistory: existingRecord.identityHistory,
+                verifiedRestorationIDs:
+                    existingRecord.verifiedRestorationIDs
             )
             if refreshedRecord != existingRecord {
                 try upsertInstalledRecord(refreshedRecord)
@@ -340,7 +353,10 @@ public struct ModelInstaller {
         try? fileManager.removeItem(at: stagingDirectory)
         try fileManager.createDirectory(at: stagingDirectory, withIntermediateDirectories: true)
         defer {
-            try? fileManager.removeItem(at: stagingDirectory)
+            if !retainsValidatedStagingOnCancellation
+                || !Task.isCancelled {
+                try? fileManager.removeItem(at: stagingDirectory)
+            }
         }
 
         onStateChange(DownloadState(
@@ -431,6 +447,8 @@ public struct ModelInstaller {
                     actual: actualChecksum
                 )
             }
+            await Task.yield()
+            try Task.checkCancellation()
             try requireCapacity(
                 for: model,
                 additionalValidatedFiles:
@@ -462,6 +480,7 @@ public struct ModelInstaller {
             completedBytes += file.sizeBytes
         }
 
+        await Task.yield()
         try Task.checkCancellation()
         try requireCapacity(
             for: model,

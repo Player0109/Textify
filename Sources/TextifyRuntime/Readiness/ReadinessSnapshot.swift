@@ -51,6 +51,8 @@ public struct ReadinessSnapshot: Equatable, Sendable {
             blockers.append(.activeModelMissing(modelID: modelID))
         case let .failed(modelID, _):
             blockers.append(.transcriptionRuntimeFailed(modelID: modelID))
+        case let .revoked(modelID):
+            blockers.append(.activeModelRevoked(modelID: modelID))
         }
 
         return blockers
@@ -86,6 +88,7 @@ public enum RuntimeModelReadiness: Equatable, Sendable {
     case warming(modelID: String)
     case ready(modelID: String)
     case failed(modelID: String, reason: RuntimeModelFailure)
+    case revoked(modelID: String)
 }
 
 public enum RuntimeModelPreparationResult: Equatable, Sendable {
@@ -93,6 +96,7 @@ public enum RuntimeModelPreparationResult: Equatable, Sendable {
     case needsRepair(modelID: String, readiness: RuntimeModelReadiness)
     case failed(modelID: String)
     case busy(modelID: String)
+    case revoked(modelID: String)
 }
 
 public enum RuntimeModelFailure: Equatable, Sendable {
@@ -109,4 +113,5 @@ public enum ReadinessBlocker: Equatable, Sendable {
     case activeModelMissing(modelID: String)
     case activeModelNotReady(modelID: String)
     case transcriptionRuntimeFailed(modelID: String)
+    case activeModelRevoked(modelID: String)
 }

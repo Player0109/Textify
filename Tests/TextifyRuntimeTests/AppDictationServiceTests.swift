@@ -164,6 +164,161 @@ final class AppDictationServiceTests: XCTestCase {
         XCTAssertEqual(cleanCount, 1)
     }
 
+    func testCurrentSegmentCapturesBothArtifactIdentitiesAndFinishesAfterRevocation() async {
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = RuntimeActiveModel.fixture.id
+        preferences.activeVoiceCleaningModelID =
+            RuntimeActiveModel.voiceCleanerFixture.id
+        let fakes = RuntimeFakes.ready(preferences: preferences)
+        await fakes.models.setVoiceCleaningModel(.voiceCleanerFixture)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+
+        XCTAssertEqual(
+            service.currentSegment,
+            RuntimeCurrentSegment(
+                transcriptionArtifactID: RuntimeActiveModel.fixture.id,
+                voiceCleaningArtifactID:
+                    RuntimeActiveModel.voiceCleanerFixture.id
+            )
+        )
+
+        await service.updateRevokedArtifactIDs([
+            RuntimeActiveModel.fixture.id,
+            RuntimeActiveModel.voiceCleanerFixture.id,
+        ])
+        await service.handleTriggerAction(.finishRecording)
+
+        XCTAssertEqual(
+            service.status,
+            .completed(textLengthBucket: "1-50")
+        )
+        XCTAssertNil(service.currentSegment)
+        let cleanCallCount = await fakes.voiceCleaner.cleanCallCount()
+        XCTAssertEqual(cleanCallCount, 1)
+
+        await service.handleTriggerAction(.beginRecording)
+
+        XCTAssertEqual(
+            service.status,
+            .blocked(
+                .readinessBlocked(
+                    .activeModelRevoked(
+                        modelID: RuntimeActiveModel.fixture.id
+                    )
+                )
+            )
+        )
+        XCTAssertNil(service.currentSegment)
+        let startCount = await fakes.audio.startCount()
+        XCTAssertEqual(startCount, 1)
+    }
+
+    func testRevokedCleanerIsExcludedFromLaterSegmentWithoutBlockingTranscription() async {
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = RuntimeActiveModel.fixture.id
+        preferences.activeVoiceCleaningModelID =
+            RuntimeActiveModel.voiceCleanerFixture.id
+        let fakes = RuntimeFakes.ready(preferences: preferences)
+        await fakes.models.setVoiceCleaningModel(.voiceCleanerFixture)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.updateRevokedArtifactIDs([
+            RuntimeActiveModel.voiceCleanerFixture.id,
+        ])
+        await service.handleTriggerAction(.beginRecording)
+
+        XCTAssertEqual(
+            service.currentSegment,
+            RuntimeCurrentSegment(
+                transcriptionArtifactID: RuntimeActiveModel.fixture.id,
+                voiceCleaningArtifactID: nil
+            )
+        )
+
+        await service.handleTriggerAction(.finishRecording)
+
+        XCTAssertEqual(
+            service.status,
+            .completed(textLengthBucket: "1-50")
+        )
+        let cleanCallCount = await fakes.voiceCleaner.cleanCallCount()
+        XCTAssertEqual(cleanCallCount, 0)
+        XCTAssertEqual(
+            service.voiceCleaningStatus,
+            .warning(
+                modelID: RuntimeActiveModel.voiceCleanerFixture.id,
+                reason: .revoked
+            )
+        )
+    }
+
+    func testTranscriberRevokedWhileCleanerResolvesCannotEnterCurrentSegment() async {
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = RuntimeActiveModel.fixture.id
+        preferences.activeVoiceCleaningModelID =
+            RuntimeActiveModel.voiceCleanerFixture.id
+        let fakes = RuntimeFakes.ready(preferences: preferences)
+        await fakes.models.setVoiceCleaningModel(.voiceCleanerFixture)
+        await fakes.models.setSuspendVoiceCleaningResolution(true)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        let admission = Task {
+            await service.handleTriggerAction(.beginRecording)
+        }
+        await waitUntil {
+            await fakes.models.isVoiceCleaningResolutionSuspended()
+        }
+        await service.updateRevokedArtifactIDs([
+            RuntimeActiveModel.fixture.id,
+        ])
+        await fakes.models.releaseVoiceCleaningResolution()
+        await admission.value
+
+        XCTAssertEqual(
+            service.status,
+            .blocked(
+                .readinessBlocked(
+                    .activeModelRevoked(
+                        modelID: RuntimeActiveModel.fixture.id
+                    )
+                )
+            )
+        )
+        XCTAssertNil(service.currentSegment)
+        let startCount = await fakes.audio.startCount()
+        XCTAssertEqual(startCount, 0)
+    }
+
+    func testCandidatePreparationCannotCrossRevocationIntoActivation() async {
+        let fakes = RuntimeFakes.ready()
+        let candidate = RuntimeActiveModel.alternateFixture
+        await fakes.models.setSelectableModels([candidate])
+        await fakes.transcriber.setSuspendPrepareUntilReleased(true)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = candidate.id
+
+        let task = Task {
+            await service.prepareModelSelection(
+                modelID: candidate.id,
+                purpose: .transcription,
+                preferences: preferences
+            )
+        }
+        await waitUntil { await fakes.transcriber.isPrepareSuspended() }
+        await service.updateRevokedArtifactIDs([candidate.id])
+        await fakes.transcriber.setSuspendPrepareUntilReleased(false)
+        await fakes.transcriber.releasePrepare()
+
+        let result = await task.value
+        XCTAssertEqual(
+            result,
+            .revoked(modelID: candidate.id)
+        )
+    }
+
     func testModelTransactionsDoNotTouchSharedBackendsDuringProcessing() async {
         let fakes = RuntimeFakes.ready()
         let candidate = RuntimeActiveModel.alternateFixture
@@ -734,7 +889,7 @@ final class AppDictationServiceTests: XCTestCase {
         XCTAssertEqual(insertedTexts, ["duration capped"])
     }
 
-    func testNoActiveModelAfterAudioFinishBlocksWithoutInsertion() async {
+    func testCurrentSegmentFinishesWhenActiveSelectionDisappears() async {
         let fakes = RuntimeFakes.ready()
         let service = AppDictationService(dependencies: fakes.dependencies)
 
@@ -742,11 +897,11 @@ final class AppDictationServiceTests: XCTestCase {
         await fakes.models.setActiveModel(nil)
         await service.handleTriggerAction(.finishRecording)
 
-        XCTAssertEqual(service.status, .blocked(.readinessBlocked(.noActiveModel)))
+        XCTAssertEqual(service.status, .completed(textLengthBucket: "1-50"))
         let insertedTexts = await fakes.inserter.insertedTexts()
         let transcribeCount = await fakes.transcriber.transcribeCount()
-        XCTAssertEqual(insertedTexts, [])
-        XCTAssertEqual(transcribeCount, 0)
+        XCTAssertEqual(insertedTexts, ["hello period"])
+        XCTAssertEqual(transcribeCount, 1)
     }
 
     func testTranscriberLoadingReadinessBlocksRefreshAndRecordingStart() async {
@@ -1160,6 +1315,11 @@ private struct RuntimeFakes {
             return fixture(activeModel: .fixture, readiness: .loading(modelID: modelID))
         case let .transcriptionRuntimeFailed(modelID):
             return fixture(activeModel: .fixture, readiness: .failed(modelID: modelID, reason: .loadFailed))
+        case let .activeModelRevoked(modelID):
+            return fixture(
+                activeModel: .fixture,
+                readiness: .revoked(modelID: modelID)
+            )
         }
     }
 
@@ -1295,6 +1455,9 @@ private actor FakeRuntimeModels: RuntimeModelResolving {
     private var selectableVoiceCleaningModelsByID:
         [String: RuntimeActiveModel] = [:]
     private var readinessOverride: RuntimeModelReadiness?
+    private var suspendVoiceCleaningResolution = false
+    private var voiceCleaningResolutionContinuation:
+        CheckedContinuation<Void, Never>?
 
     init(activeModel: RuntimeActiveModel?, readiness: RuntimeModelReadiness? = nil) {
         self.activeModel = activeModel
@@ -1320,6 +1483,11 @@ private actor FakeRuntimeModels: RuntimeModelResolving {
     }
 
     func resolveActiveVoiceCleaningModel(preferences: AppPreferences) async -> RuntimeActiveModel? {
+        if suspendVoiceCleaningResolution {
+            await withCheckedContinuation { continuation in
+                voiceCleaningResolutionContinuation = continuation
+            }
+        }
         if let modelID = preferences.activeVoiceCleaningModelID,
            let selectableModel = selectableVoiceCleaningModelsByID[modelID] {
             return selectableModel
@@ -1346,6 +1514,21 @@ private actor FakeRuntimeModels: RuntimeModelResolving {
         selectableVoiceCleaningModelsByID = Dictionary(
             uniqueKeysWithValues: models.map { ($0.id, $0) }
         )
+    }
+
+    func setSuspendVoiceCleaningResolution(_ shouldSuspend: Bool) {
+        suspendVoiceCleaningResolution = shouldSuspend
+    }
+
+    func isVoiceCleaningResolutionSuspended() -> Bool {
+        voiceCleaningResolutionContinuation != nil
+    }
+
+    func releaseVoiceCleaningResolution() {
+        suspendVoiceCleaningResolution = false
+        let continuation = voiceCleaningResolutionContinuation
+        voiceCleaningResolutionContinuation = nil
+        continuation?.resume()
     }
 
 }

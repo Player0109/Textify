@@ -851,6 +851,394 @@ final class AppCompositionTests: XCTestCase {
     }
 
     @MainActor
+    func testRevocationDisablesBothActivePurposesAndRequiresExplicitReplacement() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let transcription = try Self.catalogModel(
+            id: ProductionModelPolicy.requiredModelID
+        )
+        let fallback = try Self.catalogModel(id: "whisper-large-v2-q5_0")
+        let cleaner = try Self.catalogModel(id: "mossformer2-se-fp16")
+        try Self.writeInstalledStore(
+            models: [transcription, fallback, cleaner],
+            to: paths
+        )
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = transcription.id
+        preferences.activeVoiceCleaningModelID = cleaner.id
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths,
+            modelCatalogCompatibilityResolver:
+                ModelCatalogCompatibilityResolver(
+                    context: ModelCatalogCompatibilityContext(
+                        appVersion: "1.1.0",
+                        macOSVersion: "14.0.0",
+                        architecture: .arm64,
+                        physicalMemoryBytes: 17_179_869_184
+                    )
+                ),
+            models: CandidateRuntimeModelResolver(models: [
+                Self.runtimeModel(transcription),
+                Self.runtimeModel(fallback),
+                Self.runtimeModel(cleaner),
+            ])
+        )
+        let manifest = ModelManifest(
+            manifestVersion: 1,
+            generatedAt: "2026-07-24T00:00:00Z",
+            models: [transcription, fallback, cleaner]
+        )
+        services.modelCatalogCoordinator = ModelCatalogCoordinator(
+            initialManifest: manifest,
+            loadOperation: { manifest },
+            initialRevocationState: try ModelRevocationTestFixture.state(
+                records: [
+                    ModelRevocationRecord(
+                        recordID: "transcription-revocation",
+                        exactArtifactID: transcription.id
+                    ),
+                    ModelRevocationRecord(
+                        recordID: "cleaner-revocation",
+                        exactArtifactID: cleaner.id
+                    ),
+                ]
+            )
+        )
+
+        await services.enforceModelRevocations()
+
+        XCTAssertNil(services.preferences.activeModelID)
+        XCTAssertNil(services.preferences.activeVoiceCleaningModelID)
+        XCTAssertNil(services.settingsStore.load().activeModelID)
+        XCTAssertNil(
+            services.settingsStore.load().activeVoiceCleaningModelID
+        )
+        XCTAssertEqual(
+            services.revokedActiveTranscriptionModelID,
+            transcription.id
+        )
+        XCTAssertEqual(
+            services.revokedActiveVoiceCleaningModelID,
+            cleaner.id
+        )
+        XCTAssertFalse(services.isModelActive(fallback.id))
+        let revokedRow = try XCTUnwrap(
+            services.modelCatalogExperience(
+                for: .transcription
+            ).rows.first { $0.id == transcription.id }
+        )
+        XCTAssertTrue(revokedRow.stateTokens.contains(.revoked))
+        XCTAssertTrue(revokedRow.stateTokens.contains(.installed))
+        XCTAssertFalse(
+            revokedRow.stateTokens.contains(.needsRepair),
+            "Revocation must not fabricate an independent integrity failure."
+        )
+
+        services.chooseReplacement(for: .transcription)
+
+        XCTAssertEqual(
+            services.settingsRouter.selectedPane,
+            .transcriptionModels
+        )
+        XCTAssertEqual(
+            services.settingsRouter.modelReplacementPurpose,
+            .transcription
+        )
+        XCTAssertNil(services.settingsRouter.modelReveal)
+
+        let failedReplacement = await services.activateInstalledModel(
+            fallback.id
+        )
+
+        XCTAssertEqual(failedReplacement, .preparationFailed)
+        XCTAssertNil(services.preferences.activeModelID)
+        XCTAssertEqual(
+            services.revokedActiveTranscriptionModelID,
+            transcription.id
+        )
+        XCTAssertEqual(
+            services.settingsRouter.modelReplacementPurpose,
+            .transcription
+        )
+    }
+
+    @MainActor
+    func testMidSegmentRevocationFinishesCapturedIdentityThenDisablesDictation() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let model = try Self.catalogModel(
+            id: ProductionModelPolicy.requiredModelID
+        )
+        try Self.writeInstalledStore(models: [model], to: paths)
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = model.id
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths,
+            models: CandidateRuntimeModelResolver(
+                models: [Self.runtimeModel(model)]
+            ),
+            transcriber: ActivationTranscriberSpy()
+        )
+
+        await services.dictation.handleTriggerAction(.beginRecording)
+        XCTAssertEqual(
+            services.dictation.currentSegment?
+                .transcriptionArtifactID,
+            model.id
+        )
+
+        let manifest = ModelManifest(
+            manifestVersion: 1,
+            generatedAt: "2026-07-24T00:00:00Z",
+            models: [model]
+        )
+        services.modelCatalogCoordinator = ModelCatalogCoordinator(
+            initialManifest: manifest,
+            loadOperation: { manifest },
+            initialRevocationState: try ModelRevocationTestFixture.state(
+                records: [
+                    ModelRevocationRecord(
+                        recordID: "mid-segment-revocation",
+                        exactArtifactID: model.id
+                    ),
+                ]
+            )
+        )
+        await services.enforceModelRevocations()
+
+        XCTAssertEqual(services.preferences.activeModelID, model.id)
+
+        await services.dictation.handleTriggerAction(.finishRecording)
+        for _ in 0..<20 where services.preferences.activeModelID != nil {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(
+            services.dictation.status,
+            .cancelled(.noSpeechDetected)
+        )
+        XCTAssertNil(services.dictation.currentSegment)
+        XCTAssertNil(services.preferences.activeModelID)
+        XCTAssertNil(services.settingsStore.load().activeModelID)
+    }
+
+    @MainActor
+    func testRevocationEnforcementDrainsRequestAcceptedDuringFinalReadinessAwait() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let first = try Self.catalogModel(
+            id: ProductionModelPolicy.requiredModelID
+        )
+        let second = try Self.catalogModel(
+            id: "whisper-large-v2-q5_0"
+        )
+        try Self.writeInstalledStore(models: [first, second], to: paths)
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = second.id
+        let resolver = CandidateRuntimeModelResolver(
+            models: [
+                Self.runtimeModel(first),
+                Self.runtimeModel(second),
+            ]
+        )
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths,
+            models: resolver,
+            transcriber: ActivationTranscriberSpy()
+        )
+        await services.refreshManagedModelReadiness()
+        await resolver.suspendReadiness(for: second.id)
+        let manifest = ModelManifest(
+            manifestVersion: 1,
+            generatedAt: "2026-07-24T00:00:00Z",
+            models: [first, second]
+        )
+        services.modelCatalogCoordinator = ModelCatalogCoordinator(
+            initialManifest: manifest,
+            loadOperation: { manifest },
+            initialRevocationState: try ModelRevocationTestFixture.state(
+                records: [
+                    ModelRevocationRecord(
+                        recordID: "first-revocation",
+                        exactArtifactID: first.id
+                    ),
+                ]
+            )
+        )
+        for _ in 0..<2_000 {
+            if await resolver.isReadinessSuspended() {
+                break
+            }
+            await Task.yield()
+        }
+        let readinessIsSuspended =
+            await resolver.isReadinessSuspended()
+        XCTAssertTrue(readinessIsSuspended)
+
+        services.modelCatalogCoordinator = ModelCatalogCoordinator(
+            initialManifest: manifest,
+            loadOperation: { manifest },
+            initialRevocationState: try ModelRevocationTestFixture.state(
+                records: [
+                    ModelRevocationRecord(
+                        recordID: "first-revocation",
+                        exactArtifactID: first.id
+                    ),
+                    ModelRevocationRecord(
+                        recordID: "second-revocation",
+                        exactArtifactID: second.id
+                    ),
+                ]
+            )
+        )
+        await resolver.releaseReadiness()
+        await services.enforceModelRevocations()
+
+        XCTAssertNil(services.preferences.activeModelID)
+        XCTAssertNil(services.settingsStore.load().activeModelID)
+        XCTAssertEqual(
+            services.revokedActiveTranscriptionModelID,
+            second.id
+        )
+    }
+
+    @MainActor
+    func testRestoredSelectedArtifactIsDisabledUntilPersistedIntegrityVerification() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let model = try Self.catalogModel(id: "whisper-large-v2-q5_0")
+        try Self.writeInstalledStore(models: [model], to: paths)
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = model.id
+        let transcriber = ActivationTranscriberSpy()
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths,
+            modelCatalogCompatibilityResolver:
+                ModelCatalogCompatibilityResolver(
+                    context: ModelCatalogCompatibilityContext(
+                        appVersion: "1.1.0",
+                        macOSVersion: "14.0.0",
+                        architecture: .arm64,
+                        physicalMemoryBytes: 17_179_869_184
+                    )
+                ),
+            models: CandidateRuntimeModelResolver(
+                models: [Self.runtimeModel(model)]
+            ),
+            transcriber: transcriber
+        )
+        let manifest = ModelManifest(
+            manifestVersion: 1,
+            generatedAt: "2026-07-24T00:00:00Z",
+            models: [model]
+        )
+        let restorationID = "restore-\(model.id)"
+        let restorationState =
+            try ModelRevocationTestFixture.restoredState(
+                record: ModelRevocationRecord(
+                    recordID: "revoked-\(model.id)",
+                    exactArtifactID: model.id
+                ),
+                restoration: ModelRestorationRecord(
+                    restorationID: restorationID,
+                    revocationRecordID: "revoked-\(model.id)",
+                    exactArtifactID: model.id
+                )
+            )
+        services.modelCatalogCoordinator = ModelCatalogCoordinator(
+            initialManifest: manifest,
+            loadOperation: { manifest },
+            initialRevocationState: restorationState
+        )
+        await services.enforceModelRevocations()
+
+        let preparedModelIDs = await transcriber.preparedModelIDs()
+        XCTAssertNil(services.preferences.activeModelID)
+        XCTAssertNil(services.settingsStore.load().activeModelID)
+        XCTAssertEqual(preparedModelIDs, [])
+
+        let blocked = await services.activateInstalledModel(model.id)
+        let blockedRow = try XCTUnwrap(
+            services.modelCatalogExperience(
+                for: .transcription
+            ).rows.first { $0.id == model.id }
+        )
+
+        XCTAssertEqual(blocked, .integrityVerificationRequired)
+        XCTAssertNil(services.preferences.activeModelID)
+        XCTAssertTrue(
+            blockedRow.stateTokens.contains(.verificationRequired)
+        )
+        XCTAssertFalse(blockedRow.actions.contains(.use))
+
+        await services.acknowledgeRestoredModelIntegrity(
+            model.id,
+            expectedRestorationIDs: ["superseded-restoration"]
+        )
+        XCTAssertEqual(
+            services.pendingRestorationVerificationIDs(
+                for: try XCTUnwrap(
+                    services.installedModelRecords.first {
+                        $0.model.id == model.id
+                    }
+                )
+            ),
+            [restorationID]
+        )
+        await services.acknowledgeRestoredModelIntegrity(model.id)
+        XCTAssertNil(
+            services.preferences.activeModelID,
+            "Verification must not activate restored content."
+        )
+        let sameSessionActivation =
+            await services.activateInstalledModel(model.id)
+        XCTAssertEqual(sameSessionActivation, .activated)
+        services.preferences.activeModelID = nil
+        services.savePreferences()
+        let storedRecord = try XCTUnwrap(
+            JSONDecoder().decode(
+                InstalledModelsStore.self,
+                from: Data(
+                    contentsOf: ModelStorageLayout(
+                        rootDirectory: paths.modelsDirectory
+                    ).installedStoreURL
+                )
+            ).record(forModelID: model.id)
+        )
+        let relaunched = try Self.makeServices(
+            preferences: nil,
+            paths: paths,
+            modelCatalogCompatibilityResolver:
+                ModelCatalogCompatibilityResolver(
+                    context: ModelCatalogCompatibilityContext(
+                        appVersion: "1.1.0",
+                        macOSVersion: "14.0.0",
+                        architecture: .arm64,
+                        physicalMemoryBytes: 17_179_869_184
+                    )
+                ),
+            models: CandidateRuntimeModelResolver(
+                models: [Self.runtimeModel(model)]
+            ),
+            transcriber: ActivationTranscriberSpy()
+        )
+        relaunched.modelCatalogCoordinator = ModelCatalogCoordinator(
+            initialManifest: manifest,
+            loadOperation: { manifest },
+            initialRevocationState: restorationState
+        )
+        await relaunched.enforceModelRevocations()
+        let activated = await relaunched.activateInstalledModel(model.id)
+
+        XCTAssertEqual(
+            storedRecord.verifiedRestorationIDs,
+            [restorationID]
+        )
+        XCTAssertEqual(activated, .activated)
+        XCTAssertEqual(relaunched.preferences.activeModelID, model.id)
+    }
+
+    @MainActor
     func testFailedEnableKeepsPreviousCleanerAndRestoresItsRuntime() async throws {
         let paths = try Self.makeTemporaryPaths()
         let previous = try Self.catalogModel(id: "mossformer2-se-fp16")
@@ -1956,6 +2344,9 @@ private struct FakeRuntimeModelResolver: RuntimeModelResolving {
 private actor CandidateRuntimeModelResolver: RuntimeModelResolving {
     private let modelsByID: [String: RuntimeActiveModel]
     private let readinessByModelID: [String: RuntimeModelReadiness]
+    private var suspendedReadinessModelID: String?
+    private var readinessContinuation:
+        CheckedContinuation<Void, Never>?
 
     init(
         models: [RuntimeActiveModel],
@@ -1991,7 +2382,27 @@ private actor CandidateRuntimeModelResolver: RuntimeModelResolving {
         guard let model else {
             return .noActiveModel
         }
+        if suspendedReadinessModelID == model.id {
+            await withCheckedContinuation { continuation in
+                readinessContinuation = continuation
+            }
+        }
         return readinessByModelID[model.id] ?? .ready(modelID: model.id)
+    }
+
+    func suspendReadiness(for modelID: String) {
+        suspendedReadinessModelID = modelID
+    }
+
+    func isReadinessSuspended() -> Bool {
+        readinessContinuation != nil
+    }
+
+    func releaseReadiness() {
+        suspendedReadinessModelID = nil
+        let continuation = readinessContinuation
+        readinessContinuation = nil
+        continuation?.resume()
     }
 }
 

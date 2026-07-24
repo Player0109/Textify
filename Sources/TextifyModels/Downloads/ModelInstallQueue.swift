@@ -5,11 +5,89 @@ public enum ModelInstallQueueAction: String, Codable, Equatable, Sendable {
     case reinstall
 }
 
+public struct ModelInstallArtifactIdentity:
+    Codable,
+    Equatable,
+    Sendable
+{
+    public let artifactID: String
+    public let contentDigests: [ModelRevocationDigestTarget]
+    public let expectedFiles: [ModelFile]
+
+    public init(
+        artifactID: String,
+        contentDigests: [ModelRevocationDigestTarget],
+        expectedFiles: [ModelFile] = []
+    ) {
+        self.artifactID = artifactID
+        self.contentDigests = contentDigests
+        self.expectedFiles = expectedFiles
+    }
+
+    public init(model: ModelEntry) {
+        artifactID = model.id
+        expectedFiles = model.files
+        var digests = [
+            ModelRevocationDigestTarget(
+                algorithm: .sha256,
+                value: model.artifactFingerprint(),
+                scope: .canonicalLayout(version: 1)
+            ),
+        ]
+        if model.runtime.artifactLayout == .singleFile,
+           model.files.count == 1,
+           let file = model.files.first {
+            digests.append(
+                ModelRevocationDigestTarget(
+                    algorithm: .sha256,
+                    value: file.sha256,
+                    scope: .singleFilePayload
+                )
+            )
+        }
+        digests.append(
+            contentsOf: model.files.map {
+                ModelRevocationDigestTarget(
+                    algorithm: .sha256,
+                    value: $0.sha256,
+                    scope: .managedFile(
+                        relativePath: $0.relativePath ?? $0.filename
+                    )
+                )
+            }
+        )
+        contentDigests = digests
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        artifactID = try container.decode(
+            String.self,
+            forKey: .artifactID
+        )
+        contentDigests = try container.decode(
+            [ModelRevocationDigestTarget].self,
+            forKey: .contentDigests
+        )
+        expectedFiles = try container.decodeIfPresent(
+            [ModelFile].self,
+            forKey: .expectedFiles
+        ) ?? []
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case artifactID
+        case contentDigests
+        case expectedFiles
+    }
+}
+
 public struct ModelInstallResumableData: Codable, Equatable, Sendable {
     public let sourceAttemptID: String
     public let associatedAttemptID: String
     public let validatedBytes: Int64
     public let fileCount: Int
+    public let filenames: [String]
 
     public init(
         sourceAttemptID: String,
@@ -17,10 +95,51 @@ public struct ModelInstallResumableData: Codable, Equatable, Sendable {
         validatedBytes: Int64,
         fileCount: Int
     ) {
+        self.init(
+            sourceAttemptID: sourceAttemptID,
+            associatedAttemptID: associatedAttemptID,
+            validatedBytes: validatedBytes,
+            fileCount: fileCount,
+            filenames: []
+        )
+    }
+
+    public init(
+        sourceAttemptID: String,
+        associatedAttemptID: String,
+        validatedBytes: Int64,
+        fileCount: Int,
+        filenames: [String]
+    ) {
         self.sourceAttemptID = sourceAttemptID
         self.associatedAttemptID = associatedAttemptID
         self.validatedBytes = max(0, validatedBytes)
         self.fileCount = max(0, fileCount)
+        self.filenames = Array(Set(filenames)).sorted()
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        sourceAttemptID = try container.decode(
+            String.self,
+            forKey: .sourceAttemptID
+        )
+        associatedAttemptID = try container.decode(
+            String.self,
+            forKey: .associatedAttemptID
+        )
+        validatedBytes = max(
+            0,
+            try container.decode(Int64.self, forKey: .validatedBytes)
+        )
+        fileCount = max(
+            0,
+            try container.decode(Int.self, forKey: .fileCount)
+        )
+        filenames = try container.decodeIfPresent(
+            [String].self,
+            forKey: .filenames
+        ) ?? []
     }
 
     func reassociated(
@@ -31,14 +150,25 @@ public struct ModelInstallResumableData: Codable, Equatable, Sendable {
             sourceAttemptID: sourceAttemptID,
             associatedAttemptID: attemptID,
             validatedBytes: validatedBytes,
-            fileCount: fileCount
+            fileCount: fileCount,
+            filenames: filenames
         )
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case sourceAttemptID
+        case associatedAttemptID
+        case validatedBytes
+        case fileCount
+        case filenames
     }
 }
 
 public struct ModelInstallQueueAttempt: Codable, Equatable, Identifiable, Sendable {
     public let id: String
     public let artifactID: String
+    public let authorizedArtifactIdentity:
+        ModelInstallArtifactIdentity?
     public let purpose: ModelPurpose
     public let action: ModelInstallQueueAction
     public let createdAt: String
@@ -49,6 +179,8 @@ public struct ModelInstallQueueAttempt: Codable, Equatable, Identifiable, Sendab
     public init(
         id: String,
         artifactID: String,
+        authorizedArtifactIdentity:
+            ModelInstallArtifactIdentity? = nil,
         purpose: ModelPurpose,
         action: ModelInstallQueueAction,
         createdAt: String,
@@ -58,6 +190,7 @@ public struct ModelInstallQueueAttempt: Codable, Equatable, Identifiable, Sendab
     ) {
         self.id = id
         self.artifactID = artifactID
+        self.authorizedArtifactIdentity = authorizedArtifactIdentity
         self.purpose = purpose
         self.action = action
         self.createdAt = createdAt
@@ -89,6 +222,10 @@ public struct ModelInstallQueueAttempt: Codable, Equatable, Identifiable, Sendab
             self.resumableData = resumableData
         }
     }
+
+    mutating func discardRetainedData() {
+        resumableData = nil
+    }
 }
 
 public enum ModelInstallQueueError: Error, Equatable {
@@ -98,6 +235,7 @@ public enum ModelInstallQueueError: Error, Equatable {
     case modelIdentityMismatch(expected: String, actual: String)
     case transitionNotAllowed(from: DownloadPhase, to: DownloadPhase)
     case retryNotAllowed(String)
+    case retainedDataNotFound(String)
 }
 
 public struct ModelInstallQueue: Codable, Equatable, Sendable {
@@ -151,6 +289,8 @@ public struct ModelInstallQueue: Codable, Equatable, Sendable {
     @discardableResult
     public mutating func authorize(
         artifactID: String,
+        authorizedArtifactIdentity:
+            ModelInstallArtifactIdentity? = nil,
         purpose: ModelPurpose,
         action: ModelInstallQueueAction,
         attemptID: String,
@@ -162,6 +302,7 @@ public struct ModelInstallQueue: Codable, Equatable, Sendable {
         let attempt = ModelInstallQueueAttempt(
             id: attemptID,
             artifactID: artifactID,
+            authorizedArtifactIdentity: authorizedArtifactIdentity,
             purpose: purpose,
             action: action,
             createdAt: createdAt,
@@ -245,6 +386,20 @@ public struct ModelInstallQueue: Codable, Equatable, Sendable {
         )
     }
 
+    public mutating func discardRetainedData(
+        attemptID: String
+    ) throws {
+        guard let index = attempts.firstIndex(where: {
+            $0.id == attemptID
+        }),
+        attempts[index].state.phase == .revoked,
+        attempts[index].resumableData != nil
+        else {
+            throw ModelInstallQueueError.retainedDataNotFound(attemptID)
+        }
+        attempts[index].discardRetainedData()
+    }
+
     @discardableResult
     public mutating func retry(
         attemptID: String,
@@ -264,6 +419,8 @@ public struct ModelInstallQueue: Codable, Equatable, Sendable {
         let retry = ModelInstallQueueAttempt(
             id: newAttemptID,
             artifactID: source.artifactID,
+            authorizedArtifactIdentity:
+                source.authorizedArtifactIdentity,
             purpose: source.purpose,
             action: source.action,
             createdAt: createdAt,
@@ -295,6 +452,8 @@ public struct ModelInstallQueue: Codable, Equatable, Sendable {
             return ModelInstallQueueAttempt(
                 id: attempt.id,
                 artifactID: attempt.artifactID,
+                authorizedArtifactIdentity:
+                    attempt.authorizedArtifactIdentity,
                 purpose: attempt.purpose,
                 action: attempt.action,
                 createdAt: attempt.createdAt,
@@ -434,10 +593,16 @@ public struct ModelInstallResumableDataInspector: @unchecked Sendable {
         for attempt: ModelInstallQueueAttempt,
         expectedFiles: [ModelFile]
     ) throws -> ModelInstallResumableData? {
+        let validatedStagingFiles =
+            try validatedDirectoryStagingFiles(
+                for: attempt,
+                expectedFiles: expectedFiles
+            )
         let reusable = try ModelReusableStorageInspector.inspect(
             layout: layout,
             modelID: attempt.artifactID,
             expectedFiles: expectedFiles,
+            additionalValidatedFiles: validatedStagingFiles,
             fileManager: fileManager
         )
         guard reusable.storage.creditBytes > 0,
@@ -449,8 +614,269 @@ public struct ModelInstallResumableDataInspector: @unchecked Sendable {
             sourceAttemptID: attempt.id,
             associatedAttemptID: attempt.id,
             validatedBytes: reusable.storage.creditBytes,
-            fileCount: reusable.fileCount
+            fileCount: reusable.fileCount,
+            filenames: expectedFiles.map(\.filename)
         )
     }
 
+    private func validatedDirectoryStagingFiles(
+        for attempt: ModelInstallQueueAttempt,
+        expectedFiles: [ModelFile]
+    ) throws -> [(url: URL, logicalBytes: Int64)] {
+        guard attempt.state.phase == .revoked,
+              fileManager.fileExists(
+                  atPath: layout.downloadsDirectory.path
+              )
+        else {
+            return []
+        }
+        _ = try layout.installedModelDirectory(
+            modelID: attempt.artifactID
+        )
+        let prefix = ".\(attempt.artifactID).installing-"
+        let stagingDirectories = try fileManager.contentsOfDirectory(
+            at: layout.downloadsDirectory,
+            includingPropertiesForKeys: [.isDirectoryKey]
+        ).filter {
+            $0.lastPathComponent.hasPrefix(prefix)
+                && (
+                    try? $0.resourceValues(
+                        forKeys: [.isDirectoryKey]
+                    ).isDirectory
+                ) == true
+        }
+        var result: [(url: URL, logicalBytes: Int64)] = []
+        for stagingDirectory in stagingDirectories {
+            for file in expectedFiles {
+                let stagedURL = try layout.artifactURL(
+                    in: stagingDirectory,
+                    relativePath: file.relativePath ?? file.filename
+                )
+                guard let size = try? stagedURL.resourceValues(
+                    forKeys: [.fileSizeKey]
+                ).fileSize,
+                Int64(size) == file.sizeBytes
+                else {
+                    continue
+                }
+                result.append(
+                    (url: stagedURL, logicalBytes: file.sizeBytes)
+                )
+            }
+        }
+        return result
+    }
+}
+
+public struct ModelInstallRetainedDataRemover: @unchecked Sendable {
+    private let layout: ModelStorageLayout
+    private let fileManager: FileManager
+
+    public init(
+        layout: ModelStorageLayout,
+        fileManager: FileManager = .default
+    ) {
+        self.layout = layout
+        self.fileManager = fileManager
+    }
+
+    public func remove(
+        modelID: String,
+        expectedFiles: [ModelFile]
+    ) throws {
+        try remove(
+            modelID: modelID,
+            filenames: expectedFiles.map(\.filename)
+        )
+    }
+
+    public func remove(
+        modelID: String,
+        filenames: [String]
+    ) throws {
+        let installedDirectory = try layout.installedModelDirectory(
+            modelID: modelID
+        )
+        if filenames.isEmpty {
+            try removeMetadataAttributedDownloads(modelID: modelID)
+        }
+        for filename in filenames {
+            let partialURL = try layout.temporaryDownloadURL(
+                modelID: modelID,
+                filename: filename
+            )
+            let metadataURL = try layout.downloadResumeMetadataURL(
+                modelID: modelID,
+                filename: filename
+            )
+            try removeIfPresent(partialURL)
+            try removeIfPresent(metadataURL)
+        }
+
+        try removeDirectoryStaging(modelID: modelID)
+        try removeRetainedArchives(modelID: modelID)
+        for filename in filenames {
+            try removeMatchingChildren(
+                in: installedDirectory,
+                namePrefix: ".\(filename).installing-"
+            )
+        }
+    }
+
+    public func removeDirectoryStaging(modelID: String) throws {
+        _ = try layout.installedModelDirectory(modelID: modelID)
+        try removeMatchingChildren(
+            in: layout.downloadsDirectory,
+            namePrefix: ".\(modelID).installing-"
+        )
+    }
+
+    private func removeRetainedArchives(modelID: String) throws {
+        _ = try layout.installedModelDirectory(modelID: modelID)
+        try removeMatchingChildren(
+            in: layout.downloadsDirectory,
+            namePrefix: ".\(modelID).retained-"
+        )
+    }
+
+    private func removeMatchingChildren(
+        in directory: URL,
+        namePrefix: String
+    ) throws {
+        guard fileManager.fileExists(atPath: directory.path) else {
+            return
+        }
+        let children = try fileManager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: nil,
+            options: [.skipsSubdirectoryDescendants]
+        )
+        for child in children
+        where child.lastPathComponent.hasPrefix(namePrefix) {
+            try fileManager.removeItem(at: child)
+        }
+    }
+
+    private func removeMetadataAttributedDownloads(
+        modelID: String
+    ) throws {
+        guard fileManager.fileExists(
+            atPath: layout.downloadsDirectory.path
+        ) else {
+            return
+        }
+        let children = try fileManager.contentsOfDirectory(
+            at: layout.downloadsDirectory,
+            includingPropertiesForKeys: nil
+        )
+        for metadataURL in children
+        where metadataURL.lastPathComponent.hasSuffix(
+            ".partial.resume.json"
+        ) {
+            guard let data = try? Data(contentsOf: metadataURL),
+                  let metadata = try? JSONDecoder().decode(
+                      DownloadResumeMetadata.self,
+                      from: data
+                  ),
+                  metadata.modelID == modelID
+            else {
+                continue
+            }
+            let partialURL = metadataURL
+                .deletingPathExtension()
+                .deletingPathExtension()
+            try removeIfPresent(partialURL)
+            try removeIfPresent(metadataURL)
+        }
+    }
+
+    private func removeIfPresent(_ url: URL) throws {
+        guard fileManager.fileExists(atPath: url.path) else {
+            return
+        }
+        try fileManager.removeItem(at: url)
+    }
+}
+
+public struct ModelInstallRetainedDataIsolator: @unchecked Sendable {
+    private let layout: ModelStorageLayout
+    private let fileManager: FileManager
+
+    public init(
+        layout: ModelStorageLayout,
+        fileManager: FileManager = .default
+    ) {
+        self.layout = layout
+        self.fileManager = fileManager
+    }
+
+    public func isolate(
+        modelID: String,
+        filenames: [String]
+    ) throws {
+        try isolateDirectoryStaging(modelID: modelID)
+        let archiveDirectory =
+            try layout.temporaryRetainedDataDirectory(modelID: modelID)
+        var movedData = false
+        for filename in Array(Set(filenames)).sorted() {
+            let sourceURLs = [
+                try layout.temporaryDownloadURL(
+                    modelID: modelID,
+                    filename: filename
+                ),
+                try layout.downloadResumeMetadataURL(
+                    modelID: modelID,
+                    filename: filename
+                ),
+            ]
+            for sourceURL in sourceURLs
+            where fileManager.fileExists(atPath: sourceURL.path) {
+                if !movedData {
+                    try fileManager.createDirectory(
+                        at: archiveDirectory,
+                        withIntermediateDirectories: true
+                    )
+                }
+                let destinationURL = try layout.artifactURL(
+                    in: archiveDirectory,
+                    relativePath: sourceURL.lastPathComponent
+                )
+                try fileManager.moveItem(
+                    at: sourceURL,
+                    to: destinationURL
+                )
+                movedData = true
+            }
+        }
+    }
+
+    private func isolateDirectoryStaging(modelID: String) throws {
+        _ = try layout.installedModelDirectory(modelID: modelID)
+        guard fileManager.fileExists(
+            atPath: layout.downloadsDirectory.path
+        ) else {
+            return
+        }
+        let prefix = ".\(modelID).installing-"
+        let stagingDirectories = try fileManager.contentsOfDirectory(
+            at: layout.downloadsDirectory,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsSubdirectoryDescendants]
+        ).filter {
+            $0.lastPathComponent.hasPrefix(prefix)
+                && (
+                    try? $0.resourceValues(
+                        forKeys: [.isDirectoryKey]
+                    ).isDirectory
+                ) == true
+        }
+        for stagingDirectory in stagingDirectories {
+            try fileManager.moveItem(
+                at: stagingDirectory,
+                to: layout.temporaryRetainedDataDirectory(
+                    modelID: modelID
+                )
+            )
+        }
+    }
 }

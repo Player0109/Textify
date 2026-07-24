@@ -87,7 +87,9 @@ public struct ModelArtifactPlacementResolver: Sendable {
                     identityHistory: InstalledModelIdentityHistory(
                         wasCurated: true,
                         customImport: record.identityHistory.customImport
-                    )
+                    ),
+                    verifiedRestorationIDs:
+                        record.verifiedRestorationIDs
                 )
             }
             if let canonicalModel = uniqueCanonicalModel(
@@ -115,7 +117,9 @@ public struct ModelArtifactPlacementResolver: Sendable {
                     identityHistory: InstalledModelIdentityHistory(
                         wasCurated: true,
                         customImport: localHistory
-                    )
+                    ),
+                    verifiedRestorationIDs:
+                        record.verifiedRestorationIDs
                 )
                 placementsByArtifactID[canonicalModel.id] = .curated
                 return canonicalRecord
@@ -160,7 +164,8 @@ public struct ModelArtifactPlacementResolver: Sendable {
                     localNames: [record.model.displayName],
                     sourceFilenames: [record.model.provenance.sourceFile]
                 )
-            )
+            ),
+            verifiedRestorationIDs: record.verifiedRestorationIDs
         )
     }
 

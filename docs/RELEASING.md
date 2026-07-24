@@ -220,6 +220,10 @@ Textify GitHub Release assets or exact commit-pinned Hugging Face URLs.
    filename or publish an unscoped digest. A new envelope may add records but
    must not mutate or omit a previously published record as a removal
    mechanism; installed clients retain accepted records across omission.
+   A restoration requires revocation schema version 2, a higher signed
+   revision, a new immutable `restorationID`, the exact prior `recordID`, and
+   one or both prior targets repeated byte-for-byte. Never use a restoration to
+   clear another overlapping record or to name a compatible replacement.
    Verify the detached Ed25519 signature over the exact JSON bytes and publish
    the JSON/signature pair before or atomically with a catalog update that
    changes how an affected artifact is presented.

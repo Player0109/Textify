@@ -661,6 +661,7 @@ final class ModelCatalogCoordinatorTests: XCTestCase {
             keyID: "catalog-test-key"
         )
         var persisted: TrustedModelRevocationState?
+        var revocationChangeCount = 0
         let coordinator = ModelCatalogCoordinator(
             initialManifest: manifest,
             loadOperation: {
@@ -671,6 +672,9 @@ final class ModelCatalogCoordinatorTests: XCTestCase {
             revocationLoadOperation: { revocation },
             revocationSaveOperation: { persisted = $0 }
         )
+        coordinator.setRevocationStateDidChange {
+            revocationChangeCount += 1
+        }
 
         await coordinator.refresh()
 
@@ -684,6 +688,7 @@ final class ModelCatalogCoordinatorTests: XCTestCase {
             persisted?.highestAcceptedRevision,
             revocation.revision
         )
+        XCTAssertEqual(revocationChangeCount, 2)
         XCTAssertEqual(
             coordinator.status,
             .requiresNewerTextify(manifestVersion: 4)

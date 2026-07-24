@@ -23,21 +23,26 @@ enum ModelRevocationTestFixture {
         revision: String,
         records: [ModelRevocationRecord],
         privateKey: Curve25519.Signing.PrivateKey,
-        keyID: String = "revocation-test-key"
+        keyID: String = "revocation-test-key",
+        version: Int = 1,
+        restorations: [ModelRestorationRecord] = []
     ) throws -> TrustedModelRevocationSnapshot {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let revocationData = try encoder.encode(
             ModelRevocationEnvelope(
-                revocationVersion: 1,
+                revocationVersion: version,
                 generatedAt: revision,
-                records: records
+                records: records,
+                restorations: restorations
             )
         )
         let contentSHA256 = SHA256.hash(data: revocationData)
             .map { String(format: "%02x", $0) }
             .joined()
-        let contentType = ModelRevocationVerifier.contentTypeV1
+        let contentType = version == 1
+            ? ModelRevocationVerifier.contentTypeV1
+            : ModelRevocationVerifier.contentTypeV2
         let payload = Data(
             """
             TEXTIFY-MODEL-REVOCATIONS-SIGNATURE-V1
@@ -82,6 +87,29 @@ enum ModelRevocationTestFixture {
                     ),
                 ]
             )
+        )
+    }
+
+    static func restoredState(
+        record: ModelRevocationRecord,
+        restoration: ModelRestorationRecord
+    ) throws -> TrustedModelRevocationState {
+        let privateKey = Curve25519.Signing.PrivateKey()
+        return try TrustedModelRevocationState(
+            snapshots: [
+                snapshot(
+                    revision: "2026-07-24T01:00:00Z",
+                    records: [record],
+                    privateKey: privateKey
+                ),
+                snapshot(
+                    revision: "2026-07-24T02:00:00Z",
+                    records: [],
+                    privateKey: privateKey,
+                    version: 2,
+                    restorations: [restoration]
+                ),
+            ]
         )
     }
 }

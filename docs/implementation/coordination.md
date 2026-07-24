@@ -2,6 +2,40 @@
 
 This file records cross-agent handoffs during implementation.
 
+## Runtime Revocation Enforcement And Restoration Handoff - 2026-07-24
+
+- GitHub issue #19 owns the narrow cross-task changes needed to enforce the
+  verified issue #18 revocation overlay at Current Segment admission, active
+  transcription and voice-cleaning preferences, Queue Attempts, installer
+  durable boundaries, retained download data, and explicit signed restoration.
+- This slice may update Task 15 runtime orchestration and focused runtime tests;
+  Task 12 queue, installer, retained-data state, app coordinator, Downloads
+  presentation, and focused model/app tests; Task 4's independent signed
+  revocation envelope/state; Task 5 purpose-specific active preferences; and
+  Task 11 replacement reveal/composition needed by the acceptance criteria.
+- A Current Segment captures the transcription and optional cleaner Exact
+  Artifact identities once, before recording begins. An admitted segment may
+  finish after a matching revocation is accepted, but later segments cannot
+  admit that identity. At the completed segment boundary, revoked transcription
+  disables Dictation and revoked voice cleaning disables only Voice Cleaning.
+- Queue and installer enforcement is fail-closed at every durable phase
+  transition. A read-only hash may finish, but no verified result may cross
+  into installation, receipt mutation, repair, activation, or enablement after
+  revocation. Affected attempts become terminally Revoked without Retry, while
+  retained partial or staged bytes remain visible, nonresumable, and explicitly
+  removable.
+- Restoration must be a higher signed revocation-feed revision that references
+  the prior revocation record and its exact restored targets. It cannot clear an
+  overlapping match from another record and never auto-activates, retries,
+  repairs, reinstalls, or switches back. Restored installed content remains
+  unusable until explicit integrity verification succeeds.
+- Safe active-model deletion transactions, generalized user-requested runtime
+  switching, and large-catalog virtualization remain owned by issues #20–#22.
+- Final verification completed with 711 Swift tests (11 explicit opt-in
+  native/model smokes skipped, zero failures), an arm64 SwiftPM Release build,
+  and a native arm64 Xcode Debug app build. The final Standards and issue-spec
+  reviews reported no remaining actionable findings.
+
 ## Signed Revocation Overlay Handoff - 2026-07-24
 
 - GitHub issue #18 owns the narrow cross-task changes needed to verify and

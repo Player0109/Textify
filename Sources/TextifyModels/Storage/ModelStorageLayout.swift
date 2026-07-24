@@ -80,6 +80,17 @@ public struct ModelStorageLayout: Equatable, Sendable {
         )
     }
 
+    func temporaryRetainedDataDirectory(modelID: String) throws -> URL {
+        let safeModelID = try Self.validatePathComponent(modelID)
+        return try containedURL(
+            downloadsDirectory.appendingPathComponent(
+                ".\(safeModelID).retained-\(UUID().uuidString)",
+                isDirectory: true
+            ),
+            in: downloadsDirectory
+        )
+    }
+
     func temporaryRemovalDirectory(modelID: String) throws -> URL {
         let safeModelID = try Self.validatePathComponent(modelID)
         return try containedURL(

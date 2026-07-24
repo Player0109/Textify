@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import TextifyModels
 import TextifyRuntime
 
 struct MenuBarRoot: View {
@@ -28,6 +29,18 @@ struct MenuBarRoot: View {
         if shouldShowFinishSetup {
             Button("Finish Setup…") {
                 TextifyOnboardingWindowPresenter.shared.show(services: services)
+            }
+        }
+
+        if services.revokedActiveTranscriptionModelID != nil {
+            Button("Choose Dictation Replacement…") {
+                openReplacementPicker(for: .transcription)
+            }
+        }
+
+        if services.revokedActiveVoiceCleaningModelID != nil {
+            Button("Choose Voice Cleaning Replacement…") {
+                openReplacementPicker(for: .voiceCleaning)
             }
         }
 
@@ -91,6 +104,11 @@ struct MenuBarRoot: View {
 
     private func openSettingsPane(_ pane: SettingsPane) {
         services.settingsRouter.selectedPane = pane
+        TextifyMainWindowPresenter.shared.show(services: services)
+    }
+
+    private func openReplacementPicker(for purpose: ModelPurpose) {
+        services.chooseReplacement(for: purpose)
         TextifyMainWindowPresenter.shared.show(services: services)
     }
 

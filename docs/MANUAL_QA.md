@@ -61,6 +61,15 @@ release-blocking.
 - [ ] 33. Force the selected cleaner to fail loading or processing; Textify
   shows Raw Audio Fallback, completes dictation with the original audio, and
   diagnostics contain no audio or transcript content.
+- [ ] 34. Accept a signed revocation during a dictation with Voice Cleaning;
+  the admitted segment finishes with its captured identities, then Dictation
+  and/or Voice Cleaning disables before another segment can begin.
+- [ ] 35. Accept a signed revocation while affected installs are active and
+  queued; every affected attempt becomes Revoked without Retry, unaffected FIFO
+  work continues, and retained bytes remain visible until Remove Data.
+- [ ] 36. Accept an exact higher-revision signed restoration; the old selection
+  does not reactivate, Use/Enable remains unavailable until Verify Integrity
+  succeeds, and the verification acknowledgment survives relaunch.
 
 ## Supporting Commands
 

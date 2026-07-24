@@ -100,6 +100,81 @@ final class ModelInstallerTests: XCTestCase {
         XCTAssertEqual(record.installedAt, "2026-07-19T00:00:00Z")
     }
 
+    func testRevokedDirectoryInstallCanRetainAlreadyValidatedStaging() async throws {
+        let firstData = Data("compiled preprocessor".utf8)
+        let secondData = Data("{\"0\":\"hello\"}".utf8)
+        let manifest = try Self.directoryModelManifest(
+            files: [
+                (
+                    filename: "parakeet-preprocessor-coremldata.bin",
+                    relativePath: "Preprocessor.mlmodelc/coremldata.bin",
+                    data: firstData
+                ),
+                (
+                    filename: "parakeet-vocabulary.json",
+                    relativePath: "parakeet_vocab.json",
+                    data: secondData
+                ),
+            ]
+        )
+        let model = try XCTUnwrap(manifest.models.first)
+        let rootDirectory = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: rootDirectory) }
+        let layout = ModelStorageLayout(rootDirectory: rootDirectory)
+        let transport = CancellableSecondFileTransport(
+            dataByURL: Dictionary(
+                uniqueKeysWithValues: try model.files.map { file in
+                    (
+                        try XCTUnwrap(URL(string: file.url)),
+                        file.filename.contains("vocabulary")
+                            ? secondData
+                            : firstData
+                    )
+                }
+            )
+        )
+        let installer = ModelInstaller(
+            layout: layout,
+            transport: transport,
+            retainsValidatedStagingOnCancellation: true
+        )
+
+        let task = Task {
+            try await installer.install(
+                modelID: model.id,
+                from: manifest
+            )
+        }
+        for _ in 0..<2_000 where !transport.isSecondDownloadStarted {
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+        XCTAssertTrue(transport.isSecondDownloadStarted)
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            XCTFail("Expected cancellation.")
+        } catch is CancellationError {
+            // Revocation cancels at a durable boundary.
+        }
+
+        let stagingDirectories = try FileManager.default
+            .contentsOfDirectory(
+                at: layout.downloadsDirectory,
+                includingPropertiesForKeys: nil
+            )
+            .filter {
+                $0.lastPathComponent.hasPrefix(
+                    ".\(model.id).installing-"
+                )
+            }
+        let stagingDirectory = try XCTUnwrap(stagingDirectories.first)
+        let stagedFile = stagingDirectory.appendingPathComponent(
+            "Preprocessor.mlmodelc/coremldata.bin"
+        )
+        XCTAssertEqual(try Data(contentsOf: stagedFile), firstData)
+    }
+
     func testInstallerReportsDownloadAndInstallProgress() async throws {
         let manifest = try Self.fixtureManifest()
         let model = try XCTUnwrap(manifest.models.first)
@@ -1135,6 +1210,83 @@ private final class FixtureFileDownloadTransport: DownloadTransport {
         if progressEvents.last != finalEvent {
             try admissionCheck(finalEvent)
         }
+        return DownloadFileResponse(fileURL: temporaryURL)
+    }
+}
+
+private final class CancellableSecondFileTransport:
+    DownloadTransport,
+    @unchecked Sendable
+{
+    private let dataByURL: [URL: Data]
+    private let lock = NSLock()
+    private var downloadCount = 0
+    private var secondDownloadStarted = false
+
+    init(dataByURL: [URL: Data]) {
+        self.dataByURL = dataByURL
+    }
+
+    var isSecondDownloadStarted: Bool {
+        lock.withLock {
+            secondDownloadStarted
+        }
+    }
+
+    func fetch(_ request: URLRequest) async throws -> DownloadResponse {
+        guard let url = request.url,
+              let data = dataByURL[url]
+        else {
+            throw FixtureFileDownloadTransportError.missingResponse
+        }
+        return DownloadResponse(data: data)
+    }
+
+    func downloadFile(
+        _ request: URLRequest,
+        to temporaryURL: URL
+    ) async throws -> DownloadFileResponse {
+        try await download(request, to: temporaryURL)
+    }
+
+    func downloadFile(
+        _ request: URLRequest,
+        to temporaryURL: URL,
+        maximumBytes: Int64,
+        admissionCheck: @escaping @Sendable (
+            DownloadFileProgress
+        ) throws -> Void,
+        progress: @escaping @Sendable (DownloadFileProgress) -> Void
+    ) async throws -> DownloadFileResponse {
+        let response = try await download(request, to: temporaryURL)
+        let byteCount = Int64(
+            try Data(contentsOf: response.fileURL).count
+        )
+        let event = DownloadFileProgress(
+            bytesDownloaded: byteCount,
+            totalBytes: byteCount
+        )
+        try admissionCheck(event)
+        progress(event)
+        return response
+    }
+
+    private func download(
+        _ request: URLRequest,
+        to temporaryURL: URL
+    ) async throws -> DownloadFileResponse {
+        let callNumber = lock.withLock {
+            downloadCount += 1
+            if downloadCount == 2 {
+                secondDownloadStarted = true
+            }
+            return downloadCount
+        }
+        if callNumber == 2 {
+            try await Task.sleep(nanoseconds: .max)
+        }
+        let response = try await fetch(request)
+        try response.data.write(to: temporaryURL)
         return DownloadFileResponse(fileURL: temporaryURL)
     }
 }

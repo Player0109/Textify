@@ -35,6 +35,8 @@ private extension ProductionDictationError {
         case .readinessBlocked(.noActiveModel),
              .readinessBlocked(.activeModelMissing):
             return "Install the dictation model."
+        case .readinessBlocked(.activeModelRevoked):
+            return "Choose a replacement dictation model."
         case .readinessBlocked(.activeModelNotReady):
             return "Model is still preparing."
         case .readinessBlocked(.transcriptionRuntimeFailed),

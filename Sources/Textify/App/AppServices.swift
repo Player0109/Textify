@@ -52,7 +52,8 @@ final class AppServices {
                 transport: URLSessionDownloadTransport(),
                 currentAppVersion: Bundle.main.object(
                     forInfoDictionaryKey: "CFBundleShortVersionString"
-                ) as? String ?? "1.1.0"
+                ) as? String ?? "1.1.0",
+                retainsValidatedStagingOnCancellation: true
             )
             let installedRecord: InstalledModelRecord
             do {
@@ -74,12 +75,16 @@ final class AppServices {
             )
         },
         resumableDataProvider: { [weak self] attempt in
-            guard let self,
-                  let expectedFiles = self.modelCatalogCoordinator
+            guard let self else {
+                return nil
+            }
+            let expectedFiles = self.modelCatalogCoordinator
                     .authoritativeManifest?.models.first(
                         where: { $0.id == attempt.artifactID }
                     )?.files
-            else {
+                ?? attempt.authorizedArtifactIdentity?.expectedFiles
+                ?? []
+            guard !expectedFiles.isEmpty else {
                 return nil
             }
             return try? ModelInstallResumableDataInspector(
@@ -90,6 +95,87 @@ final class AppServices {
                 for: attempt,
                 expectedFiles: expectedFiles
             )
+        },
+        removeRetainedDataOperation: { [weak self] attempt in
+            guard let self else {
+                throw ModelInstallCoordinatorError
+                    .storageOrConfigurationUnavailable
+            }
+            let manifestFilenames = self.modelCatalogCoordinator
+                .authoritativeManifest?.models.first(
+                    where: { $0.id == attempt.artifactID }
+                )?.files.map(\.filename) ?? []
+            let authorizedFilenames =
+                attempt.authorizedArtifactIdentity?
+                    .expectedFiles.map(\.filename) ?? []
+            let filenames = Array(
+                Set(
+                    manifestFilenames
+                        + authorizedFilenames
+                        + (attempt.resumableData?.filenames ?? [])
+                )
+            ).sorted()
+            try ModelInstallRetainedDataRemover(
+                layout: ModelStorageLayout(
+                    rootDirectory: self.paths.modelsDirectory
+                )
+            ).remove(
+                modelID: attempt.artifactID,
+                filenames: filenames
+            )
+        },
+        removeStagingDataOperation: { [weak self] attempt in
+            guard let self else {
+                throw ModelInstallCoordinatorError
+                    .storageOrConfigurationUnavailable
+            }
+            try ModelInstallRetainedDataRemover(
+                layout: ModelStorageLayout(
+                    rootDirectory: self.paths.modelsDirectory
+                )
+            ).removeDirectoryStaging(modelID: attempt.artifactID)
+        },
+        isolateRetainedDataOperation: { [weak self] attempts in
+            guard let self,
+                  let artifactID = attempts.first?.artifactID
+            else {
+                return
+            }
+            let manifestFilenames = self.modelCatalogCoordinator
+                .authoritativeManifest?.models.first(
+                    where: { $0.id == artifactID }
+                )?.files.map(\.filename) ?? []
+            let authorizedFilenames = attempts.flatMap {
+                $0.authorizedArtifactIdentity?
+                    .expectedFiles.map(\.filename) ?? []
+            }
+            let filenames = Array(
+                Set(
+                    manifestFilenames
+                        + authorizedFilenames
+                        + attempts.flatMap {
+                            $0.resumableData?.filenames ?? []
+                        }
+                )
+            ).sorted()
+            try ModelInstallRetainedDataIsolator(
+                layout: ModelStorageLayout(
+                    rootDirectory: self.paths.modelsDirectory
+                )
+            ).isolate(
+                modelID: artifactID,
+                filenames: filenames
+            )
+        },
+        artifactIdentityProvider: { [weak self] artifactID in
+            guard let model = self?.modelCatalogCoordinator
+                .authoritativeManifest?.models.first(
+                    where: { $0.id == artifactID }
+                )
+            else {
+                return nil
+            }
+            return ModelInstallArtifactIdentity(model: model)
         },
         lastSuccessfulCatalogIntegrityCheckAt: { [weak self] in
             self?.modelCatalogCoordinator
@@ -115,15 +201,34 @@ final class AppServices {
                 return .waitingForCatalogCheck
             }
         },
-        isArtifactKnownRevoked: { [weak self] artifactID in
+        isArtifactKnownRevoked: {
+            [weak self] artifactID, authorizedIdentity in
             guard let self else {
                 return false
             }
-            return self.modelCatalogCoordinator.revocationOverlay.isRevoked(
-                artifactID: artifactID,
-                trustedManifest: self.modelCatalogCoordinator
-                    .authoritativeManifest
-            )
+            let manifest =
+                self.modelCatalogCoordinator.authoritativeManifest
+            if let authorizedIdentity {
+                return self.modelCatalogCoordinator.revocationOverlay
+                    .isRevoked(
+                        installIdentity: authorizedIdentity,
+                        trustedManifest: manifest
+                    )
+            }
+            if let model = manifest?.models.first(
+                where: { $0.id == artifactID }
+            ) {
+                return self.modelCatalogCoordinator.revocationOverlay
+                    .isRevoked(
+                        model: model,
+                        trustedManifest: manifest
+                    )
+            }
+            return self.modelCatalogCoordinator.revocationOverlay
+                .isRevoked(
+                    artifactID: artifactID,
+                    trustedManifest: manifest
+                )
         },
         lifecycleDidChange: { [weak self] in
             self?.refreshModelStorageInventory()
@@ -137,6 +242,7 @@ final class AppServices {
         }
     ) {
         didSet {
+            attachModelRevocationEnforcement()
             reconcileInstalledModelsWithCatalog()
             observeModelCatalogManifest()
         }
@@ -149,6 +255,8 @@ final class AppServices {
     var onboardingStep = OnboardingStep.welcome
     var overlayState = RecordingOverlayState.hidden
     var runtimeIssue: AppRuntimeIssue?
+    private(set) var revokedActiveTranscriptionModelID: String?
+    private(set) var revokedActiveVoiceCleaningModelID: String?
 
     @ObservationIgnored private var runtimeStarted = false
     @ObservationIgnored private var diagnosticsStarted = false
@@ -157,6 +265,12 @@ final class AppServices {
     @ObservationIgnored private let waitBeforeTerminalStatusDismissal: @Sendable () async -> Void
     @ObservationIgnored private var processingOverlayTask: Task<Void, Never>?
     @ObservationIgnored private var terminalStatusTask: Task<Void, Never>?
+    @ObservationIgnored private var modelRevocationEnforcementTask:
+        Task<Void, Never>?
+    @ObservationIgnored private var modelRevocationEnforcementRequested =
+        false
+    @ObservationIgnored private var modelRevocationEnforcementDeferred =
+        false
     @ObservationIgnored private var overlayUpdateGeneration = 0
     private var managedReadinessByModelID:
         [String: ModelCatalogManagedReadiness] = [:]
@@ -352,7 +466,25 @@ final class AppServices {
                 }
                 self.updateOverlay()
                 self.scheduleTerminalStatusDismissal(for: self.dictation.status)
+                if self.dictation.currentSegment == nil,
+                   self.modelRevocationEnforcementDeferred {
+                    self.modelRevocationEnforcementDeferred = false
+                    await self.enforceModelRevocations()
+                }
                 self.observeDictationStatus()
+            }
+        }
+    }
+
+    private func attachModelRevocationEnforcement() {
+        modelCatalogCoordinator.setRevocationStateDidChange {
+            [weak self] in
+            guard let self else {
+                return
+            }
+            self.modelInstallCoordinator.enforceKnownRevocations()
+            Task { @MainActor [weak self] in
+                await self?.enforceModelRevocations()
             }
         }
     }
@@ -572,6 +704,22 @@ final class AppServices {
         installedModelsStore.records
     }
 
+    func pendingRestorationVerificationIDs(
+        for record: InstalledModelRecord
+    ) -> [String] {
+        let required = Set(
+            modelCatalogCoordinator.revocationState
+                .restorationIDsRequiringIntegrityVerification(
+                    for: record,
+                    trustedManifest:
+                        modelCatalogCoordinator.authoritativeManifest
+                )
+        )
+        return required
+            .subtracting(record.verifiedRestorationIDs)
+            .sorted()
+    }
+
     func modelCatalogExperience(
         for purpose: ModelPurpose,
         onDiskBytesByModelID: [String: Int64]? = nil,
@@ -661,6 +809,16 @@ final class AppServices {
         onStateChange: @escaping @Sendable (DownloadState) -> Void
     ) async throws {
         refreshInstalledModels()
+        guard let installedRecord = self.installedModel(installedModel.id),
+              !modelCatalogCoordinator.revocationOverlay.isRevoked(
+                  record: installedRecord,
+                  trustedManifest:
+                      modelCatalogCoordinator.authoritativeManifest
+              )
+        else {
+            throw ModelInstallCoordinatorError.revoked
+        }
+        await acknowledgeRestoredModelIntegrity(installedModel.id)
         managedReadinessByModelID[installedModel.id] = .ready
         try Task.checkCancellation()
         if isModelActive(installedModel.id) {
@@ -727,6 +885,12 @@ final class AppServices {
         ) else {
             return .revoked
         }
+        guard pendingRestorationVerificationIDs(
+            for: installedRecord
+        ).isEmpty else {
+            managedReadinessByModelID[modelID] = .verificationRequired
+            return .integrityVerificationRequired
+        }
         let compatibility = activationCompatibility(for: modelID)
         guard compatibility == .compatible else {
             return .incompatible(compatibility)
@@ -741,9 +905,35 @@ final class AppServices {
         )
         switch preparation {
         case .ready:
+            guard let preparedRecord = installedModel(modelID),
+                  !modelCatalogCoordinator.revocationOverlay.isRevoked(
+                      record: preparedRecord,
+                      trustedManifest:
+                          modelCatalogCoordinator.authoritativeManifest
+                  )
+            else {
+                _ = await dictation.prepareActiveModelIfAvailable()
+                return .revoked
+            }
+            guard pendingRestorationVerificationIDs(
+                for: preparedRecord
+            ).isEmpty else {
+                managedReadinessByModelID[modelID] = .verificationRequired
+                _ = await dictation.prepareActiveModelIfAvailable()
+                return .integrityVerificationRequired
+            }
             managedReadinessByModelID[modelID] = .ready
             preferences = candidatePreferences
             savePreferences()
+            switch model.purpose {
+            case .transcription:
+                revokedActiveTranscriptionModelID = nil
+            case .voiceCleaning:
+                revokedActiveVoiceCleaningModelID = nil
+            }
+            settingsRouter.dismissModelReplacement(
+                purpose: model.purpose
+            )
             _ = await dictation.prepareActiveModelIfAvailable()
             return .activated
         case .needsRepair:
@@ -753,6 +943,9 @@ final class AppServices {
         case .failed:
             _ = await dictation.prepareActiveModelIfAvailable()
             return .preparationFailed
+        case .revoked:
+            _ = await dictation.prepareActiveModelIfAvailable()
+            return .revoked
         case .busy:
             return .dictationInProgress
         }
@@ -827,6 +1020,21 @@ final class AppServices {
         let records = installedModelsStore.records
         for record in records {
             let model = record.model
+            if modelCatalogCoordinator.revocationOverlay.isRevoked(
+                record: record,
+                trustedManifest:
+                    modelCatalogCoordinator.authoritativeManifest
+            ) {
+                if managedReadinessByModelID[model.id] == nil {
+                    managedReadinessByModelID[model.id] = .installed
+                }
+                continue
+            }
+            if !pendingRestorationVerificationIDs(for: record).isEmpty {
+                managedReadinessByModelID[model.id] =
+                    .verificationRequired
+                continue
+            }
             let readiness = await dictation.modelReadiness(
                 modelID: model.id,
                 purpose: model.purpose,
@@ -840,10 +1048,173 @@ final class AppServices {
                 managedReadinessByModelID[model.id] = .ready
             case .loading, .warming:
                 managedReadinessByModelID[model.id] = .installed
-            case .noActiveModel, .missing, .failed:
+            case .noActiveModel, .missing, .failed, .revoked:
                 managedReadinessByModelID[model.id] = .needsRepair
             }
         }
+    }
+
+    func acknowledgeRestoredModelIntegrity(
+        _ modelID: String,
+        expectedRestorationIDs: [String]? = nil
+    ) async {
+        guard let record = installedModel(modelID),
+              !modelCatalogCoordinator.revocationOverlay.isRevoked(
+                  record: record,
+                  trustedManifest:
+                      modelCatalogCoordinator.authoritativeManifest
+              )
+        else {
+            return
+        }
+        let required = pendingRestorationVerificationIDs(for: record)
+        if let expectedRestorationIDs,
+           required != expectedRestorationIDs {
+            return
+        }
+        guard !required.isEmpty else {
+            return
+        }
+        let acknowledged = InstalledModelRecord(
+            model: record.model,
+            installedAt: record.installedAt,
+            localFilesByManifestFilename:
+                record.localFilesByManifestFilename,
+            storageModelID: record.storageModelID,
+            identityHistory: record.identityHistory,
+            verifiedRestorationIDs:
+                record.verifiedRestorationIDs + required
+        )
+        var updatedStore = installedModelsStore
+        updatedStore.upsert(acknowledged)
+        let storeURL = ModelStorageLayout(
+            rootDirectory: paths.modelsDirectory
+        ).installedStoreURL
+        do {
+            try JSONEncoder().encode(updatedStore).write(
+                to: storeURL,
+                options: [.atomic]
+            )
+        } catch {
+            return
+        }
+        installedModelsStore = updatedStore
+        managedReadinessByModelID[modelID] = .installed
+        await enforceModelRevocations()
+    }
+
+    func enforceModelRevocations() async {
+        modelRevocationEnforcementRequested = true
+        if let modelRevocationEnforcementTask {
+            await modelRevocationEnforcementTask.value
+            return
+        }
+        let task = Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+            while self.modelRevocationEnforcementRequested {
+                self.modelRevocationEnforcementRequested = false
+                await self.performModelRevocationEnforcement()
+            }
+            self.modelRevocationEnforcementTask = nil
+        }
+        modelRevocationEnforcementTask = task
+        await task.value
+    }
+
+    private func performModelRevocationEnforcement() async {
+        let manifest = modelCatalogCoordinator.authoritativeManifest
+        let overlay = modelCatalogCoordinator.revocationOverlay
+        let runtimeBlockedRecords = installedModelsStore.records.filter {
+            overlay.isRevoked(
+                record: $0,
+                trustedManifest: manifest
+            )
+                || !pendingRestorationVerificationIDs(for: $0).isEmpty
+        }
+        var revokedArtifactIDs = Set(
+            runtimeBlockedRecords.map(\.model.id)
+        )
+        for activeID in [
+            preferences.activeModelID,
+            preferences.activeVoiceCleaningModelID,
+        ].compactMap({ $0 })
+        where overlay.isRevoked(
+            artifactID: activeID,
+            trustedManifest: manifest
+        ) || !modelCatalogCoordinator.revocationState
+            .restorationIDsRequiringIntegrityVerification(
+                artifactID: activeID,
+                trustedManifest: manifest
+            ).isEmpty {
+            revokedArtifactIDs.insert(activeID)
+        }
+
+        await dictation.updateRevokedArtifactIDs(revokedArtifactIDs)
+        modelInstallCoordinator.enforceKnownRevocations()
+
+        guard dictation.currentSegment == nil else {
+            modelRevocationEnforcementDeferred = true
+            return
+        }
+        modelRevocationEnforcementDeferred = false
+
+        var didChangePreferences = false
+        if let modelID = preferences.activeModelID,
+           isInstalledArtifactRuntimeBlocked(
+               modelID,
+               overlay: overlay,
+               trustedManifest: manifest
+           ) {
+            preferences.activeModelID = nil
+            revokedActiveTranscriptionModelID = modelID
+            didChangePreferences = true
+        }
+        if let modelID = preferences.activeVoiceCleaningModelID,
+           isInstalledArtifactRuntimeBlocked(
+               modelID,
+               overlay: overlay,
+               trustedManifest: manifest
+           ) {
+            preferences.activeVoiceCleaningModelID = nil
+            revokedActiveVoiceCleaningModelID = modelID
+            didChangePreferences = true
+        }
+        if didChangePreferences {
+            savePreferences()
+            _ = await dictation.prepareActiveModelIfAvailable()
+        }
+        await refreshManagedModelReadiness()
+    }
+
+    func chooseReplacement(for purpose: ModelPurpose) {
+        settingsRouter.selectModelReplacement(purpose: purpose)
+    }
+
+    private func isInstalledArtifactRuntimeBlocked(
+        _ modelID: String,
+        overlay: ModelRevocationOverlay,
+        trustedManifest: ModelManifest?
+    ) -> Bool {
+        if let record = installedModel(modelID) {
+            return overlay.isRevoked(
+                record: record,
+                trustedManifest: trustedManifest
+            )
+                || !pendingRestorationVerificationIDs(
+                    for: record
+                ).isEmpty
+        }
+        return overlay.isRevoked(
+            artifactID: modelID,
+            trustedManifest: trustedManifest
+        )
+            || !modelCatalogCoordinator.revocationState
+                .restorationIDsRequiringIntegrityVerification(
+                    artifactID: modelID,
+                    trustedManifest: trustedManifest
+                ).isEmpty
     }
 
     private func preferencesSelecting(_ model: ModelEntry) -> AppPreferences {
@@ -1217,6 +1588,7 @@ enum ModelInstallCoordinatorError: Error {
     case bundledCatalogIncomplete
     case networkUnavailable
     case catalogCheckUnavailable
+    case revoked
 }
 
 enum ModelTransferPrerequisiteResult: Equatable, Sendable {
@@ -1231,6 +1603,7 @@ enum AppModelActivationResult: Equatable {
     case dictationInProgress
     case notInstalled
     case revoked
+    case integrityVerificationRequired
     case incompatible(ModelCatalogCompatibility)
     case needsRepair
     case preparationFailed
@@ -1245,6 +1618,8 @@ enum AppModelActivationResult: Equatable {
             return "Install \(model.displayName) before \(model.useLabel.lowercased())."
         case .revoked:
             return "\(model.displayName) was revoked and cannot be activated."
+        case .integrityVerificationRequired:
+            return "Verify \(model.displayName) in Details before activating restored content."
         case let .incompatible(compatibility):
             return compatibility.catalogExplanation
         case .needsRepair:
@@ -1273,11 +1648,23 @@ final class ModelInstallCoordinator {
         _ modelID: String,
         @escaping @Sendable (DownloadState) -> Void
     ) async throws -> Void
+    typealias QueueSaveOperation = @MainActor @Sendable (
+        _ queue: ModelInstallQueue
+    ) throws -> Void
 
     private let installOperation: InstallOperation
     private let queueStore: ModelInstallQueueStore?
+    private let queueSaveOperation: QueueSaveOperation?
     private let resumableDataProvider:
         @MainActor @Sendable (ModelInstallQueueAttempt) -> ModelInstallResumableData?
+    private let removeRetainedDataOperation:
+        @MainActor @Sendable (ModelInstallQueueAttempt) throws -> Void
+    private let removeStagingDataOperation:
+        @MainActor @Sendable (ModelInstallQueueAttempt) throws -> Void
+    private let isolateRetainedDataOperation:
+        @MainActor @Sendable ([ModelInstallQueueAttempt]) throws -> Void
+    private let artifactIdentityProvider:
+        @MainActor @Sendable (String) -> ModelInstallArtifactIdentity?
     private let makeAttemptID: @Sendable () -> String
     private let nowISO8601: @Sendable () -> String
     private let now: @Sendable () -> Date
@@ -1287,7 +1674,10 @@ final class ModelInstallCoordinator {
     private let integrityCheckOperation:
         @MainActor @Sendable (String) async -> ModelTransferPrerequisiteResult
     private let isArtifactKnownRevoked:
-        @MainActor @Sendable (String) -> Bool
+        @MainActor @Sendable (
+            String,
+            ModelInstallArtifactIdentity?
+        ) -> Bool
     private let lifecycleDidChange: @MainActor @Sendable () -> Void
     @ObservationIgnored private var installTask: Task<Void, Never>?
     @ObservationIgnored private var activeAttemptID: String?
@@ -1319,10 +1709,27 @@ final class ModelInstallCoordinator {
 
     init(
         queueStore: ModelInstallQueueStore? = nil,
+        queueSaveOperation: QueueSaveOperation? = nil,
         installOperation: @escaping InstallOperation,
         resumableDataProvider: @escaping @MainActor @Sendable (
             ModelInstallQueueAttempt
         ) -> ModelInstallResumableData? = { _ in nil },
+        removeRetainedDataOperation:
+            @escaping @MainActor @Sendable (
+                ModelInstallQueueAttempt
+            ) throws -> Void = { _ in },
+        removeStagingDataOperation:
+            @escaping @MainActor @Sendable (
+                ModelInstallQueueAttempt
+            ) throws -> Void = { _ in },
+        isolateRetainedDataOperation:
+            @escaping @MainActor @Sendable (
+                [ModelInstallQueueAttempt]
+            ) throws -> Void = { _ in },
+        artifactIdentityProvider:
+            @escaping @MainActor @Sendable (
+                String
+            ) -> ModelInstallArtifactIdentity? = { _ in nil },
         freshnessPolicy: ModelTransferFreshnessPolicy =
             ModelTransferFreshnessPolicy(),
         lastSuccessfulCatalogIntegrityCheckAt:
@@ -1334,7 +1741,10 @@ final class ModelInstallCoordinator {
                 .ready(checkedAt: Date())
             },
         isArtifactKnownRevoked:
-            @escaping @MainActor @Sendable (String) -> Bool = { _ in false },
+            @escaping @MainActor @Sendable (
+                String,
+                ModelInstallArtifactIdentity?
+            ) -> Bool = { _, _ in false },
         makeAttemptID: @escaping @Sendable () -> String = {
             UUID().uuidString.lowercased()
         },
@@ -1345,8 +1755,21 @@ final class ModelInstallCoordinator {
         lifecycleDidChange: @escaping @MainActor @Sendable () -> Void = {}
     ) {
         self.queueStore = queueStore
+        if let queueSaveOperation {
+            self.queueSaveOperation = queueSaveOperation
+        } else if let queueStore {
+            self.queueSaveOperation = { @MainActor @Sendable queue in
+                try queueStore.save(queue)
+            }
+        } else {
+            self.queueSaveOperation = nil
+        }
         self.installOperation = installOperation
         self.resumableDataProvider = resumableDataProvider
+        self.removeRetainedDataOperation = removeRetainedDataOperation
+        self.removeStagingDataOperation = removeStagingDataOperation
+        self.isolateRetainedDataOperation = isolateRetainedDataOperation
+        self.artifactIdentityProvider = artifactIdentityProvider
         self.freshnessPolicy = freshnessPolicy
         self.lastSuccessfulCatalogIntegrityCheckAt =
             lastSuccessfulCatalogIntegrityCheckAt
@@ -1360,7 +1783,7 @@ final class ModelInstallCoordinator {
         if let queueStore {
             do {
                 queue = try queueStore.loadForRelaunch()
-                try queueStore.save(queue)
+                try self.queueSaveOperation?(queue)
             } catch {
                 queue = ModelInstallQueue()
                 persistenceIsAvailable = false
@@ -1371,6 +1794,7 @@ final class ModelInstallCoordinator {
         }
 
         Task { @MainActor [weak self] in
+            self?.enforceKnownRevocations()
             self?.processNextAttempt()
         }
     }
@@ -1391,7 +1815,29 @@ final class ModelInstallCoordinator {
         purpose: ModelPurpose = .transcription,
         action: ModelInstallQueueAction = .install
     ) -> String? {
-        guard persistenceIsAvailable else {
+        guard persistenceIsAvailable,
+              !queue.attempts.contains(where: {
+                  $0.artifactID == modelID
+                      && !$0.state.phase.isTerminal
+              })
+        else {
+            return nil
+        }
+        let artifactIdentity = artifactIdentityProvider(modelID)
+        guard !isArtifactKnownRevoked(
+            modelID,
+            artifactIdentity
+        ) else {
+            return nil
+        }
+        let retainedAttempts = queue.attempts.filter {
+            $0.artifactID == modelID
+                && $0.state.phase == .revoked
+                && $0.resumableData != nil
+        }
+        do {
+            try isolateRetainedDataOperation(retainedAttempts)
+        } catch {
             return nil
         }
         let previousQueue = queue
@@ -1399,6 +1845,7 @@ final class ModelInstallCoordinator {
         do {
             try queue.authorize(
                 artifactID: modelID,
+                authorizedArtifactIdentity: artifactIdentity,
                 purpose: purpose,
                 action: action,
                 attemptID: attemptID,
@@ -1498,6 +1945,15 @@ final class ModelInstallCoordinator {
                 return nil
             }
         }
+        guard let sourcePhase = queue.attempt(id: attemptID)?.state.phase,
+              [
+                  DownloadPhase.interrupted,
+                  .failed,
+                  .cancelled,
+              ].contains(sourcePhase)
+        else {
+            return nil
+        }
         let previousQueue = queue
         let newAttemptID = makeAttemptID()
         do {
@@ -1534,6 +1990,124 @@ final class ModelInstallCoordinator {
             phases: [.waitingForNetwork, .waitingForCatalogCheck],
             message: "Catalog authority restored."
         )
+    }
+
+    func removeRetainedData(attemptID: String) {
+        guard let attempt = queue.attempt(id: attemptID),
+              attempt.state.phase == .revoked,
+              attempt.resumableData != nil,
+              !queue.attempts.contains(where: {
+                  $0.artifactID == attempt.artifactID
+                      && !$0.state.phase.isTerminal
+              })
+        else {
+            return
+        }
+        let retainedAttempts = queue.attempts.filter {
+            $0.artifactID == attempt.artifactID
+                && $0.state.phase == .revoked
+                && $0.resumableData != nil
+        }
+        let previousQueue = queue
+        do {
+            for retainedAttempt in retainedAttempts {
+                try queue.discardRetainedData(
+                    attemptID: retainedAttempt.id
+                )
+            }
+            guard persistQueue() else {
+                queue = previousQueue
+                return
+            }
+            do {
+                for retainedAttempt in retainedAttempts {
+                    try removeRetainedDataOperation(retainedAttempt)
+                }
+            } catch {
+                queue = previousQueue
+                _ = persistQueue()
+                return
+            }
+            recordLifecycleChange()
+        } catch {
+            queue = previousQueue
+        }
+    }
+
+    func enforceKnownRevocations() {
+        let retainedDataDiscoveryAttemptIDs =
+            queue.attempts.compactMap { attempt in
+                attempt.state.phase == .revoked
+                    && attempt.resumableData == nil
+                    ? attempt.id
+                    : nil
+            }
+        let revokedAttemptIDs: [String] = queue.attempts.compactMap { attempt in
+            guard !attempt.state.phase.isTerminal,
+                  isArtifactKnownRevoked(
+                      attempt.artifactID,
+                      attempt.authorizedArtifactIdentity
+                  )
+            else {
+                return nil
+            }
+            return attempt.id
+        }
+        guard !revokedAttemptIDs.isEmpty else {
+            for attemptID in retainedDataDiscoveryAttemptIDs {
+                associateResumableDataIfAvailable(
+                    attemptID: attemptID
+                )
+            }
+            return
+        }
+
+        let previousQueue = queue
+        do {
+            for attemptID in revokedAttemptIDs {
+                guard let attempt = queue.attempt(id: attemptID) else {
+                    continue
+                }
+                try queue.transition(
+                    attemptID: attemptID,
+                    to: DownloadState(
+                        modelID: attempt.artifactID,
+                        phase: .revoked,
+                        bytesDownloaded: attempt.state.bytesDownloaded,
+                        totalBytes: attempt.state.totalBytes,
+                        message: "Install revoked.",
+                        attemptID: attemptID
+                    )
+                )
+            }
+            guard persistQueue() else {
+                recordLifecycleChange()
+                if let activeAttemptID,
+                   revokedAttemptIDs.contains(activeAttemptID) {
+                    installTask?.cancel()
+                }
+                return
+            }
+            recordLifecycleChange()
+            for attemptID in Set(
+                revokedAttemptIDs
+                    + retainedDataDiscoveryAttemptIDs
+            ).sorted() {
+                associateResumableDataIfAvailable(
+                    attemptID: attemptID
+                )
+            }
+        } catch {
+            queue = previousQueue
+            return
+        }
+
+        if let activeAttemptID,
+           revokedAttemptIDs.contains(activeAttemptID) {
+            installTask?.cancel()
+        } else {
+            processNextAttempt()
+        }
     }
 
     private func processNextAttempt() {
@@ -1634,6 +2208,9 @@ final class ModelInstallCoordinator {
                         )
                     }
                 }
+                if finishIfKnownRevoked(attempt) {
+                    return
+                }
                 finish(
                     attemptID: attempt.id,
                     phase: .installed,
@@ -1652,6 +2229,12 @@ final class ModelInstallCoordinator {
                     attemptID: attempt.id,
                     phase: .waitingForCatalogCheck,
                     message: "Waiting for catalog check."
+                )
+            } catch ModelInstallCoordinatorError.revoked {
+                finish(
+                    attemptID: attempt.id,
+                    phase: .revoked,
+                    message: "Install revoked."
                 )
             } catch let error as ModelInstallError {
                 finish(
@@ -1672,7 +2255,10 @@ final class ModelInstallCoordinator {
     private func finishIfKnownRevoked(
         _ attempt: ModelInstallQueueAttempt
     ) -> Bool {
-        guard isArtifactKnownRevoked(attempt.artifactID) else {
+        guard isArtifactKnownRevoked(
+            attempt.artifactID,
+            attempt.authorizedArtifactIdentity
+        ) else {
             return false
         }
         finish(
@@ -1748,6 +2334,9 @@ final class ModelInstallCoordinator {
         guard let attempt = queue.attempt(id: attemptID) else {
             completeTask(attemptID: attemptID)
             return
+        }
+        if attempt.state.phase != .revoked {
+            try? removeStagingDataOperation(attempt)
         }
         if !attempt.state.phase.isTerminal,
            attempt.state.phase != .paused {
@@ -1842,11 +2431,11 @@ final class ModelInstallCoordinator {
 
     @discardableResult
     private func persistQueue() -> Bool {
-        guard let queueStore else {
+        guard let queueSaveOperation else {
             return true
         }
         do {
-            try queueStore.save(queue)
+            try queueSaveOperation(queue)
             persistenceErrorMessage = nil
             return true
         } catch {
@@ -1876,6 +2465,8 @@ final class ModelCatalogCoordinator {
         @MainActor @Sendable (TrustedModelRevocationState) throws -> Void
     typealias DiagnosticOperation =
         @MainActor @Sendable (TrustedCatalogSecurityIssue) -> Void
+    typealias RevocationStateDidChangeOperation =
+        @MainActor @Sendable () -> Void
 
     private enum Candidate {
         case manifest(ModelManifest)
@@ -1906,6 +2497,8 @@ final class ModelCatalogCoordinator {
     private let now: @Sendable () -> Date
     private let integrityCheckAcceptedOperation:
         @MainActor @Sendable () -> Void
+    @ObservationIgnored private var revocationStateDidChangeOperation:
+        RevocationStateDidChangeOperation = {}
     @ObservationIgnored private var openDestinations: Set<ModelPurpose> = []
     @ObservationIgnored private var presentedSnapshot: TrustedCatalogSnapshot?
     @ObservationIgnored private var stagedSnapshot: TrustedCatalogSnapshot?
@@ -1948,6 +2541,13 @@ final class ModelCatalogCoordinator {
         case .unavailable:
             return "The signed model catalog is unavailable. Installed models still work offline."
         }
+    }
+
+    func setRevocationStateDidChange(
+        _ operation: @escaping RevocationStateDidChangeOperation
+    ) {
+        revocationStateDidChangeOperation = operation
+        operation()
     }
 
     init(
@@ -2140,6 +2740,7 @@ final class ModelCatalogCoordinator {
             if accepted != revocationState {
                 try revocationSaveOperation?(accepted)
                 revocationState = accepted
+                revocationStateDidChangeOperation()
             }
         } catch let error as TrustedModelRevocationStateError {
             let candidateRevision: String?
@@ -2151,7 +2752,10 @@ final class ModelCatalogCoordinator {
             case let .conflictingRevision(revision):
                 candidateRevision = revision
                 reason = .rollback
-            case .conflictingRecord:
+            case .conflictingRecord,
+                 .conflictingRestoration,
+                 .unknownRestorationRecord,
+                 .restorationTargetMismatch:
                 candidateRevision = nil
                 reason = .schemaValidation
             }
@@ -2355,6 +2959,7 @@ final class ModelCatalogCoordinator {
         do {
             try revocationSaveOperation?(nextState)
             revocationState = nextState
+            revocationStateDidChangeOperation()
             return true
         } catch {
             return false
@@ -2489,6 +3094,7 @@ extension TrustedCatalogSecurityReason {
 final class SettingsRouter {
     var selectedPane: SettingsPane = .general
     private(set) var modelReveal: ModelCatalogRevealRequest?
+    private(set) var modelReplacementPurpose: ModelPurpose?
 
     func revealModelArtifact(id: String, purpose: ModelPurpose) {
         modelReveal = ModelCatalogRevealRequest(
@@ -2502,6 +3108,21 @@ final class SettingsRouter {
 
     func dismissModelReveal() {
         modelReveal = nil
+    }
+
+    func selectModelReplacement(purpose: ModelPurpose) {
+        modelReveal = nil
+        modelReplacementPurpose = purpose
+        selectedPane = purpose == .voiceCleaning
+            ? .voiceCleaning
+            : .transcriptionModels
+    }
+
+    func dismissModelReplacement(purpose: ModelPurpose) {
+        guard modelReplacementPurpose == purpose else {
+            return
+        }
+        modelReplacementPurpose = nil
     }
 }
 
