@@ -190,8 +190,8 @@ extension ModelCatalogCheckpointPresentation {
             ModelCatalogVariantComparisonPresentation(
                 id: artifact.id,
                 variant: artifact.metadata.presentation.displayName,
-                isRecommended: artifact.id == reference.id,
-                isFallback: resolution?.fallback?.fallbackArtifactID == artifact.id,
+                isRecommended: presentsRecommendation(artifact),
+                isFallback: presentsFallback(artifact),
                 artifactFormat: ModelCatalogVariantTerminology.artifactFormat(
                     artifact.metadata.artifactFormat
                 ),
@@ -224,7 +224,8 @@ extension ModelCatalogCheckpointPresentation {
                 ),
                 state: Self.state(for: artifact.row),
                 compatibilityExplanation: artifact.row.compatibility.catalogExplanation,
-                isActionable: artifact.row.compatibility.allowsModelOperations,
+                isActionable: !artifact.row.isRevoked
+                    && artifact.row.compatibility.allowsModelOperations,
                 isActive: artifact.row.isActive,
                 primaryAction: Self.primaryAction(for: artifact.row.actions)
             )

@@ -1925,6 +1925,89 @@ Verification order:
 verification key table. Unknown `keyId` means reject, with no degraded trust
 path.
 
+### 22.3 Signed Model Revocation Overlay
+
+Model security revocations are an independently versioned, independently
+signed input at `revocations.json` and `revocations.json.sig`. Textify fetches
+and authenticates this pair before attempting to decode a fetched catalog for
+presentation. A valid revocation update therefore still applies when the
+catalog uses a presentation schema that this app version does not support.
+
+The revocation body is strict JSON:
+
+```json
+{
+  "revocationVersion": 1,
+  "generatedAt": "2026-07-24T12:00:00Z",
+  "records": [
+    {
+      "recordID": "security-advisory-1",
+      "exactArtifactID": "exact-artifact-id",
+      "contentDigest": null
+    }
+  ]
+}
+```
+
+Its detached signature uses the manifest key table but a separate signature
+domain:
+
+```json
+{
+  "signatureVersion": 1,
+  "signatureType": "io.github.Player0109.Textify.model-revocations",
+  "algorithm": "Ed25519",
+  "keyId": "model-manifest-v1",
+  "revocationFile": "revocations.json",
+  "contentType": "application/vnd.textify.model-revocations+json;version=1",
+  "contentSHA256": "lowercase-hex-sha256-of-exact-revocation-json-bytes",
+  "signature": "base64url-no-padding-ed25519-signature"
+}
+```
+
+The signed canonical payload begins with
+`TEXTIFY-MODEL-REVOCATIONS-SIGNATURE-V1` and binds every envelope field in the
+same line-oriented form as the model-manifest signature. Textify verifies the
+strict signature envelope, exact content hash, and Ed25519 signature before
+decoding or applying the revocation body.
+
+Each revocation record has a stable `recordID` and targets an Exact Artifact ID,
+a typed immutable content digest, or both. When both are present, either match
+revokes the artifact. Supported digest scopes are:
+
+- `single_file_payload`
+- `canonical_layout` with explicit version `1`
+- `managed_file` with an explicit safe relative path
+
+An unscoped or ambiguous digest, a filename treated as artifact identity, an
+unsafe managed path, an unknown canonical-layout version, or a mutable record
+ID fails closed. Exact IDs match signed artifact aliases. Typed content digests
+also carry revocation across Custom re-import identity, Legacy migration, and
+later catalog canonicalization.
+
+Accepted revocations are sticky. A later signed envelope may add records but
+cannot mutate an existing `recordID`, roll back the accepted timestamp, or
+remove the effect of a prior record by omission. The app persists the exact
+signed envelopes and re-verifies them when loading the cache. Network failure,
+catalog refresh failure, unsupported catalog presentation, and rollback retain
+the previously accepted overlay. When an accepted signed catalog supplies an
+artifact alias, Textify also persists that exact signed catalog evidence and
+re-verifies it on load so a later catalog omission cannot break the identity
+relationship.
+
+Revocation never changes an Installation Receipt's Curated, No Longer Curated,
+Legacy, or Custom placement and never erases license, provenance, local import
+history, or diagnostic evidence. A revoked Exact Artifact stays visible with
+`Revoked` as its leading action-defining state. Inspection, Exact Artifact
+reveal, on-demand verification, deletion, and diagnostic copying remain
+available. Use, Enable, Install, Reinstall, Repair, Export, activation, and
+recommendation/fallback presentation are unavailable. Compatibility and
+integrity evidence remain visible as independent facts.
+
+Matching is local. Revocation fetches are anonymous HTTPS GETs for only the two
+configured files. Textify never sends installed Artifact IDs, Custom content
+digests, local filenames, storage inventory, or match results to the publisher.
+
 ## 23. Post-Processing Pipeline
 
 Pipeline order:

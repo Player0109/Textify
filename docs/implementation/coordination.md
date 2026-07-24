@@ -2,6 +2,33 @@
 
 This file records cross-agent handoffs during implementation.
 
+## Signed Revocation Overlay Handoff - 2026-07-24
+
+- GitHub issue #18 owns the narrow cross-task changes needed to verify and
+  persist an independently versioned signed revocation envelope before catalog
+  presentation decoding, then project revocation as an identity-wide security
+  overlay rather than a fifth catalog placement.
+- This slice may update Task 4 manifest trust, storage identity/digest
+  matching, and focused model tests; Task 11 trusted-catalog composition,
+  catalog presentation/action policy, and focused app tests; Task 3's closed
+  privacy-safe diagnostics only if a new typed rejection reason is required;
+  and Task 14 release guidance for the independent signed feed.
+- Revocation matching is local and uses Exact Artifact IDs or explicit typed
+  immutable digest scopes with OR semantics. It must cover aliases, migrated
+  Legacy receipts, Custom imports, and every matching record without deriving
+  identity from filenames or uploading installed identities, digests, or
+  inventory.
+- Accepted revocations are sticky across catalog omission, placement,
+  recommendation, later catalog publication, refresh failures, and rollback
+  responses. Revoked rows retain their Curated, No Longer Curated, Legacy, or
+  Custom placement while suppressing recommendation and mutating actions.
+- Issue #19 retains ownership of Current Segment runtime admission, active
+  transcription/cleaner enforcement, in-flight queue and installer stopping,
+  retained partial-byte policy, signed restoration, and any automatic
+  post-revocation runtime or preference transaction. Issue #18 exposes only the
+  verified durable overlay and the existing known-revocation prerequisite
+  truth needed by that later enforcement.
+
 ## Installed Artifact Provenance Placement Handoff - 2026-07-24
 
 - GitHub issue #17 owns the narrow cross-task changes needed to place every

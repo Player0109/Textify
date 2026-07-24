@@ -30,8 +30,11 @@ state such as permissions, model status, timing, and error categories.
 
 Textify V1.1 does not automatically upload audio, transcripts, clipboard
 content, diagnostics, or settings. Network access is used for the signed model
-manifest and signature from GitHub Pages, the curated model download from
-Textify GitHub Release assets, and manual app downloads from GitHub Releases.
+manifest, model-revocation records, and their signatures from GitHub Pages, the
+curated model download from Textify GitHub Release assets, and manual app
+downloads from GitHub Releases. Revocation matching happens locally. Those
+requests do not include installed model IDs, Custom model hashes, local
+filenames, storage inventory, or match results.
 
 GitHub Pages and GitHub Releases may receive ordinary request metadata for those
 downloads, such as IP address, user agent, and request time. Textify does not add

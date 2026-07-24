@@ -208,7 +208,28 @@ Textify GitHub Release assets or exact commit-pinned Hugging Face URLs.
    - `https://player0109.github.io/Textify/models/manifest.json`
    - `https://player0109.github.io/Textify/models/manifest.json.sig`
 
-12. On a clean machine, install and dictate once with every catalog backend
+12. Review the independently signed model revocation pair before publishing
+   catalog changes:
+
+   - `https://player0109.github.io/Textify/models/revocations.json`
+   - `https://player0109.github.io/Textify/models/revocations.json.sig`
+
+   Every record must have an immutable stable `recordID` and target an Exact
+   Artifact ID, a lowercase SHA-256 with one explicit supported digest scope,
+   or both. Both targets use OR semantics. Never derive identity from a
+   filename or publish an unscoped digest. A new envelope may add records but
+   must not mutate or omit a previously published record as a removal
+   mechanism; installed clients retain accepted records across omission.
+   Verify the detached Ed25519 signature over the exact JSON bytes and publish
+   the JSON/signature pair before or atomically with a catalog update that
+   changes how an affected artifact is presented.
+
+   Revocation lookup is private and local. Do not add query parameters,
+   request bodies, per-install endpoints, telemetry, or any publication flow
+   that receives installed Artifact IDs, Custom hashes, local filenames, or
+   storage inventory.
+
+13. On a clean machine, install and dictate once with every catalog backend
    from the final signed arm64 app. Confirm diagnostics prove Metal, Neural
    Engine, or the explicitly declared CPU provider and that offline dictation
    still works after network access is disabled.

@@ -90,6 +90,71 @@ final class ModelCatalogExperienceTests: XCTestCase {
         XCTAssertFalse(row.compatibility.allowsModelOperations)
     }
 
+    func testRevokedArtifactKeepsPlacementAndDiagnosticsButSuppressesOperationsAndRecommendation() throws {
+        let manifest = try v3FixtureManifest(
+            recommendedMinimumMemoryBytes: 8_000_000_000
+        )
+        let model = try XCTUnwrap(
+            manifest.models.first { $0.id == "whisper-small-q5_1" }
+        )
+        let experience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [installed(model)],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            revocationOverlay: ModelRevocationOverlay(
+                records: [
+                    ModelRevocationRecord(
+                        recordID: "security-advisory",
+                        exactArtifactID: model.id
+                    ),
+                ]
+            ),
+            managedReadinessByModelID: [model.id: .ready]
+        )
+
+        let row = try XCTUnwrap(
+            experience.rows.first { $0.id == model.id }
+        )
+        XCTAssertTrue(row.isRevoked)
+        XCTAssertEqual(row.placement, .curated)
+        XCTAssertEqual(
+            row.stateTokens,
+            [.revoked, .installed, .ready]
+        )
+        XCTAssertEqual(row.actions, [.delete, .details])
+        XCTAssertEqual(row.compatibility, .compatible)
+
+        let checkpoint = try XCTUnwrap(
+            experience.families
+                .flatMap(\.checkpoints)
+                .first { checkpoint in
+                    checkpoint.artifacts.contains { $0.id == model.id }
+                }
+        )
+        XCTAssertEqual(checkpoint.referenceArtifact?.id, model.id)
+        XCTAssertNil(checkpoint.defaultInstallArtifact)
+        let comparison = try XCTUnwrap(
+            checkpoint.variantComparisons.first { $0.id == model.id }
+        )
+        XCTAssertFalse(comparison.isRecommended)
+        XCTAssertFalse(comparison.isActionable)
+        guard case let .exactArtifact(inspector)? =
+            experience.inspectorPresentation(
+                for: .exactArtifact(model.id)
+            )
+        else {
+            return XCTFail("Revoked artifact must remain inspectable.")
+        }
+        XCTAssertTrue(inspector.localState.hasPrefix("Revoked"))
+        XCTAssertTrue(inspector.canVerify)
+        XCTAssertEqual(
+            OnboardingModelCatalog(experience: experience)
+                .action(for: model.id),
+            .unavailable
+        )
+    }
+
     func testCombinesTrustedInstalledActiveAndTransferStateIntoRows() throws {
         let downloadable = model(id: "downloadable")
         let active = model(id: "active")

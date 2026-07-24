@@ -644,6 +644,52 @@ final class ModelCatalogCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.status, .offline)
     }
 
+    @MainActor
+    func testRevocationAppliesBeforeUnsupportedCatalogPresentationDecoding() async throws {
+        let manifest = try manifest(revision: "2026-07-24T00:00:00Z")
+        let model = try XCTUnwrap(manifest.models.first)
+        let privateKey = Curve25519.Signing.PrivateKey()
+        let revocation = try ModelRevocationTestFixture.snapshot(
+            revision: "2026-07-24T01:00:00Z",
+            records: [
+                ModelRevocationRecord(
+                    recordID: "security-advisory",
+                    exactArtifactID: model.id
+                ),
+            ],
+            privateKey: privateKey,
+            keyID: "catalog-test-key"
+        )
+        var persisted: TrustedModelRevocationState?
+        let coordinator = ModelCatalogCoordinator(
+            initialManifest: manifest,
+            loadOperation: {
+                throw ModelCatalogRefreshError.requiresNewerTextify(
+                    manifestVersion: 4
+                )
+            },
+            revocationLoadOperation: { revocation },
+            revocationSaveOperation: { persisted = $0 }
+        )
+
+        await coordinator.refresh()
+
+        XCTAssertTrue(
+            coordinator.revocationOverlay.isRevoked(
+                model: model,
+                trustedManifest: manifest
+            )
+        )
+        XCTAssertEqual(
+            persisted?.highestAcceptedRevision,
+            revocation.revision
+        )
+        XCTAssertEqual(
+            coordinator.status,
+            .requiresNewerTextify(manifestVersion: 4)
+        )
+    }
+
     func testCatalogEmptyPresentationsKeepLoadingTrustAndAvailabilityDistinct() {
         XCTAssertEqual(
             ModelCatalogEmptyPresentation.checking.title,

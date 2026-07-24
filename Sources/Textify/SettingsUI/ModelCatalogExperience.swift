@@ -744,8 +744,10 @@ struct OnboardingModelCatalog: Equatable {
                 .first?
                 .id
                 ?? choices.first(where: {
-                    $0.compatibility.allowsModelOperations
+                    !$0.isRevoked
+                        && $0.compatibility.allowsModelOperations
                 })?.id
+                ?? choices.first(where: { !$0.isRevoked })?.id
                 ?? choices.first?.id
         }
         selectionNotice = Self.selectionNotice(
@@ -757,6 +759,9 @@ struct OnboardingModelCatalog: Equatable {
     func action(for modelID: String) -> OnboardingModelAction? {
         guard let row = choices.first(where: { $0.id == modelID }) else {
             return nil
+        }
+        if row.isRevoked {
+            return .unavailable
         }
         if row.actions.contains(.cancelInstall) {
             return .cancelInstall
@@ -927,6 +932,7 @@ enum ModelCatalogManagedReadiness: Equatable {
 }
 
 enum ModelCatalogStateToken: Equatable {
+    case revoked
     case installed
     case ready
     case active
@@ -935,6 +941,8 @@ enum ModelCatalogStateToken: Equatable {
 
     var title: String {
         switch self {
+        case .revoked:
+            return "Revoked"
         case .installed:
             return "Installed"
         case .ready:
@@ -960,6 +968,7 @@ struct ModelCatalogRowPresentation: Equatable, Identifiable {
     let sizeDescription: String
     let compatibility: ModelCatalogCompatibility
     let placement: ModelArtifactPlacement?
+    let isRevoked: Bool
     let isInstalled: Bool
     let isActive: Bool
     let install: ModelCatalogInstallPresentation?
@@ -1022,6 +1031,28 @@ struct ModelCatalogCheckpointPresentation: Equatable, Identifiable {
             return nil
         }
         return installedArtifacts.compactMap(\.row.onDiskBytes).reduce(0, +)
+    }
+}
+
+extension ModelCatalogCheckpointPresentation {
+    var presentedReferenceArtifact: ModelCatalogExactArtifactPresentation? {
+        referenceArtifact.flatMap {
+            $0.row.isRevoked ? nil : $0
+        }
+    }
+
+    func presentsRecommendation(
+        _ artifact: ModelCatalogExactArtifactPresentation
+    ) -> Bool {
+        !artifact.row.isRevoked
+            && metadata.recommendedArtifactID == artifact.id
+    }
+
+    func presentsFallback(
+        _ artifact: ModelCatalogExactArtifactPresentation
+    ) -> Bool {
+        !artifact.row.isRevoked
+            && resolution?.fallback?.fallbackArtifactID == artifact.id
     }
 }
 
@@ -1437,6 +1468,7 @@ struct ModelCatalogExperience: Equatable {
         installedRecords: [InstalledModelRecord],
         activePreferences: ModelCatalogActivePreferences,
         transferState: DownloadState?,
+        revocationOverlay: ModelRevocationOverlay = .init(),
         managedReadinessByModelID: [String: ModelCatalogManagedReadiness] = [:],
         onDiskBytesByModelID: [String: Int64] = [:],
         storageInventoryByModelID: [String: ModelStorageArtifactInventory] = [:],
@@ -1452,6 +1484,7 @@ struct ModelCatalogExperience: Equatable {
             transferStatesByModelID: Self.transferStatesByModelID(
                 from: transferState
             ),
+            revocationOverlay: revocationOverlay,
             managedReadinessByModelID: managedReadinessByModelID,
             onDiskBytesByModelID: onDiskBytesByModelID,
             storageInventoryByModelID: storageInventoryByModelID,
@@ -1466,6 +1499,7 @@ struct ModelCatalogExperience: Equatable {
         installedRecords: [InstalledModelRecord],
         activePreferences: ModelCatalogActivePreferences,
         transferState: DownloadState?,
+        revocationOverlay: ModelRevocationOverlay = .init(),
         managedReadinessByModelID: [String: ModelCatalogManagedReadiness] = [:],
         onDiskBytesByModelID: [String: Int64] = [:],
         storageInventoryByModelID: [String: ModelStorageArtifactInventory] = [:],
@@ -1487,6 +1521,7 @@ struct ModelCatalogExperience: Equatable {
             transferStatesByModelID: Self.transferStatesByModelID(
                 from: transferState
             ),
+            revocationOverlay: revocationOverlay,
             managedReadinessByModelID: managedReadinessByModelID,
             onDiskBytesByModelID: onDiskBytesByModelID,
             storageInventoryByModelID: storageInventoryByModelID,
@@ -1501,6 +1536,7 @@ struct ModelCatalogExperience: Equatable {
         installedRecords: [InstalledModelRecord],
         activePreferences: ModelCatalogActivePreferences,
         transferStatesByModelID: [String: DownloadState],
+        revocationOverlay: ModelRevocationOverlay = .init(),
         managedReadinessByModelID: [String: ModelCatalogManagedReadiness] = [:],
         onDiskBytesByModelID: [String: Int64] = [:],
         storageInventoryByModelID: [String: ModelStorageArtifactInventory] = [:],
@@ -1520,6 +1556,7 @@ struct ModelCatalogExperience: Equatable {
             installedRecords: installedRecords,
             activePreferences: activePreferences,
             transferStatesByModelID: transferStatesByModelID,
+            revocationOverlay: revocationOverlay,
             managedReadinessByModelID: managedReadinessByModelID,
             onDiskBytesByModelID: onDiskBytesByModelID,
             storageInventoryByModelID: storageInventoryByModelID,
@@ -1537,21 +1574,23 @@ struct ModelCatalogExperience: Equatable {
         installedRecords: [InstalledModelRecord],
         activePreferences: ModelCatalogActivePreferences,
         transferStatesByModelID: [String: DownloadState],
+        revocationOverlay: ModelRevocationOverlay,
         managedReadinessByModelID: [String: ModelCatalogManagedReadiness],
         onDiskBytesByModelID: [String: Int64],
         storageInventoryByModelID: [String: ModelStorageArtifactInventory],
         installedSizeStatus: ModelCatalogInstalledSizeStatus,
         query: ModelCatalogQuery
     ) {
+        let trustedManifest = ModelManifest(
+            manifestVersion: presentationGraph == nil ? 1 : 3,
+            generatedAt: "1970-01-01T00:00:00Z",
+            models: trustedModels,
+            presentationGraph: presentationGraph,
+            artifactAliases: artifactAliases
+        )
         let placementSnapshot = ModelArtifactPlacementResolver().reconcile(
             records: installedRecords,
-            trustedManifest: ModelManifest(
-                manifestVersion: presentationGraph == nil ? 1 : 3,
-                generatedAt: "1970-01-01T00:00:00Z",
-                models: trustedModels,
-                presentationGraph: presentationGraph,
-                artifactAliases: artifactAliases
-            )
+            trustedManifest: trustedManifest
         )
         let installedRecords = placementSnapshot.records
         let sizeLabel = query.scope == .installed ? "On Disk" : "Download Size"
@@ -1588,7 +1627,19 @@ struct ModelCatalogExperience: Equatable {
         let orderedCatalog = trustedCatalog + localCatalog
         let allRows = orderedCatalog.map { model in
             let installedModel = installedByID[model.id]
+            let installedRecord = installedRecordsByID[model.id]
             let isInstalled = installedIDs.contains(model.id)
+            let isRevoked = installedRecord.map {
+                revocationOverlay.isRevoked(
+                    record: $0,
+                    trustedManifest: trustedManifest
+                )
+            } ?? trustedModelsByID[model.id].map {
+                revocationOverlay.isRevoked(
+                    model: $0,
+                    trustedManifest: trustedManifest
+                )
+            } ?? false
             let managedReadiness = isInstalled
                 ? managedReadinessByModelID[model.id] ?? .ready
                 : nil
@@ -1602,7 +1653,7 @@ struct ModelCatalogExperience: Equatable {
             return ModelCatalogRowPresentation(
                 model: model,
                 operationalModel: trustedModelsByID[model.id] ?? installedModel,
-                installedRecord: installedRecordsByID[model.id],
+                installedRecord: installedRecord,
                 storageInventory: storageInventoryByModelID[model.id],
                 installedSizeStatus: installedSizeStatus,
                 onDiskBytes: isInstalled ? onDiskBytesByModelID[model.id] : nil,
@@ -1620,10 +1671,12 @@ struct ModelCatalogExperience: Equatable {
                 placement: placementSnapshot.placement(
                     forArtifactID: model.id
                 ),
+                isRevoked: isRevoked,
                 isInstalled: isInstalled,
                 isActive: isActive,
                 install: installState.map(ModelCatalogInstallPresentation.init),
                 stateTokens: Self.stateTokens(
+                    isRevoked: isRevoked,
                     isInstalled: isInstalled,
                     isActive: isActive,
                     managedReadiness: managedReadiness,
@@ -1631,6 +1684,7 @@ struct ModelCatalogExperience: Equatable {
                 ),
                 actions: Self.actions(
                     for: model,
+                    isRevoked: isRevoked,
                     isInstalled: isInstalled,
                     isActive: isActive,
                     managedReadiness: managedReadiness,
@@ -2177,12 +2231,19 @@ struct ModelCatalogExperience: Equatable {
 
     private static func actions(
         for model: ProductionModelPresentation,
+        isRevoked: Bool,
         isInstalled: Bool,
         isActive: Bool,
         managedReadiness: ModelCatalogManagedReadiness?,
         installState: DownloadState?
     ) -> Set<ModelCatalogRowAction> {
         var actions: Set<ModelCatalogRowAction> = [.details]
+        if isRevoked {
+            if isInstalled {
+                actions.insert(.delete)
+            }
+            return actions
+        }
 
         if isActive {
             if model.purpose == .voiceCleaning {
@@ -2211,12 +2272,16 @@ struct ModelCatalogExperience: Equatable {
     }
 
     private static func stateTokens(
+        isRevoked: Bool,
         isInstalled: Bool,
         isActive: Bool,
         managedReadiness: ModelCatalogManagedReadiness?,
         compatibility: ModelCatalogCompatibility
     ) -> [ModelCatalogStateToken] {
         var tokens: [ModelCatalogStateToken] = []
+        if isRevoked {
+            tokens.append(.revoked)
+        }
         if isInstalled {
             tokens.append(.installed)
         }
@@ -2302,7 +2367,7 @@ struct ModelCatalogExperience: Equatable {
                         )
                     }
                     let resolution = checkpointResolutions[checkpoint.id]
-                    let defaultInstallArtifact = resolution?.installArtifactID
+                    let resolvedDefaultArtifact = resolution?.installArtifactID
                         .flatMap { artifactID in
                             if let visible = artifacts.first(
                                 where: { $0.id == artifactID }
@@ -2319,6 +2384,10 @@ struct ModelCatalogExperience: Equatable {
                                 row: row
                             )
                         }
+                    let defaultInstallArtifact =
+                        resolvedDefaultArtifact?.row.isRevoked == false
+                            ? resolvedDefaultArtifact
+                            : nil
                     return ModelCatalogCheckpointPresentation(
                         metadata: checkpoint,
                         artifacts: artifacts,

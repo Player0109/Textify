@@ -938,10 +938,9 @@ private struct ModelsSettingsPane: View {
                         title: artifact.metadata.presentation.displayName,
                         description: checkpoint.metadata.presentation.description,
                         variantLabel: nil,
-                        isRecommended: checkpoint.metadata
-                            .recommendedArtifactID == artifact.id,
-                        isFallback: checkpoint.resolution?.fallback?
-                            .fallbackArtifactID == artifact.id,
+                        isRecommended: checkpoint
+                            .presentsRecommendation(artifact),
+                        isFallback: checkpoint.presentsFallback(artifact),
                         isSelected: hierarchyState.selection
                             == .exactArtifact(artifact.id),
                         indentation: 0,
@@ -1118,6 +1117,7 @@ private struct ModelsSettingsPane: View {
                 hierarchyContext: context,
                 compatibility: row.compatibility,
                 placement: row.placement,
+                isRevoked: row.isRevoked,
                 isInstalled: row.isInstalled,
                 isActive: row.isActive,
                 isActivating: activatingModelID == row.id,
@@ -2387,11 +2387,13 @@ private struct ModelCatalogSurface<Row: View>: View {
                                                 ? artifact.metadata.presentation.displayName
                                                 : nil,
                                             isRecommended: !isSingleVariant
-                                                && checkpoint.metadata
-                                                    .recommendedArtifactID == artifact.id,
+                                                && checkpoint
+                                                    .presentsRecommendation(
+                                                        artifact
+                                                    ),
                                             isFallback: !isSingleVariant
-                                                && checkpoint.resolution?.fallback?
-                                                    .fallbackArtifactID == artifact.id,
+                                                && checkpoint
+                                                    .presentsFallback(artifact),
                                             isSelected: selection == .exactArtifact(artifact.id),
                                             indentation: isSingleVariant ? 0 : 30,
                                             comparison: isSingleVariant
@@ -2635,7 +2637,7 @@ private struct ModelCatalogCheckpointRow: View {
     }
 
     private var recommendedArtifact: ModelCatalogExactArtifactPresentation? {
-        checkpoint.referenceArtifact
+        checkpoint.presentedReferenceArtifact
     }
 
     private var checkpointState: some View {
@@ -2740,6 +2742,7 @@ private struct TextifyModelCard: View {
     let hierarchyContext: ModelCatalogArtifactRowContext?
     let compatibility: ModelCatalogCompatibility
     let placement: ModelArtifactPlacement?
+    let isRevoked: Bool
     let isInstalled: Bool
     let isActive: Bool
     let isActivating: Bool
@@ -2777,6 +2780,9 @@ private struct TextifyModelCard: View {
                                 .font(.system(size: 9, weight: .bold, design: .monospaced))
                                 .tracking(0.5)
                                 .foregroundStyle(.secondary)
+                        }
+                        if isRevoked {
+                            TextifyStatusBadge(title: "REVOKED", tone: .warning)
                         }
                         if hierarchyContext?.isRecommended == true {
                             TextifyStatusBadge(title: "RECOMMENDED", tone: .accent)
@@ -4086,11 +4092,29 @@ extension ModelProviderIdentity {
 struct ProductionModelInstallConfiguration: Equatable {
     let manifestURL: URL
     let signatureURL: URL
+    let revocationURL: URL?
+    let revocationSignatureURL: URL?
     let trustedKeys: [TrustedModelManifestKey]
+
+    init(
+        manifestURL: URL,
+        signatureURL: URL,
+        revocationURL: URL? = nil,
+        revocationSignatureURL: URL? = nil,
+        trustedKeys: [TrustedModelManifestKey]
+    ) {
+        self.manifestURL = manifestURL
+        self.signatureURL = signatureURL
+        self.revocationURL = revocationURL
+        self.revocationSignatureURL = revocationSignatureURL
+        self.trustedKeys = trustedKeys
+    }
 
     static let current: ProductionModelInstallConfiguration? = ProductionModelInstallConfiguration(
         manifestURL: URL(string: "https://player0109.github.io/Textify/models/manifest.json")!,
         signatureURL: URL(string: "https://player0109.github.io/Textify/models/manifest.json.sig")!,
+        revocationURL: URL(string: "https://player0109.github.io/Textify/models/revocations.json")!,
+        revocationSignatureURL: URL(string: "https://player0109.github.io/Textify/models/revocations.json.sig")!,
         trustedKeys: [
             TrustedModelManifestKey(
                 keyId: "textify-model-manifest-2026-primary",

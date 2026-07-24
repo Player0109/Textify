@@ -115,8 +115,15 @@ final class AppServices {
                 return .waitingForCatalogCheck
             }
         },
-        isArtifactKnownRevoked: { _ in
-            false
+        isArtifactKnownRevoked: { [weak self] artifactID in
+            guard let self else {
+                return false
+            }
+            return self.modelCatalogCoordinator.revocationOverlay.isRevoked(
+                artifactID: artifactID,
+                trustedManifest: self.modelCatalogCoordinator
+                    .authoritativeManifest
+            )
         },
         lifecycleDidChange: { [weak self] in
             self?.refreshModelStorageInventory()
@@ -368,6 +375,14 @@ final class AppServices {
                 .appendingPathComponent("catalog-state.json"),
             verifier: verifier
         )
+        let revocationStore = TrustedModelRevocationStore(
+            fileURL: paths.manifestCacheDirectory
+                .appendingPathComponent("revocation-state.json"),
+            verifier: ModelRevocationVerifier(
+                trustedKeys: configuration.trustedKeys
+            ),
+            catalogVerifier: verifier
+        )
         let loader = ProductionModelManifestLoader(
             configuration: configuration
         )
@@ -382,6 +397,16 @@ final class AppServices {
             storedState = TrustedCatalogStoredState(
                 securityIssue: bootstrapIssue
             )
+        }
+        let revocationState: TrustedModelRevocationState
+        do {
+            revocationState = try revocationStore.load()
+        } catch {
+            let issue = TrustedCatalogSecurityIssue(
+                reason: .cacheCorruption
+            )
+            logCatalogSecurityIssue(issue)
+            revocationState = TrustedModelRevocationState()
         }
 
         let bundledSnapshot: TrustedCatalogSnapshot?
@@ -408,6 +433,13 @@ final class AppServices {
             },
             saveOperation: { state in
                 try store.save(state)
+            },
+            revocationState: revocationState,
+            revocationSnapshotLoadOperation: {
+                try await loader.downloadRemoteRevocationSnapshot()
+            },
+            revocationSaveOperation: { state in
+                try revocationStore.save(state)
             },
             diagnosticOperation: { [weak self] issue in
                 self?.logCatalogSecurityIssue(issue)
@@ -595,6 +627,7 @@ final class AppServices {
                 voiceCleaningModelID: preferences.activeVoiceCleaningModelID
             ),
             transferStatesByModelID: modelInstallCoordinator.artifactStates,
+            revocationOverlay: modelCatalogCoordinator.revocationOverlay,
             managedReadinessByModelID: readiness,
             onDiskBytesByModelID: measuredBytes,
             storageInventoryByModelID: storageInventoryByModelID,
@@ -684,8 +717,15 @@ final class AppServices {
         guard dictation.allowsModelTransactions else {
             return .dictationInProgress
         }
-        guard let model = installedModel(modelID)?.model else {
+        guard let installedRecord = installedModel(modelID) else {
             return .notInstalled
+        }
+        let model = installedRecord.model
+        guard !modelCatalogCoordinator.revocationOverlay.isRevoked(
+            record: installedRecord,
+            trustedManifest: modelCatalogCoordinator.authoritativeManifest
+        ) else {
+            return .revoked
         }
         let compatibility = activationCompatibility(for: modelID)
         guard compatibility == .compatible else {
@@ -1190,6 +1230,7 @@ enum AppModelActivationResult: Equatable {
     case activated
     case dictationInProgress
     case notInstalled
+    case revoked
     case incompatible(ModelCatalogCompatibility)
     case needsRepair
     case preparationFailed
@@ -1202,6 +1243,8 @@ enum AppModelActivationResult: Equatable {
             return "Wait for the current dictation to finish, then try again."
         case .notInstalled:
             return "Install \(model.displayName) before \(model.useLabel.lowercased())."
+        case .revoked:
+            return "\(model.displayName) was revoked and cannot be activated."
         case let .incompatible(compatibility):
             return compatibility.catalogExplanation
         case .needsRepair:
@@ -1825,8 +1868,12 @@ final class ModelCatalogCoordinator {
     typealias LoadOperation = @Sendable () async throws -> ModelManifest
     typealias SnapshotLoadOperation =
         @Sendable () async throws -> TrustedCatalogSnapshot
+    typealias RevocationSnapshotLoadOperation =
+        @Sendable () async throws -> TrustedModelRevocationSnapshot
     typealias SaveOperation =
         @MainActor @Sendable (TrustedCatalogStoredState) throws -> Void
+    typealias RevocationSaveOperation =
+        @MainActor @Sendable (TrustedModelRevocationState) throws -> Void
     typealias DiagnosticOperation =
         @MainActor @Sendable (TrustedCatalogSecurityIssue) -> Void
 
@@ -1852,7 +1899,9 @@ final class ModelCatalogCoordinator {
     }
 
     private let loadCandidate: @Sendable () async throws -> Candidate
+    private let loadRevocationSnapshot: RevocationSnapshotLoadOperation?
     private let saveOperation: SaveOperation?
+    private let revocationSaveOperation: RevocationSaveOperation?
     private let diagnosticOperation: DiagnosticOperation
     private let now: @Sendable () -> Date
     private let integrityCheckAcceptedOperation:
@@ -1870,6 +1919,7 @@ final class ModelCatalogCoordinator {
     private(set) var presentedRevision: String?
     private(set) var stagedRevision: String?
     private(set) var securityIssue: TrustedCatalogSecurityIssue?
+    private(set) var revocationState: TrustedModelRevocationState
     private(set) var lastSuccessfulCatalogIntegrityCheckAt: Date?
     private(set) var status: ModelCatalogCoordinatorStatus
 
@@ -1879,6 +1929,10 @@ final class ModelCatalogCoordinator {
 
     var authoritativeManifest: ModelManifest? {
         stagedManifest ?? manifest
+    }
+
+    var revocationOverlay: ModelRevocationOverlay {
+        revocationState.overlay
     }
 
     var errorMessage: String? {
@@ -1899,6 +1953,9 @@ final class ModelCatalogCoordinator {
     init(
         initialManifest: ModelManifest? = nil,
         loadOperation: @escaping LoadOperation,
+        initialRevocationState: TrustedModelRevocationState = .init(),
+        revocationLoadOperation: RevocationSnapshotLoadOperation? = nil,
+        revocationSaveOperation: RevocationSaveOperation? = nil,
         diagnosticOperation: @escaping DiagnosticOperation = { _ in },
         now: @escaping @Sendable () -> Date = { Date() },
         integrityCheckAcceptedOperation:
@@ -1907,12 +1964,15 @@ final class ModelCatalogCoordinator {
         self.loadCandidate = {
             .manifest(try await loadOperation())
         }
+        self.loadRevocationSnapshot = revocationLoadOperation
         self.saveOperation = nil
+        self.revocationSaveOperation = revocationSaveOperation
         self.diagnosticOperation = diagnosticOperation
         self.now = now
         self.integrityCheckAcceptedOperation =
             integrityCheckAcceptedOperation
         self.manifest = initialManifest
+        self.revocationState = initialRevocationState
         self.highestAcceptedRevision = initialManifest?.generatedAt
         self.presentedRevision = initialManifest?.generatedAt
         self.lastSuccessfulCatalogIntegrityCheckAt = nil
@@ -1924,6 +1984,10 @@ final class ModelCatalogCoordinator {
         bundledSnapshot: TrustedCatalogSnapshot?,
         snapshotLoadOperation: @escaping SnapshotLoadOperation,
         saveOperation: @escaping SaveOperation,
+        revocationState: TrustedModelRevocationState = .init(),
+        revocationSnapshotLoadOperation:
+            RevocationSnapshotLoadOperation? = nil,
+        revocationSaveOperation: RevocationSaveOperation? = nil,
         diagnosticOperation: @escaping DiagnosticOperation = { _ in },
         now: @escaping @Sendable () -> Date = { Date() },
         integrityCheckAcceptedOperation:
@@ -1932,11 +1996,14 @@ final class ModelCatalogCoordinator {
         self.loadCandidate = {
             .snapshot(try await snapshotLoadOperation())
         }
+        self.loadRevocationSnapshot = revocationSnapshotLoadOperation
         self.saveOperation = saveOperation
+        self.revocationSaveOperation = revocationSaveOperation
         self.diagnosticOperation = diagnosticOperation
         self.now = now
         self.integrityCheckAcceptedOperation =
             integrityCheckAcceptedOperation
+        self.revocationState = revocationState
 
         var resolved = storedState
         if let staged = resolved.stagedSnapshot {
@@ -1983,6 +2050,7 @@ final class ModelCatalogCoordinator {
         } else {
             status = resolved.presentedSnapshot == nil ? .checking : .trusted
         }
+        _ = retainAcceptedCatalogAliases()
     }
 
     @discardableResult
@@ -1994,6 +2062,11 @@ final class ModelCatalogCoordinator {
         }
         refreshInProgress = true
         status = manifest == nil ? .checking : .checkingForUpdates
+        guard retainAcceptedCatalogAliases() else {
+            handle(.unavailable)
+            return finishRefresh(.catalogUnavailable)
+        }
+        await refreshRevocations()
         let result: ModelCatalogRefreshResult
         do {
             result = try accept(try await loadCandidate())
@@ -2042,6 +2115,12 @@ final class ModelCatalogCoordinator {
             handle(.unavailable)
             result = .catalogUnavailable
         }
+        return finishRefresh(result)
+    }
+
+    private func finishRefresh(
+        _ result: ModelCatalogRefreshResult
+    ) -> ModelCatalogRefreshResult {
         refreshInProgress = false
         let waiters = refreshWaiters
         refreshWaiters.removeAll()
@@ -2049,6 +2128,59 @@ final class ModelCatalogCoordinator {
             waiter.resume(returning: result)
         }
         return result
+    }
+
+    private func refreshRevocations() async {
+        guard let loadRevocationSnapshot else {
+            return
+        }
+        do {
+            let candidate = try await loadRevocationSnapshot()
+            let accepted = try revocationState.accepting(candidate)
+            if accepted != revocationState {
+                try revocationSaveOperation?(accepted)
+                revocationState = accepted
+            }
+        } catch let error as TrustedModelRevocationStateError {
+            let candidateRevision: String?
+            let reason: TrustedCatalogSecurityReason
+            switch error {
+            case let .rollback(candidate, _):
+                candidateRevision = candidate
+                reason = .rollback
+            case let .conflictingRevision(revision):
+                candidateRevision = revision
+                reason = .rollback
+            case .conflictingRecord:
+                candidateRevision = nil
+                reason = .schemaValidation
+            }
+            recordRevocationIssue(
+                reason: reason,
+                candidateRevision: candidateRevision
+            )
+        } catch is ModelRevocationVerificationError {
+            recordRevocationIssue(reason: .invalidSignature)
+        } catch is ModelRevocationPolicyError {
+            recordRevocationIssue(reason: .schemaValidation)
+        } catch is DecodingError {
+            recordRevocationIssue(reason: .strictDecoding)
+        } catch {
+            // Availability and persistence failures retain the prior overlay.
+        }
+    }
+
+    private func recordRevocationIssue(
+        reason: TrustedCatalogSecurityReason,
+        candidateRevision: String? = nil
+    ) {
+        let issue = TrustedCatalogSecurityIssue(
+            reason: reason,
+            candidateRevision: candidateRevision,
+            highestAcceptedRevision:
+                revocationState.highestAcceptedRevision
+        )
+        diagnosticOperation(issue)
     }
 
     func destinationOpened(_ purpose: ModelPurpose) {
@@ -2128,6 +2260,9 @@ final class ModelCatalogCoordinator {
                 )
                 return .rejected
             }
+            guard retainAliases(from: candidate.snapshot) else {
+                return .catalogUnavailable
+            }
             if candidateDate == highestDate {
                 let acceptedAt = candidate.snapshot == nil
                     ? lastSuccessfulCatalogIntegrityCheckAt
@@ -2150,6 +2285,9 @@ final class ModelCatalogCoordinator {
                 }
                 return .presentationAccepted
             }
+        }
+        guard retainAliases(from: candidate.snapshot) else {
+            return .catalogUnavailable
         }
 
         let shouldStage = !openDestinations.isEmpty && manifest != nil
@@ -2195,6 +2333,32 @@ final class ModelCatalogCoordinator {
 
     private func matchesAcceptedCandidate(_ candidate: ModelManifest) -> Bool {
         stagedManifest == candidate || manifest == candidate
+    }
+
+    private func retainAcceptedCatalogAliases() -> Bool {
+        retainAliases(from: presentedSnapshot)
+            && retainAliases(from: stagedSnapshot)
+    }
+
+    private func retainAliases(
+        from snapshot: TrustedCatalogSnapshot?
+    ) -> Bool {
+        guard let snapshot else {
+            return true
+        }
+        let nextState = revocationState.retainingAliases(
+            from: snapshot
+        )
+        guard nextState != revocationState else {
+            return true
+        }
+        do {
+            try revocationSaveOperation?(nextState)
+            revocationState = nextState
+            return true
+        } catch {
+            return false
+        }
     }
 
     private func handle(_ error: ModelCatalogRefreshError) {

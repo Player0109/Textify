@@ -362,6 +362,16 @@ final class ProductionUITests: XCTestCase {
             "https://player0109.github.io/Textify/models/manifest.json.sig"
         )
         XCTAssertEqual(
+            ProductionModelInstallConfiguration.current?
+                .revocationURL?.absoluteString,
+            "https://player0109.github.io/Textify/models/revocations.json"
+        )
+        XCTAssertEqual(
+            ProductionModelInstallConfiguration.current?
+                .revocationSignatureURL?.absoluteString,
+            "https://player0109.github.io/Textify/models/revocations.json.sig"
+        )
+        XCTAssertEqual(
             ProductionModelInstallConfiguration.current?.trustedKeys.first?.keyId,
             "textify-model-manifest-2026-primary"
         )

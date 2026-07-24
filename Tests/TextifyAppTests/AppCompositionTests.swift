@@ -528,6 +528,99 @@ final class AppCompositionTests: XCTestCase {
     }
 
     @MainActor
+    func testRevokedCustomReimportPreservesInstallAndNeverAutoActivates() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let layout = ModelStorageLayout(rootDirectory: paths.modelsDirectory)
+        var sourceData = Data(
+            repeating: 0,
+            count: Int(CustomWhisperModelImporter.minimumFileSizeBytes)
+        )
+        sourceData.replaceSubrange(0..<4, with: Data("GGUF".utf8))
+        let sourceDirectory = paths.settingsFileURL.deletingLastPathComponent()
+        let originalURL = sourceDirectory.appendingPathComponent("original.gguf")
+        let renamedURL = sourceDirectory.appendingPathComponent("renamed.gguf")
+        try FileManager.default.createDirectory(
+            at: sourceDirectory,
+            withIntermediateDirectories: true
+        )
+        try sourceData.write(to: originalURL)
+        try sourceData.write(to: renamedURL)
+        let firstRecord = try await CustomWhisperModelImporter(
+            layout: layout,
+            nowISO8601: { "2026-07-24T00:00:00Z" }
+        ).importModel(
+            from: originalURL,
+            options: CustomWhisperImportOptions(
+                displayName: "Original Local Name",
+                licenseName: "User-provided model; license not verified by Textify"
+            )
+        )
+        let digest = try XCTUnwrap(
+            firstRecord.identityHistory.customImport?.contentDigest.value
+        )
+        let transcriber = ActivationTranscriberSpy()
+        let services = try Self.makeServices(
+            paths: paths,
+            transcriber: transcriber
+        )
+        let manifest = ModelManifest(
+            manifestVersion: 1,
+            generatedAt: "2026-07-24T00:00:00Z",
+            models: []
+        )
+        services.modelCatalogCoordinator = ModelCatalogCoordinator(
+            initialManifest: manifest,
+            loadOperation: { manifest },
+            initialRevocationState: try ModelRevocationTestFixture.state(
+                records: [
+                    ModelRevocationRecord(
+                        recordID: "custom-digest-revocation",
+                        contentDigest: ModelRevocationDigestTarget(
+                            algorithm: .sha256,
+                            value: digest,
+                            scope: .singleFilePayload
+                        )
+                    ),
+                ]
+            )
+        )
+
+        do {
+            _ = try await services.importCustomWhisperModel(
+                from: renamedURL,
+                displayName: "Renamed Local Model"
+            )
+            XCTFail("Expected revoked reimport activation to fail.")
+        } catch ModelInstallCoordinatorError.modelPreparationFailed {
+        } catch {
+            XCTFail("Unexpected import error: \(error)")
+        }
+
+        let storedRecord = try XCTUnwrap(
+            services.installedModelRecords.first
+        )
+        XCTAssertEqual(storedRecord.storageModelID, firstRecord.storageModelID)
+        XCTAssertEqual(
+            storedRecord.identityHistory.customImport?.localNames,
+            ["Original Local Name", "Renamed Local Model"]
+        )
+        XCTAssertEqual(
+            storedRecord.identityHistory.customImport?.sourceFilenames,
+            ["original.gguf", "renamed.gguf"]
+        )
+        XCTAssertNil(services.preferences.activeModelID)
+        let preparedModelIDs = await transcriber.preparedModelIDs()
+        XCTAssertTrue(preparedModelIDs.isEmpty)
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: try XCTUnwrap(
+                    storedRecord.localFilesByManifestFilename.values.first
+                )
+            )
+        )
+    }
+
+    @MainActor
     func testVoiceCleanerActivationDoesNotReplaceActiveTranscriptionModel() async throws {
         let paths = try Self.makeTemporaryPaths()
         let transcriptionModel = try Self.catalogModel(id: ProductionModelPolicy.requiredModelID)
@@ -697,6 +790,61 @@ final class AppCompositionTests: XCTestCase {
                 )
             )
         )
+        XCTAssertEqual(services.preferences.activeModelID, previous.id)
+        XCTAssertEqual(services.settingsStore.load().activeModelID, previous.id)
+        XCTAssertTrue(preparedModelIDs.isEmpty)
+    }
+
+    @MainActor
+    func testUseRejectsDigestRevokedInstalledArtifactBeforePreparation() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let previous = try Self.catalogModel(
+            id: ProductionModelPolicy.requiredModelID
+        )
+        let candidate = try Self.catalogModel(id: "whisper-large-v2-q5_0")
+        try Self.writeInstalledStore(
+            models: [previous, candidate],
+            to: paths
+        )
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = previous.id
+        let transcriber = ActivationTranscriberSpy()
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths,
+            models: CandidateRuntimeModelResolver(models: [
+                Self.runtimeModel(previous),
+                Self.runtimeModel(candidate),
+            ]),
+            transcriber: transcriber
+        )
+        let manifest = ModelManifest(
+            manifestVersion: 1,
+            generatedAt: "2026-07-24T00:00:00Z",
+            models: [previous, candidate]
+        )
+        let digest = try XCTUnwrap(candidate.files.first?.sha256)
+        services.modelCatalogCoordinator = ModelCatalogCoordinator(
+            initialManifest: manifest,
+            loadOperation: { manifest },
+            initialRevocationState: try ModelRevocationTestFixture.state(
+                records: [
+                    ModelRevocationRecord(
+                        recordID: "digest-revocation",
+                        contentDigest: ModelRevocationDigestTarget(
+                            algorithm: .sha256,
+                            value: digest,
+                            scope: .singleFilePayload
+                        )
+                    ),
+                ]
+            )
+        )
+
+        let result = await services.activateInstalledModel(candidate.id)
+        let preparedModelIDs = await transcriber.preparedModelIDs()
+
+        XCTAssertEqual(result, .revoked)
         XCTAssertEqual(services.preferences.activeModelID, previous.id)
         XCTAssertEqual(services.settingsStore.load().activeModelID, previous.id)
         XCTAssertTrue(preparedModelIDs.isEmpty)

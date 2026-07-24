@@ -47,6 +47,24 @@ struct ProductionModelManifestLoader {
         )
     }
 
+    func downloadRemoteRevocationSnapshot() async throws
+        -> TrustedModelRevocationSnapshot {
+        guard let revocationURL = configuration.revocationURL,
+              let signatureURL = configuration.revocationSignatureURL
+        else {
+            throw ModelCatalogRefreshError.unavailable
+        }
+        return try await ModelRevocationDownloader(
+            transport: transport,
+            verifier: ModelRevocationVerifier(
+                trustedKeys: configuration.trustedKeys
+            )
+        ).downloadSnapshot(
+            revocationURL: revocationURL,
+            signatureURL: signatureURL
+        )
+    }
+
     func loadBundledSnapshot() throws -> TrustedCatalogSnapshot? {
         guard let resourceDirectory else {
             return nil
