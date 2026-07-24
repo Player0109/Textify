@@ -1402,6 +1402,36 @@ Model load states shown in Settings -> Models:
 - Unloaded to save memory
 - Failed to load
 
+Model catalog interaction and accessibility:
+
+- Family, Checkpoint, and Exact Artifact rows expose their hierarchy level,
+  expanded/collapsed state where applicable, selection, and logical row
+  position/count. The comparison header remains available to assistive
+  technology and compact layouts label every Quality, Speed, Features, State,
+  and Action field.
+- Arrow keys move catalog focus; Page Up/Page Down move by a bounded logical
+  page increment and scroll to the resulting off-screen row; Home/End move to
+  the first/last logical row; Return selects and inspects the focused artifact;
+  Left/Right collapse or expand checkpoints; and Command-Delete requests
+  deletion only for the selected installed Exact Artifact.
+- Query, catalog refresh, revocation, install, and deletion updates preserve a
+  surviving focused identity. If the selected row disappears, focus moves to
+  the nearest surviving selectable row and Textify announces that result once.
+- Download progress exposes its current phase, bytes, and percentage as a
+  queryable accessibility value without announcing every progress tick.
+  Completion, failure, cancellation, activation, deletion, and revocation use
+  one concise announcement per state transition.
+- Catalog rows, toolbar controls, Downloads, inspector, storage summary,
+  confirmation copy, Settings navigation, and onboarding reflow at
+  accessibility text sizes and narrow supported widths. Status never depends
+  on color alone.
+- Reduce Motion suppresses nonessential shimmer/motion. Reduce Transparency
+  uses opaque surfaces, and Increase Contrast or Differentiate Without Color
+  adds stronger selection and control boundaries.
+- V1 ships Base English only. Critical model-management labels live in the
+  string catalog and are exercised with pseudolocalized expansion and
+  right-to-left isolation; full localization remains out of scope.
+
 Menu/overlay may show "Preparing Balanced - Whisper small.en..." when relevant.
 
 No percentage for model loading in V1; use spinner/state text only.

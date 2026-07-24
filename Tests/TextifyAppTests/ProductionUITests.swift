@@ -57,6 +57,94 @@ final class ProductionUITests: XCTestCase {
         )
     }
 
+    func testShippingModelManagementStringCatalogRetainsCriticalLabels() throws {
+        let catalogURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Resources/Localizable.xcstrings")
+        let object = try XCTUnwrap(
+            try JSONSerialization.jsonObject(
+                with: Data(contentsOf: catalogURL)
+            ) as? [String: Any]
+        )
+        XCTAssertEqual(object["sourceLanguage"] as? String, "en")
+        let strings = try XCTUnwrap(
+            object["strings"] as? [String: Any]
+        )
+        let criticalLabels = [
+            "Action",
+            "Action column header",
+            "About Model Variants…",
+            "All",
+            "Back to Filtered Results",
+            "Cancel",
+            "Clear Search",
+            "Collapsed",
+            "Delete",
+            "Details",
+            "Disable",
+            "Dismiss Reveal",
+            "Disclosure",
+            "Downloads",
+            "Enable",
+            "Expanded",
+            "Features",
+            "Features column header",
+            "Filters",
+            "Hide Details",
+            "Import Whisper Model…",
+            "Installed",
+            "Install",
+            "Inspect",
+            "Logical position",
+            "Model",
+            "Model catalog table headers",
+            "Model column header",
+            "More catalog actions",
+            "No Downloads",
+            "Outline level",
+            "Pause",
+            "Quality",
+            "Quality column header",
+            "Reinstall",
+            "Remove Data",
+            "Reset Catalog View",
+            "Resume",
+            "Retry",
+            "Search models",
+            "Show in Catalog",
+            "Speed",
+            "Speed column header",
+            "State",
+            "State column header",
+            "Transcription Models",
+            "Use Model",
+            "Verify Integrity",
+            "Verify Installed",
+            "Voice Cleaning",
+        ]
+
+        for key in criticalLabels {
+            let entry = try XCTUnwrap(
+                strings[key] as? [String: Any],
+                "Missing critical localization key \(key)"
+            )
+            let localizations = try XCTUnwrap(
+                entry["localizations"] as? [String: Any]
+            )
+            XCTAssertEqual(Set(localizations.keys), ["en"])
+            let english = try XCTUnwrap(
+                localizations["en"] as? [String: Any]
+            )
+            let unit = try XCTUnwrap(
+                english["stringUnit"] as? [String: Any]
+            )
+            let value = try XCTUnwrap(unit["value"] as? String)
+            XCTAssertFalse(value.isEmpty)
+        }
+    }
+
     func testVisualIdentitySupportsTheNativeSidebarRedesign() {
         XCTAssertEqual(TextifyVisualIdentity.signatureElement, "Spokenly blue selection")
         XCTAssertEqual(TextifyVisualIdentity.voiceVioletHex, "#0A84FF")

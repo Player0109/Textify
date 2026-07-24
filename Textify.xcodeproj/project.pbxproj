@@ -59,6 +59,7 @@
 		F5A00884B700CBB2ADE2DA16 /* SwiftAtomics.txt in Resources */ = {isa = PBXBuildFile; fileRef = AEFEFF555251FEBD7FDD9B9A /* SwiftAtomics.txt */; };
 		F846FDC25A332B69852DEA3A /* OnboardingRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44C5780DE99C8DD3D79B7EFC /* OnboardingRootView.swift */; };
 		F8839E7DC406FE2BCF8E199D /* yyjson.txt in Resources */ = {isa = PBXBuildFile; fileRef = 0EFB7B3B702120578207D4FB /* yyjson.txt */; };
+		FA4A729A01A787D41F0A0605 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 5328DF9E826A6D401E0FDC4B /* Localizable.xcstrings */; };
 		FB6FC34E77EF31AA5495DAB1 /* ModelStorageInventoryCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F57373CBDBD84E287E3A0094 /* ModelStorageInventoryCoordinator.swift */; };
 		FECC8E50DA0E6FD0AC8F8B50 /* AppServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DE762BA89473A6795A5D976 /* AppServices.swift */; };
 /* End PBXBuildFile section */
@@ -84,6 +85,7 @@
 		4CC623827B3C6D9A378CDFB3 /* ModelCatalogInspectorPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogInspectorPresentation.swift; sourceTree = "<group>"; };
 		50EFA53917D5428EA5F8CFDD /* THIRD_PARTY_NOTICES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = THIRD_PARTY_NOTICES.md; sourceTree = "<group>"; };
 		521E635A02FA359283D0D319 /* TextifyVisualSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextifyVisualSystem.swift; sourceTree = "<group>"; };
+		5328DF9E826A6D401E0FDC4B /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		571CC5300AD3FA1F34564F0C /* SwiftCollections.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftCollections.txt; sourceTree = "<group>"; };
 		58F5611F5BE94FA64F4648CB /* ModelCatalogArtifactInspection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogArtifactInspection.swift; sourceTree = "<group>"; };
 		5B64C10E76B28DCB342D30DE /* ModelCatalogInspectorController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogInspectorController.swift; sourceTree = "<group>"; };
@@ -145,6 +147,7 @@
 			isa = PBXGroup;
 			children = (
 				F7E292AC1DD24E083692F969 /* Assets.xcassets */,
+				5328DF9E826A6D401E0FDC4B /* Localizable.xcstrings */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -359,6 +362,7 @@
 				F088E249B21EAB13FB7FA38E /* FluidAudio.txt in Resources */,
 				6A51BA26C3D3B66F0B321F3B /* FunASR_Model_License_1.1.txt in Resources */,
 				C87B35194E13C6B8347A9AA8 /* LiteRT-LM.txt in Resources */,
+				FA4A729A01A787D41F0A0605 /* Localizable.xcstrings in Resources */,
 				6A364A441FCF57DA734D6D57 /* MLXAudioSwift.txt in Resources */,
 				B3D0D133AA19D87D88A454EE /* MLXSwift.txt in Resources */,
 				2BA724319382989A1C583610 /* MLXSwiftLM.txt in Resources */,

@@ -105,12 +105,23 @@ private struct SettingsSidebar: View {
                                 .foregroundStyle(selection == pane ? TextifyVisualIdentity.voiceViolet : Color.white.opacity(0.62))
                                 .frame(width: 18)
                             Text(pane.sidebarTitle)
-                                .font(.system(size: 15, weight: selection == pane ? .semibold : .regular))
+                                .font(
+                                    .body.weight(
+                                        selection == pane
+                                            ? .semibold
+                                            : .regular
+                                    )
+                                )
+                                .fixedSize(
+                                    horizontal: false,
+                                    vertical: true
+                                )
                             Spacer(minLength: 0)
                         }
                         .foregroundStyle(selection == pane ? Color.white : Color.white.opacity(0.62))
                         .padding(.horizontal, 10)
-                        .frame(height: 35)
+                        .padding(.vertical, 7)
+                        .frame(minHeight: 35)
                         .background(
                             selection == pane ? TextifyVisualIdentity.consoleSelection : Color.clear,
                             in: RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -550,7 +561,10 @@ struct ModelsSettingsPane: View {
     @State private var showsInspector = false
     @State private var showsModelVariantsHelp = false
     @State private var showsDownloads = false
+    @State private var announcementTracker = ModelCatalogAnnouncementTracker()
     @FocusState private var focusedCatalogRowID: ModelCatalogHierarchyRowID?
+    @AccessibilityFocusState private var accessibilityFocusedCatalogRowID:
+        ModelCatalogHierarchyRowID?
 
     init(destination: ModelCatalogPurposeDestination) {
         self.destination = destination
@@ -561,6 +575,9 @@ struct ModelsSettingsPane: View {
             for: destination.purpose,
             query: catalogQuery
         )
+        let announcementRows = services.modelCatalogExperience(
+            for: destination.purpose
+        ).rows
 
         return SettingsPaneLayout(
             title: destination.title,
@@ -596,7 +613,7 @@ struct ModelsSettingsPane: View {
                 Text(modelMessage)
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
             } else if ProductionModelInstallConfiguration.current == nil,
                       services.modelCatalogCoordinator.manifest == nil {
                 Text("Signed catalog unavailable in this build")
@@ -669,12 +686,19 @@ struct ModelsSettingsPane: View {
             ModelCatalogVariantsAboutView()
         }
         .task {
+            _ = announcementTracker.update(
+                attempts: services.modelInstallCoordinator.attempts
+            )
+            _ = announcementTracker.update(rows: announcementRows)
             services.refreshModelStorageInventory()
             _ = await services.dictation.refreshReadiness()
             await services.modelCatalogCoordinator.refresh()
         }
-        .onChange(of: catalogExperience) { _, updatedExperience in
-            hierarchyState.reconcile(with: updatedExperience)
+        .onChange(of: catalogExperience) { previousExperience, updatedExperience in
+            let recovery = hierarchyState.reconcile(
+                from: previousExperience,
+                to: updatedExperience
+            )
             focusedCatalogRowID = hierarchyState.focusedRowID
             inspectorController.select(
                 hierarchyState.selection,
@@ -683,9 +707,35 @@ struct ModelsSettingsPane: View {
             if hierarchyState.selection == nil {
                 showsInspector = false
             }
+            if let recovery,
+               let rowID = hierarchyState.focusedRowID {
+                accessibilityFocusedCatalogRowID = rowID
+                announce(recovery.announcement)
+            }
         }
         .onChange(of: focusedCatalogRowID) { _, rowID in
             hierarchyState.focus(rowID)
+        }
+        .onChange(
+            of: accessibilityFocusedCatalogRowID
+        ) { _, rowID in
+            if let rowID {
+                hierarchyState.focus(rowID)
+            }
+        }
+        .onChange(
+            of: services.modelInstallCoordinator.attempts
+        ) { _, attempts in
+            for announcement in announcementTracker.update(
+                attempts: attempts
+            ) {
+                announce(announcement)
+            }
+        }
+        .onChange(of: announcementRows) { _, rows in
+            for announcement in announcementTracker.update(rows: rows) {
+                announce(announcement)
+            }
         }
         .onChange(of: inspectorController.verificationState) { _, state in
             switch state {
@@ -709,12 +759,25 @@ struct ModelsSettingsPane: View {
                 break
             }
         }
-        .onKeyPress(.delete, phases: .down) { keyPress in
-            guard keyPress.modifiers.contains(.command) else {
-                return .ignored
-            }
-            beginSelectedRemoval(in: catalogExperience)
-            return .handled
+        .onKeyPress(
+            keys: [
+                .upArrow,
+                .downArrow,
+                .pageUp,
+                .pageDown,
+                .home,
+                .end,
+                .return,
+                .leftArrow,
+                .rightArrow,
+                .delete,
+            ],
+            phases: .down
+        ) { keyPress in
+            handleCatalogKeyPress(
+                keyPress,
+                in: catalogExperience
+            )
         }
         .alert("Import local Whisper model?", isPresented: $showsImportConfirmation) {
             Button("Cancel", role: .cancel) {
@@ -893,8 +956,12 @@ struct ModelsSettingsPane: View {
             hierarchyRows: isInitialCatalogCheck
                 ? []
                 : hierarchyState.visibleRows(in: catalogExperience),
+            accessibilityRows: isInitialCatalogCheck
+                ? []
+                : hierarchyState.accessibilityRows(in: catalogExperience),
             selection: hierarchyState.selection,
             focusedRowID: $focusedCatalogRowID,
+            accessibilityFocusedRowID: $accessibilityFocusedCatalogRowID,
             onSelect: { selection in
                 hierarchyState.select(selection)
                 inspectorController.select(selection, in: catalogExperience)
@@ -925,6 +992,74 @@ struct ModelsSettingsPane: View {
                 } : nil
             )
         }
+    }
+
+    private func handleCatalogKeyPress(
+        _ keyPress: KeyPress,
+        in catalogExperience: ModelCatalogExperience
+    ) -> KeyPress.Result {
+        let command: ModelCatalogKeyboardCommand?
+        switch keyPress.key {
+        case .upArrow:
+            command = .moveUp
+        case .downArrow:
+            command = .moveDown
+        case .pageUp:
+            command = .pageUp
+        case .pageDown:
+            command = .pageDown
+        case .home:
+            command = .home
+        case .end:
+            command = .end
+        case .return:
+            command = .activate
+        case .leftArrow:
+            command = .collapse
+        case .rightArrow:
+            command = .expand
+        case .delete where keyPress.modifiers.contains(.command):
+            command = .deleteSelection
+        default:
+            command = nil
+        }
+        guard let command else {
+            return .ignored
+        }
+        let disallowedModifiers: EventModifiers = [
+            .command,
+            .control,
+            .option,
+        ]
+        if command != .deleteSelection,
+           !keyPress.modifiers.intersection(disallowedModifiers).isEmpty {
+            return .ignored
+        }
+
+        let action = hierarchyState.handleKeyboardCommand(
+            command,
+            in: catalogExperience
+        )
+        focusedCatalogRowID = hierarchyState.focusedRowID
+        switch action {
+        case .none:
+            break
+        case let .selectionChanged(selection):
+            inspectorController.select(selection, in: catalogExperience)
+            showsInspector = true
+        case .disclosureChanged:
+            inspectorController.select(
+                hierarchyState.selection,
+                in: catalogExperience
+            )
+        case .requestDeletion:
+            beginSelectedRemoval(in: catalogExperience)
+        }
+        return .handled
+    }
+
+    private func announce(_ message: String) {
+        ModelCatalogAccessibilityAnnouncer.post(message)
     }
 
     private var emptyPresentation: ModelCatalogEmptyPresentation {
@@ -994,6 +1129,7 @@ struct ModelsSettingsPane: View {
         switch reveal {
         case let .catalogArtifact(family, checkpoint, artifact):
             pinnedRevealCard(
+                rowID: .exactArtifact(artifact.id),
                 title: "\(family.metadata.presentation.displayName) → "
                     + "\(checkpoint.metadata.presentation.displayName) → "
                     + artifact.metadata.presentation.displayName
@@ -1026,6 +1162,7 @@ struct ModelsSettingsPane: View {
             }
         case let .standaloneArtifact(row):
             pinnedRevealCard(
+                rowID: .standaloneArtifact(row.id),
                 title: "\(row.model.displayName) (\(row.id))"
             ) {
                 catalogRow(
@@ -1044,7 +1181,10 @@ struct ModelsSettingsPane: View {
                 )
             }
         case let .unavailableArtifact(artifactID):
-            pinnedRevealCard(title: artifactID) {
+            pinnedRevealCard(
+                rowID: .standaloneArtifact(artifactID),
+                title: artifactID
+            ) {
                 Label(
                     "This Exact Artifact is no longer in the signed catalog and is not installed on this Mac.",
                     systemImage: "questionmark.folder"
@@ -1058,6 +1198,7 @@ struct ModelsSettingsPane: View {
     }
 
     private func pinnedRevealCard<Content: View>(
+        rowID: ModelCatalogHierarchyRowID,
         title: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
@@ -1109,6 +1250,15 @@ struct ModelsSettingsPane: View {
                 )
         }
         .accessibilityElement(children: .contain)
+        .accessibilityLabel("Pinned Exact Artifact reveal")
+        .accessibilityValue(title)
+        .accessibilityIdentifier("model-catalog-pinned-reveal")
+        .focusable()
+        .focused($focusedCatalogRowID, equals: rowID)
+        .accessibilityFocused(
+            $accessibilityFocusedCatalogRowID,
+            equals: rowID
+        )
     }
 
     @ViewBuilder
@@ -1121,16 +1271,20 @@ struct ModelsSettingsPane: View {
             activatingModelID = row.id
             Task {
                 let result = await services.activateInstalledModel(row.id)
-                modelMessage = result.message(for: row.model)
+                let message = result.message(for: row.model)
+                modelMessage = message
                 activatingModelID = nil
+                announce(message)
             }
         }
         let onDisable: () -> Void = {
             Task {
                 let disabled = await services.disableVoiceCleaning()
-                modelMessage = disabled
+                let message = disabled
                     ? "Voice cleaning is off."
                     : "Wait for the current dictation to finish, then try again."
+                modelMessage = message
+                announce(message)
             }
         }
         let onInstall: () -> Void = {
@@ -1233,10 +1387,14 @@ struct ModelsSettingsPane: View {
                     activeResolution:
                         confirmation.activeResolution
                 )
-                modelMessage =
+                let message =
                     "\(confirmation.exactArtifactName) was deleted."
+                modelMessage = message
+                announce(message)
             } catch {
-                modelMessage = error.localizedDescription
+                let message = error.localizedDescription
+                modelMessage = message
+                announce(message)
             }
         }
     }
@@ -1280,6 +1438,22 @@ struct ModelsSettingsPane: View {
                 modelMessage = "Import failed: \(String(describing: error))"
             }
         }
+    }
+}
+
+@MainActor
+private enum ModelCatalogAccessibilityAnnouncer {
+    static func post(_ message: String) {
+        NSAccessibility.post(
+            element: NSApplication.shared,
+            notification: .announcementRequested,
+            userInfo: [
+                .announcement: message,
+                .priority: NSNumber(
+                    value: NSAccessibilityPriorityLevel.medium.rawValue
+                ),
+            ]
+        )
     }
 }
 
@@ -1515,6 +1689,12 @@ private struct ModelDownloadsPopover: View {
                     )
                 )
                 .frame(maxWidth: .infinity, minHeight: 230)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("No Downloads")
+                .accessibilityValue(
+                    "Authorized model installations and their history appear here."
+                )
+                .accessibilityIdentifier("model-downloads-empty-state")
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 16) {
@@ -1547,7 +1727,14 @@ private struct ModelDownloadsPopover: View {
                 .padding(12)
             }
         }
-        .frame(width: 390, height: 420)
+        .frame(
+            minWidth: 390,
+            idealWidth: 420,
+            maxWidth: 520,
+            minHeight: 420,
+            idealHeight: 480,
+            maxHeight: 620
+        )
         .background(TextifyVisualIdentity.windowSurface)
     }
 
@@ -1559,8 +1746,7 @@ private struct ModelDownloadsPopover: View {
         if !rows.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 Text(title.uppercased())
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .tracking(0.8)
+                    .font(.caption2.bold().monospaced())
                     .foregroundStyle(.tertiary)
 
                 ForEach(rows) { row in
@@ -1613,6 +1799,11 @@ private struct ModelDownloadAttemptRow: View {
     let onRetry: () -> Void
     let onRemoveRetainedData: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceTransparency)
+    private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
@@ -1624,8 +1815,8 @@ private struct ModelDownloadAttemptRow: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(row.artifactID)
                         .font(.callout.weight(.semibold))
-                        .lineLimit(1)
                         .truncationMode(.middle)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(row.statusTitle)
                         .font(.caption.weight(.medium))
                         .foregroundStyle(statusColor)
@@ -1642,6 +1833,8 @@ private struct ModelDownloadAttemptRow: View {
                 HStack(spacing: 8) {
                     ProgressView(value: row.progressValue, total: 1)
                         .tint(statusColor)
+                        .accessibilityLabel(row.statusTitle)
+                        .accessibilityValue(row.accessibilityValue)
                     if let percentText = row.percentText {
                         Text(percentText)
                             .font(.system(.caption2, design: .monospaced))
@@ -1653,31 +1846,26 @@ private struct ModelDownloadAttemptRow: View {
             Text(row.detailText)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
 
-            HStack(spacing: 12) {
-                Button("Show in Catalog", action: onReveal)
-
-                Spacer(minLength: 0)
-
-                if row.canPause {
-                    Button("Pause", action: onPause)
-                }
-                if row.canResume {
-                    Button("Resume", action: onResume)
-                }
-                if row.canRetry {
-                    Button("Retry", action: onRetry)
-                }
-                if row.canCancel {
-                    Button("Cancel", role: .destructive, action: onCancel)
-                }
-                if row.canRemoveRetainedData {
-                    Button(
-                        "Remove Data",
-                        role: .destructive,
-                        action: onRemoveRetainedData
-                    )
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Button("Show in Catalog", action: onReveal)
+                        downloadAttemptActions
+                    }
+                } else {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 12) {
+                            Button("Show in Catalog", action: onReveal)
+                            Spacer(minLength: 0)
+                            downloadAttemptActions
+                        }
+                        VStack(alignment: .leading, spacing: 8) {
+                            Button("Show in Catalog", action: onReveal)
+                            downloadAttemptActions
+                        }
+                    }
                 }
             }
             .buttonStyle(.borderless)
@@ -1685,14 +1873,50 @@ private struct ModelDownloadAttemptRow: View {
         }
         .padding(12)
         .background(
-            Color.primary.opacity(0.045),
+            reduceTransparency
+                ? TextifyVisualIdentity.raisedSurface
+                : Color.primary.opacity(0.045),
             in: RoundedRectangle(cornerRadius: 10, style: .continuous)
         )
         .overlay {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(TextifyVisualIdentity.separator, lineWidth: 1)
+                .stroke(
+                    colorSchemeContrast == .increased
+                        ? Color.primary.opacity(0.7)
+                        : TextifyVisualIdentity.separator,
+                    lineWidth:
+                        colorSchemeContrast == .increased ? 2 : 1
+                )
         }
         .accessibilityElement(children: .contain)
+        .accessibilityLabel(row.artifactID)
+        .accessibilityValue(row.accessibilityValue)
+        .accessibilityIdentifier("model-download-\(row.id)")
+    }
+
+    @ViewBuilder
+    private var downloadAttemptActions: some View {
+        HStack(spacing: 12) {
+            if row.canPause {
+                Button("Pause", action: onPause)
+            }
+            if row.canResume {
+                Button("Resume", action: onResume)
+            }
+            if row.canRetry {
+                Button("Retry", action: onRetry)
+            }
+            if row.canCancel {
+                Button("Cancel", role: .destructive, action: onCancel)
+            }
+            if row.canRemoveRetainedData {
+                Button(
+                    "Remove Data",
+                    role: .destructive,
+                    action: onRemoveRetainedData
+                )
+            }
+        }
     }
 
     private var statusImage: String {
@@ -1744,219 +1968,310 @@ private struct ModelCatalogToolbar: View {
     let downloadCount: Int
     let isImportDisabled: Bool
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceTransparency)
+    private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+
     var body: some View {
-        HStack(spacing: 10) {
-            Picker("Catalog scope", selection: scopeBinding) {
-                ForEach(ModelCatalogScope.allCases) { scope in
-                    Text(scope.title).tag(scope)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                compactToolbar
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    wideToolbar
+                    compactToolbar
                 }
             }
-            .pickerStyle(.segmented)
-            .frame(width: 150)
-
-            HStack(spacing: 7) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField("Search models", text: $query.searchText)
-                    .textFieldStyle(.plain)
-                if query.hasSearch {
-                    Button {
-                        query.clearSearch()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Clear Search")
-                }
-            }
-            .padding(.horizontal, 10)
-            .frame(minWidth: 180, idealWidth: 280)
-            .frame(height: 28)
-            .background(
-                Color.primary.opacity(0.055),
-                in: RoundedRectangle(cornerRadius: 7, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(TextifyVisualIdentity.separator, lineWidth: 1)
-            }
-
-            Menu {
-                Picker("Sort models", selection: $query.sort) {
-                    ForEach(query.availableSorts) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-                if query.sort != .catalog {
-                    Divider()
-                    Picker("Direction", selection: $query.sortDirection) {
-                        ForEach(ModelCatalogSortDirection.allCases) { direction in
-                            Label(direction.title, systemImage: direction.systemImage)
-                                .tag(direction)
-                        }
-                    }
-                }
-            } label: {
-                Label(
-                    query.sort.title,
-                    systemImage: query.sort == .catalog
-                        ? "arrow.up.arrow.down"
-                        : query.sortDirection.systemImage
-                )
-            }
-            .fixedSize()
-
-            Menu {
-                Menu("Compatibility") {
-                    ForEach(ModelCatalogCompatibilityFilter.allCases) { value in
-                        filterButton(
-                            value,
-                            at: \.compatibility,
-                            title: value.title
-                        )
-                    }
-                }
-                Menu("State") {
-                    ForEach(ModelCatalogStateFilter.allCases) { value in
-                        filterButton(value, at: \.states, title: value.title)
-                    }
-                }
-                Menu("Artifact Format") {
-                    ForEach(filterOptions.artifactFormats, id: \.rawValue) { value in
-                        filterButton(
-                            value,
-                            at: \.artifactFormats,
-                            title: ModelCatalogVariantTerminology.artifactFormat(value)
-                        )
-                    }
-                }
-                Menu("Numeric Format") {
-                    ForEach(filterOptions.numericFormats, id: \.rawValue) { value in
-                        filterButton(
-                            value,
-                            at: \.numericFormats,
-                            title: value.rawValue
-                        )
-                    }
-                }
-                Menu("Runtime") {
-                    ForEach(filterOptions.runtimes, id: \.rawValue) { value in
-                        filterButton(
-                            value,
-                            at: \.runtimes,
-                            title: ModelCatalogVariantTerminology.runtime(value)
-                        )
-                    }
-                }
-                Menu("Compute Route") {
-                    ForEach(filterOptions.computeRoutes, id: \.rawValue) { value in
-                        filterButton(
-                            value,
-                            at: \.computeRoutes,
-                            title: ModelCatalogVariantTerminology.computeRoute(value)
-                        )
-                    }
-                }
-                Menu("Language") {
-                    ForEach(filterOptions.languages, id: \.self) { value in
-                        filterButton(
-                            value,
-                            at: \.languages,
-                            title: ModelCatalogQuery.languageName(value)
-                        )
-                    }
-                }
-                Menu("Evidence") {
-                    ForEach(ModelCatalogEvidenceFilter.allCases) { value in
-                        filterButton(value, at: \.evidence, title: value.title)
-                    }
-                }
-                if query.hasAppliedFilters {
-                    Divider()
-                    Button("Clear Filters", systemImage: "line.3.horizontal.decrease.circle") {
-                        query.clearFilters()
-                    }
-                }
-            } label: {
-                Label(
-                    query.hasAppliedFilters
-                        ? "Filters (\(query.appliedFilterTokens.count))"
-                        : "Filters",
-                    systemImage: query.hasAppliedFilters
-                        ? "line.3.horizontal.decrease.circle.fill"
-                        : "line.3.horizontal.decrease.circle"
-                )
-            }
-            .fixedSize()
-
-            Spacer(minLength: 0)
-
-            Button {
-                showsDownloads = true
-            } label: {
-                HStack(spacing: 5) {
-                    Image(systemName: downloadCount > 0
-                        ? "arrow.down.circle.fill"
-                        : "arrow.down.circle")
-                    Text("Downloads")
-                    if downloadCount > 0 {
-                        Text("\(downloadCount)")
-                            .font(.system(size: 9, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 5)
-                            .frame(minWidth: 17, minHeight: 17)
-                            .background(
-                                TextifyVisualIdentity.voiceViolet,
-                                in: Capsule()
-                            )
-                    }
-                }
-            }
-            .fixedSize()
-            .accessibilityLabel(
-                downloadCount == 0
-                    ? "Downloads"
-                    : "Downloads, \(downloadCount) pending"
-            )
-            .popover(isPresented: $showsDownloads) {
-                ModelDownloadsPopover {
-                    showsDownloads = false
-                }
-            }
-
-            Menu {
-                if hasChanges {
-                    Button(
-                        "Reset Catalog View",
-                        systemImage: "arrow.counterclockwise",
-                        action: onReset
-                    )
-                }
-                Divider()
-                Button(
-                    "About Model Variants…",
-                    systemImage: "questionmark.circle",
-                    action: onShowVariantHelp
-                )
-                Button("Verify Installed", systemImage: "checkmark.seal", action: onVerify)
-                if let onImport {
-                    Button(
-                        "Import Whisper Model…",
-                        systemImage: "square.and.arrow.down",
-                        action: onImport
-                    )
-                    .disabled(isImportDisabled)
-                }
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.system(size: 15, weight: .medium))
-            }
-            .menuStyle(.borderlessButton)
-            .frame(width: 24)
         }
         .controlSize(.small)
         .accessibilityElement(children: .contain)
+    }
+
+    private var wideToolbar: some View {
+        HStack(spacing: 10) {
+            scopePicker
+            searchField
+            sortMenu
+            filterMenu
+            Spacer(minLength: 0)
+            downloadsButton
+            overflowMenu
+        }
+    }
+
+    private var compactToolbar: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                scopePicker
+                searchField
+            }
+            HStack(spacing: 10) {
+                sortMenu
+                filterMenu
+                Spacer(minLength: 0)
+                downloadsButton
+                overflowMenu
+            }
+        }
+    }
+
+    private var scopePicker: some View {
+        Picker("Catalog scope", selection: scopeBinding) {
+            ForEach(ModelCatalogScope.allCases) { scope in
+                Text(scope.title).tag(scope)
+            }
+        }
+        .pickerStyle(.segmented)
+        .frame(minWidth: 150, idealWidth: 180)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 7) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("Search models", text: $query.searchText)
+                .textFieldStyle(.plain)
+            if query.hasSearch {
+                Button {
+                    query.clearSearch()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear Search")
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(minWidth: 180, idealWidth: 280)
+        .frame(minHeight: 28)
+        .background(
+            reduceTransparency
+                ? TextifyVisualIdentity.raisedSurface
+                : Color.primary.opacity(0.055),
+            in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .stroke(
+                    colorSchemeContrast == .increased
+                        ? Color.primary.opacity(0.7)
+                        : TextifyVisualIdentity.separator,
+                    lineWidth:
+                        colorSchemeContrast == .increased ? 2 : 1
+                )
+        }
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            Picker("Sort models", selection: $query.sort) {
+                ForEach(query.availableSorts) { option in
+                    Text(option.title).tag(option)
+                }
+            }
+            if query.sort != .catalog {
+                Divider()
+                Picker("Direction", selection: $query.sortDirection) {
+                    ForEach(ModelCatalogSortDirection.allCases) { direction in
+                        Label(
+                            direction.title,
+                            systemImage: direction.systemImage
+                        )
+                        .tag(direction)
+                    }
+                }
+            }
+        } label: {
+            Label(
+                query.sort.title,
+                systemImage: query.sort == .catalog
+                    ? "arrow.up.arrow.down"
+                    : query.sortDirection.systemImage
+            )
+        }
+        .fixedSize()
+    }
+
+    private var filterMenu: some View {
+        Menu {
+            Menu("Compatibility") {
+                ForEach(ModelCatalogCompatibilityFilter.allCases) { value in
+                    filterButton(
+                        value,
+                        at: \.compatibility,
+                        title: value.title
+                    )
+                }
+            }
+            Menu("State") {
+                ForEach(ModelCatalogStateFilter.allCases) { value in
+                    filterButton(value, at: \.states, title: value.title)
+                }
+            }
+            Menu("Artifact Format") {
+                ForEach(
+                    filterOptions.artifactFormats,
+                    id: \.rawValue
+                ) { value in
+                    filterButton(
+                        value,
+                        at: \.artifactFormats,
+                        title:
+                            ModelCatalogVariantTerminology
+                                .artifactFormat(value)
+                    )
+                }
+            }
+            Menu("Numeric Format") {
+                ForEach(
+                    filterOptions.numericFormats,
+                    id: \.rawValue
+                ) { value in
+                    filterButton(
+                        value,
+                        at: \.numericFormats,
+                        title: value.rawValue
+                    )
+                }
+            }
+            Menu("Runtime") {
+                ForEach(filterOptions.runtimes, id: \.rawValue) { value in
+                    filterButton(
+                        value,
+                        at: \.runtimes,
+                        title:
+                            ModelCatalogVariantTerminology.runtime(value)
+                    )
+                }
+            }
+            Menu("Compute Route") {
+                ForEach(
+                    filterOptions.computeRoutes,
+                    id: \.rawValue
+                ) { value in
+                    filterButton(
+                        value,
+                        at: \.computeRoutes,
+                        title:
+                            ModelCatalogVariantTerminology
+                                .computeRoute(value)
+                    )
+                }
+            }
+            Menu("Language") {
+                ForEach(filterOptions.languages, id: \.self) { value in
+                    filterButton(
+                        value,
+                        at: \.languages,
+                        title: ModelCatalogQuery.languageName(value)
+                    )
+                }
+            }
+            Menu("Evidence") {
+                ForEach(ModelCatalogEvidenceFilter.allCases) { value in
+                    filterButton(
+                        value,
+                        at: \.evidence,
+                        title: value.title
+                    )
+                }
+            }
+            if query.hasAppliedFilters {
+                Divider()
+                Button(
+                    "Clear Filters",
+                    systemImage: "line.3.horizontal.decrease.circle"
+                ) {
+                    query.clearFilters()
+                }
+            }
+        } label: {
+            Label(
+                query.hasAppliedFilters
+                    ? "Filters (\(query.appliedFilterTokens.count))"
+                    : "Filters",
+                systemImage: query.hasAppliedFilters
+                    ? "line.3.horizontal.decrease.circle.fill"
+                    : "line.3.horizontal.decrease.circle"
+            )
+        }
+        .fixedSize()
+    }
+
+    private var downloadsButton: some View {
+        Button {
+            showsDownloads = true
+        } label: {
+            HStack(spacing: 5) {
+                Image(
+                    systemName: downloadCount > 0
+                        ? "arrow.down.circle.fill"
+                        : "arrow.down.circle"
+                )
+                Text("Downloads")
+                if downloadCount > 0 {
+                    Text("\(downloadCount)")
+                        .font(.caption2.bold())
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 5)
+                        .frame(minWidth: 17, minHeight: 17)
+                        .background(
+                            TextifyVisualIdentity.voiceViolet,
+                            in: Capsule()
+                        )
+                }
+            }
+        }
+        .fixedSize()
+        .accessibilityLabel(
+            downloadCount == 0
+                ? "Downloads"
+                : "Downloads, \(downloadCount) pending"
+        )
+        .popover(isPresented: $showsDownloads) {
+            ModelDownloadsPopover {
+                showsDownloads = false
+            }
+        }
+    }
+
+    private var overflowMenu: some View {
+        Menu {
+            if hasChanges {
+                Button(
+                    "Reset Catalog View",
+                    systemImage: "arrow.counterclockwise",
+                    action: onReset
+                )
+            }
+            Divider()
+            Button(
+                "About Model Variants…",
+                systemImage: "questionmark.circle",
+                action: onShowVariantHelp
+            )
+            Button(
+                "Verify Installed",
+                systemImage: "checkmark.seal",
+                action: onVerify
+            )
+            if let onImport {
+                Button(
+                    "Import Whisper Model…",
+                    systemImage: "square.and.arrow.down",
+                    action: onImport
+                )
+                .disabled(isImportDisabled)
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .font(.body.weight(.medium))
+        }
+        .menuStyle(.borderlessButton)
+        .frame(minWidth: 24)
+        .accessibilityLabel("More catalog actions")
     }
 
     private var scopeBinding: Binding<ModelCatalogScope> {
@@ -2048,10 +2363,12 @@ private struct ModelCatalogFilterTokens: View {
 private struct ModelCatalogStorageSummaryView: View {
     let presentation: ModelCatalogStorageSummaryPresentation
 
-    private let columns = Array(
-        repeating: GridItem(.flexible(), alignment: .topLeading),
-        count: 3
-    )
+    @Environment(\.accessibilityReduceTransparency)
+    private var reduceTransparency
+
+    private let columns = [
+        GridItem(.adaptive(minimum: 150), alignment: .topLeading),
+    ]
 
     var body: some View {
         LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
@@ -2061,18 +2378,22 @@ private struct ModelCatalogStorageSummaryView: View {
             ) { _, fact in
                 VStack(alignment: .leading, spacing: 3) {
                     Text(fact.label.uppercased())
-                        .font(.system(size: 8, weight: .bold, design: .monospaced))
-                        .tracking(0.45)
+                        .font(.caption2.bold().monospaced())
                         .foregroundStyle(.tertiary)
                     Text(fact.value)
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .accessibilityElement(children: .combine)
             }
         }
         .padding(12)
-        .background(Color.primary.opacity(0.035))
+        .background(
+            reduceTransparency
+                ? TextifyVisualIdentity.cardSurface
+                : Color.primary.opacity(0.035)
+        )
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
@@ -2404,8 +2725,11 @@ private struct ModelCatalogSurface<Row: View>: View {
     let rows: [ModelCatalogRowPresentation]
     let sizeLabel: String
     let hierarchyRows: [ModelCatalogHierarchyRow]
+    let accessibilityRows: [ModelCatalogAccessibilityRow]
     let selection: ModelCatalogHierarchySelection?
     let focusedRowID: FocusState<ModelCatalogHierarchyRowID?>.Binding
+    let accessibilityFocusedRowID:
+        AccessibilityFocusState<ModelCatalogHierarchyRowID?>.Binding
     let onSelect: (ModelCatalogHierarchySelection) -> Void
     let onToggleCheckpoint: (ModelCatalogCheckpointPresentation) -> Void
     let onReset: () -> Void
@@ -2413,13 +2737,17 @@ private struct ModelCatalogSurface<Row: View>: View {
     let row: (ModelCatalogRowPresentation, ModelCatalogArtifactRowContext?) -> Row
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
 
     init(
         rows: [ModelCatalogRowPresentation],
         sizeLabel: String,
         hierarchyRows: [ModelCatalogHierarchyRow],
+        accessibilityRows: [ModelCatalogAccessibilityRow],
         selection: ModelCatalogHierarchySelection?,
         focusedRowID: FocusState<ModelCatalogHierarchyRowID?>.Binding,
+        accessibilityFocusedRowID:
+            AccessibilityFocusState<ModelCatalogHierarchyRowID?>.Binding,
         onSelect: @escaping (ModelCatalogHierarchySelection) -> Void,
         onToggleCheckpoint: @escaping (ModelCatalogCheckpointPresentation) -> Void,
         onReset: @escaping () -> Void,
@@ -2432,8 +2760,10 @@ private struct ModelCatalogSurface<Row: View>: View {
         self.rows = rows
         self.sizeLabel = sizeLabel
         self.hierarchyRows = hierarchyRows
+        self.accessibilityRows = accessibilityRows
         self.selection = selection
         self.focusedRowID = focusedRowID
+        self.accessibilityFocusedRowID = accessibilityFocusedRowID
         self.onSelect = onSelect
         self.onToggleCheckpoint = onToggleCheckpoint
         self.onReset = onReset
@@ -2459,6 +2789,10 @@ private struct ModelCatalogSurface<Row: View>: View {
                                 .focusable()
                                 .focused(
                                     focusedRowID,
+                                    equals: .standaloneArtifact(catalogRow.id)
+                                )
+                                .accessibilityFocused(
+                                    accessibilityFocusedRowID,
                                     equals: .standaloneArtifact(catalogRow.id)
                                 )
                         }
@@ -2529,6 +2863,17 @@ private struct ModelCatalogSurface<Row: View>: View {
                             .id(hierarchyRow.id)
                             .focusable()
                             .focused(focusedRowID, equals: hierarchyRow.id)
+                            .accessibilityFocused(
+                                accessibilityFocusedRowID,
+                                equals: hierarchyRow.id
+                            )
+                            .modifier(
+                                ModelCatalogRowAccessibilityModifier(
+                                    presentation: accessibilityRows.first {
+                                        $0.id == hierarchyRow.id
+                                    }
+                                )
+                            )
                         }
                     }
                 }
@@ -2539,7 +2884,67 @@ private struct ModelCatalogSurface<Row: View>: View {
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(TextifyVisualIdentity.separator, lineWidth: 1)
+                .stroke(
+                    colorSchemeContrast == .increased
+                        ? Color.primary.opacity(0.7)
+                        : TextifyVisualIdentity.separator,
+                    lineWidth:
+                        colorSchemeContrast == .increased ? 2 : 1
+                )
+        }
+    }
+}
+
+private struct ModelCatalogRowAccessibilityModifier: ViewModifier {
+    let presentation: ModelCatalogAccessibilityRow?
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let presentation {
+            content
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel(presentation.label)
+                .accessibilityValue(presentation.value)
+                .accessibilityCustomContent(
+                    LocalizedStringKey("Outline level"),
+                    String(presentation.outlineLevel),
+                    importance: .high
+                )
+                .accessibilityCustomContent(
+                    LocalizedStringKey("Logical position"),
+                    "\(presentation.logicalPosition) of \(presentation.logicalCount)",
+                    importance: .high
+                )
+                .accessibilityAddTraits(
+                    presentation.role == .familyHeading ? .isHeader : []
+                )
+                .accessibilityIdentifier(
+                    presentation.id.accessibilityIdentifier
+                )
+                .modifier(
+                    ModelCatalogDisclosureAccessibilityModifier(
+                        state: presentation.disclosureState
+                    )
+                )
+        } else {
+            content
+        }
+    }
+}
+
+private struct ModelCatalogDisclosureAccessibilityModifier: ViewModifier {
+    let state: ModelCatalogAccessibilityDisclosureState?
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let state {
+            content.accessibilityCustomContent(
+                LocalizedStringKey("Disclosure"),
+                Text(LocalizedStringKey(state.accessibilityLabel)),
+                importance: .high
+            )
+        } else {
+            content
         }
     }
 }
@@ -2632,40 +3037,75 @@ private struct ModelCatalogFamilyHeading: View {
     let family: ModelCatalogFamilyPresentation
 
     var body: some View {
-        HStack(spacing: 12) {
-            ModelProviderTile(provider: provider, isActive: false)
-
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 7) {
-                    Text(family.metadata.presentation.displayName)
-                        .font(.system(.headline, design: .rounded, weight: .bold))
-                    Text(family.metadata.presentation.provider.displayName)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Text(family.metadata.presentation.description)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                familyIdentity
+                Spacer(minLength: 12)
+                checkpointCount
             }
-
-            Spacer(minLength: 12)
-
-            Text(
-                "\(family.checkpoints.count) "
-                    + (family.checkpoints.count == 1 ? "checkpoint" : "checkpoints")
-            )
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+            VStack(alignment: .leading, spacing: 8) {
+                familyIdentity
+                checkpointCount
+            }
         }
         .padding(.horizontal, 14)
-        .frame(minHeight: 62)
+        .padding(.vertical, 10)
+        .frame(minHeight: 62, alignment: .leading)
         .background(Color.primary.opacity(0.035))
         .overlay(alignment: .bottom) {
             Divider()
         }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
+    }
+
+    private var familyIdentity: some View {
+        HStack(alignment: .top, spacing: 12) {
+            ModelProviderTile(provider: provider, isActive: false)
+
+            VStack(alignment: .leading, spacing: 4) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 7) {
+                        familyTitle
+                        providerName
+                    }
+                    VStack(alignment: .leading, spacing: 3) {
+                        familyTitle
+                        providerName
+                    }
+                }
+                Text(family.metadata.presentation.description)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var familyTitle: some View {
+        Text(family.metadata.presentation.displayName)
+            .font(.headline.bold())
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var providerName: some View {
+        Text(family.metadata.presentation.provider.displayName)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
+    private var checkpointCount: some View {
+        Text(
+            "\(family.checkpoints.count) "
+                + (
+                    family.checkpoints.count == 1
+                        ? "checkpoint"
+                        : "checkpoints"
+                )
+        )
+        .font(.caption)
+        .foregroundStyle(.tertiary)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private var provider: ModelProviderIdentity {
@@ -2684,6 +3124,7 @@ private struct ModelCatalogCheckpointRow: View {
     let onToggle: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         HStack(spacing: 8) {
@@ -2700,40 +3141,19 @@ private struct ModelCatalogCheckpointRow: View {
             )
 
             Button(action: onSelect) {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 7) {
-                            Text(checkpoint.metadata.presentation.displayName)
-                                .font(.system(size: 15, weight: .semibold))
-                                .lineLimit(1)
-                            Text("\(checkpoint.metadata.artifactIDs.count) VARIANTS")
-                                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                .tracking(0.6)
-                                .foregroundStyle(.secondary)
-                        }
-                        Text(checkpoint.metadata.presentation.description)
-                            .font(.system(size: 13))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    if let reference = recommendedArtifact {
-                        ModelSignalMetric(
-                            level: reference.row.model.qualitySignalLevel,
-                            label: reference.row.model.qualityLabel
-                        )
-                        .frame(width: 86, alignment: .leading)
-                        ModelSignalMetric(
-                            level: reference.row.model.speedSignalLevel,
-                            label: reference.row.model.speedLabel
-                        )
-                        .frame(width: 86, alignment: .leading)
-                        checkpointState
-                            .frame(width: 138, alignment: .leading)
+                if dynamicTypeSize.isAccessibilitySize {
+                    checkpointContent(isCompact: true)
+                } else {
+                    ViewThatFits(in: .horizontal) {
+                        checkpointContent(isCompact: false)
+                            .frame(
+                                minWidth:
+                                    ModelCatalogPrimaryRowLayout
+                                        .wideMinimumWidth
+                            )
+                        checkpointContent(isCompact: true)
                     }
                 }
-                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(checkpoint.metadata.presentation.displayName)
@@ -2750,6 +3170,118 @@ private struct ModelCatalogCheckpointRow: View {
             Divider()
                 .padding(.leading, 40)
         }
+    }
+
+    @ViewBuilder
+    private func checkpointContent(
+        isCompact: Bool
+    ) -> some View {
+        if isCompact {
+            VStack(alignment: .leading, spacing: 10) {
+                checkpointIdentity(allowsWrapping: true)
+                if let reference = recommendedArtifact {
+                    LazyVGrid(
+                        columns: [
+                            GridItem(
+                                .adaptive(minimum: 130),
+                                alignment: .topLeading
+                            ),
+                        ],
+                        alignment: .leading,
+                        spacing: 10
+                    ) {
+                        checkpointField("Quality") {
+                            ModelSignalMetric(
+                                level:
+                                    reference.row.model
+                                        .qualitySignalLevel,
+                                label: reference.row.model.qualityLabel
+                            )
+                        }
+                        checkpointField("Speed") {
+                            ModelSignalMetric(
+                                level:
+                                    reference.row.model
+                                        .speedSignalLevel,
+                                label: reference.row.model.speedLabel
+                            )
+                        }
+                        checkpointField("State") {
+                            checkpointState
+                        }
+                    }
+                }
+            }
+            .contentShape(Rectangle())
+        } else {
+            HStack(spacing: 12) {
+                checkpointIdentity(allowsWrapping: false)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                if let reference = recommendedArtifact {
+                    ModelSignalMetric(
+                        level: reference.row.model.qualitySignalLevel,
+                        label: reference.row.model.qualityLabel
+                    )
+                    .frame(width: 86, alignment: .leading)
+                    ModelSignalMetric(
+                        level: reference.row.model.speedSignalLevel,
+                        label: reference.row.model.speedLabel
+                    )
+                    .frame(width: 86, alignment: .leading)
+                    checkpointState
+                        .frame(width: 138, alignment: .leading)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+    }
+
+    private func checkpointIdentity(
+        allowsWrapping: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 7) {
+                    checkpointTitle
+                    checkpointVariantCount
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    checkpointTitle
+                    checkpointVariantCount
+                }
+            }
+            Text(checkpoint.metadata.presentation.description)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .lineLimit(allowsWrapping ? nil : 2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var checkpointTitle: some View {
+        Text(checkpoint.metadata.presentation.displayName)
+            .font(.body.weight(.semibold))
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var checkpointVariantCount: some View {
+        Text("\(checkpoint.metadata.artifactIDs.count) VARIANTS")
+            .font(.caption2.bold().monospaced())
+            .foregroundStyle(.secondary)
+    }
+
+    private func checkpointField<Content: View>(
+        _ label: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label.uppercased())
+                .font(.caption2.bold().monospaced())
+                .foregroundStyle(.secondary)
+            content()
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private var recommendedArtifact: ModelCatalogExactArtifactPresentation? {
@@ -2829,25 +3361,71 @@ private struct ModelCatalogEmptyState: View {
 }
 
 private struct ModelCatalogColumnHeader: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
-        HStack(spacing: 12) {
-            Text("MODEL")
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Text("QUALITY")
-                .frame(width: 86, alignment: .leading)
-            Text("SPEED")
-                .frame(width: 86, alignment: .leading)
-            Text("FEATURES")
-                .frame(width: 138, alignment: .leading)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                header(for: .compact)
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    header(for: .wide)
+                        .frame(
+                            minWidth:
+                                ModelCatalogPrimaryRowLayout.wideMinimumWidth
+                        )
+                    header(for: .compact)
+                }
+            }
         }
         .font(.system(size: 10, weight: .bold, design: .monospaced))
         .tracking(0.9)
         .foregroundStyle(.secondary)
-        .padding(.leading, 94)
-        .padding(.trailing, 14)
-        .frame(height: 38)
         .background(Color.white.opacity(0.015))
-        .accessibilityHidden(true)
+        .accessibilityLabel("Model catalog table headers")
+        .accessibilityElement(children: .contain)
+        .accessibilityChildren {
+            ForEach(
+                ModelCatalogAccessibilityTableHeader.allCases
+            ) { header in
+                Text(LocalizedStringKey(header.label))
+                    .accessibilityLabel(
+                        LocalizedStringKey(header.accessibilityLabel)
+                    )
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier(
+                        "model-catalog-header-\(header.id)"
+                    )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func header(
+        for layout: ModelCatalogPrimaryRowLayout
+    ) -> some View {
+        if layout.showsTableHeader {
+            HStack(spacing: 12) {
+                Text("MODEL")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("QUALITY")
+                    .frame(width: 86, alignment: .leading)
+                Text("SPEED")
+                    .frame(width: 86, alignment: .leading)
+                Text("FEATURES")
+                    .frame(width: 138, alignment: .leading)
+            }
+            .padding(.leading, 94)
+            .padding(.trailing, 14)
+            .frame(minHeight: 38)
+            .accessibilityHidden(true)
+        } else {
+            Text("MODEL DETAILS")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .frame(minHeight: 38)
+                .accessibilityHidden(true)
+        }
     }
 }
 
@@ -2876,66 +3454,22 @@ private struct TextifyModelCard: View {
     @State private var showsDetails = false
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+    @Environment(\.accessibilityDifferentiateWithoutColor)
+    private var differentiateWithoutColor
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center, spacing: 12) {
-                ModelSelectionIndicator(isInstalled: isInstalled, isActive: showsSelectedTreatment)
-
-                if hierarchyContext == nil {
-                    ModelProviderTile(provider: model.provider, isActive: showsSelectedTreatment)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 7) {
-                        Text(hierarchyContext?.title ?? model.catalogDisplayName)
-                            .font(.system(size: 15, weight: .semibold))
-                            .lineLimit(1)
-                        if let variantLabel = hierarchyContext?.variantLabel {
-                            Text(variantLabel.uppercased())
-                                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                .tracking(0.5)
-                                .foregroundStyle(.secondary)
-                        }
-                        if isRevoked {
-                            TextifyStatusBadge(title: "REVOKED", tone: .warning)
-                        }
-                        if hierarchyContext?.isRecommended == true {
-                            TextifyStatusBadge(title: "RECOMMENDED", tone: .accent)
-                        }
-                        if hierarchyContext?.isFallback == true {
-                            TextifyStatusBadge(title: "SIGNED FALLBACK", tone: .warning)
-                        }
-                        TextifyStatusBadge(title: model.supportTier.uppercased(), tone: tierTone)
-                        if let placement, placement != .curated {
-                            TextifyStatusBadge(
-                                title: placement.title.uppercased(),
-                                tone: placement == .custom ? .neutral : .warning
-                            )
-                        }
-                    }
-                    Text(hierarchyContext?.description ?? model.description)
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                ModelSignalMetric(level: model.qualitySignalLevel, label: model.qualityLabel)
-                    .frame(width: 86, alignment: .leading)
-                ModelSignalMetric(level: model.speedSignalLevel, label: model.speedLabel)
-                    .frame(width: 86, alignment: .leading)
-                ModelFeaturesMetric(
-                    model: model,
-                    sizeLabel: sizeLabel,
-                    sizeDescription: sizeDescription
-                )
-                    .frame(width: 138, alignment: .leading)
-            }
+            adaptiveSummary
 
             HStack(spacing: 10) {
                 Spacer()
                     .frame(width: hierarchyContext == nil ? 76 : 28)
+
+                Text("ACTIONS")
+                    .font(.caption2.bold().monospaced())
+                    .foregroundStyle(.secondary)
 
                 if isActivating {
                     ProgressView()
@@ -3040,6 +3574,13 @@ private struct TextifyModelCard: View {
         .padding(.leading, hierarchyContext?.indentation ?? 0)
         .frame(minHeight: 102, alignment: .topLeading)
         .background(activeBackground)
+        .overlay {
+            if accessibleAppearance.requiresSelectionBorder,
+               hierarchyContext?.isSelected == true || showsSelectedTreatment {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.primary, lineWidth: 2)
+            }
+        }
         .overlay(alignment: .bottom) {
             Divider()
                 .padding(.leading, 94)
@@ -3051,6 +3592,205 @@ private struct TextifyModelCard: View {
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(
             hierarchyContext?.isSelected == true ? .isSelected : []
+        )
+    }
+
+    @ViewBuilder
+    private var adaptiveSummary: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            modelSummary(for: .compact)
+        } else {
+            ViewThatFits(in: .horizontal) {
+                modelSummary(for: .wide)
+                    .frame(
+                        minWidth:
+                            ModelCatalogPrimaryRowLayout.wideMinimumWidth
+                    )
+                modelSummary(for: .compact)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func modelSummary(
+        for layout: ModelCatalogPrimaryRowLayout
+    ) -> some View {
+        switch layout {
+        case .wide:
+            HStack(alignment: .center, spacing: 12) {
+                identitySummary(allowsCompactText: false)
+                ModelSignalMetric(
+                    level: model.qualitySignalLevel,
+                    label: model.qualityLabel
+                )
+                .frame(width: 86, alignment: .leading)
+                ModelSignalMetric(
+                    level: model.speedSignalLevel,
+                    label: model.speedLabel
+                )
+                .frame(width: 86, alignment: .leading)
+                ModelFeaturesMetric(
+                    model: model,
+                    sizeLabel: sizeLabel,
+                    sizeDescription: sizeDescription
+                )
+                .frame(width: 138, alignment: .leading)
+            }
+        case .compact:
+            VStack(alignment: .leading, spacing: 12) {
+                identitySummary(allowsCompactText: true)
+                LazyVGrid(
+                    columns: [
+                        GridItem(
+                            .adaptive(minimum: 130),
+                            alignment: .topLeading
+                        ),
+                    ],
+                    alignment: .leading,
+                    spacing: 10
+                ) {
+                    labeledRowField("Quality") {
+                        ModelSignalMetric(
+                            level: model.qualitySignalLevel,
+                            label: model.qualityLabel
+                        )
+                    }
+                    labeledRowField("Speed") {
+                        ModelSignalMetric(
+                            level: model.speedSignalLevel,
+                            label: model.speedLabel
+                        )
+                    }
+                    labeledRowField("Features") {
+                        ModelFeaturesMetric(
+                            model: model,
+                            sizeLabel: sizeLabel,
+                            sizeDescription: sizeDescription
+                        )
+                    }
+                    labeledRowField("State") {
+                        Text(accessibilityStateDescription)
+                            .font(.caption)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.leading, hierarchyContext == nil ? 76 : 28)
+            }
+        }
+    }
+
+    private func identitySummary(
+        allowsCompactText: Bool
+    ) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            ModelSelectionIndicator(
+                isInstalled: isInstalled,
+                isActive: showsSelectedTreatment
+            )
+
+            if hierarchyContext == nil {
+                ModelProviderTile(
+                    provider: model.provider,
+                    isActive: showsSelectedTreatment
+                )
+            }
+
+            VStack(alignment: .leading, spacing: 5) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 7) {
+                        modelTitle
+                        statusBadges
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        modelTitle
+                        statusBadges
+                    }
+                }
+                Text(hierarchyContext?.description ?? model.description)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(allowsCompactText ? nil : 2)
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: allowsCompactText
+                    )
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var modelTitle: some View {
+        HStack(spacing: 7) {
+            Text(hierarchyContext?.title ?? model.catalogDisplayName)
+                .font(.body.weight(.semibold))
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+            if let variantLabel = hierarchyContext?.variantLabel {
+                Text(variantLabel.uppercased())
+                    .font(.caption2.bold().monospaced())
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var statusBadges: some View {
+        HStack(spacing: 6) {
+            if isRevoked {
+                TextifyStatusBadge(title: "REVOKED", tone: .warning)
+            }
+            if hierarchyContext?.isRecommended == true {
+                TextifyStatusBadge(title: "RECOMMENDED", tone: .accent)
+            }
+            if hierarchyContext?.isFallback == true {
+                TextifyStatusBadge(title: "SIGNED FALLBACK", tone: .warning)
+            }
+            TextifyStatusBadge(
+                title: model.supportTier.uppercased(),
+                tone: tierTone
+            )
+            if let placement, placement != .curated {
+                TextifyStatusBadge(
+                    title: placement.title.uppercased(),
+                    tone: placement == .custom ? .neutral : .warning
+                )
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func labeledRowField<Content: View>(
+        _ label: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label.uppercased())
+                .font(.caption2.bold().monospaced())
+                .foregroundStyle(.secondary)
+            content()
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var accessibilityStateDescription: String {
+        if isRevoked {
+            return "Revoked"
+        }
+        if isActivating {
+            return "Preparing"
+        }
+        if isActive {
+            return "Active"
+        }
+        if let install {
+            return install.accessibilityValue
+        }
+        return isInstalled ? "Installed" : "Not installed"
+    }
+
+    private var accessibleAppearance: ModelCatalogAccessibleAppearance {
+        ModelCatalogAccessibleAppearance(
+            increaseContrast: colorSchemeContrast == .increased,
+            differentiateWithoutColor: differentiateWithoutColor
         )
     }
 
@@ -3116,10 +3856,14 @@ private struct ModelCardInstallProgress: View {
             if install.state.totalBytes > 0 {
                 ProgressView(value: install.progressValue, total: 1)
                     .tint(statusColor)
+                    .accessibilityLabel(install.title)
+                    .accessibilityValue(install.accessibilityValue)
             } else if install.state.isActive {
                 ProgressView()
                     .controlSize(.small)
                     .tint(statusColor)
+                    .accessibilityLabel(install.title)
+                    .accessibilityValue(install.accessibilityValue)
             }
 
             Text(install.detailText)
@@ -3141,6 +3885,8 @@ private struct ModelCardInstallProgress: View {
                 .stroke(statusColor.opacity(0.16), lineWidth: 1)
         }
         .accessibilityElement(children: .contain)
+        .accessibilityLabel(install.title)
+        .accessibilityValue(install.accessibilityValue)
     }
 
     private var statusColor: Color {

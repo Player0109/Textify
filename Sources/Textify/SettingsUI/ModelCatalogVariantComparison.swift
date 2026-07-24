@@ -125,6 +125,34 @@ enum ModelCatalogVariantComparisonLayout: Equatable {
     }
 }
 
+enum ModelCatalogPrimaryRowLayout: Equatable {
+    case wide
+    case compact
+
+    static let wideMinimumWidth: CGFloat = 680
+
+    var showsTableHeader: Bool {
+        self == .wide
+    }
+}
+
+struct ModelCatalogAccessibleAppearance: Equatable {
+    let increaseContrast: Bool
+    let differentiateWithoutColor: Bool
+
+    init(
+        increaseContrast: Bool = false,
+        differentiateWithoutColor: Bool = false
+    ) {
+        self.increaseContrast = increaseContrast
+        self.differentiateWithoutColor = differentiateWithoutColor
+    }
+
+    var requiresSelectionBorder: Bool {
+        increaseContrast || differentiateWithoutColor
+    }
+}
+
 enum ModelCatalogVariantTerminology {
     static let artifactFormatExplanation =
         "Artifact Format describes packaging model files for a compatible runtime."

@@ -24,6 +24,8 @@ targets:
     sources:
       - path: Sources/Textify
       - path: Resources/Assets.xcassets
+      - path: Resources/Localizable.xcstrings
+        buildPhase: resources
       - path: ACKNOWLEDGMENTS.md
         buildPhase: resources
       - path: THIRD_PARTY_NOTICES.md

@@ -994,6 +994,14 @@ struct ModelCatalogRowPresentation: Equatable, Identifiable {
         return onDiskBytes
     }
 
+    var accessibilityStateDescription: String {
+        if let install {
+            return install.accessibilityValue
+        }
+        let states = stateTokens.map(\.title)
+        return states.isEmpty ? "Not installed" : states.joined(separator: ", ")
+    }
+
     func visibleActions(
         for selection: ModelCatalogHierarchySelection?
     ) -> Set<ModelCatalogRowAction> {
@@ -1234,6 +1242,19 @@ enum ModelCatalogHierarchyRowID: Equatable, Hashable {
     case checkpoint(String)
     case exactArtifact(String)
     case standaloneArtifact(String)
+
+    var accessibilityIdentifier: String {
+        switch self {
+        case let .family(id):
+            return "model-catalog-family-\(id)"
+        case let .checkpoint(id):
+            return "model-catalog-checkpoint-\(id)"
+        case let .exactArtifact(id):
+            return "model-catalog-artifact-\(id)"
+        case let .standaloneArtifact(id):
+            return "model-catalog-standalone-artifact-\(id)"
+        }
+    }
 }
 
 enum ModelCatalogHierarchySelection: Equatable, Hashable {
@@ -1266,6 +1287,97 @@ struct ModelCatalogHierarchyRow: Equatable, Identifiable {
             .exactArtifact(artifact.id)
         case let .standaloneArtifact(row):
             .standaloneArtifact(row.id)
+        }
+    }
+}
+
+enum ModelCatalogKeyboardCommand: Equatable {
+    case moveUp
+    case moveDown
+    case pageUp
+    case pageDown
+    case home
+    case end
+    case activate
+    case expand
+    case collapse
+    case deleteSelection
+}
+
+enum ModelCatalogKeyboardAction: Equatable {
+    case none
+    case selectionChanged(ModelCatalogHierarchySelection)
+    case disclosureChanged(checkpointID: String, isExpanded: Bool)
+    case requestDeletion
+}
+
+struct ModelCatalogSelectionRecovery: Equatable {
+    let selection: ModelCatalogHierarchySelection
+    let announcement: String
+}
+
+enum ModelCatalogAccessibilityRowRole: Equatable {
+    case familyHeading
+    case checkpoint
+    case exactArtifact
+}
+
+enum ModelCatalogAccessibilityDisclosureState: String, Equatable {
+    case expanded
+    case collapsed
+
+    var accessibilityLabel: String {
+        switch self {
+        case .expanded: "Expanded"
+        case .collapsed: "Collapsed"
+        }
+    }
+}
+
+struct ModelCatalogAccessibilityRow: Equatable, Identifiable {
+    let id: ModelCatalogHierarchyRowID
+    let label: String
+    let value: String
+    let role: ModelCatalogAccessibilityRowRole
+    let outlineLevel: Int
+    let logicalPosition: Int
+    let logicalCount: Int
+    let disclosureState: ModelCatalogAccessibilityDisclosureState?
+
+    var positionDescription: String {
+        "Row \(logicalPosition) of \(logicalCount)"
+    }
+}
+
+enum ModelCatalogAccessibilityTableHeader: String, CaseIterable, Identifiable {
+    case model
+    case quality
+    case speed
+    case features
+    case state
+    case action
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .model: "Model"
+        case .quality: "Quality"
+        case .speed: "Speed"
+        case .features: "Features"
+        case .state: "State"
+        case .action: "Action"
+        }
+    }
+
+    var accessibilityLabel: String {
+        switch self {
+        case .model: "Model column header"
+        case .quality: "Quality column header"
+        case .speed: "Speed column header"
+        case .features: "Features column header"
+        case .state: "State column header"
+        case .action: "Action column header"
         }
     }
 }
@@ -1323,9 +1435,20 @@ struct ModelCatalogHierarchyState: Equatable {
     }
 
     mutating func reconcile(with experience: ModelCatalogExperience) {
+        _ = reconcile(from: nil, to: experience)
+    }
+
+    @discardableResult
+    mutating func reconcile(
+        from previousExperience: ModelCatalogExperience?,
+        to experience: ModelCatalogExperience
+    ) -> ModelCatalogSelectionRecovery? {
+        let previousRowIDs = previousExperience.map {
+            keyboardRowIDs(in: $0)
+        } ?? []
         let checkpoints = experience.families.flatMap(\.checkpoints)
         let validCheckpointIDs = Set(checkpoints.map(\.id))
-        let validArtifactIDs = Set(checkpoints.flatMap(\.artifacts).map(\.id))
+        let validArtifactIDs = Set(experience.rows.map(\.id))
 
         expandedCheckpointIDs.formIntersection(
             checkpoints
@@ -1333,21 +1456,57 @@ struct ModelCatalogHierarchyState: Equatable {
                 .map(\.id)
         )
 
+        let updatedRowIDs = keyboardRowIDs(in: experience)
+        let updatedRowIDSet = Set(updatedRowIDs)
+        var recovery: ModelCatalogSelectionRecovery?
+
         switch selection {
         case let .checkpoint(id) where !validCheckpointIDs.contains(id),
              let .exactArtifact(id) where !validArtifactIDs.contains(id):
-            selection = nil
+            let removedRowID = rowID(for: selection)
+            let replacement = nearestSelectableRow(
+                to: removedRowID,
+                previousRowIDs: previousRowIDs,
+                updatedRowIDs: updatedRowIDs,
+                in: experience
+            )
+            selection = replacement.flatMap {
+                selection(for: $0, in: experience)
+            }
+            if let selection,
+               let selectedRowID = rowID(for: selection),
+               let presentation = accessibilityRows(in: experience).first(
+                   where: { $0.id == selectedRowID }
+               ) {
+                recovery = ModelCatalogSelectionRecovery(
+                    selection: selection,
+                    announcement:
+                        "Selection moved to \(presentation.label), "
+                        + "\(presentation.positionDescription.lowercased())."
+                )
+            }
         case .checkpoint, .exactArtifact, nil:
             break
         }
 
-        let visibleRowIDs = Set(visibleRows(in: experience).map(\.id))
-        if let focusedRowID, !visibleRowIDs.contains(focusedRowID) {
-            self.focusedRowID = nil
+        if let focusedRowID, !updatedRowIDSet.contains(focusedRowID) {
+            self.focusedRowID = recovery.map {
+                rowID(for: $0.selection)
+            } ?? nearestRow(
+                to: focusedRowID,
+                previousRowIDs: previousRowIDs,
+                updatedRowIDs: updatedRowIDs
+            )
         }
-        if let scrollAnchorID, !visibleRowIDs.contains(scrollAnchorID) {
-            self.scrollAnchorID = nil
+        if let scrollAnchorID, !updatedRowIDSet.contains(scrollAnchorID) {
+            self.scrollAnchorID = self.focusedRowID
+                ?? nearestRow(
+                    to: scrollAnchorID,
+                    previousRowIDs: previousRowIDs,
+                    updatedRowIDs: updatedRowIDs
+                )
         }
+        return recovery
     }
 
     func visibleRows(in experience: ModelCatalogExperience) -> [ModelCatalogHierarchyRow] {
@@ -1416,6 +1575,328 @@ struct ModelCatalogHierarchyState: Equatable {
             }
         return hierarchyRows + standaloneRows
     }
+
+    func accessibilityRows(
+        in experience: ModelCatalogExperience
+    ) -> [ModelCatalogAccessibilityRow] {
+        let rows = visibleRows(in: experience)
+        return rows.enumerated().map { offset, hierarchyRow in
+            let position = offset + 1
+            switch hierarchyRow.content {
+            case let .family(family):
+                return ModelCatalogAccessibilityRow(
+                    id: hierarchyRow.id,
+                    label: family.metadata.presentation.displayName,
+                    value:
+                        "\(family.metadata.presentation.provider.displayName), "
+                        + "\(family.checkpoints.count) "
+                        + (family.checkpoints.count == 1
+                            ? "checkpoint"
+                            : "checkpoints"),
+                    role: .familyHeading,
+                    outlineLevel: 1,
+                    logicalPosition: position,
+                    logicalCount: rows.count,
+                    disclosureState: nil
+                )
+            case let .checkpoint(checkpoint):
+                return ModelCatalogAccessibilityRow(
+                    id: hierarchyRow.id,
+                    label: checkpoint.metadata.presentation.displayName,
+                    value: "\(checkpoint.metadata.artifactIDs.count) variants",
+                    role: .checkpoint,
+                    outlineLevel: 2,
+                    logicalPosition: position,
+                    logicalCount: rows.count,
+                    disclosureState: hierarchyRow.isExpanded
+                        ? .expanded
+                        : .collapsed
+                )
+            case let .exactArtifact(checkpoint, artifact, isSingleVariant):
+                return ModelCatalogAccessibilityRow(
+                    id: hierarchyRow.id,
+                    label: isSingleVariant
+                        ? checkpoint.metadata.presentation.displayName
+                        : artifact.metadata.presentation.displayName,
+                    value: artifact.row.accessibilityStateDescription,
+                    role: .exactArtifact,
+                    outlineLevel: isSingleVariant ? 2 : 3,
+                    logicalPosition: position,
+                    logicalCount: rows.count,
+                    disclosureState: nil
+                )
+            case let .standaloneArtifact(row):
+                return ModelCatalogAccessibilityRow(
+                    id: hierarchyRow.id,
+                    label: row.model.displayName,
+                    value: row.accessibilityStateDescription,
+                    role: .exactArtifact,
+                    outlineLevel: 1,
+                    logicalPosition: position,
+                    logicalCount: rows.count,
+                    disclosureState: nil
+                )
+            }
+        }
+    }
+
+    @discardableResult
+    mutating func handleKeyboardCommand(
+        _ command: ModelCatalogKeyboardCommand,
+        in experience: ModelCatalogExperience,
+        pageSize: Int = 8
+    ) -> ModelCatalogKeyboardAction {
+        let rowIDs = keyboardRowIDs(in: experience)
+        guard !rowIDs.isEmpty else {
+            return .none
+        }
+
+        switch command {
+        case .moveUp:
+            moveFocus(by: -1, within: rowIDs)
+        case .moveDown:
+            moveFocus(by: 1, within: rowIDs)
+        case .pageUp:
+            moveFocus(by: -max(1, pageSize), within: rowIDs)
+        case .pageDown:
+            moveFocus(by: max(1, pageSize), within: rowIDs)
+        case .home:
+            moveFocus(to: rowIDs.startIndex, within: rowIDs)
+        case .end:
+            moveFocus(to: rowIDs.index(before: rowIDs.endIndex), within: rowIDs)
+        case .activate:
+            guard let focusedRowID,
+                  let selected = selection(for: focusedRowID, in: experience)
+            else {
+                return .none
+            }
+            selection = selected
+            return .selectionChanged(selected)
+        case .expand:
+            guard case let .checkpoint(checkpointID) = focusedRowID,
+                  !expandedCheckpointIDs.contains(checkpointID),
+                  let checkpoint = checkpoint(
+                    withID: checkpointID,
+                    in: experience
+                  )
+            else {
+                return .none
+            }
+            toggleExpansion(of: checkpoint)
+            return .disclosureChanged(
+                checkpointID: checkpointID,
+                isExpanded: true
+            )
+        case .collapse:
+            guard let focusedRowID,
+                  let checkpoint = collapsibleCheckpoint(
+                    for: focusedRowID,
+                    in: experience
+                  ),
+                  expandedCheckpointIDs.contains(checkpoint.id)
+            else {
+                return .none
+            }
+            toggleExpansion(of: checkpoint)
+            return .disclosureChanged(
+                checkpointID: checkpoint.id,
+                isExpanded: false
+            )
+        case .deleteSelection:
+            guard case .exactArtifact = selection else {
+                return .none
+            }
+            return .requestDeletion
+        }
+        return .none
+    }
+
+    func keyboardRowIDs(
+        in experience: ModelCatalogExperience
+    ) -> [ModelCatalogHierarchyRowID] {
+        var rowIDs = visibleRows(in: experience).map(\.id)
+        guard let pinnedRowID = pinnedRowID(in: experience),
+              !rowIDs.contains(pinnedRowID)
+        else {
+            return rowIDs
+        }
+        rowIDs.insert(pinnedRowID, at: 0)
+        return rowIDs
+    }
+
+    private func pinnedRowID(
+        in experience: ModelCatalogExperience
+    ) -> ModelCatalogHierarchyRowID? {
+        switch experience.pinnedReveal {
+        case let .catalogArtifact(_, _, artifact):
+            return .exactArtifact(artifact.id)
+        case let .standaloneArtifact(row):
+            return .standaloneArtifact(row.id)
+        case let .unavailableArtifact(artifactID):
+            return .standaloneArtifact(artifactID)
+        case nil:
+            return nil
+        }
+    }
+
+    private func selection(
+        for rowID: ModelCatalogHierarchyRowID,
+        in experience: ModelCatalogExperience
+    ) -> ModelCatalogHierarchySelection? {
+        switch rowID {
+        case .family:
+            return nil
+        case let .checkpoint(id):
+            return .checkpoint(id)
+        case let .exactArtifact(id):
+            guard experience.rows.contains(where: { $0.id == id })
+                    || pinnedSelectableArtifactID(in: experience) == id
+            else {
+                return nil
+            }
+            return .exactArtifact(id)
+        case let .standaloneArtifact(id):
+            guard experience.rows.contains(where: { $0.id == id })
+                    || pinnedSelectableArtifactID(in: experience) == id
+            else {
+                return nil
+            }
+            return .exactArtifact(id)
+        }
+    }
+
+    private func pinnedSelectableArtifactID(
+        in experience: ModelCatalogExperience
+    ) -> String? {
+        switch experience.pinnedReveal {
+        case let .catalogArtifact(_, _, artifact):
+            return artifact.id
+        case let .standaloneArtifact(row):
+            return row.id
+        case .unavailableArtifact, nil:
+            return nil
+        }
+    }
+
+    private func rowID(
+        for selection: ModelCatalogHierarchySelection?
+    ) -> ModelCatalogHierarchyRowID? {
+        switch selection {
+        case let .checkpoint(id):
+            return .checkpoint(id)
+        case let .exactArtifact(id):
+            return .exactArtifact(id)
+        case nil:
+            return nil
+        }
+    }
+
+    private mutating func moveFocus(
+        by offset: Int,
+        within rowIDs: [ModelCatalogHierarchyRowID]
+    ) {
+        guard let startingIndex = focusedRowID.flatMap({
+            rowIDs.firstIndex(of: $0)
+        }) else {
+            moveFocus(
+                to: offset < 0
+                    ? rowIDs.index(before: rowIDs.endIndex)
+                    : rowIDs.startIndex,
+                within: rowIDs
+            )
+            return
+        }
+        moveFocus(to: startingIndex + offset, within: rowIDs)
+    }
+
+    private mutating func moveFocus(
+        to proposedIndex: Int,
+        within rowIDs: [ModelCatalogHierarchyRowID]
+    ) {
+        let index = min(max(proposedIndex, rowIDs.startIndex), rowIDs.endIndex - 1)
+        focusedRowID = rowIDs[index]
+        scrollAnchorID = rowIDs[index]
+    }
+
+    private func checkpoint(
+        withID checkpointID: String,
+        in experience: ModelCatalogExperience
+    ) -> ModelCatalogCheckpointPresentation? {
+        experience.families
+            .lazy
+            .flatMap(\.checkpoints)
+            .first { $0.id == checkpointID }
+    }
+
+    private func collapsibleCheckpoint(
+        for rowID: ModelCatalogHierarchyRowID,
+        in experience: ModelCatalogExperience
+    ) -> ModelCatalogCheckpointPresentation? {
+        switch rowID {
+        case let .checkpoint(checkpointID):
+            return checkpoint(withID: checkpointID, in: experience)
+        case let .exactArtifact(artifactID):
+            return experience.families
+                .lazy
+                .flatMap(\.checkpoints)
+                .first {
+                    $0.metadata.artifactIDs.count > 1
+                        && $0.artifacts.contains { $0.id == artifactID }
+                }
+        case .family, .standaloneArtifact:
+            return nil
+        }
+    }
+
+    private func nearestSelectableRow(
+        to removedRowID: ModelCatalogHierarchyRowID?,
+        previousRowIDs: [ModelCatalogHierarchyRowID],
+        updatedRowIDs: [ModelCatalogHierarchyRowID],
+        in experience: ModelCatalogExperience
+    ) -> ModelCatalogHierarchyRowID? {
+        let candidates = orderedSurvivors(
+            near: removedRowID,
+            previousRowIDs: previousRowIDs,
+            updatedRowIDs: updatedRowIDs
+        )
+        return candidates.first {
+            selection(for: $0, in: experience) != nil
+        } ?? updatedRowIDs.first {
+            selection(for: $0, in: experience) != nil
+        }
+    }
+
+    private func nearestRow(
+        to removedRowID: ModelCatalogHierarchyRowID,
+        previousRowIDs: [ModelCatalogHierarchyRowID],
+        updatedRowIDs: [ModelCatalogHierarchyRowID]
+    ) -> ModelCatalogHierarchyRowID? {
+        orderedSurvivors(
+            near: removedRowID,
+            previousRowIDs: previousRowIDs,
+            updatedRowIDs: updatedRowIDs
+        ).first ?? updatedRowIDs.first
+    }
+
+    private func orderedSurvivors(
+        near removedRowID: ModelCatalogHierarchyRowID?,
+        previousRowIDs: [ModelCatalogHierarchyRowID],
+        updatedRowIDs: [ModelCatalogHierarchyRowID]
+    ) -> [ModelCatalogHierarchyRowID] {
+        guard let removedRowID,
+              let removedIndex = previousRowIDs.firstIndex(of: removedRowID)
+        else {
+            return updatedRowIDs
+        }
+        let updatedSet = Set(updatedRowIDs)
+        let following = previousRowIDs
+            .dropFirst(removedIndex + 1)
+            .filter(updatedSet.contains)
+        let preceding = previousRowIDs[..<removedIndex]
+            .reversed()
+            .filter(updatedSet.contains)
+        return Array(following) + Array(preceding)
+    }
 }
 
 struct ModelCatalogInstallPresentation: Equatable {
@@ -1431,6 +1912,14 @@ struct ModelCatalogInstallPresentation: Equatable {
         percentText = ModelInstallProgressPresentation.percentText(for: state)
         progressValue = ModelInstallProgressPresentation.progressValue(for: state)
         detailText = ModelInstallProgressPresentation.detailText(for: state)
+    }
+
+    var accessibilityValue: String {
+        modelCatalogAccessibilityProgressValue(
+            title: title,
+            percentText: percentText,
+            detailText: detailText
+        )
     }
 }
 
@@ -1483,6 +1972,14 @@ struct ModelDownloadAttemptPresentation: Equatable, Identifiable {
         ModelInstallProgressPresentation.percentText(for: state)
     }
 
+    var accessibilityValue: String {
+        modelCatalogAccessibilityProgressValue(
+            title: statusTitle,
+            percentText: percentText,
+            detailText: detailText
+        )
+    }
+
     var revealRequest: ModelCatalogRevealRequest {
         ModelCatalogRevealRequest(
             artifactID: attempt.artifactID,
@@ -1513,6 +2010,15 @@ struct ModelDownloadAttemptPresentation: Equatable, Identifiable {
     }
 }
 
+private func modelCatalogAccessibilityProgressValue(
+    title: String,
+    percentText: String?,
+    detailText: String
+) -> String {
+    let progress = percentText.map { ", \($0)" } ?? ""
+    return "\(title)\(progress). \(detailText)"
+}
+
 struct ModelDownloadsPresentation: Equatable {
     let active: [ModelDownloadAttemptPresentation]
     let pending: [ModelDownloadAttemptPresentation]
@@ -1540,6 +2046,97 @@ struct ModelDownloadsPresentation: Equatable {
 
     var nonterminalCount: Int {
         active.count + pending.count
+    }
+}
+
+struct ModelCatalogAnnouncementTracker {
+    private var phasesByAttemptID: [String: DownloadPhase]?
+    private var revokedArtifactIDs: Set<String>?
+    private var announcedRevokedArtifactIDs: Set<String> = []
+
+    mutating func update(
+        attempts: [ModelInstallQueueAttempt]
+    ) -> [String] {
+        let updatedPhases = Dictionary(
+            uniqueKeysWithValues: attempts.map {
+                ($0.id, $0.state.phase)
+            }
+        )
+        defer {
+            phasesByAttemptID = updatedPhases
+        }
+        guard let phasesByAttemptID else {
+            announcedRevokedArtifactIDs.formUnion(
+                attempts.lazy
+                    .filter { $0.state.phase == .revoked }
+                    .map(\.artifactID)
+            )
+            return []
+        }
+
+        return attempts.compactMap { attempt in
+            let phase = attempt.state.phase
+            guard phasesByAttemptID[attempt.id] != phase,
+                  phase.isTerminal
+            else {
+                return nil
+            }
+            switch phase {
+            case .installed:
+                return "\(attempt.artifactID) installation completed."
+            case .interrupted:
+                return "\(attempt.artifactID) installation interrupted."
+            case .failed:
+                return "\(attempt.artifactID) installation failed."
+            case .cancelled:
+                return "\(attempt.artifactID) installation cancelled."
+            case .revoked:
+                guard announcedRevokedArtifactIDs
+                    .insert(attempt.artifactID).inserted
+                else {
+                    return nil
+                }
+                return "\(attempt.artifactID) installation revoked."
+            case .queued, .paused, .waitingForNetwork,
+                 .waitingForCatalogCheck, .checkingSpace, .downloading,
+                 .verifying, .installing:
+                return nil
+            }
+        }
+    }
+
+    mutating func update(
+        rows: [ModelCatalogRowPresentation]
+    ) -> [String] {
+        let visibleArtifactIDs = Set(rows.lazy.map(\.id))
+        let visibleRevokedArtifactIDs = Set(
+            rows.lazy.filter(\.isRevoked).map(\.id)
+        )
+        guard let revokedArtifactIDs else {
+            announcedRevokedArtifactIDs.formUnion(
+                visibleRevokedArtifactIDs
+            )
+            self.revokedArtifactIDs = visibleRevokedArtifactIDs
+            return []
+        }
+        let restoredArtifactIDs = revokedArtifactIDs
+            .intersection(visibleArtifactIDs)
+            .subtracting(visibleRevokedArtifactIDs)
+        announcedRevokedArtifactIDs.subtract(
+            restoredArtifactIDs
+        )
+        self.revokedArtifactIDs = revokedArtifactIDs
+            .subtracting(restoredArtifactIDs)
+            .union(visibleRevokedArtifactIDs)
+        return rows.compactMap { row in
+            guard row.isRevoked,
+                  !revokedArtifactIDs.contains(row.id),
+                  announcedRevokedArtifactIDs.insert(row.id).inserted
+            else {
+                return nil
+            }
+            return "\(row.model.displayName) was revoked."
+        }
     }
 }
 

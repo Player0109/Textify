@@ -155,6 +155,146 @@ final class ModelCatalogExperienceTests: XCTestCase {
         )
     }
 
+    func testNewArtifactRevocationProducesOneConciseAnnouncement() throws {
+        let manifest = try v3FixtureManifest(
+            recommendedMinimumMemoryBytes: 8_000_000_000
+        )
+        let model = try XCTUnwrap(
+            manifest.models.first { $0.id == "whisper-small-q5_1" }
+        )
+        let ordinary = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [installed(model)],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        let revoked = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [installed(model)],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            revocationOverlay: ModelRevocationOverlay(
+                records: [
+                    ModelRevocationRecord(
+                        recordID: "security-advisory",
+                        exactArtifactID: model.id
+                    ),
+                ]
+            )
+        )
+        var tracker = ModelCatalogAnnouncementTracker()
+
+        XCTAssertEqual(tracker.update(rows: ordinary.rows), [])
+        XCTAssertEqual(
+            tracker.update(rows: revoked.rows),
+            ["\(model.displayName) was revoked."]
+        )
+        XCTAssertEqual(tracker.update(rows: revoked.rows), [])
+    }
+
+    func testFilteringRevokedArtifactDoesNotRepeatAnnouncement() throws {
+        let manifest = try v3FixtureManifest(
+            recommendedMinimumMemoryBytes: 8_000_000_000
+        )
+        let model = try XCTUnwrap(
+            manifest.models.first { $0.id == "whisper-small-q5_1" }
+        )
+        let ordinary = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [installed(model)],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        let revoked = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [installed(model)],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            revocationOverlay: ModelRevocationOverlay(
+                records: [
+                    ModelRevocationRecord(
+                        recordID: "security-advisory",
+                        exactArtifactID: model.id
+                    ),
+                ]
+            )
+        )
+        var tracker = ModelCatalogAnnouncementTracker()
+
+        XCTAssertEqual(tracker.update(rows: ordinary.rows), [])
+        XCTAssertEqual(
+            tracker.update(rows: revoked.rows),
+            ["\(model.displayName) was revoked."]
+        )
+        XCTAssertEqual(tracker.update(rows: []), [])
+        XCTAssertEqual(tracker.update(rows: revoked.rows), [])
+        XCTAssertEqual(tracker.update(rows: ordinary.rows), [])
+        XCTAssertEqual(
+            tracker.update(rows: revoked.rows),
+            ["\(model.displayName) was revoked."]
+        )
+    }
+
+    func testAttemptAndCatalogRevocationShareOneArtifactAnnouncement() throws {
+        let manifest = try v3FixtureManifest(
+            recommendedMinimumMemoryBytes: 8_000_000_000
+        )
+        let model = try XCTUnwrap(
+            manifest.models.first { $0.id == "whisper-small-q5_1" }
+        )
+        let ordinary = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [installed(model)],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        let revoked = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [installed(model)],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            revocationOverlay: ModelRevocationOverlay(
+                records: [
+                    ModelRevocationRecord(
+                        recordID: "security-advisory",
+                        exactArtifactID: model.id
+                    ),
+                ]
+            )
+        )
+        let activeAttempt = ModelInstallQueueAttempt(
+            id: "attempt-1",
+            artifactID: model.id,
+            purpose: .transcription,
+            action: .install,
+            createdAt: "2026-07-24T10:00:00Z",
+            state: DownloadState(
+                modelID: model.id,
+                phase: .downloading
+            )
+        )
+        let revokedAttempt = ModelInstallQueueAttempt(
+            id: activeAttempt.id,
+            artifactID: activeAttempt.artifactID,
+            purpose: activeAttempt.purpose,
+            action: activeAttempt.action,
+            createdAt: activeAttempt.createdAt,
+            state: DownloadState(
+                modelID: model.id,
+                phase: .revoked
+            )
+        )
+        var tracker = ModelCatalogAnnouncementTracker()
+
+        XCTAssertEqual(tracker.update(rows: ordinary.rows), [])
+        XCTAssertEqual(tracker.update(attempts: [activeAttempt]), [])
+        XCTAssertEqual(
+            tracker.update(attempts: [revokedAttempt]),
+            ["\(model.id) installation revoked."]
+        )
+        XCTAssertEqual(tracker.update(rows: revoked.rows), [])
+    }
+
     func testRestoredArtifactOffersFreshInstallWithoutRetryingRevokedAttempt() throws {
         let restored = model(id: "restored")
         let revokedHistory = DownloadState(
@@ -1754,7 +1894,7 @@ final class ModelCatalogExperienceTests: XCTestCase {
         )
     }
 
-    func testHierarchyReconcilePreservesSurvivingViewportAnchorsAndClearsRemovedOnes() throws {
+    func testHierarchyReconcilePreservesSurvivingViewportAnchorsAndMovesRemovedFocusDeterministically() throws {
         let manifest = try signedV3FixtureManifest()
         let initialExperience = ModelCatalogExperience(
             trustedManifest: manifest,
@@ -1789,10 +1929,329 @@ final class ModelCatalogExperienceTests: XCTestCase {
             transferState: nil,
             query: ModelCatalogQuery(searchText: "tiny")
         )
-        state.reconcile(with: filteredExperience)
+        let recovery = state.reconcile(
+            from: initialExperience,
+            to: filteredExperience
+        )
 
-        XCTAssertNil(state.focusedRowID)
-        XCTAssertNil(state.scrollAnchorID)
+        XCTAssertEqual(
+            state.focusedRowID,
+            .exactArtifact("whisper-tiny-f16")
+        )
+        XCTAssertEqual(
+            state.scrollAnchorID,
+            .exactArtifact("whisper-tiny-f16")
+        )
+        XCTAssertNil(recovery)
+    }
+
+    func testRemovedSelectionMovesToTheNextSurvivingSelectableRowAndAnnouncesIt() throws {
+        let manifest = try signedV3FixtureManifest()
+        let initialExperience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        let checkpoint = try XCTUnwrap(
+            initialExperience.families.first?.checkpoints.first
+        )
+        var state = ModelCatalogHierarchyState(
+            selection: .exactArtifact("whisper-small-q5_1"),
+            expandedCheckpointIDs: [checkpoint.id],
+            focusedRowID: .exactArtifact("whisper-small-q5_1"),
+            scrollAnchorID: .exactArtifact("whisper-small-q5_1")
+        )
+        let filteredExperience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            query: ModelCatalogQuery(searchText: "tiny")
+        )
+
+        let recovery = state.reconcile(
+            from: initialExperience,
+            to: filteredExperience
+        )
+
+        XCTAssertEqual(
+            state.selection,
+            .exactArtifact("whisper-tiny-f16")
+        )
+        XCTAssertEqual(
+            state.focusedRowID,
+            .exactArtifact("whisper-tiny-f16")
+        )
+        XCTAssertEqual(
+            recovery,
+            ModelCatalogSelectionRecovery(
+                selection: .exactArtifact("whisper-tiny-f16"),
+                announcement: "Selection moved to Whisper Tiny, row 2 of 2."
+            )
+        )
+    }
+
+    func testKeyboardNavigationMovesAcrossOffscreenRowsAndKeepsFocusScrollAndSelectionTogether() throws {
+        let experience = ModelCatalogExperience(
+            trustedManifest: try signedV3FixtureManifest(),
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        let checkpoint = try XCTUnwrap(
+            experience.families.first?.checkpoints.first
+        )
+        var state = ModelCatalogHierarchyState(
+            expandedCheckpointIDs: [checkpoint.id],
+            focusedRowID: .family("family.whisper")
+        )
+
+        XCTAssertEqual(
+            state.handleKeyboardCommand(
+                .pageDown,
+                in: experience,
+                pageSize: 3
+            ),
+            .none
+        )
+        XCTAssertEqual(
+            state.focusedRowID,
+            .exactArtifact("whisper-small-q8_0")
+        )
+        XCTAssertEqual(
+            state.scrollAnchorID,
+            .exactArtifact("whisper-small-q8_0")
+        )
+
+        XCTAssertEqual(
+            state.handleKeyboardCommand(.activate, in: experience),
+            .selectionChanged(.exactArtifact("whisper-small-q8_0"))
+        )
+        XCTAssertEqual(
+            state.selection,
+            .exactArtifact("whisper-small-q8_0")
+        )
+
+        _ = state.handleKeyboardCommand(.end, in: experience)
+        XCTAssertEqual(
+            state.focusedRowID,
+            .exactArtifact("whisper-tiny-f16")
+        )
+        _ = state.handleKeyboardCommand(.home, in: experience)
+        XCTAssertEqual(state.focusedRowID, .family("family.whisper"))
+        _ = state.handleKeyboardCommand(.moveDown, in: experience)
+        _ = state.handleKeyboardCommand(.moveUp, in: experience)
+        XCTAssertEqual(state.focusedRowID, .family("family.whisper"))
+    }
+
+    func testKeyboardDisclosureAndExactDeletionUseFocusedHierarchyState() throws {
+        let experience = ModelCatalogExperience(
+            trustedManifest: try signedV3FixtureManifest(),
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        let checkpoint = try XCTUnwrap(
+            experience.families.first?.checkpoints.first
+        )
+        var state = ModelCatalogHierarchyState(
+            selection: .checkpoint(checkpoint.id),
+            focusedRowID: .checkpoint(checkpoint.id)
+        )
+
+        XCTAssertEqual(
+            state.handleKeyboardCommand(.expand, in: experience),
+            .disclosureChanged(checkpointID: checkpoint.id, isExpanded: true)
+        )
+        XCTAssertTrue(state.expandedCheckpointIDs.contains(checkpoint.id))
+
+        _ = state.handleKeyboardCommand(.moveDown, in: experience)
+        XCTAssertEqual(
+            state.handleKeyboardCommand(.activate, in: experience),
+            .selectionChanged(.exactArtifact("whisper-small-q5_1"))
+        )
+        XCTAssertEqual(
+            state.handleKeyboardCommand(.deleteSelection, in: experience),
+            .requestDeletion
+        )
+
+        XCTAssertEqual(
+            state.handleKeyboardCommand(.collapse, in: experience),
+            .disclosureChanged(checkpointID: checkpoint.id, isExpanded: false)
+        )
+        XCTAssertEqual(state.focusedRowID, .checkpoint(checkpoint.id))
+        XCTAssertEqual(state.selection, .checkpoint(checkpoint.id))
+        XCTAssertEqual(
+            state.handleKeyboardCommand(.deleteSelection, in: experience),
+            .none
+        )
+    }
+
+    func testPinnedRevealParticipatesInKeyboardOrderWhenItsArtifactIsFilteredOut() throws {
+        var query = ModelCatalogQuery(searchText: "tiny")
+        query.revealedArtifactID = "whisper-small-q5_1"
+        let experience = ModelCatalogExperience(
+            trustedManifest: try signedV3FixtureManifest(),
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            query: query
+        )
+        var state = ModelCatalogHierarchyState()
+
+        _ = state.handleKeyboardCommand(.home, in: experience)
+
+        XCTAssertEqual(
+            state.focusedRowID,
+            .exactArtifact("whisper-small-q5_1")
+        )
+        XCTAssertEqual(
+            state.scrollAnchorID,
+            .exactArtifact("whisper-small-q5_1")
+        )
+        XCTAssertEqual(
+            state.handleKeyboardCommand(.activate, in: experience),
+            .selectionChanged(.exactArtifact("whisper-small-q5_1"))
+        )
+    }
+
+    func testCatalogAccessibilityRowsExposeHierarchyDisclosureAndLogicalPosition() throws {
+        let experience = ModelCatalogExperience(
+            trustedManifest: try signedV3FixtureManifest(),
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        let checkpoint = try XCTUnwrap(
+            experience.families.first?.checkpoints.first
+        )
+        let state = ModelCatalogHierarchyState(
+            expandedCheckpointIDs: [checkpoint.id]
+        )
+
+        let rows = state.accessibilityRows(in: experience)
+
+        XCTAssertEqual(rows.count, 5)
+        XCTAssertEqual(rows[0].role, .familyHeading)
+        XCTAssertEqual(rows[0].outlineLevel, 1)
+        XCTAssertEqual(rows[0].logicalPosition, 1)
+        XCTAssertEqual(rows[0].logicalCount, 5)
+        XCTAssertEqual(rows[1].role, .checkpoint)
+        XCTAssertEqual(rows[1].outlineLevel, 2)
+        XCTAssertEqual(rows[1].disclosureState, .expanded)
+        XCTAssertEqual(rows[1].disclosureState?.accessibilityLabel, "Expanded")
+        XCTAssertEqual(
+            ModelCatalogAccessibilityDisclosureState.collapsed
+                .accessibilityLabel,
+            "Collapsed"
+        )
+        XCTAssertEqual(rows[2].role, .exactArtifact)
+        XCTAssertEqual(rows[2].outlineLevel, 3)
+        XCTAssertEqual(rows[2].logicalPosition, 3)
+        XCTAssertEqual(
+            ModelCatalogAccessibilityTableHeader.allCases.map(\.label),
+            ["Model", "Quality", "Speed", "Features", "State", "Action"]
+        )
+    }
+
+    func testDownloadProgressIsQueryableWithoutAnnouncingTicks() {
+        let initial = ModelInstallQueueAttempt(
+            id: "attempt-1",
+            artifactID: "artifact-a",
+            purpose: .transcription,
+            action: .install,
+            createdAt: "2026-07-24T10:00:00Z",
+            state: DownloadState(
+                modelID: "artifact-a",
+                phase: .downloading,
+                bytesDownloaded: 25,
+                totalBytes: 100
+            )
+        )
+        var tracker = ModelCatalogAnnouncementTracker()
+
+        XCTAssertEqual(tracker.update(attempts: [initial]), [])
+
+        let progressTick = ModelInstallQueueAttempt(
+            id: initial.id,
+            artifactID: initial.artifactID,
+            purpose: initial.purpose,
+            action: initial.action,
+            createdAt: initial.createdAt,
+            state: DownloadState(
+                modelID: "artifact-a",
+                phase: .downloading,
+                bytesDownloaded: 50,
+                totalBytes: 100
+            )
+        )
+        XCTAssertEqual(tracker.update(attempts: [progressTick]), [])
+        XCTAssertEqual(
+            ModelCatalogInstallPresentation(
+                state: progressTick.state
+            ).accessibilityValue,
+            "Downloading model, 50%. 50 bytes of 100 bytes"
+        )
+
+        let completed = ModelInstallQueueAttempt(
+            id: initial.id,
+            artifactID: initial.artifactID,
+            purpose: initial.purpose,
+            action: initial.action,
+            createdAt: initial.createdAt,
+            state: DownloadState(
+                modelID: "artifact-a",
+                phase: .installed,
+                bytesDownloaded: 100,
+                totalBytes: 100
+            )
+        )
+        XCTAssertEqual(
+            tracker.update(attempts: [completed]),
+            ["artifact-a installation completed."]
+        )
+        XCTAssertEqual(tracker.update(attempts: [completed]), [])
+    }
+
+    func testTerminalDownloadAnnouncementsAreConciseAndDistinct() {
+        let terminalPhases: [(DownloadPhase, String)] = [
+            (.failed, "artifact-a installation failed."),
+            (.cancelled, "artifact-a installation cancelled."),
+            (.revoked, "artifact-a installation revoked."),
+        ]
+
+        for (phase, expected) in terminalPhases {
+            var tracker = ModelCatalogAnnouncementTracker()
+            let active = ModelInstallQueueAttempt(
+                id: "attempt-\(phase.rawValue)",
+                artifactID: "artifact-a",
+                purpose: .transcription,
+                action: .install,
+                createdAt: "2026-07-24T10:00:00Z",
+                state: DownloadState(
+                    modelID: "artifact-a",
+                    phase: .downloading
+                )
+            )
+            _ = tracker.update(attempts: [active])
+            let terminal = ModelInstallQueueAttempt(
+                id: active.id,
+                artifactID: active.artifactID,
+                purpose: active.purpose,
+                action: active.action,
+                createdAt: active.createdAt,
+                state: DownloadState(
+                    modelID: active.artifactID,
+                    phase: phase
+                )
+            )
+
+            XCTAssertEqual(
+                tracker.update(attempts: [terminal]),
+                [expected]
+            )
+        }
     }
 
     func testCollapsingCheckpointPromotesChildViewportAnchors() throws {
@@ -2201,6 +2660,22 @@ final class ModelCatalogExperienceTests: XCTestCase {
             ModelCatalogVariantComparisonLayout.narrow.labeledFields
                 .contains(.state)
         )
+    }
+
+    func testPrimaryCatalogRowCompactLayoutLabelsEveryFormerColumn() {
+        XCTAssertTrue(ModelCatalogPrimaryRowLayout.wide.showsTableHeader)
+        XCTAssertFalse(ModelCatalogPrimaryRowLayout.compact.showsTableHeader)
+    }
+
+    func testAccessibilityDisplayPreferencesKeepSelectionNonColor() {
+        let standard = ModelCatalogAccessibleAppearance()
+        let accessible = ModelCatalogAccessibleAppearance(
+            increaseContrast: true,
+            differentiateWithoutColor: true
+        )
+
+        XCTAssertFalse(standard.requiresSelectionBorder)
+        XCTAssertTrue(accessible.requiresSelectionBorder)
     }
 
     func testAboutModelVariantsDefinesCanonicalTermsAndTradeoffs() {

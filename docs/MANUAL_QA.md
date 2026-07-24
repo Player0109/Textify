@@ -443,3 +443,71 @@ This verification includes the then-current nine-model catalog.
 - BLOCKED: Developer ID signing, notarization/stapling, Gatekeeper assessment,
   and final clean-machine interactive model switching require the credentialed
   release-maintainer workflow. This ad-hoc staged app is for local testing.
+
+## Adaptive Model Catalog Accessibility Audit - 2026-07-24
+
+Interactive inspection used the native Xcode Debug app at
+`dist/DerivedData/Build/Products/Debug/Textify.app`. This is a local
+accessibility audit, not release certification of a signed and stapled build.
+VoiceOver was temporarily enabled in macOS Accessibility settings, the live
+catalog checks below were repeated with it active, and its original off state
+was restored after the audit.
+
+- PASS: Settings navigation and the Transcription Models destination expose
+  stable labels. The catalog exposes its Model, Quality, Speed, Features,
+  State, and Action headers plus Family and Exact Artifact rows with outline
+  level and logical row position/count.
+- PASS: Arrow Down moved accessibility focus from Whisper small.en to Whisper
+  large-v2. Return selected that exact artifact and opened an inspector whose
+  identity, operational requirements, benchmark evidence, provenance, license,
+  and local-file state were readable in the macOS accessibility tree.
+- PASS: Right expanded Whisper large-v3-turbo from a two-variant collapsed
+  Checkpoint into two outline-level-3 Exact Artifacts and updated the logical
+  count from 35 to 37; Left restored the collapsed state and count. End reached
+  row 35 of 35 and Home returned to the first Family heading.
+- PASS: entering `Canary` in Search models reduced the logical catalog from 35
+  rows to one Family and one Exact Artifact while preserving a deterministic
+  selection and inspector while VoiceOver was active. Installed scope exposed
+  a readable five-field storage summary and the selected artifact's measured
+  on-disk state.
+- PASS: Downloads presented a coherent empty-state layout. Its explicit
+  `No Downloads` label, explanatory value, and stable identifier were added
+  after the initial tree inspection found that SwiftUI's visual
+  `ContentUnavailableView` did not expose those children reliably.
+- PASS with automated state fixtures: terminal completion, failure,
+  cancellation, deletion, activation, and revocation announcements are
+  concise and emitted once; incremental progress stays queryable without
+  announcing each tick; selection removal moves to the nearest surviving row;
+  pinned reveal, disclosure, page/home/end navigation, off-screen selection,
+  and Command-Delete share deterministic pure-state tests.
+- PASS with automated presentation checks: accessibility text sizes force
+  labeled compact fields; Reduce Motion, Reduce Transparency, Increase
+  Contrast, and Differentiate Without Color produce the intended presentation
+  decisions. The Base-English string catalog retains primary, overflow,
+  Downloads, verification, and destructive-action labels.
+- PASS with live localization stress: a temporary copy of the same Debug app,
+  using an isolated bundle identifier, ran once with
+  `NSDoubleLocalizedStrings` and once with forced right-to-left direction. The
+  doubled catalog kept Search, scope, Filters, Downloads, More actions, row
+  actions, and six individually exposed headers reachable. The RTL pass
+  mirrored the sidebar, toolbar, catalog columns, rows, and action order
+  without clipping critical controls. The isolated preferences were deleted
+  and the temporary app was moved to Trash after the audit.
+- PASS: selecting an installed artifact exposed Delete while VoiceOver was
+  active. Its confirmation named Canary-Qwen 2.5B's Exact Artifact,
+  Checkpoint, and measured 1.74 GB local size; the audit cancelled it and
+  preserved the selected row and installed data.
+- PASS: fresh onboarding was audited with VoiceOver after backing up
+  `settings.json` and temporarily changing only `onboardingCompleted`.
+  Welcome, model selection/verification, Microphone, Accessibility, and
+  trigger-test steps exposed their progress, status, explanatory copy, and
+  actions without requesting permissions or starting a trigger test. The app
+  was stopped and the original settings file restored byte-for-byte; its
+  SHA-256 returned to
+  `1206b08cbfcf53c33d7f610e1fb1f5aa9d9c3189d71b3942f3184b90d57bf265`.
+- SKIPPED by explicit implementation-session direction: the remaining live
+  revoked-row VoiceOver pass. No installation was started, no installed
+  artifact was revoked, and no deletion was accepted, so the existing
+  installed models and user data were not modified. Their semantics and
+  focus/announcement transitions are covered by the focused automated fixtures
+  above.

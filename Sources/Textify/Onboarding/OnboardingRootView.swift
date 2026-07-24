@@ -34,12 +34,11 @@ struct OnboardingRootView: View {
             VStack(alignment: .leading, spacing: 0) {
                 VStack(alignment: .leading, spacing: 7) {
                     Text(services.onboardingStep.progressTitle.uppercased())
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .tracking(1.1)
+                        .font(.caption2.bold().monospaced())
                         .foregroundStyle(TextifyVisualIdentity.voiceViolet)
                     Text(currentStepTitle)
-                        .font(.system(size: 26, weight: .semibold))
-                        .tracking(-0.35)
+                        .font(.title2.weight(.semibold))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.horizontal, 34)
                 .padding(.top, 32)
@@ -77,7 +76,8 @@ struct OnboardingRootView: View {
                     .disabled(primaryButtonDisabled)
                 }
                 .padding(.horizontal, 34)
-                .frame(height: 68)
+                .padding(.vertical, 14)
+                .frame(minHeight: 68)
             }
         }
         .tint(TextifyVisualIdentity.voiceViolet)
@@ -838,11 +838,13 @@ private struct StepRow: View {
             Text(title)
                 .font(.system(.callout, design: .rounded, weight: isSelected ? .semibold : .regular))
                 .foregroundStyle(isSelected ? .primary : .secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 9)
-        .frame(height: 38)
+        .padding(.vertical, 7)
+        .frame(minHeight: 38)
         .background(
             isSelected ? TextifyVisualIdentity.voiceViolet.opacity(0.10) : Color.clear,
             in: RoundedRectangle(cornerRadius: 9, style: .continuous)

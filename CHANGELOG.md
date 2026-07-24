@@ -22,6 +22,12 @@
 - Added exact-artifact deletion with shared runtime-boundary serialization,
   current-dictation draining, purpose-aware confirmation, and retryable
   filesystem recovery that removes receipts only after managed bytes.
+- Added adaptive model-management layouts, deterministic keyboard browsing,
+  explicit catalog hierarchy/table semantics, stable accessibility focus,
+  queryable download progress, and concise lifecycle announcements.
+- Added accessibility-display preference support and Base-English string
+  catalog coverage with pseudolocalization and right-to-left stress checks for
+  critical model-management labels.
 - Added Fast Parakeet TDT-CTC 110M and Accurate Parakeet V2 English choices,
   both using the existing offline Core ML/Neural Engine runtime.
 - Added Parakeet Japanese as a Specialist choice after a fixed public-corpus

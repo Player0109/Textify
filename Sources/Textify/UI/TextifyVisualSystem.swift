@@ -139,11 +139,12 @@ struct TextifyStatusBadge: View {
 
     var body: some View {
         Text(title)
-            .font(.system(size: 11, weight: .semibold))
+            .font(.caption.weight(.semibold))
             .foregroundStyle(tone.color)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
             .background(tone.color.opacity(0.13), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .fixedSize(horizontal: false, vertical: true)
             .accessibilityLabel(title)
     }
 }
@@ -174,11 +175,11 @@ struct TextifyPaneHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title)
-                .font(.system(size: 26, weight: .semibold))
-                .tracking(-0.35)
+                .font(.title2.weight(.semibold))
             Text(subtitle)
-                .font(.system(size: 14))
+                .font(.callout)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
@@ -192,7 +193,7 @@ struct TextifySectionLabel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.body.weight(.semibold))
             if let detail {
                 Text(detail)
                     .font(.callout)

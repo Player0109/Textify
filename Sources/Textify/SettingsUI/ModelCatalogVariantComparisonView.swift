@@ -11,8 +11,7 @@ struct ModelCatalogVariantComparisonHeader: View {
                 .frame(minWidth: ModelCatalogVariantComparisonLayout.mediumMinimumWidth)
             header(for: .narrow)
         }
-        .font(.system(size: 9, weight: .bold, design: .monospaced))
-        .tracking(0.65)
+        .font(.caption2.bold().monospaced())
         .foregroundStyle(.secondary)
         .background(Color.primary.opacity(0.025))
         .overlay(alignment: .bottom) {
@@ -49,7 +48,8 @@ struct ModelCatalogVariantComparisonHeader: View {
             }
             .padding(.leading, 48)
             .padding(.trailing, 14)
-            .frame(height: 34)
+            .padding(.vertical, 8)
+            .frame(minHeight: 34)
         case .medium:
             HStack(spacing: 10) {
                 Text("VARIANT")
@@ -61,13 +61,15 @@ struct ModelCatalogVariantComparisonHeader: View {
             }
             .padding(.leading, 48)
             .padding(.trailing, 14)
-            .frame(height: 34)
+            .padding(.vertical, 8)
+            .frame(minHeight: 34)
         case .narrow:
             Text("MODEL VARIANTS")
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, 48)
                 .padding(.trailing, 14)
-                .frame(height: 34)
+                .padding(.vertical, 8)
+                .frame(minHeight: 34)
         }
     }
 }
@@ -89,16 +91,44 @@ struct ModelCatalogVariantComparisonRow: View {
     let onDelete: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+    @Environment(\.accessibilityDifferentiateWithoutColor)
+    private var differentiateWithoutColor
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            row(for: .wide)
-                .frame(minWidth: ModelCatalogVariantComparisonLayout.wideMinimumWidth)
-            row(for: .medium)
-                .frame(minWidth: ModelCatalogVariantComparisonLayout.mediumMinimumWidth)
-            row(for: .narrow)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                row(for: .narrow)
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    row(for: .wide)
+                        .frame(
+                            minWidth:
+                                ModelCatalogVariantComparisonLayout
+                                    .wideMinimumWidth
+                        )
+                    row(for: .medium)
+                        .frame(
+                            minWidth:
+                                ModelCatalogVariantComparisonLayout
+                                    .mediumMinimumWidth
+                        )
+                    row(for: .narrow)
+                }
+            }
         }
         .background(rowBackground)
+        .overlay {
+            if isSelected
+                && (
+                    colorSchemeContrast == .increased
+                        || differentiateWithoutColor
+                ) {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.primary, lineWidth: 2)
+            }
+        }
         .overlay(alignment: .bottom) {
             Divider()
                 .padding(.leading, 40)
@@ -204,19 +234,17 @@ struct ModelCatalogVariantComparisonRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(presentation.variant)
-                        .font(.system(size: 13, weight: .semibold))
-                        .lineLimit(1)
+                        .font(.body.weight(.semibold))
+                        .fixedSize(horizontal: false, vertical: true)
                     if presentation.isRecommended {
                         Text("RECOMMENDED")
-                            .font(.system(size: 8, weight: .bold, design: .monospaced))
-                            .tracking(0.4)
+                            .font(.caption2.bold().monospaced())
                             .foregroundStyle(TextifyVisualIdentity.voiceViolet)
                             .accessibilityLabel("Catalog recommendation")
                     }
                     if presentation.isFallback {
                         Text("SIGNED FALLBACK")
-                            .font(.system(size: 8, weight: .bold, design: .monospaced))
-                            .tracking(0.4)
+                            .font(.caption2.bold().monospaced())
                             .foregroundStyle(TextifyVisualIdentity.warmWarning)
                             .accessibilityLabel("Signed compatibility fallback")
                     }
@@ -224,7 +252,7 @@ struct ModelCatalogVariantComparisonRow: View {
                 Text(presentation.runtime)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -343,8 +371,7 @@ struct ModelCatalogVariantComparisonRow: View {
 
     private func fieldLabel(_ label: String) -> some View {
         Text(label.uppercased())
-            .font(.system(size: 8, weight: .bold, design: .monospaced))
-            .tracking(0.45)
+            .font(.caption2.bold().monospaced())
             .foregroundStyle(.tertiary)
     }
 

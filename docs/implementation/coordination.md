@@ -2,6 +2,49 @@
 
 This file records cross-agent handoffs during implementation.
 
+## Adaptive Model Catalog Accessibility Handoff - 2026-07-24
+
+- GitHub issue #21 owns the narrow cross-task changes needed to make the
+  existing model-management experience usable at supported widths and text
+  sizes with deterministic keyboard navigation, stable keyboard and VoiceOver
+  focus, explicit hierarchy semantics, concise user-action announcements, and
+  macOS accessibility display preferences.
+- This slice may update Task 11 Models, Downloads, storage, inspector, pinned
+  reveal, and onboarding presentation plus focused app tests; Task 14's manual
+  VoiceOver, pseudolocalization, and right-to-left QA record; Task 14-owned
+  `Resources/Localizable.xcstrings`, `project.yml`, and the generated
+  `Textify.xcodeproj/project.pbxproj` needed to ship the Base-English critical
+  labels; and only the shared presentation state needed to keep those surfaces
+  testable.
+- It preserves the catalog, queue, storage, revocation, and Purpose Runtime
+  Boundary behavior completed by issues #3–#20. It does not add a second
+  selection model, change installation/runtime transactions, introduce a
+  general app-wide redesign, or claim new shipping localizations.
+- The local Xcode Debug accessibility audit verified the live Settings
+  destination, hierarchy/header/row semantics, arrow/Return browsing, filtered
+  query, inspector, Downloads empty state, and installed-storage summary.
+  VoiceOver was enabled for the live browsing, query, Downloads, storage,
+  inspector, and deletion-confirmation passes, then restored to its original
+  off state.
+- A temporary Debug-app copy with an isolated bundle identifier completed live
+  `NSDoubleLocalizedStrings` and forced-right-to-left passes. Critical toolbar,
+  header, row, primary, and overflow labels remained reachable; the isolated
+  preference domain was removed and the temporary app was moved to Trash.
+- Fresh onboarding was audited with VoiceOver by backing up `settings.json`,
+  temporarily setting only `onboardingCompleted` to false while Textify was
+  stopped, and visiting Welcome through Trigger Test without requesting
+  permissions. The exact original settings bytes were restored afterward and
+  their SHA-256 matched the pre-audit value.
+  Mutable installation and deletion outcomes were not triggered against the
+  user's installed artifacts; focused pure-state tests cover those
+  transitions. The remaining isolated live revoked-row VoiceOver pass was
+  skipped by explicit implementation-session direction.
+- Final verification completed with 751 Swift tests (11 explicit opt-in
+  native/model smokes skipped, zero failures), an arm64 SwiftPM Release build,
+  and a native Xcode Debug app build. Independent Standards review reports no
+  remaining actionable findings. Issue-spec review is otherwise clean and
+  records only the explicitly skipped live revoked-row VoiceOver pass.
+
 ## Exact Artifact Deletion Transaction Handoff - 2026-07-24
 
 - GitHub issue #20 owns the narrow cross-task changes needed to delete one
