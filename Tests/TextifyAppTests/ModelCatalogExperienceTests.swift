@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import XCTest
 @testable import Textify
 import TextifyModels
@@ -354,6 +355,355 @@ final class ModelCatalogExperienceTests: XCTestCase {
         XCTAssertTrue(artifact.row.isInstalled)
     }
 
+    func testCheckpointInspectorShowsAggregateTruthAndReferenceEvidence() throws {
+        let manifest = try signedV3FixtureManifest()
+        let installedModel = try XCTUnwrap(
+            manifest.models.first { $0.id == "whisper-small-q5_1" }
+        )
+        let experience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [installed(installedModel)],
+            activePreferences: ModelCatalogActivePreferences(
+                transcriptionModelID: installedModel.id
+            ),
+            transferState: nil
+        )
+
+        let inspector = try XCTUnwrap(
+            experience.inspectorPresentation(
+                for: .checkpoint("checkpoint.whisper.small")
+            )
+        )
+        guard case let .checkpoint(checkpoint) = inspector else {
+            return XCTFail("Checkpoint selection must publish checkpoint truth.")
+        }
+
+        XCTAssertEqual(checkpoint.id, "checkpoint.whisper.small")
+        XCTAssertEqual(checkpoint.displayName, "Whisper Small")
+        XCTAssertEqual(checkpoint.description, "Balanced English speech recognition.")
+        XCTAssertEqual(checkpoint.referenceArtifactID, "whisper-small-q5_1")
+        XCTAssertEqual(checkpoint.referenceArtifactName, "Q5_1")
+        XCTAssertEqual(checkpoint.referenceQuality, "Unrated")
+        XCTAssertEqual(checkpoint.referenceSpeed, "Unrated")
+        XCTAssertEqual(checkpoint.aggregateState, "1 of 2 variants installed • Q5_1 active")
+        XCTAssertEqual(checkpoint.languages, "English")
+        XCTAssertEqual(checkpoint.capabilities, "Speech recognition")
+    }
+
+    func testCheckpointInspectorAggregatesSignedLanguageCodesAcrossVariants() throws {
+        let manifest = try ModelManifest.decode(
+            Data(contentsOf: repositoryRoot.appendingPathComponent("models/manifest.json"))
+        )
+        let experience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+
+        let inspector = try XCTUnwrap(
+            experience.inspectorPresentation(
+                for: .checkpoint("checkpoint.openai.whisper-large-v3-turbo")
+            )
+        )
+        guard case let .checkpoint(checkpoint) = inspector else {
+            return XCTFail("The production checkpoint must expose aggregate truth.")
+        }
+
+        XCTAssertEqual(checkpoint.languages, "English, Hindi")
+    }
+
+    func testCheckpointInspectorReportsTerminalTransferStateTruthfully() throws {
+        let manifest = try signedV3FixtureManifest()
+        let cases: [(DownloadPhase, String)] = [
+            (.failed, "No variants installed • Install failed"),
+            (.cancelled, "No variants installed • Install cancelled"),
+            (.interrupted, "No variants installed • Download interrupted"),
+        ]
+
+        for (phase, expectedState) in cases {
+            let experience = ModelCatalogExperience(
+                trustedManifest: manifest,
+                installedRecords: [],
+                activePreferences: ModelCatalogActivePreferences(),
+                transferState: DownloadState(
+                    modelID: "whisper-small-q5_1",
+                    phase: phase
+                )
+            )
+
+            let inspector = try XCTUnwrap(
+                experience.inspectorPresentation(
+                    for: .checkpoint("checkpoint.whisper.small")
+                )
+            )
+            guard case let .checkpoint(checkpoint) = inspector else {
+                return XCTFail("Checkpoint selection must publish checkpoint truth.")
+            }
+            XCTAssertEqual(checkpoint.aggregateState, expectedState)
+        }
+    }
+
+    func testExactArtifactInspectorShowsOperationalSignedAndLocalTruth() throws {
+        let manifest = try signedV3FixtureManifest()
+        let installedModel = try XCTUnwrap(
+            manifest.models.first { $0.id == "whisper-small-q5_1" }
+        )
+        let experience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [installed(installedModel)],
+            activePreferences: ModelCatalogActivePreferences(
+                transcriptionModelID: installedModel.id
+            ),
+            transferState: nil
+        )
+
+        let inspector = try XCTUnwrap(
+            experience.inspectorPresentation(
+                for: .exactArtifact(installedModel.id)
+            )
+        )
+        guard case let .exactArtifact(artifact) = inspector else {
+            return XCTFail("Exact Artifact selection must publish operational truth.")
+        }
+
+        XCTAssertEqual(artifact.id, "whisper-small-q5_1")
+        XCTAssertEqual(artifact.checkpointName, "Whisper Small")
+        XCTAssertEqual(artifact.displayName, "Q5_1")
+        XCTAssertEqual(artifact.artifactFormat, "GGML")
+        XCTAssertEqual(artifact.numericFormat, "Q5_1")
+        XCTAssertEqual(artifact.runtime, "Whisper.cpp")
+        XCTAssertEqual(artifact.computeRoute, "GPU via Metal")
+        XCTAssertEqual(
+            artifact.compatibility,
+            "Textify 1.1.0+ • macOS 14.0.0+ • arm64 • 1 GB memory"
+        )
+        XCTAssertEqual(artifact.transferSize, "33 bytes")
+        XCTAssertEqual(artifact.localState, "Active • Installed")
+        XCTAssertEqual(artifact.qualityEvidence, "Unrated")
+        XCTAssertEqual(artifact.speedEvidence, "Unrated")
+        XCTAssertEqual(
+            artifact.provenance,
+            "Fixture • Whisper Small • revision 1234567890ab • model.bin"
+        )
+        XCTAssertEqual(artifact.license, "MIT — MIT License (model)")
+        XCTAssertTrue(artifact.canVerify)
+        XCTAssertEqual(
+            artifact.localInspectionRequest?.expectedFiles.map(\.relativePath),
+            ["model.bin"]
+        )
+    }
+
+    func testSingleVariantSelectionOpensExactArtifactInspector() throws {
+        let experience = ModelCatalogExperience(
+            trustedManifest: try signedV3FixtureManifest(),
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+
+        let inspector = try XCTUnwrap(
+            experience.inspectorPresentation(
+                for: .exactArtifact("whisper-tiny-f16")
+            )
+        )
+        guard case let .exactArtifact(artifact) = inspector else {
+            return XCTFail("A single-variant leaf must inspect its exact artifact.")
+        }
+
+        XCTAssertEqual(artifact.checkpointName, "Whisper Tiny")
+        XCTAssertEqual(artifact.displayName, "F16")
+        XCTAssertEqual(artifact.numericFormat, "F16")
+    }
+
+    @MainActor
+    func testInspectorCancelsAndRejectsStaleLocalDetailsAfterSelectionChanges() async throws {
+        let manifest = try signedV3FixtureManifest()
+        let installedModels = try [
+            XCTUnwrap(manifest.models.first { $0.id == "whisper-small-q5_1" }),
+            XCTUnwrap(manifest.models.first { $0.id == "whisper-small-q8_0" }),
+        ]
+        let experience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: installedModels.map(installed),
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        let probe = InspectorDetailLoadProbe()
+        let controller = ModelCatalogInspectorController(
+            loadLocalDetails: { request in
+                try await probe.load(request)
+            }
+        )
+
+        controller.select(.exactArtifact("whisper-small-q5_1"), in: experience)
+        XCTAssertEqual(
+            controller.localDetailsState,
+            .loading(artifactID: "whisper-small-q5_1")
+        )
+        await probe.waitUntilRequested("whisper-small-q5_1")
+
+        controller.select(.exactArtifact("whisper-small-q8_0"), in: experience)
+        XCTAssertEqual(
+            controller.localDetailsState,
+            .loading(artifactID: "whisper-small-q8_0")
+        )
+        await probe.waitUntilCancelled("whisper-small-q5_1")
+        await probe.waitUntilRequested("whisper-small-q8_0")
+
+        let expectedDetails = ModelCatalogArtifactLocalDetails(
+            artifactID: "whisper-small-q8_0",
+            allocatedBytes: 80,
+            presentFileCount: 1,
+            expectedFileCount: 1,
+            missingRelativePaths: [],
+            integrity: .notVerified
+        )
+        await probe.complete(
+            artifactID: "whisper-small-q8_0",
+            allocatedBytes: 80
+        )
+        await wait(
+            for: .loaded(expectedDetails),
+            from: controller
+        )
+
+        await probe.complete(
+            artifactID: "whisper-small-q5_1",
+            allocatedBytes: 50
+        )
+
+        XCTAssertEqual(
+            controller.localDetailsState,
+            .loaded(expectedDetails)
+        )
+        guard case let .exactArtifact(selected) = controller.presentation else {
+            return XCTFail("The latest Exact Artifact must remain selected.")
+        }
+        XCTAssertEqual(selected.id, "whisper-small-q8_0")
+    }
+
+    @MainActor
+    func testInspectorVerifiesOnlyAfterTheExplicitVerifyAction() async throws {
+        let manifest = try signedV3FixtureManifest()
+        let installedModel = try XCTUnwrap(
+            manifest.models.first { $0.id == "whisper-small-q5_1" }
+        )
+        let experience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [installed(installedModel)],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        let verificationProbe = InspectorVerificationProbe()
+        let controller = ModelCatalogInspectorController(
+            loadLocalDetails: { request in
+                ModelCatalogArtifactLocalDetails(
+                    artifactID: request.artifactID,
+                    allocatedBytes: 33,
+                    presentFileCount: 1,
+                    expectedFileCount: 1,
+                    missingRelativePaths: [],
+                    integrity: .notVerified
+                )
+            },
+            verifyIntegrity: { request in
+                await verificationProbe.verify(request)
+            }
+        )
+
+        controller.select(.exactArtifact(installedModel.id), in: experience)
+        let implicitVerificationCount = await verificationProbe.requestCount
+        XCTAssertEqual(implicitVerificationCount, 0)
+        XCTAssertEqual(
+            controller.verificationState,
+            .available(artifactID: installedModel.id)
+        )
+
+        controller.verifySelectedArtifact()
+        await verificationProbe.waitUntilRequested()
+        await wait(
+            for: .verified(artifactID: installedModel.id),
+            from: controller
+        )
+
+        let explicitVerificationCount = await verificationProbe.requestCount
+        XCTAssertEqual(explicitVerificationCount, 1)
+        XCTAssertEqual(
+            controller.verificationState,
+            .verified(artifactID: installedModel.id)
+        )
+    }
+
+    func testLocalInventoryReadsMetadataWithoutClaimingFullVerification() async throws {
+        let temporaryDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: temporaryDirectory,
+            withIntermediateDirectories: true
+        )
+        defer {
+            try? FileManager.default.removeItem(at: temporaryDirectory)
+        }
+        let artifactURL = temporaryDirectory.appendingPathComponent("model.bin")
+        try Data([1, 2, 3]).write(to: artifactURL)
+
+        let details = try await ModelCatalogArtifactInventoryReader.load(
+            request: ModelCatalogArtifactInspectionRequest(
+                artifactID: "fixture",
+                expectedFiles: [
+                    ModelCatalogArtifactInspectionRequest.ExpectedFile(
+                        relativePath: "model.bin",
+                        expectedSizeBytes: 3,
+                        localPath: artifactURL.path
+                    ),
+                ]
+            )
+        )
+
+        XCTAssertEqual(details.artifactID, "fixture")
+        XCTAssertEqual(details.presentFileCount, 1)
+        XCTAssertEqual(details.expectedFileCount, 1)
+        XCTAssertGreaterThan(details.allocatedBytes, 0)
+        XCTAssertEqual(details.missingRelativePaths, [])
+        XCTAssertEqual(details.sizeMismatchRelativePaths, [])
+        XCTAssertEqual(details.integrity, .notVerified)
+
+        let verificationFile = ModelCatalogArtifactVerificationRequest.ExpectedFile(
+            relativePath: "model.bin",
+            expectedSizeBytes: 3,
+            expectedSHA256: "039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81",
+            localPath: artifactURL.path
+        )
+        try await ModelCatalogArtifactVerifier.verify(
+            request: ModelCatalogArtifactVerificationRequest(
+                artifactID: "fixture",
+                expectedFiles: [verificationFile]
+            )
+        )
+
+        do {
+            try await ModelCatalogArtifactVerifier.verify(
+                request: ModelCatalogArtifactVerificationRequest(
+                    artifactID: "fixture",
+                    expectedFiles: [
+                        ModelCatalogArtifactVerificationRequest.ExpectedFile(
+                            relativePath: verificationFile.relativePath,
+                            expectedSizeBytes: verificationFile.expectedSizeBytes,
+                            expectedSHA256: String(repeating: "0", count: 64),
+                            localPath: verificationFile.localPath
+                        ),
+                    ]
+                )
+            )
+            XCTFail("An explicit verification must reject a digest mismatch.")
+        } catch let error as ModelCatalogArtifactVerifier.VerificationError {
+            XCTAssertEqual(error, .digestMismatch)
+        } catch {
+            XCTFail("Expected digestMismatch, received \(error).")
+        }
+    }
+
     func testProductionV3ResolvesV2ReceiptAndActivePreferenceToSameExactArtifact() throws {
         let fixtures = repositoryRoot
             .appendingPathComponent("Tests/TextifyModelsTests/Fixtures/Models")
@@ -441,6 +791,38 @@ final class ModelCatalogExperienceTests: XCTestCase {
         )
     }
 
+    @MainActor
+    private func wait(
+        for expectedState: ModelCatalogInspectorLocalDetailsState,
+        from controller: ModelCatalogInspectorController
+    ) async {
+        while controller.localDetailsState != expectedState {
+            await withCheckedContinuation { continuation in
+                withObservationTracking {
+                    _ = controller.localDetailsState
+                } onChange: {
+                    continuation.resume()
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func wait(
+        for expectedState: ModelCatalogInspectorVerificationState,
+        from controller: ModelCatalogInspectorController
+    ) async {
+        while controller.verificationState != expectedState {
+            await withCheckedContinuation { continuation in
+                withObservationTracking {
+                    _ = controller.verificationState
+                } onChange: {
+                    continuation.resume()
+                }
+            }
+        }
+    }
+
     private func model(
         id: String,
         purpose: ModelPurpose = .transcription,
@@ -496,5 +878,89 @@ final class ModelCatalogExperienceTests: XCTestCase {
             presentation: nil,
             purpose: purpose
         )
+    }
+}
+
+private actor InspectorDetailLoadProbe {
+    private var continuations: [
+        String: CheckedContinuation<ModelCatalogArtifactLocalDetails, Error>
+    ] = [:]
+    private var requestedArtifactIDs: Set<String> = []
+    private var requestWaiters: [String: [CheckedContinuation<Void, Never>]] = [:]
+    private var cancelledArtifactIDs: Set<String> = []
+    private var cancellationWaiters: [String: [CheckedContinuation<Void, Never>]] = [:]
+
+    func load(
+        _ request: ModelCatalogArtifactInspectionRequest
+    ) async throws -> ModelCatalogArtifactLocalDetails {
+        requestedArtifactIDs.insert(request.artifactID)
+        requestWaiters.removeValue(forKey: request.artifactID)?
+            .forEach { $0.resume() }
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                continuations[request.artifactID] = continuation
+            }
+        } onCancel: {
+            Task {
+                await self.recordCancellation(of: request.artifactID)
+            }
+        }
+    }
+
+    func waitUntilRequested(_ artifactID: String) async {
+        guard !requestedArtifactIDs.contains(artifactID) else {
+            return
+        }
+        await withCheckedContinuation { continuation in
+            requestWaiters[artifactID, default: []].append(continuation)
+        }
+    }
+
+    func waitUntilCancelled(_ artifactID: String) async {
+        guard !cancelledArtifactIDs.contains(artifactID) else {
+            return
+        }
+        await withCheckedContinuation { continuation in
+            cancellationWaiters[artifactID, default: []].append(continuation)
+        }
+    }
+
+    private func recordCancellation(of artifactID: String) {
+        cancelledArtifactIDs.insert(artifactID)
+        cancellationWaiters.removeValue(forKey: artifactID)?
+            .forEach { $0.resume() }
+    }
+
+    func complete(artifactID: String, allocatedBytes: Int64) {
+        continuations.removeValue(forKey: artifactID)?.resume(
+            returning: ModelCatalogArtifactLocalDetails(
+                artifactID: artifactID,
+                allocatedBytes: allocatedBytes,
+                presentFileCount: 1,
+                expectedFileCount: 1,
+                missingRelativePaths: [],
+                integrity: .notVerified
+            )
+        )
+    }
+}
+
+private actor InspectorVerificationProbe {
+    private(set) var requestCount = 0
+    private var requestWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func verify(_ request: ModelCatalogArtifactVerificationRequest) {
+        requestCount += 1
+        requestWaiters.forEach { $0.resume() }
+        requestWaiters.removeAll()
+    }
+
+    func waitUntilRequested() async {
+        guard requestCount == 0 else {
+            return
+        }
+        await withCheckedContinuation { continuation in
+            requestWaiters.append(continuation)
+        }
     }
 }

@@ -833,3 +833,20 @@ Task 1 must merge before parallel Wave 1 work begins.
   adaptive inspector, comparison columns, purpose destinations, expanded query
   behavior, queues, storage, revocation, and runtime transactions remain owned
   by later tickets.
+
+## Adaptive Model Inspector Handoff - 2026-07-24
+
+- GitHub issue #6 owns the adaptive trailing inspector under
+  `Sources/Textify/SettingsUI/`, the catalog-experience projections and
+  cancellable local-detail loading needed to distinguish aggregate Checkpoint
+  truth from operational Exact Artifact truth, and focused semantic coverage in
+  `Tests/TextifyAppTests/`.
+- Catalog, compatibility, receipt, and cached local-state facts must publish
+  immediately. Filesystem metadata inspection runs off the main actor, never
+  hashes model contents implicitly, and may publish only for the current typed
+  selection and generation.
+- The existing hierarchy, exact installation/runtime identities, active
+  preferences, and explicit verification action remain unchanged. Storage
+  inventory accounting, comparison tables, query expansion, queues,
+  revocation, deletion transactions, and runtime changes remain owned by later
+  tickets.

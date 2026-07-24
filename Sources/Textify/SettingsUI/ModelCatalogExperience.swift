@@ -203,6 +203,8 @@ enum ModelCatalogRowAction: Equatable, Hashable {
 
 struct ModelCatalogRowPresentation: Equatable, Identifiable {
     let model: ProductionModelPresentation
+    let operationalModel: ModelEntry?
+    let installedRecord: InstalledModelRecord?
     let isInstalled: Bool
     let isActive: Bool
     let install: ModelCatalogInstallPresentation?
@@ -400,6 +402,7 @@ struct ModelCatalogInstallPresentation: Equatable {
 struct ModelCatalogExperience: Equatable {
     let rows: [ModelCatalogRowPresentation]
     let families: [ModelCatalogFamilyPresentation]
+    private let inspectorFamilies: [ModelCatalogFamilyPresentation]
 
     init(
         trustedModels: [ModelEntry],
@@ -457,8 +460,16 @@ struct ModelCatalogExperience: Equatable {
                 )
             }
         let trustedIDs = Set(trustedCatalog.map(\.id))
+        let trustedModelsByID = trustedModels.reduce(into: [String: ModelEntry]()) {
+            $0[$1.id] = $1
+        }
         let installedByID = installedRecords.reduce(into: [String: ModelEntry]()) {
             $0[$1.model.id] = $1.model
+        }
+        let installedRecordsByID = installedRecords.reduce(
+            into: [String: InstalledModelRecord]()
+        ) {
+            $0[$1.model.id] = $1
         }
         let installedIDs = Set(installedByID.keys)
         let localCatalog = installedRecords
@@ -475,7 +486,7 @@ struct ModelCatalogExperience: Equatable {
             orderedCatalog.insert(activeModel, at: 0)
         }
 
-        let derivedRows = query.apply(to: orderedCatalog).map { model in
+        let allRows = orderedCatalog.map { model in
             let installedModel = installedByID[model.id]
             let isInstalled = installedIDs.contains(model.id)
             let activePurpose = installedModel?.purpose ?? model.purpose
@@ -487,6 +498,8 @@ struct ModelCatalogExperience: Equatable {
             )
             return ModelCatalogRowPresentation(
                 model: model,
+                operationalModel: trustedModelsByID[model.id] ?? installedModel,
+                installedRecord: installedRecordsByID[model.id],
                 isInstalled: isInstalled,
                 isActive: isActive,
                 install: installState.map(ModelCatalogInstallPresentation.init),
@@ -498,10 +511,302 @@ struct ModelCatalogExperience: Equatable {
                 )
             )
         }
+        let allRowsByID = allRows.reduce(into: [String: ModelCatalogRowPresentation]()) {
+            $0[$1.id] = $1
+        }
+        let derivedRows = query.apply(to: orderedCatalog).compactMap {
+            allRowsByID[$0.id]
+        }
         rows = derivedRows
         families = presentationGraph.map {
             Self.makeFamilyPresentations(graph: $0, rows: derivedRows)
         } ?? []
+        inspectorFamilies = presentationGraph.map {
+            Self.makeFamilyPresentations(graph: $0, rows: allRows)
+        } ?? []
+    }
+
+    func inspectorPresentation(
+        for selection: ModelCatalogHierarchySelection
+    ) -> ModelCatalogInspectorPresentation? {
+        switch selection {
+        case let .checkpoint(checkpointID):
+            guard let checkpoint = inspectorFamilies
+                .flatMap(\.checkpoints)
+                .first(where: { $0.id == checkpointID })
+            else {
+                return nil
+            }
+            return Self.checkpointInspector(checkpoint).map {
+                .checkpoint($0)
+            }
+        case let .exactArtifact(artifactID):
+            for checkpoint in inspectorFamilies.flatMap(\.checkpoints) {
+                guard let artifact = checkpoint.artifacts.first(
+                    where: { $0.id == artifactID }
+                ) else {
+                    continue
+                }
+                return .exactArtifact(
+                    Self.exactArtifactInspector(
+                        checkpoint: checkpoint,
+                        artifact: artifact
+                    )
+                )
+            }
+            return nil
+        }
+    }
+
+    private static func checkpointInspector(
+        _ checkpoint: ModelCatalogCheckpointPresentation
+    ) -> ModelCatalogCheckpointInspectorPresentation? {
+        guard let referenceArtifact = checkpoint.artifacts.first(
+            where: { $0.id == checkpoint.metadata.recommendedArtifactID }
+        ) ?? checkpoint.artifacts.first else {
+            return nil
+        }
+
+        let installedCount = checkpoint.artifacts.filter(\.row.isInstalled).count
+        var aggregateState = installedCount == 0
+            ? "No variants installed"
+            : "\(installedCount) of \(checkpoint.metadata.artifactIDs.count) variants installed"
+        if let activeArtifact = checkpoint.artifacts.first(where: \.row.isActive) {
+            aggregateState += " • \(activeArtifact.metadata.presentation.displayName) active"
+        } else if let install = checkpoint.artifacts.compactMap(\.row.install).first {
+            aggregateState += " • \(install.title)"
+        }
+
+        var capabilities = [
+            checkpoint.metadata.purpose == .voiceCleaning
+                ? "Voice cleaning"
+                : "Speech recognition",
+        ]
+        let operationalModels = checkpoint.artifacts.compactMap(\.row.operationalModel)
+        if operationalModels.contains(where: \.capabilities.supportsTranslation) {
+            capabilities.append("Translation")
+        }
+        if operationalModels.contains(where: \.capabilities.supportsCustomVocabulary) {
+            capabilities.append("Custom vocabulary")
+        }
+
+        return ModelCatalogCheckpointInspectorPresentation(
+            id: checkpoint.id,
+            displayName: checkpoint.metadata.presentation.displayName,
+            description: checkpoint.metadata.presentation.description,
+            referenceArtifactID: referenceArtifact.id,
+            referenceArtifactName: referenceArtifact.metadata.presentation.displayName,
+            referenceQuality: referenceArtifact.row.model.qualityLabel,
+            referenceSpeed: referenceArtifact.row.model.speedLabel,
+            referenceQualityEvidence: referenceArtifact.row.model
+                .qualityEvidenceDescription
+                ?? "No signed comparable quality evidence",
+            referenceSpeedEvidence: referenceArtifact.row.model
+                .speedEvidenceDescription
+                ?? "No signed stable speed evidence",
+            aggregateState: aggregateState,
+            languages: checkpointLanguageDescription(checkpoint.artifacts),
+            capabilities: capabilities.joined(separator: " • ")
+        )
+    }
+
+    private static func exactArtifactInspector(
+        checkpoint: ModelCatalogCheckpointPresentation,
+        artifact: ModelCatalogExactArtifactPresentation
+    ) -> ModelCatalogExactArtifactInspectorPresentation {
+        let model = artifact.row.operationalModel
+        let metadata = artifact.metadata
+        let compatibility = metadata.compatibility
+        var compatibilityParts = [
+            "Textify \(compatibility.minimumAppVersion)+",
+            "macOS \(compatibility.minimumMacOSVersion)+",
+            compatibility.supportedArchitectures.map(\.rawValue).joined(separator: ", "),
+        ]
+        if let minimumMemoryBytes = compatibility.minimumMemoryBytes {
+            let minimumMemory = ByteCountFormatter.string(
+                fromByteCount: minimumMemoryBytes,
+                countStyle: .memory
+            )
+            compatibilityParts.append("\(minimumMemory) memory")
+        }
+
+        let provenance = model.map {
+            "\($0.provenance.sourceName) • \($0.provenance.originalModelName) • "
+                + "revision \($0.provenance.sourceRevision.prefix(12)) • "
+                + $0.provenance.sourceFile
+        } ?? "Catalog provenance unavailable"
+        let license = model.map {
+            $0.licenses.map {
+                "\($0.spdxId) — \($0.name) (\($0.scope))"
+            }.joined(separator: " • ")
+        } ?? "License metadata unavailable"
+        let localInspectionRequest = makeLocalInspectionRequest(
+            artifactID: artifact.id,
+            model: model,
+            installedRecord: artifact.row.installedRecord
+        )
+        let verificationRequest = makeVerificationRequest(
+            artifactID: artifact.id,
+            model: model,
+            installedRecord: artifact.row.installedRecord
+        )
+
+        return ModelCatalogExactArtifactInspectorPresentation(
+            id: artifact.id,
+            checkpointName: checkpoint.metadata.presentation.displayName,
+            displayName: metadata.presentation.displayName,
+            description: model?.description ?? artifact.row.model.description,
+            artifactFormat: artifactFormatName(metadata.artifactFormat),
+            numericFormat: metadata.numericFormat.rawValue,
+            runtime: runtimeName(metadata.runtime),
+            computeRoute: computeRouteName(metadata.computeRoute),
+            compatibility: compatibilityParts.joined(separator: " • "),
+            qualityEvidence: artifact.row.model.qualityEvidenceDescription ?? "Unrated",
+            speedEvidence: artifact.row.model.speedEvidenceDescription ?? "Unrated",
+            transferSize: ByteCountFormatter.string(
+                fromByteCount: model?.sizeBytes ?? 0,
+                countStyle: .file
+            ),
+            localState: localState(for: artifact.row),
+            provenance: provenance,
+            license: license,
+            sourceURL: artifact.row.model.sourceURL,
+            canVerify: artifact.row.isInstalled,
+            localInspectionRequest: localInspectionRequest,
+            verificationRequest: verificationRequest
+        )
+    }
+
+    private static func makeLocalInspectionRequest(
+        artifactID: String,
+        model: ModelEntry?,
+        installedRecord: InstalledModelRecord?
+    ) -> ModelCatalogArtifactInspectionRequest? {
+        guard let model, let installedRecord else {
+            return nil
+        }
+        return ModelCatalogArtifactInspectionRequest(
+            artifactID: artifactID,
+            expectedFiles: model.files.map {
+                ModelCatalogArtifactInspectionRequest.ExpectedFile(
+                    relativePath: $0.relativePath ?? $0.filename,
+                    expectedSizeBytes: $0.sizeBytes,
+                    localPath: installedRecord.localFilesByManifestFilename[$0.filename]
+                )
+            }
+        )
+    }
+
+    private static func makeVerificationRequest(
+        artifactID: String,
+        model: ModelEntry?,
+        installedRecord: InstalledModelRecord?
+    ) -> ModelCatalogArtifactVerificationRequest? {
+        guard let model, let installedRecord else {
+            return nil
+        }
+        return ModelCatalogArtifactVerificationRequest(
+            artifactID: artifactID,
+            expectedFiles: model.files.map {
+                ModelCatalogArtifactVerificationRequest.ExpectedFile(
+                    relativePath: $0.relativePath ?? $0.filename,
+                    expectedSizeBytes: $0.sizeBytes,
+                    expectedSHA256: $0.sha256,
+                    localPath: installedRecord.localFilesByManifestFilename[$0.filename]
+                )
+            }
+        )
+    }
+
+    private static func localState(for row: ModelCatalogRowPresentation) -> String {
+        if row.isActive {
+            return "Active • Installed"
+        }
+        if row.isInstalled {
+            return "Installed"
+        }
+        if let install = row.install {
+            return install.title
+        }
+        return "Not installed"
+    }
+
+    private static func artifactFormatName(
+        _ format: ModelArtifactContainerFormat
+    ) -> String {
+        switch format {
+        case .ggml:
+            "GGML"
+        case .gguf:
+            "GGUF"
+        case .mlx:
+            "MLX"
+        case .coreML:
+            "Core ML"
+        case .onnx:
+            "ONNX"
+        }
+    }
+
+    private static func runtimeName(_ runtime: TranscriptionEngine) -> String {
+        switch runtime {
+        case .whisperCpp:
+            "Whisper.cpp"
+        case .fluidAudioParakeet:
+            "FluidAudio Parakeet"
+        case .fluidAudioParaformer:
+            "FluidAudio Paraformer"
+        case .sherpaOnnx:
+            "sherpa-onnx"
+        case .transcribeCpp:
+            "transcribe.cpp"
+        case .mlxAudio:
+            "MLX Audio"
+        case .liteRTLM:
+            "LiteRT-LM"
+        }
+    }
+
+    private static func computeRouteName(_ route: ModelComputeRoute) -> String {
+        switch route {
+        case .gpuViaMetal:
+            "GPU via Metal"
+        case .coreMLNeuralEngine:
+            "Core ML / Neural Engine"
+        case .cpuOnly:
+            "CPU only"
+        }
+    }
+
+    private static func checkpointLanguageDescription(
+        _ artifacts: [ModelCatalogExactArtifactPresentation]
+    ) -> String {
+        let languageCodes = orderedUnique(
+            artifacts
+                .compactMap(\.row.operationalModel)
+                .flatMap(\.capabilities.languages)
+        )
+        guard !languageCodes.isEmpty else {
+            return "Capabilities unavailable"
+        }
+        if languageCodes.contains("*") {
+            return "Language agnostic"
+        }
+        if languageCodes.count > 5 {
+            return "\(languageCodes.count) languages"
+        }
+        return languageCodes.map(languageName).joined(separator: ", ")
+    }
+
+    private static func languageName(_ code: String) -> String {
+        Locale(identifier: "en_US").localizedString(forLanguageCode: code)?
+            .capitalized
+            ?? code.uppercased()
+    }
+
+    private static func orderedUnique(_ values: [String]) -> [String] {
+        var seen: Set<String> = []
+        return values.filter { seen.insert($0).inserted }
     }
 
     private static func actions(

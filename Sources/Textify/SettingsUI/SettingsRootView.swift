@@ -539,6 +539,8 @@ private struct ModelsSettingsPane: View {
     @State private var catalogFormat: ModelArtifactFormat?
     @State private var catalogPrecision: ModelArtifactPrecision?
     @State private var hierarchyState = ModelCatalogHierarchyState()
+    @State private var inspectorController = ModelCatalogInspectorController()
+    @State private var showsInspector = false
 
     var body: some View {
         let catalogExperience = ModelCatalogExperience(
@@ -576,58 +578,19 @@ private struct ModelsSettingsPane: View {
                     .foregroundStyle(.secondary)
             }
 
-            ModelCatalogSurface(
-                rows: catalogExperience.rows,
-                hierarchyRows: hierarchyState.visibleRows(in: catalogExperience),
-                selection: hierarchyState.selection,
-                onSelect: { selection in
-                    hierarchyState.select(selection)
-                },
-                onToggleCheckpoint: { checkpoint in
-                    hierarchyState.toggleExpansion(of: checkpoint)
-                },
-                onReset: resetCatalogQuery
-            ) { row, context in
-                TextifyModelCard(
-                    model: row.model,
-                    hierarchyContext: context,
-                    isInstalled: row.isInstalled,
-                    isActive: row.isActive,
-                    isActivating: activatingModelID == row.id,
-                    isBusy: activatingModelID != nil || isInstalling || isImporting,
-                    install: row.install,
-                    actions: row.actions,
-                    onUse: {
-                        activatingModelID = row.id
-                        Task {
-                            let activated = await services.activateInstalledModel(row.id)
-                            modelMessage = activated
-                                ? row.model.activationMessage
-                                : "Textify kept the previous model because \(row.model.displayName) could not be prepared."
-                            activatingModelID = nil
-                        }
-                    },
-                    onDisable: {
-                        Task {
-                            await services.disableVoiceCleaning()
-                            modelMessage = "Voice cleaning is off."
-                        }
-                    },
-                    onInstall: {
-                        services.modelInstallCoordinator.start(modelID: row.id)
-                    },
-                    onCancelInstall: {
-                        services.modelInstallCoordinator.cancel()
-                    },
-                    onRetryInstall: {
-                        services.modelInstallCoordinator.retry()
-                    },
-                    onDelete: {
-                        pendingRemovalModel = row.model
-                    }
+            catalogSurface(catalogExperience)
+        }
+        .inspector(isPresented: $showsInspector) {
+            ScrollView {
+                ModelCatalogInspectorView(
+                    presentation: inspectorController.presentation,
+                    localDetailsState: inspectorController.localDetailsState,
+                    verificationState: inspectorController.verificationState,
+                    onVerify: inspectorController.verifySelectedArtifact
                 )
             }
-
+            .scrollContentBackground(.hidden)
+            .inspectorColumnWidth(min: 280, ideal: 320, max: 360)
         }
         .overlay(alignment: .topTrailing) {
             ModelCatalogToolbar(
@@ -635,12 +598,7 @@ private struct ModelsSettingsPane: View {
                 format: $catalogFormat,
                 precision: $catalogPrecision,
                 onReset: resetCatalogQuery,
-                onVerify: {
-                    Task {
-                        _ = await services.dictation.refreshReadiness()
-                        modelMessage = services.dictation.readiness.model.settingsModelStatus
-                    }
-                },
+                onVerify: verifyInstalledModels,
                 onImport: chooseCustomWhisperModel,
                 isImportDisabled: isInstalling || isImporting
             )
@@ -653,6 +611,13 @@ private struct ModelsSettingsPane: View {
         }
         .onChange(of: catalogExperience) { _, updatedExperience in
             hierarchyState.reconcile(with: updatedExperience)
+            inspectorController.select(
+                hierarchyState.selection,
+                in: updatedExperience
+            )
+            if hierarchyState.selection == nil {
+                showsInspector = false
+            }
         }
         .alert("Import local Whisper model?", isPresented: $showsImportConfirmation) {
             Button("Cancel", role: .cancel) {
@@ -707,6 +672,75 @@ private struct ModelsSettingsPane: View {
         catalogSort = .catalog
         catalogFormat = nil
         catalogPrecision = nil
+    }
+
+    private func verifyInstalledModels() {
+        Task {
+            _ = await services.dictation.refreshReadiness()
+            modelMessage = services.dictation.readiness.model.settingsModelStatus
+        }
+    }
+
+    private func catalogSurface(
+        _ catalogExperience: ModelCatalogExperience
+    ) -> some View {
+        ModelCatalogSurface(
+            rows: catalogExperience.rows,
+            hierarchyRows: hierarchyState.visibleRows(in: catalogExperience),
+            selection: hierarchyState.selection,
+            onSelect: { selection in
+                hierarchyState.select(selection)
+                inspectorController.select(selection, in: catalogExperience)
+                showsInspector = true
+            },
+            onToggleCheckpoint: { checkpoint in
+                hierarchyState.toggleExpansion(of: checkpoint)
+                inspectorController.select(
+                    hierarchyState.selection,
+                    in: catalogExperience
+                )
+            },
+            onReset: resetCatalogQuery
+        ) { row, context in
+            TextifyModelCard(
+                model: row.model,
+                hierarchyContext: context,
+                isInstalled: row.isInstalled,
+                isActive: row.isActive,
+                isActivating: activatingModelID == row.id,
+                isBusy: activatingModelID != nil || isInstalling || isImporting,
+                install: row.install,
+                actions: row.actions,
+                onUse: {
+                    activatingModelID = row.id
+                    Task {
+                        let activated = await services.activateInstalledModel(row.id)
+                        modelMessage = activated
+                            ? row.model.activationMessage
+                            : "Textify kept the previous model because \(row.model.displayName) could not be prepared."
+                        activatingModelID = nil
+                    }
+                },
+                onDisable: {
+                    Task {
+                        await services.disableVoiceCleaning()
+                        modelMessage = "Voice cleaning is off."
+                    }
+                },
+                onInstall: {
+                    services.modelInstallCoordinator.start(modelID: row.id)
+                },
+                onCancelInstall: {
+                    services.modelInstallCoordinator.cancel()
+                },
+                onRetryInstall: {
+                    services.modelInstallCoordinator.retry()
+                },
+                onDelete: {
+                    pendingRemovalModel = row.model
+                }
+            )
+        }
     }
 
     private func chooseCustomWhisperModel() {
@@ -1013,6 +1047,285 @@ private struct ModelCatalogArtifactRowContext {
     let isSelected: Bool
     let indentation: CGFloat
     let onSelect: () -> Void
+}
+
+private struct ModelCatalogInspectorView: View {
+    let presentation: ModelCatalogInspectorPresentation?
+    let localDetailsState: ModelCatalogInspectorLocalDetailsState
+    let verificationState: ModelCatalogInspectorVerificationState
+    let onVerify: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("INSPECTOR")
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .tracking(0.9)
+                .foregroundStyle(.secondary)
+
+            switch presentation {
+            case let .checkpoint(checkpoint):
+                checkpointInspector(checkpoint)
+            case let .exactArtifact(artifact):
+                exactArtifactInspector(artifact)
+            case nil:
+                ContentUnavailableView {
+                    Label("Nothing Selected", systemImage: "sidebar.right")
+                } description: {
+                    Text("Select a checkpoint or exact artifact to inspect its details.")
+                }
+                .frame(maxWidth: .infinity, minHeight: 220)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(TextifyVisualIdentity.cardSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(TextifyVisualIdentity.separator, lineWidth: 1)
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder
+    private func checkpointInspector(
+        _ checkpoint: ModelCatalogCheckpointInspectorPresentation
+    ) -> some View {
+        inspectorHeader(
+            eyebrow: "CHECKPOINT",
+            title: checkpoint.displayName,
+            identity: checkpoint.id,
+            description: checkpoint.description
+        )
+
+        ModelInspectorSection(title: "Reference Variant") {
+            ModelInspectorFactRow(
+                label: "Variant",
+                value: checkpoint.referenceArtifactName
+            )
+            ModelInspectorFactRow(
+                label: "Quality",
+                value: checkpoint.referenceQuality
+            )
+            ModelInspectorFactRow(
+                label: "Speed",
+                value: checkpoint.referenceSpeed
+            )
+            ModelInspectorFactRow(
+                label: "Quality Evidence",
+                value: checkpoint.referenceQualityEvidence
+            )
+            ModelInspectorFactRow(
+                label: "Speed Evidence",
+                value: checkpoint.referenceSpeedEvidence
+            )
+        }
+
+        ModelInspectorSection(title: "Aggregate State") {
+            ModelInspectorFactRow(label: "Variants", value: checkpoint.aggregateState)
+            ModelInspectorFactRow(label: "Languages", value: checkpoint.languages)
+            ModelInspectorFactRow(label: "Capabilities", value: checkpoint.capabilities)
+        }
+    }
+
+    @ViewBuilder
+    private func exactArtifactInspector(
+        _ artifact: ModelCatalogExactArtifactInspectorPresentation
+    ) -> some View {
+        inspectorHeader(
+            eyebrow: "EXACT ARTIFACT",
+            title: "\(artifact.checkpointName) — \(artifact.displayName)",
+            identity: artifact.id,
+            description: artifact.description
+        )
+
+        ModelInspectorSection(title: "Operational Truth") {
+            ModelInspectorFactRow(label: "Artifact Format", value: artifact.artifactFormat)
+            ModelInspectorFactRow(label: "Numeric Format", value: artifact.numericFormat)
+            ModelInspectorFactRow(label: "Runtime", value: artifact.runtime)
+            ModelInspectorFactRow(label: "Compute Route", value: artifact.computeRoute)
+            ModelInspectorFactRow(label: "Compatibility", value: artifact.compatibility)
+            ModelInspectorFactRow(label: "Download Size", value: artifact.transferSize)
+            ModelInspectorFactRow(label: "Local State", value: artifact.localState)
+        }
+
+        ModelInspectorSection(title: "Signed Evidence") {
+            ModelInspectorFactRow(label: "Quality", value: artifact.qualityEvidence)
+            ModelInspectorFactRow(label: "Speed", value: artifact.speedEvidence)
+        }
+
+        ModelInspectorSection(title: "Source & License") {
+            ModelInspectorFactRow(label: "Provenance", value: artifact.provenance)
+                .textSelection(.enabled)
+            ModelInspectorFactRow(label: "License", value: artifact.license)
+            if let sourceURL = artifact.sourceURL {
+                Link(destination: sourceURL) {
+                    Label("Open Upstream Source", systemImage: "arrow.up.right.square")
+                }
+                .font(.callout)
+            }
+        }
+
+        ModelInspectorSection(title: "Local Files") {
+            localDetails(for: artifact)
+            if artifact.canVerify {
+                Button(
+                    verificationState == .verifying(artifactID: artifact.id)
+                        ? "Verifying…"
+                        : "Verify Integrity",
+                    systemImage: "checkmark.seal",
+                    action: onVerify
+                )
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(
+                        verificationState == .verifying(artifactID: artifact.id)
+                    )
+                    .help("Hash installed model files only when you request verification.")
+            }
+        }
+    }
+
+    private func inspectorHeader(
+        eyebrow: String,
+        title: String,
+        identity: String,
+        description: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(eyebrow)
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .tracking(0.6)
+                .foregroundStyle(TextifyVisualIdentity.voiceViolet)
+            Text(title)
+                .font(.system(.title3, design: .rounded, weight: .bold))
+            Text(identity)
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(.tertiary)
+                .textSelection(.enabled)
+            Text(description)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private func localDetails(
+        for artifact: ModelCatalogExactArtifactInspectorPresentation
+    ) -> some View {
+        switch localDetailsState {
+        case let .loading(artifactID) where artifactID == artifact.id:
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Calculating local file details…")
+                    .foregroundStyle(.secondary)
+            }
+            .font(.caption)
+            .accessibilityElement(children: .combine)
+        case let .loaded(details) where details.artifactID == artifact.id:
+            ModelInspectorFactRow(
+                label: "On Disk",
+                value: ByteCountFormatter.string(
+                    fromByteCount: details.allocatedBytes,
+                    countStyle: .file
+                )
+            )
+            ModelInspectorFactRow(
+                label: "Files",
+                value: "\(details.presentFileCount) of \(details.expectedFileCount) present"
+            )
+            ModelInspectorFactRow(
+                label: "Integrity",
+                value: integrityDescription(
+                    for: artifact,
+                    localDetails: details
+                )
+            )
+            if !details.missingRelativePaths.isEmpty {
+                ModelInspectorFactRow(
+                    label: "Missing",
+                    value: details.missingRelativePaths.joined(separator: ", ")
+                )
+            }
+            if !details.sizeMismatchRelativePaths.isEmpty {
+                ModelInspectorFactRow(
+                    label: "Unexpected Size",
+                    value: details.sizeMismatchRelativePaths.joined(separator: ", ")
+                )
+            }
+        case let .failed(artifactID) where artifactID == artifact.id:
+            Label("Local file details are unavailable.", systemImage: "exclamationmark.triangle")
+                .font(.caption)
+                .foregroundStyle(TextifyVisualIdentity.warmWarning)
+        case .notApplicable, .loading, .loaded, .failed:
+            Text(
+                artifact.canVerify
+                    ? "Local details have not been loaded."
+                    : "Install this exact artifact to inspect local files."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private func integrityDescription(
+        for artifact: ModelCatalogExactArtifactInspectorPresentation,
+        localDetails: ModelCatalogArtifactLocalDetails
+    ) -> String {
+        switch verificationState {
+        case let .verified(artifactID) where artifactID == artifact.id:
+            return "Verified"
+        case let .failed(artifactID) where artifactID == artifact.id:
+            return "Verification failed"
+        case let .verifying(artifactID) where artifactID == artifact.id:
+            return "Verifying…"
+        case .unavailable, .available, .verifying, .verified, .failed:
+            return localDetails.integrity == .notVerified
+                ? "Not re-verified — use Verify Integrity to hash files"
+                : "Needs attention"
+        }
+    }
+}
+
+private struct ModelInspectorSection<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: Content
+
+    init(title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Divider()
+            Text(title.uppercased())
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .tracking(0.55)
+                .foregroundStyle(.secondary)
+            content
+        }
+    }
+}
+
+private struct ModelInspectorFactRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+            Text(value)
+                .font(.caption)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
+    }
 }
 
 private struct ModelCatalogSurface<Row: View>: View {
@@ -1421,9 +1734,18 @@ private struct TextifyModelCard: View {
                 }
 
                 if actions.contains(.details) {
-                    Button(showsDetails ? "Hide Details" : "Details", systemImage: "info.circle") {
-                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
-                            showsDetails.toggle()
+                    Button(
+                        hierarchyContext == nil
+                            ? (showsDetails ? "Hide Details" : "Details")
+                            : "Inspect",
+                        systemImage: "info.circle"
+                    ) {
+                        if let hierarchyContext {
+                            hierarchyContext.onSelect()
+                        } else {
+                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
+                                showsDetails.toggle()
+                            }
                         }
                     }
                     .foregroundStyle(.secondary)
@@ -1445,7 +1767,7 @@ private struct TextifyModelCard: View {
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
-            if showsDetails {
+            if showsDetails, hierarchyContext == nil {
                 ModelDetailGrid(model: model)
                     .padding(.leading, 76)
                     .transition(.opacity.combined(with: .move(edge: .top)))
