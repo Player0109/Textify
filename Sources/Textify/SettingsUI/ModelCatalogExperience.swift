@@ -1075,17 +1075,31 @@ struct ModelCatalogHierarchyRow: Equatable, Identifiable {
 struct ModelCatalogHierarchyState: Equatable {
     private(set) var selection: ModelCatalogHierarchySelection?
     private(set) var expandedCheckpointIDs: Set<String>
+    private(set) var focusedRowID: ModelCatalogHierarchyRowID?
+    private(set) var scrollAnchorID: ModelCatalogHierarchyRowID?
 
     init(
         selection: ModelCatalogHierarchySelection? = nil,
-        expandedCheckpointIDs: Set<String> = []
+        expandedCheckpointIDs: Set<String> = [],
+        focusedRowID: ModelCatalogHierarchyRowID? = nil,
+        scrollAnchorID: ModelCatalogHierarchyRowID? = nil
     ) {
         self.selection = selection
         self.expandedCheckpointIDs = expandedCheckpointIDs
+        self.focusedRowID = focusedRowID
+        self.scrollAnchorID = scrollAnchorID
     }
 
     mutating func select(_ selection: ModelCatalogHierarchySelection) {
         self.selection = selection
+    }
+
+    mutating func focus(_ rowID: ModelCatalogHierarchyRowID?) {
+        focusedRowID = rowID
+    }
+
+    mutating func scroll(to rowID: ModelCatalogHierarchyRowID?) {
+        scrollAnchorID = rowID
     }
 
     mutating func toggleExpansion(of checkpoint: ModelCatalogCheckpointPresentation) {
@@ -1093,6 +1107,17 @@ struct ModelCatalogHierarchyState: Equatable {
             if case let .exactArtifact(selectedArtifactID) = selection,
                checkpoint.artifacts.contains(where: { $0.id == selectedArtifactID }) {
                 selection = .checkpoint(checkpoint.id)
+            }
+            let childRowIDs = Set(
+                checkpoint.artifacts.map {
+                    ModelCatalogHierarchyRowID.exactArtifact($0.id)
+                }
+            )
+            if let focusedRowID, childRowIDs.contains(focusedRowID) {
+                self.focusedRowID = .checkpoint(checkpoint.id)
+            }
+            if let scrollAnchorID, childRowIDs.contains(scrollAnchorID) {
+                self.scrollAnchorID = .checkpoint(checkpoint.id)
             }
         } else {
             expandedCheckpointIDs.insert(checkpoint.id)
@@ -1116,6 +1141,14 @@ struct ModelCatalogHierarchyState: Equatable {
             selection = nil
         case .checkpoint, .exactArtifact, nil:
             break
+        }
+
+        let visibleRowIDs = Set(visibleRows(in: experience).map(\.id))
+        if let focusedRowID, !visibleRowIDs.contains(focusedRowID) {
+            self.focusedRowID = nil
+        }
+        if let scrollAnchorID, !visibleRowIDs.contains(scrollAnchorID) {
+            self.scrollAnchorID = nil
         }
     }
 

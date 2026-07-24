@@ -39,6 +39,22 @@ struct SettingsRootView: View {
             minHeight: TextifyWindowMetrics.mainMinimumHeight,
             idealHeight: TextifyWindowMetrics.mainHeight
         )
+        .onAppear {
+            if let purpose = router.selectedPane.modelPurpose {
+                services.modelCatalogCoordinator.destinationOpened(purpose)
+            }
+        }
+        .onChange(of: router.selectedPane) { previousPane, nextPane in
+            services.modelCatalogCoordinator.destinationChanged(
+                from: previousPane.modelPurpose,
+                to: nextPane.modelPurpose
+            )
+        }
+        .onDisappear {
+            if let purpose = router.selectedPane.modelPurpose {
+                services.modelCatalogCoordinator.destinationClosed(purpose)
+            }
+        }
     }
 
     @ViewBuilder
@@ -532,6 +548,7 @@ private struct ModelsSettingsPane: View {
     @State private var showsInspector = false
     @State private var showsModelVariantsHelp = false
     @State private var showsDownloads = false
+    @FocusState private var focusedCatalogRowID: ModelCatalogHierarchyRowID?
 
     var body: some View {
         let catalogExperience = services.modelCatalogExperience(
@@ -543,61 +560,62 @@ private struct ModelsSettingsPane: View {
         return SettingsPaneLayout(
             title: destination.title,
             subtitle: destination.subtitle,
-            maxContentWidth: 1_360
+            maxContentWidth: 1_360,
+            scrollPosition: Binding(
+                get: { hierarchyState.scrollAnchorID },
+                set: { hierarchyState.scroll(to: $0) }
+            )
         ) {
-            if services.modelCatalogCoordinator.isLoading {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Loading signed catalog")
-                        .foregroundStyle(.secondary)
-                }
-                .font(.callout)
-            } else if let message = services.modelCatalogCoordinator.errorMessage ?? modelMessage {
-                Text(message)
+            catalogStatus(hasRows: !catalogExperience.rows.isEmpty)
+
+            if let modelMessage {
+                Text(modelMessage)
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-            } else if ProductionModelInstallConfiguration.current == nil {
+            } else if ProductionModelInstallConfiguration.current == nil,
+                      services.modelCatalogCoordinator.manifest == nil {
                 Text("Signed catalog unavailable in this build")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
 
-            ModelCatalogToolbar(
-                query: $discoveryQuery,
-                showsDownloads: $showsDownloads,
-                filterOptions: catalogExperience.filterOptions,
-                onReset: resetCatalogQuery,
-                onVerify: verifyInstalledModels,
-                onImport: destination == .transcription
-                    ? chooseCustomWhisperModel
-                    : nil,
-                onShowVariantHelp: {
-                    showsModelVariantsHelp = true
-                },
-                downloadCount: services.modelInstallCoordinator
-                    .hasNonterminalAttempts
-                    ? ModelDownloadsPresentation(
-                        attempts: services.modelInstallCoordinator.attempts
-                    ).nonterminalCount
-                    : 0,
-                isImportDisabled: hasPendingDownloads || isImporting
-            )
-
-            if !discoveryQuery.appliedFilterTokens.isEmpty {
-                ModelCatalogFilterTokens(
-                    tokens: discoveryQuery.appliedFilterTokens
-                ) { token in
-                    discoveryQuery.removeFilter(token)
-                }
-            }
-
-            if let pinnedReveal = catalogExperience.pinnedReveal {
-                pinnedRevealView(
-                    pinnedReveal,
-                    in: catalogExperience
+            if !isInitialCatalogCheck {
+                ModelCatalogToolbar(
+                    query: $discoveryQuery,
+                    showsDownloads: $showsDownloads,
+                    filterOptions: catalogExperience.filterOptions,
+                    onReset: resetCatalogQuery,
+                    onVerify: verifyInstalledModels,
+                    onImport: destination == .transcription
+                        ? chooseCustomWhisperModel
+                        : nil,
+                    onShowVariantHelp: {
+                        showsModelVariantsHelp = true
+                    },
+                    downloadCount: services.modelInstallCoordinator
+                        .hasNonterminalAttempts
+                        ? ModelDownloadsPresentation(
+                            attempts: services.modelInstallCoordinator.attempts
+                        ).nonterminalCount
+                        : 0,
+                    isImportDisabled: hasPendingDownloads || isImporting
                 )
+
+                if !discoveryQuery.appliedFilterTokens.isEmpty {
+                    ModelCatalogFilterTokens(
+                        tokens: discoveryQuery.appliedFilterTokens
+                    ) { token in
+                        discoveryQuery.removeFilter(token)
+                    }
+                }
+
+                if let pinnedReveal = catalogExperience.pinnedReveal {
+                    pinnedRevealView(
+                        pinnedReveal,
+                        in: catalogExperience
+                    )
+                }
             }
 
             catalogSurface(catalogExperience)
@@ -623,6 +641,7 @@ private struct ModelsSettingsPane: View {
         }
         .onChange(of: catalogExperience) { _, updatedExperience in
             hierarchyState.reconcile(with: updatedExperience)
+            focusedCatalogRowID = hierarchyState.focusedRowID
             inspectorController.select(
                 hierarchyState.selection,
                 in: updatedExperience
@@ -630,6 +649,9 @@ private struct ModelsSettingsPane: View {
             if hierarchyState.selection == nil {
                 showsInspector = false
             }
+        }
+        .onChange(of: focusedCatalogRowID) { _, rowID in
+            hierarchyState.focus(rowID)
         }
         .onChange(of: inspectorController.localDetailsState) { _, state in
             if case let .loaded(details) = state {
@@ -680,6 +702,92 @@ private struct ModelsSettingsPane: View {
         services.modelInstallCoordinator.hasNonterminalAttempts
     }
 
+    private var isInitialCatalogCheck: Bool {
+        services.modelCatalogCoordinator.manifest == nil
+            && services.modelCatalogCoordinator.status == .checking
+    }
+
+    @ViewBuilder
+    private func catalogStatus(hasRows: Bool) -> some View {
+        let coordinator = services.modelCatalogCoordinator
+        if coordinator.stagedRevision != nil {
+            HStack(spacing: 10) {
+                Label(
+                    "A verified catalog update is ready.",
+                    systemImage: "checkmark.shield"
+                )
+                .font(.callout)
+                Spacer(minLength: 12)
+                Button("Apply Now") {
+                    coordinator.applyStagedUpdate()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
+            .padding(12)
+            .background(TextifyVisualIdentity.voiceViolet.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        if let issue = coordinator.securityIssue {
+            HStack(spacing: 10) {
+                Image(systemName: "exclamationmark.shield.fill")
+                    .foregroundStyle(.red)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Signed catalog update rejected")
+                        .font(.callout.weight(.semibold))
+                    Text(
+                        "Security check: \(issue.reason.displayName). "
+                            + "The last trusted catalog remains available."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 12)
+                Button("Check Again") {
+                    Task {
+                        await coordinator.refresh()
+                    }
+                }
+            }
+            .padding(12)
+            .background(Color.red.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        } else {
+            switch coordinator.status {
+            case .checking where coordinator.manifest == nil:
+                EmptyView()
+            case .checking, .checkingForUpdates:
+                Label("Checking for signed catalog updates", systemImage: "arrow.triangle.2.circlepath")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            case .updateAvailable:
+                EmptyView()
+            case .offline:
+                Label(
+                    "Offline — using the last trusted catalog.",
+                    systemImage: "network.slash"
+                )
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            case let .requiresNewerTextify(manifestVersion):
+                Label(
+                    "Catalog version \(manifestVersion) requires a newer Textify.",
+                    systemImage: "arrow.down.app"
+                )
+                .font(.callout)
+                .foregroundStyle(.orange)
+            case .unavailable:
+                if hasRows {
+                    Text(coordinator.errorMessage ?? "")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+            case .trusted, .securityFailure:
+                EmptyView()
+            }
+        }
+    }
+
     private var catalogQuery: ModelCatalogQuery {
         var query = discoveryQuery
         query.purpose = destination.purpose
@@ -705,9 +813,12 @@ private struct ModelsSettingsPane: View {
         _ catalogExperience: ModelCatalogExperience
     ) -> some View {
         ModelCatalogSurface(
-            rows: catalogExperience.rows,
-            hierarchyRows: hierarchyState.visibleRows(in: catalogExperience),
+            rows: isInitialCatalogCheck ? [] : catalogExperience.rows,
+            hierarchyRows: isInitialCatalogCheck
+                ? []
+                : hierarchyState.visibleRows(in: catalogExperience),
             selection: hierarchyState.selection,
+            focusedRowID: $focusedCatalogRowID,
             onSelect: { selection in
                 hierarchyState.select(selection)
                 inspectorController.select(selection, in: catalogExperience)
@@ -728,9 +839,26 @@ private struct ModelsSettingsPane: View {
     }
 
     private var emptyPresentation: ModelCatalogEmptyPresentation {
-        if services.modelCatalogCoordinator.manifest == nil,
-           services.modelCatalogCoordinator.errorMessage != nil
-                || ProductionModelInstallConfiguration.current == nil {
+        let coordinator = services.modelCatalogCoordinator
+        if coordinator.manifest == nil {
+            if coordinator.securityIssue != nil {
+                return .securityFailure(destination)
+            }
+            switch coordinator.status {
+            case .checking, .checkingForUpdates:
+                return .checking
+            case let .requiresNewerTextify(manifestVersion):
+                return .requiresNewerTextify(
+                    manifestVersion: manifestVersion
+                )
+            case .unavailable, .offline:
+                return .unavailable(destination)
+            case .trusted, .updateAvailable, .securityFailure:
+                break
+            }
+        }
+        if ProductionModelInstallConfiguration.current == nil,
+           coordinator.manifest == nil {
             return .unavailable(destination)
         }
         if catalogQuery.emptyState == .validCatalog {
@@ -740,23 +868,32 @@ private struct ModelsSettingsPane: View {
     }
 
     private func performEmptyStateAction() {
-        switch catalogQuery.emptyState {
-        case .installed:
-            discoveryQuery.scope = .all
-            if discoveryQuery.sort == .installedSize {
-                discoveryQuery.sort = .catalog
+        switch emptyPresentation {
+        case let .query(state):
+            switch state {
+            case .installed:
+                discoveryQuery.scope = .all
+                if discoveryQuery.sort == .installedSize {
+                    discoveryQuery.sort = .catalog
+                }
+            case .search:
+                discoveryQuery.clearSearch()
+            case .filters:
+                discoveryQuery.clearFilters()
+            case .combined:
+                discoveryQuery.clearSearch()
+                discoveryQuery.clearFilters()
+            case .validCatalog:
+                Task {
+                    await services.modelCatalogCoordinator.refresh()
+                }
             }
-        case .search:
-            discoveryQuery.clearSearch()
-        case .filters:
-            discoveryQuery.clearFilters()
-        case .combined:
-            discoveryQuery.clearSearch()
-            discoveryQuery.clearFilters()
-        case .validCatalog:
+        case .purpose, .unavailable, .securityFailure:
             Task {
                 await services.modelCatalogCoordinator.refresh()
             }
+        case .checking, .requiresNewerTextify:
+            break
         }
     }
 
@@ -2068,6 +2205,7 @@ private struct ModelCatalogSurface<Row: View>: View {
     let rows: [ModelCatalogRowPresentation]
     let hierarchyRows: [ModelCatalogHierarchyRow]
     let selection: ModelCatalogHierarchySelection?
+    let focusedRowID: FocusState<ModelCatalogHierarchyRowID?>.Binding
     let onSelect: (ModelCatalogHierarchySelection) -> Void
     let onToggleCheckpoint: (ModelCatalogCheckpointPresentation) -> Void
     let onReset: () -> Void
@@ -2080,6 +2218,7 @@ private struct ModelCatalogSurface<Row: View>: View {
         rows: [ModelCatalogRowPresentation],
         hierarchyRows: [ModelCatalogHierarchyRow],
         selection: ModelCatalogHierarchySelection?,
+        focusedRowID: FocusState<ModelCatalogHierarchyRowID?>.Binding,
         onSelect: @escaping (ModelCatalogHierarchySelection) -> Void,
         onToggleCheckpoint: @escaping (ModelCatalogCheckpointPresentation) -> Void,
         onReset: @escaping () -> Void,
@@ -2092,6 +2231,7 @@ private struct ModelCatalogSurface<Row: View>: View {
         self.rows = rows
         self.hierarchyRows = hierarchyRows
         self.selection = selection
+        self.focusedRowID = focusedRowID
         self.onSelect = onSelect
         self.onToggleCheckpoint = onToggleCheckpoint
         self.onReset = onReset
@@ -2113,68 +2253,80 @@ private struct ModelCatalogSurface<Row: View>: View {
                     if hierarchyRows.isEmpty {
                         ForEach(rows) { catalogRow in
                             row(catalogRow, nil)
+                                .id(ModelCatalogHierarchyRowID.standaloneArtifact(catalogRow.id))
+                                .focusable()
+                                .focused(
+                                    focusedRowID,
+                                    equals: .standaloneArtifact(catalogRow.id)
+                                )
                         }
                     } else {
                         ForEach(hierarchyRows) { hierarchyRow in
-                            switch hierarchyRow.content {
-                            case let .family(family):
-                                ModelCatalogFamilyHeading(family: family)
-                            case let .checkpoint(checkpoint):
-                                ModelCatalogCheckpointRow(
-                                    checkpoint: checkpoint,
-                                    isExpanded: hierarchyRow.isExpanded,
-                                    isSelected: selection == .checkpoint(checkpoint.id),
-                                    onSelect: {
-                                        onSelect(.checkpoint(checkpoint.id))
-                                    },
-                                    onToggle: {
-                                        withAnimation(
-                                            reduceMotion ? nil : .easeInOut(duration: 0.16)
-                                        ) {
-                                            onToggleCheckpoint(checkpoint)
-                                        }
-                                    }
-                                )
-                                if hierarchyRow.isExpanded {
-                                    ModelCatalogVariantComparisonHeader()
-                                }
-                            case let .exactArtifact(checkpoint, artifact, isSingleVariant):
-                                row(
-                                    artifact.row,
-                                    ModelCatalogArtifactRowContext(
-                                        title: isSingleVariant
-                                            ? checkpoint.metadata.presentation.displayName
-                                            : artifact.metadata.presentation.displayName,
-                                        description: isSingleVariant
-                                            ? checkpoint.metadata.presentation.description
-                                            : "\(checkpoint.metadata.presentation.displayName) • \(artifact.row.model.engineName) • \(artifact.row.model.acceleratorName)",
-                                        variantLabel: isSingleVariant
-                                            ? artifact.metadata.presentation.displayName
-                                            : nil,
-                                        isRecommended: !isSingleVariant
-                                            && checkpoint.metadata
-                                                .recommendedArtifactID == artifact.id,
-                                        isFallback: !isSingleVariant
-                                            && checkpoint.resolution?.fallback?
-                                                .fallbackArtifactID == artifact.id,
-                                        isSelected: selection == .exactArtifact(artifact.id),
-                                        indentation: isSingleVariant ? 0 : 30,
-                                        comparison: isSingleVariant
-                                            ? nil
-                                            : checkpoint.variantComparisons.first {
-                                                $0.id == artifact.id
-                                            },
+                            VStack(spacing: 0) {
+                                switch hierarchyRow.content {
+                                case let .family(family):
+                                    ModelCatalogFamilyHeading(family: family)
+                                case let .checkpoint(checkpoint):
+                                    ModelCatalogCheckpointRow(
+                                        checkpoint: checkpoint,
+                                        isExpanded: hierarchyRow.isExpanded,
+                                        isSelected: selection == .checkpoint(checkpoint.id),
                                         onSelect: {
-                                            onSelect(.exactArtifact(artifact.id))
+                                            onSelect(.checkpoint(checkpoint.id))
+                                        },
+                                        onToggle: {
+                                            withAnimation(
+                                                reduceMotion ? nil : .easeInOut(duration: 0.16)
+                                            ) {
+                                                onToggleCheckpoint(checkpoint)
+                                            }
                                         }
                                     )
-                                )
-                            case let .standaloneArtifact(standaloneRow):
-                                row(standaloneRow, nil)
+                                    if hierarchyRow.isExpanded {
+                                        ModelCatalogVariantComparisonHeader()
+                                    }
+                                case let .exactArtifact(checkpoint, artifact, isSingleVariant):
+                                    row(
+                                        artifact.row,
+                                        ModelCatalogArtifactRowContext(
+                                            title: isSingleVariant
+                                                ? checkpoint.metadata.presentation.displayName
+                                                : artifact.metadata.presentation.displayName,
+                                            description: isSingleVariant
+                                                ? checkpoint.metadata.presentation.description
+                                                : "\(checkpoint.metadata.presentation.displayName) • \(artifact.row.model.engineName) • \(artifact.row.model.acceleratorName)",
+                                            variantLabel: isSingleVariant
+                                                ? artifact.metadata.presentation.displayName
+                                                : nil,
+                                            isRecommended: !isSingleVariant
+                                                && checkpoint.metadata
+                                                    .recommendedArtifactID == artifact.id,
+                                            isFallback: !isSingleVariant
+                                                && checkpoint.resolution?.fallback?
+                                                    .fallbackArtifactID == artifact.id,
+                                            isSelected: selection == .exactArtifact(artifact.id),
+                                            indentation: isSingleVariant ? 0 : 30,
+                                            comparison: isSingleVariant
+                                                ? nil
+                                                : checkpoint.variantComparisons.first {
+                                                    $0.id == artifact.id
+                                                },
+                                            onSelect: {
+                                                onSelect(.exactArtifact(artifact.id))
+                                            }
+                                        )
+                                    )
+                                case let .standaloneArtifact(standaloneRow):
+                                    row(standaloneRow, nil)
+                                }
                             }
+                            .id(hierarchyRow.id)
+                            .focusable()
+                            .focused(focusedRowID, equals: hierarchyRow.id)
                         }
                     }
                 }
+                .scrollTargetLayout()
             }
         }
         .background(TextifyVisualIdentity.cardSurface)
@@ -2186,10 +2338,13 @@ private struct ModelCatalogSurface<Row: View>: View {
     }
 }
 
-private enum ModelCatalogEmptyPresentation {
+enum ModelCatalogEmptyPresentation {
+    case checking
     case query(ModelCatalogQueryEmptyState)
     case purpose(ModelCatalogPurposeDestination)
     case unavailable(ModelCatalogPurposeDestination)
+    case securityFailure(ModelCatalogPurposeDestination)
+    case requiresNewerTextify(manifestVersion: Int)
 
     var icon: String {
         switch self {
@@ -2206,40 +2361,62 @@ private enum ModelCatalogEmptyPresentation {
             case .validCatalog:
                 return "shippingbox"
             }
+        case .checking:
+            return "clock.arrow.circlepath"
         case .purpose:
             return "shippingbox"
         case .unavailable:
             return "wifi.exclamationmark"
+        case .securityFailure:
+            return "exclamationmark.shield"
+        case .requiresNewerTextify:
+            return "arrow.down.app"
         }
     }
 
     var title: String {
         switch self {
+        case .checking:
+            return "Checking signed catalog"
         case let .query(state):
             return state.title
         case let .purpose(destination):
             return destination.emptyTitle
         case let .unavailable(destination):
             return destination.unavailableTitle
+        case .securityFailure:
+            return "Catalog security check failed"
+        case .requiresNewerTextify:
+            return "Update Textify to view this catalog"
         }
     }
 
     var detail: String {
         switch self {
+        case .checking:
+            return "Textify is verifying trusted catalog data. Model actions will appear when the check finishes."
         case let .query(state):
             return state.detail
         case let .purpose(destination):
             return destination.emptyDetail
         case let .unavailable(destination):
             return destination.unavailableDetail
+        case .securityFailure:
+            return "Textify rejected the candidate catalog and did not replace trusted data."
+        case let .requiresNewerTextify(manifestVersion):
+            return "This signed catalog uses schema version \(manifestVersion), which this version of Textify cannot present."
         }
     }
 
-    var actionTitle: String {
+    var actionTitle: String? {
         switch self {
+        case .checking, .requiresNewerTextify:
+            return nil
         case let .query(state):
             return state.actionTitle
-        case let .purpose(destination), let .unavailable(destination):
+        case let .purpose(destination),
+             let .unavailable(destination),
+             let .securityFailure(destination):
             return destination.unavailableActionTitle
         }
     }
@@ -2434,9 +2611,11 @@ private struct ModelCatalogEmptyState: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button(presentation.actionTitle, action: onAction)
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+            if let actionTitle = presentation.actionTitle {
+                Button(actionTitle, action: onAction)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            }
         }
         .frame(maxWidth: .infinity, minHeight: 170)
         .accessibilityElement(children: .contain)
@@ -3946,21 +4125,34 @@ private struct SettingsPaneLayout<Content: View>: View {
     let title: String
     let subtitleOverride: String?
     let maxContentWidth: CGFloat
+    let scrollPosition: Binding<ModelCatalogHierarchyRowID?>?
     @ViewBuilder var content: Content
 
     init(
         title: String,
         subtitle: String? = nil,
         maxContentWidth: CGFloat = TextifyWindowMetrics.readableContentWidth,
+        scrollPosition: Binding<ModelCatalogHierarchyRowID?>? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
         self.subtitleOverride = subtitle
         self.maxContentWidth = maxContentWidth
+        self.scrollPosition = scrollPosition
         self.content = content()
     }
 
+    @ViewBuilder
     var body: some View {
+        if let scrollPosition {
+            paneScrollView
+                .scrollPosition(id: scrollPosition, anchor: .top)
+        } else {
+            paneScrollView
+        }
+    }
+
+    private var paneScrollView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 TextifyPaneHeader(title: title, subtitle: subtitle)

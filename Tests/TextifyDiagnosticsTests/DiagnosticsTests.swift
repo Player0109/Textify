@@ -2,6 +2,28 @@ import TextifyDiagnostics
 import XCTest
 
 final class DiagnosticsTests: XCTestCase {
+    func testCatalogRejectionEventIsClosedHighSeverityMetadata() throws {
+        let event = DiagnosticEvent.catalogUpdateRejected(
+            severity: "high",
+            reasonCode: "invalid_signature",
+            candidateRevision: "not-a-catalog-revision",
+            acceptedRevision: "2026-07-24T00:00:00Z"
+        )
+
+        let (object, json) = try encodedJSONObject(for: event)
+
+        XCTAssertEqual(object["event"] as? String, "catalog_update_rejected")
+        XCTAssertEqual(object["severity"] as? String, "high")
+        XCTAssertEqual(object["reasonCode"] as? String, "invalid_signature")
+        XCTAssertEqual(object["candidateRevision"] as? String, "unknown")
+        XCTAssertEqual(
+            object["acceptedRevision"] as? String,
+            "2026-07-24T00:00:00Z"
+        )
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("message"))
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("content"))
+    }
+
     func testVoiceCleaningEventContainsOnlyTechnicalMetadata() throws {
         let event = DiagnosticEvent.voiceCleaning(
             modelID: "mossformer2-se-fp16",

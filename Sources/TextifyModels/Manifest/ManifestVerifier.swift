@@ -63,7 +63,7 @@ public struct ManifestVerifier {
     }
 
     public func verify(manifestData: Data, signatureData: Data) throws -> ModelManifest {
-        if try isLegacyEnvelope(signatureData) {
+        if isLegacyEnvelope(signatureData) {
             return try verifyLegacy(manifestData: manifestData, signatureData: signatureData)
         }
 
@@ -81,8 +81,8 @@ public struct ManifestVerifier {
         guard envelope.manifestFile == Self.manifestFile else {
             throw ManifestVerificationError.unexpectedManifestFile(envelope.manifestFile)
         }
-        guard let envelopeVersion = ModelManifestSchemaVersion(
-            contentType: envelope.contentType
+        guard let contentTypeVersion = Self.manifestVersion(
+            fromContentType: envelope.contentType
         ) else {
             throw ManifestVerificationError.unsupportedContentType(envelope.contentType)
         }
@@ -107,6 +107,17 @@ public struct ManifestVerifier {
         guard publicKey.isValidSignature(signatureBytes, for: payload) else {
             throw ManifestVerificationError.signatureRejected
         }
+        let bodyVersion = try Self.manifestVersion(in: manifestData)
+        guard bodyVersion == contentTypeVersion else {
+            throw ManifestVerificationError.contentTypeManifestVersionMismatch
+        }
+        guard let envelopeVersion = ModelManifestSchemaVersion(
+            rawValue: contentTypeVersion
+        ) else {
+            throw ManifestVerificationError.unsupportedManifestVersion(
+                contentTypeVersion
+            )
+        }
         let manifest: ModelManifest
         do {
             manifest = try ModelManifest.decode(manifestData)
@@ -116,14 +127,7 @@ public struct ManifestVerifier {
                 throw ManifestVerificationError.unsupportedManifestVersion(version)
             }
         }
-        guard let manifestVersion = ModelManifestSchemaVersion(
-            rawValue: manifest.manifestVersion
-        ) else {
-            throw ManifestVerificationError.unsupportedManifestVersion(
-                manifest.manifestVersion
-            )
-        }
-        guard envelopeVersion == manifestVersion else {
+        guard envelopeVersion.rawValue == manifest.manifestVersion else {
             throw ManifestVerificationError.contentTypeManifestVersionMismatch
         }
         return manifest
@@ -167,8 +171,9 @@ public struct ManifestVerifier {
         }
     }
 
-    private func isLegacyEnvelope(_ signatureData: Data) throws -> Bool {
-        guard let object = try JSONSerialization.jsonObject(with: signatureData) as? [String: Any] else {
+    private func isLegacyEnvelope(_ signatureData: Data) -> Bool {
+        guard let object = try? JSONSerialization.jsonObject(with: signatureData)
+            as? [String: Any] else {
             return false
         }
         return object["signatureBase64"] != nil
@@ -215,6 +220,29 @@ public struct ManifestVerifier {
         base64.append(String(repeating: "=", count: (4 - base64.count % 4) % 4))
         return Data(base64Encoded: base64)
     }
+
+    private static func manifestVersion(fromContentType contentType: String) -> Int? {
+        let prefix = "application/vnd.textify.model-manifest+json;version="
+        guard contentType.hasPrefix(prefix) else {
+            return nil
+        }
+        let suffix = contentType.dropFirst(prefix.count)
+        guard !suffix.isEmpty, suffix.allSatisfy(\.isNumber) else {
+            return nil
+        }
+        return Int(suffix)
+    }
+
+    private static func manifestVersion(in manifestData: Data) throws -> Int {
+        try JSONDecoder().decode(
+            ManifestVersionEnvelope.self,
+            from: manifestData
+        ).manifestVersion
+    }
+}
+
+private struct ManifestVersionEnvelope: Decodable {
+    let manifestVersion: Int
 }
 
 private struct LegacyManifestSignature: Decodable {

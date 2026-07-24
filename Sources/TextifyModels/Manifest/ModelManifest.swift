@@ -92,7 +92,7 @@ public struct ModelManifest: Codable, Equatable, Sendable {
     }
 }
 
-public enum ModelPurpose: String, Codable, Equatable, Sendable {
+public enum ModelPurpose: String, Codable, Equatable, Hashable, Sendable {
     case transcription
     case voiceCleaning = "voice_cleaning"
 }

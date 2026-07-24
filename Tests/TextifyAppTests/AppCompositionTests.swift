@@ -648,6 +648,10 @@ final class AppCompositionTests: XCTestCase {
         XCTAssertTrue(paths.applicationSupportDirectory.path.hasPrefix(root.path))
         XCTAssertEqual(paths.settingsFileURL.lastPathComponent, "settings.json")
         XCTAssertEqual(paths.modelsDirectory.lastPathComponent, "Models")
+        XCTAssertEqual(
+            paths.manifestCacheDirectory.lastPathComponent,
+            "ManifestCache"
+        )
         XCTAssertEqual(paths.logsDirectory.lastPathComponent, "Textify")
     }
 

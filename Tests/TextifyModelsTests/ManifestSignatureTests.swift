@@ -115,6 +115,60 @@ final class ManifestSignatureTests: XCTestCase {
         XCTAssertEqual(manifest.manifestVersion, 2)
     }
 
+    func testVerifierClassifiesAuthenticFutureSchemaAsUnsupportedVersion() throws {
+        let privateKey = Curve25519.Signing.PrivateKey()
+        let manifestData = Data(
+            #"{"manifestVersion":4,"generatedAt":"2026-07-25T00:00:00Z","models":[]}"#.utf8
+        )
+        let verifier = ManifestVerifier(trustedKeys: [
+            TrustedModelManifestKey(
+                keyId: "test-key",
+                publicKeyBase64: privateKey.publicKey.rawRepresentation.base64EncodedString()
+            ),
+        ])
+
+        XCTAssertThrowsError(
+            try verifier.verify(
+                manifestData: manifestData,
+                signatureData: Self.specEnvelope(
+                    manifestData: manifestData,
+                    privateKey: privateKey,
+                    contentTypeVersion: 4
+                )
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? ManifestVerificationError,
+                .unsupportedManifestVersion(4)
+            )
+        }
+    }
+
+    func testVerifierSurfacesAuthenticMalformedJSONAsStrictDecodeFailure() throws {
+        let privateKey = Curve25519.Signing.PrivateKey()
+        let manifestData = Data(#"{"manifestVersion":3"#.utf8)
+        let verifier = ManifestVerifier(trustedKeys: [
+            TrustedModelManifestKey(
+                keyId: "test-key",
+                publicKeyBase64: privateKey.publicKey.rawRepresentation
+                    .base64EncodedString()
+            ),
+        ])
+
+        XCTAssertThrowsError(
+            try verifier.verify(
+                manifestData: manifestData,
+                signatureData: Self.specEnvelope(
+                    manifestData: manifestData,
+                    privateKey: privateKey,
+                    contentTypeVersion: 3
+                )
+            )
+        ) { error in
+            XCTAssertTrue(error is DecodingError)
+        }
+    }
+
     func testVerifierRejectsContentTypeVersionDifferentFromManifest() throws {
         let privateKey = Curve25519.Signing.PrivateKey()
         let manifestData = Data(

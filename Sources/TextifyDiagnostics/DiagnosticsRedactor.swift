@@ -63,10 +63,12 @@ public struct DiagnosticsRedactor: Sendable {
     public static let defaultAllowedKeys: Set<String> = [
         "appLocationCategory",
         "appVersion",
+        "acceptedRevision",
         "audioDurationMs",
         "accelerator",
         "averageLogProbability",
         "compressionRatio",
+        "candidateRevision",
         "durationMs",
         "engine",
         "errorCode",
@@ -89,6 +91,7 @@ public struct DiagnosticsRedactor: Sendable {
         "reasonCode",
         "result",
         "secureFieldDetected",
+        "severity",
         "stage",
         "statusAfter",
         "statusBefore",
@@ -123,7 +126,9 @@ enum DiagnosticsStringSanitizer {
         if key == "modelID" {
             return sanitizeModelID(normalized)
         }
-        if key == "timestamp" {
+        if key == "timestamp"
+            || key == "acceptedRevision"
+            || key == "candidateRevision" {
             return sanitizeTimestamp(normalized)
         }
 
@@ -217,6 +222,7 @@ enum DiagnosticsStringSanitizer {
         ],
         "event": [
             "app_started",
+            "catalog_update_rejected",
             "dictation_blocked_excluded_app",
             "insertion_attempt",
             "launch_at_login_change",
@@ -258,18 +264,28 @@ enum DiagnosticsStringSanitizer {
             "audio_too_long",
             "automatic_language_detection_required",
             "automatic_language_detection_unsupported",
+            "bundled_catalog_invalid",
+            "cache_corruption",
             "empty_audio",
             "incompatible_runtime_configuration",
             "inference_failed",
+            "invalid_signature",
             "invalid_audio_format",
             "missing_model",
             "missing_runtime",
             "model_load_failed",
             "model_warmup_failed",
+            "rollback",
             "runtime_not_loaded",
             "runtime_unavailable",
+            "schema_validation",
+            "strict_decoding",
             "unsupported_language",
             "unsupported_variant",
+            unknownValue
+        ],
+        "severity": [
+            "high",
             unknownValue
         ],
         "result": [

@@ -109,6 +109,32 @@ final class DownloadTests: XCTestCase {
         ])
     }
 
+    func testManifestSnapshotRetainsTheExactVerifiedManifestAndSignatureBytes() async throws {
+        let manifestData = try Self.fixtureData("manifest.json")
+        let signatureData = try Self.fixtureData("manifest.json.sig")
+        let transport = FixtureDownloadTransport(responses: [
+            URL(string: "https://example.com/manifest.json")!: DownloadResponse(
+                data: manifestData
+            ),
+            URL(string: "https://example.com/manifest.json.sig")!: DownloadResponse(
+                data: signatureData
+            ),
+        ])
+        let downloader = ModelDownloader(
+            transport: transport,
+            manifestVerifier: try Self.fixtureManifestVerifier()
+        )
+
+        let snapshot = try await downloader.downloadManifestSnapshot(
+            manifestURL: URL(string: "https://example.com/manifest.json")!,
+            signatureURL: URL(string: "https://example.com/manifest.json.sig")!
+        )
+
+        XCTAssertEqual(snapshot.manifestData, manifestData)
+        XCTAssertEqual(snapshot.signatureData, signatureData)
+        XCTAssertEqual(snapshot.revision, snapshot.manifest.generatedAt)
+    }
+
     func testManifestDownloadRejectsTamperedManifestBytes() async throws {
         var tamperedManifest = try Self.fixtureData("manifest.json")
         tamperedManifest.append(Data("\n".utf8))

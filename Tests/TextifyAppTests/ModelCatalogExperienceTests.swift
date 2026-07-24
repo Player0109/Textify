@@ -1153,6 +1153,67 @@ final class ModelCatalogExperienceTests: XCTestCase {
         )
     }
 
+    func testHierarchyReconcilePreservesSurvivingViewportAnchorsAndClearsRemovedOnes() throws {
+        let manifest = try signedV3FixtureManifest()
+        let initialExperience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        let checkpoint = try XCTUnwrap(
+            initialExperience.families.first?.checkpoints.first
+        )
+        var state = ModelCatalogHierarchyState(
+            expandedCheckpointIDs: [checkpoint.id],
+            focusedRowID: .exactArtifact("whisper-small-q5_1"),
+            scrollAnchorID: .checkpoint(checkpoint.id)
+        )
+
+        state.reconcile(with: initialExperience)
+
+        XCTAssertEqual(
+            state.focusedRowID,
+            .exactArtifact("whisper-small-q5_1")
+        )
+        XCTAssertEqual(
+            state.scrollAnchorID,
+            .checkpoint(checkpoint.id)
+        )
+
+        let filteredExperience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            query: ModelCatalogQuery(searchText: "tiny")
+        )
+        state.reconcile(with: filteredExperience)
+
+        XCTAssertNil(state.focusedRowID)
+        XCTAssertNil(state.scrollAnchorID)
+    }
+
+    func testCollapsingCheckpointPromotesChildViewportAnchors() throws {
+        let experience = ModelCatalogExperience(
+            trustedManifest: try signedV3FixtureManifest(),
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        let checkpoint = try XCTUnwrap(experience.families.first?.checkpoints.first)
+        var state = ModelCatalogHierarchyState(
+            expandedCheckpointIDs: [checkpoint.id],
+            focusedRowID: .exactArtifact("whisper-small-q8_0"),
+            scrollAnchorID: .exactArtifact("whisper-small-q5_1")
+        )
+
+        state.toggleExpansion(of: checkpoint)
+
+        XCTAssertEqual(state.focusedRowID, .checkpoint(checkpoint.id))
+        XCTAssertEqual(state.scrollAnchorID, .checkpoint(checkpoint.id))
+    }
+
     func testSelectionIsSingleAndSurvivesOrdinaryArtifactStateUpdates() throws {
         let manifest = try signedV3FixtureManifest()
         let initialExperience = ModelCatalogExperience(

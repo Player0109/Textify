@@ -1017,3 +1017,44 @@ Task 1 must merge before parallel Wave 1 work begins.
   smokes skipped, zero failures), the staged signed app bundle and its
   43-model manifest, a native macOS Downloads-popover smoke, and clean
   independent Standards and Spec reviews.
+
+## Trusted Catalog Snapshot And Staging Handoff - 2026-07-24
+
+- GitHub issue #13 owns the trusted-catalog authority and presentation-staging
+  work under `Sources/TextifyModels/Manifest/`, the narrow Task 11
+  `ProductionModelManifestLoader`/`ModelCatalogCoordinator`/Models-destination
+  composition and UI changes, and focused model/app tests.
+- This slice also owns two narrow cross-task closures required by its
+  acceptance criteria: Task 12's `ModelDownloader` must expose the exact
+  verified manifest/signature bytes without adding another verification path,
+  and Task 3's closed diagnostics schema must record a high-severity catalog
+  rejection reason without free-form content.
+- The closed diagnostics-schema addition requires the exhaustive
+  `FakeRuntimeDiagnostics` switch in
+  `Tests/TextifyRuntimeTests/AppDictationServiceTests.swift` to acknowledge
+  the new catalog event. That test-only compatibility case is owned by this
+  handoff and does not alter runtime behavior.
+- `generatedAt` is the existing signed manifest-v3 monotonic catalog revision.
+  The durable highest accepted revision remains independent from the presented
+  revision so routine updates can be accepted and staged while either Models
+  destination is open.
+- This work does not add queue freshness gating, revocation ingestion, storage
+  inventory, deletion transactions, generalized runtime switching, or
+  large-catalog virtualization; those remain owned by later tickets.
+- The bundled/cache snapshot renders before the remote check, retains the
+  exact verified manifest and signature bytes, and persists highest accepted,
+  presented, and staged revisions atomically. Invalid signatures, rollbacks,
+  strict decoding, schema validation, and cache corruption never replace
+  trusted presentation; future schemas remain a distinct update-required
+  outcome.
+- Valid updates stage while either Models destination is open and apply once
+  both close or the user chooses Apply Now. Stable hierarchy identities retain
+  surviving selection, expansion, focus, and scroll anchors. Installed-model
+  Activate and Delete actions remain available through untrusted, trusted,
+  offline, staged, rejected, and future-schema catalog states.
+- Final verification completed with 591 tests (11 opt-in native backend smokes
+  skipped, zero failures), the production release validator, the staged
+  signed app bundle and its 43-model catalog, and a native macOS smoke of both
+  Models destinations with trusted content remaining usable under a persistent
+  rejection banner. Independent Standards and Spec reviews report no
+  remaining actionable findings.

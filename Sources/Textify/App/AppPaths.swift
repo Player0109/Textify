@@ -4,6 +4,7 @@ struct AppPaths: Equatable {
     let applicationSupportDirectory: URL
     let settingsFileURL: URL
     let modelsDirectory: URL
+    let manifestCacheDirectory: URL
     let logsDirectory: URL
 
     static func production(fileManager: FileManager = .default) throws -> AppPaths {
@@ -35,6 +36,8 @@ struct AppPaths: Equatable {
             .appendingPathComponent("Textify", isDirectory: true)
         let modelsDirectory = applicationSupportDirectory
             .appendingPathComponent("Models", isDirectory: true)
+        let manifestCacheDirectory = applicationSupportDirectory
+            .appendingPathComponent("ManifestCache", isDirectory: true)
         let logsDirectory = libraryDirectory
             .appendingPathComponent("Logs", isDirectory: true)
             .appendingPathComponent("Textify", isDirectory: true)
@@ -48,6 +51,10 @@ struct AppPaths: Equatable {
             withIntermediateDirectories: true
         )
         try fileManager.createDirectory(
+            at: manifestCacheDirectory,
+            withIntermediateDirectories: true
+        )
+        try fileManager.createDirectory(
             at: logsDirectory,
             withIntermediateDirectories: true
         )
@@ -56,6 +63,7 @@ struct AppPaths: Equatable {
             applicationSupportDirectory: applicationSupportDirectory,
             settingsFileURL: applicationSupportDirectory.appendingPathComponent("settings.json"),
             modelsDirectory: modelsDirectory,
+            manifestCacheDirectory: manifestCacheDirectory,
             logsDirectory: logsDirectory
         )
     }
@@ -78,6 +86,10 @@ struct AppPaths: Equatable {
             applicationSupportDirectory: applicationSupportDirectory,
             settingsFileURL: applicationSupportDirectory.appendingPathComponent("settings.json"),
             modelsDirectory: applicationSupportDirectory.appendingPathComponent("Models", isDirectory: true),
+            manifestCacheDirectory: applicationSupportDirectory.appendingPathComponent(
+                "ManifestCache",
+                isDirectory: true
+            ),
             logsDirectory: root
                 .appendingPathComponent("Library", isDirectory: true)
                 .appendingPathComponent("Logs", isDirectory: true)

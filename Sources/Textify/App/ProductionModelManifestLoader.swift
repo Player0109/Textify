@@ -8,29 +8,23 @@ struct ProductionModelManifestLoader {
 
     let configuration: ProductionModelInstallConfiguration
     let resourceDirectory: URL?
+    let transport: any DownloadTransport
 
     init(
         configuration: ProductionModelInstallConfiguration,
-        resourceDirectory: URL? = Bundle.main.resourceURL
+        resourceDirectory: URL? = Bundle.main.resourceURL,
+        transport: any DownloadTransport = URLSessionDownloadTransport()
     ) {
         self.configuration = configuration
         self.resourceDirectory = resourceDirectory
+        self.transport = transport
     }
 
     func load() async throws -> ModelManifest {
-        let verifier = ManifestVerifier(
-            trustedKeys: configuration.trustedKeys,
-            legacyPolicy: .publishedV1_1
-        )
-        let bundled = try loadBundledManifest(verifier: verifier)
+        let bundled = try loadBundledSnapshot()?.manifest
 
         do {
-            let remote = try await ModelDownloader(
-                manifestVerifier: verifier
-            ).downloadManifest(
-                manifestURL: configuration.manifestURL,
-                signatureURL: configuration.signatureURL
-            )
+            let remote = try await downloadRemoteSnapshot().manifest
             guard let bundled else {
                 return remote
             }
@@ -43,21 +37,17 @@ struct ProductionModelManifestLoader {
         }
     }
 
-    static func newest(
-        bundled: ModelManifest,
-        remote: ModelManifest
-    ) throws -> ModelManifest {
-        let formatter = ISO8601DateFormatter()
-        guard let bundledDate = formatter.date(from: bundled.generatedAt) else {
-            throw ProductionModelPolicyError.invalidGeneratedAt(bundled.generatedAt)
-        }
-        guard let remoteDate = formatter.date(from: remote.generatedAt) else {
-            throw ProductionModelPolicyError.invalidGeneratedAt(remote.generatedAt)
-        }
-        return remoteDate >= bundledDate ? remote : bundled
+    func downloadRemoteSnapshot() async throws -> TrustedCatalogSnapshot {
+        try await ModelDownloader(
+            transport: transport,
+            manifestVerifier: verifier
+        ).downloadManifestSnapshot(
+            manifestURL: configuration.manifestURL,
+            signatureURL: configuration.signatureURL
+        )
     }
 
-    private func loadBundledManifest(verifier: ManifestVerifier) throws -> ModelManifest? {
+    func loadBundledSnapshot() throws -> TrustedCatalogSnapshot? {
         guard let resourceDirectory else {
             return nil
         }
@@ -76,11 +66,31 @@ struct ProductionModelManifestLoader {
         guard manifestExists, signatureExists else {
             throw ModelInstallCoordinatorError.bundledCatalogIncomplete
         }
-        let manifest = try verifier.verify(
+        return try TrustedCatalogSnapshot(
             manifestData: Data(contentsOf: manifestURL),
-            signatureData: Data(contentsOf: signatureURL)
+            signatureData: Data(contentsOf: signatureURL),
+            verifier: verifier
         )
-        try ProductionModelPolicy.validateProductionManifest(manifest)
-        return manifest
+    }
+
+    static func newest(
+        bundled: ModelManifest,
+        remote: ModelManifest
+    ) throws -> ModelManifest {
+        let formatter = ISO8601DateFormatter()
+        guard let bundledDate = formatter.date(from: bundled.generatedAt) else {
+            throw ProductionModelPolicyError.invalidGeneratedAt(bundled.generatedAt)
+        }
+        guard let remoteDate = formatter.date(from: remote.generatedAt) else {
+            throw ProductionModelPolicyError.invalidGeneratedAt(remote.generatedAt)
+        }
+        return remoteDate >= bundledDate ? remote : bundled
+    }
+
+    private var verifier: ManifestVerifier {
+        ManifestVerifier(
+            trustedKeys: configuration.trustedKeys,
+            legacyPolicy: .publishedV1_1
+        )
     }
 }

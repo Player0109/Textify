@@ -1712,7 +1712,7 @@ private actor FakeRuntimeDiagnostics: RuntimeDiagnosticsLogging {
             runtimeFailureValues.append((stage, reasonCode))
         case .voiceCleaning:
             voiceCleaningCountValue += 1
-        case .appStarted, .launchAtLoginChange:
+        case .appStarted, .catalogUpdateRejected, .launchAtLoginChange:
             break
         }
     }

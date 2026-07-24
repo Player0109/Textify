@@ -12,6 +12,12 @@ public enum DiagnosticEvent: Encodable, Sendable {
         durationMs: Int
     )
     case dictationBlockedExcludedApp
+    case catalogUpdateRejected(
+        severity: String,
+        reasonCode: String,
+        candidateRevision: String?,
+        acceptedRevision: String?
+    )
     case transcriptionCompleted(
         modelID: String,
         engine: String,
@@ -88,6 +94,9 @@ public enum DiagnosticEvent: Encodable, Sendable {
         case result
         case stage
         case reasonCode
+        case severity
+        case candidateRevision
+        case acceptedRevision
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -119,6 +128,30 @@ public enum DiagnosticEvent: Encodable, Sendable {
 
         case .dictationBlockedExcludedApp:
             try container.encode("dictation_blocked_excluded_app", forKey: .event)
+
+        case let .catalogUpdateRejected(
+            severity,
+            reasonCode,
+            candidateRevision,
+            acceptedRevision
+        ):
+            try container.encode("catalog_update_rejected", forKey: .event)
+            try container.encode(
+                sanitize(severity, forKey: .severity),
+                forKey: .severity
+            )
+            try container.encode(
+                sanitize(reasonCode, forKey: .reasonCode),
+                forKey: .reasonCode
+            )
+            try container.encodeIfPresent(
+                sanitize(candidateRevision, forKey: .candidateRevision),
+                forKey: .candidateRevision
+            )
+            try container.encodeIfPresent(
+                sanitize(acceptedRevision, forKey: .acceptedRevision),
+                forKey: .acceptedRevision
+            )
 
         case let .transcriptionCompleted(
             modelID,

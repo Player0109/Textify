@@ -661,17 +661,26 @@ public struct ModelDownloader {
         manifestURL: URL,
         signatureURL: URL
     ) async throws -> ModelManifest {
+        try await downloadManifestSnapshot(
+            manifestURL: manifestURL,
+            signatureURL: signatureURL
+        ).manifest
+    }
+
+    public func downloadManifestSnapshot(
+        manifestURL: URL,
+        signatureURL: URL
+    ) async throws -> TrustedCatalogSnapshot {
         try ModelDownloadURLPolicy.requireHTTPS(manifestURL)
         try ModelDownloadURLPolicy.requireHTTPS(signatureURL)
 
         let manifestResponse = try await transport.fetch(URLRequest(url: manifestURL))
         let signatureResponse = try await transport.fetch(URLRequest(url: signatureURL))
 
-        let manifest = try manifestVerifier.verify(
+        return try TrustedCatalogSnapshot(
             manifestData: manifestResponse.data,
-            signatureData: signatureResponse.data
+            signatureData: signatureResponse.data,
+            verifier: manifestVerifier
         )
-        try ProductionModelPolicy.validateProductionManifest(manifest)
-        return manifest
     }
 }

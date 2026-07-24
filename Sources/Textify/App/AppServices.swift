@@ -86,13 +86,9 @@ final class AppServices {
     )
 
     @ObservationIgnored lazy var modelCatalogCoordinator = ModelCatalogCoordinator(
+        initialManifest: nil,
         loadOperation: {
-            guard let configuration = ProductionModelInstallConfiguration.current else {
-                throw ModelInstallCoordinatorError.storageOrConfigurationUnavailable
-            }
-            return try await ProductionModelManifestLoader(
-                configuration: configuration
-            ).load()
+            throw ModelCatalogRefreshError.unavailable
         }
     )
 
@@ -193,6 +189,7 @@ final class AppServices {
         Task { @MainActor [weak self] in
             await self?.refreshManagedModelReadiness()
         }
+        modelCatalogCoordinator = makeProductionModelCatalogCoordinator()
     }
 
     func startRuntime() {
@@ -289,6 +286,85 @@ final class AppServices {
                 self.scheduleTerminalStatusDismissal(for: self.dictation.status)
                 self.observeDictationStatus()
             }
+        }
+    }
+
+    private func makeProductionModelCatalogCoordinator() -> ModelCatalogCoordinator {
+        guard startupIssue == nil,
+              let configuration = ProductionModelInstallConfiguration.current
+        else {
+            return ModelCatalogCoordinator {
+                throw ModelCatalogRefreshError.unavailable
+            }
+        }
+
+        let verifier = ManifestVerifier(
+            trustedKeys: configuration.trustedKeys,
+            legacyPolicy: .publishedV1_1
+        )
+        let store = TrustedCatalogStore(
+            fileURL: paths.manifestCacheDirectory
+                .appendingPathComponent("catalog-state.json"),
+            verifier: verifier
+        )
+        let loader = ProductionModelManifestLoader(
+            configuration: configuration
+        )
+        var storedState: TrustedCatalogStoredState
+        var bootstrapIssue: TrustedCatalogSecurityIssue?
+        do {
+            storedState = try store.load()
+        } catch {
+            bootstrapIssue = TrustedCatalogSecurityIssue(
+                reason: .cacheCorruption
+            )
+            storedState = TrustedCatalogStoredState(
+                securityIssue: bootstrapIssue
+            )
+        }
+
+        let bundledSnapshot: TrustedCatalogSnapshot?
+        do {
+            bundledSnapshot = try loader.loadBundledSnapshot()
+        } catch {
+            let issue = TrustedCatalogSecurityIssue(
+                reason: .bundledCatalogInvalid,
+                highestAcceptedRevision: storedState.highestAcceptedRevision
+            )
+            bootstrapIssue = issue
+            storedState.securityIssue = issue
+            bundledSnapshot = nil
+        }
+
+        if let bootstrapIssue {
+            logCatalogSecurityIssue(bootstrapIssue)
+        }
+        return ModelCatalogCoordinator(
+            storedState: storedState,
+            bundledSnapshot: bundledSnapshot,
+            snapshotLoadOperation: {
+                try await loader.downloadRemoteSnapshot()
+            },
+            saveOperation: { state in
+                try store.save(state)
+            },
+            diagnosticOperation: { [weak self] issue in
+                self?.logCatalogSecurityIssue(issue)
+            }
+        )
+    }
+
+    private func logCatalogSecurityIssue(_ issue: TrustedCatalogSecurityIssue) {
+        let logger = diagnosticsLogger
+        Task {
+            try? await logger.log(
+                .catalogUpdateRejected(
+                    severity: issue.severity.rawValue,
+                    reasonCode: issue.reason.rawValue,
+                    candidateRevision: issue.candidateRevision,
+                    acceptedRevision: issue.highestAcceptedRevision
+                )
+            )
         }
     }
 
@@ -1291,27 +1367,395 @@ final class ModelInstallCoordinator {
 @Observable
 final class ModelCatalogCoordinator {
     typealias LoadOperation = @Sendable () async throws -> ModelManifest
+    typealias SnapshotLoadOperation =
+        @Sendable () async throws -> TrustedCatalogSnapshot
+    typealias SaveOperation =
+        @MainActor @Sendable (TrustedCatalogStoredState) throws -> Void
+    typealias DiagnosticOperation =
+        @MainActor @Sendable (TrustedCatalogSecurityIssue) -> Void
 
-    private let loadOperation: LoadOperation
+    private enum Candidate {
+        case manifest(ModelManifest)
+        case snapshot(TrustedCatalogSnapshot)
+
+        var manifest: ModelManifest {
+            switch self {
+            case let .manifest(manifest):
+                return manifest
+            case let .snapshot(snapshot):
+                return snapshot.manifest
+            }
+        }
+
+        var snapshot: TrustedCatalogSnapshot? {
+            if case let .snapshot(snapshot) = self {
+                return snapshot
+            }
+            return nil
+        }
+    }
+
+    private let loadCandidate: @Sendable () async throws -> Candidate
+    private let saveOperation: SaveOperation?
+    private let diagnosticOperation: DiagnosticOperation
+    @ObservationIgnored private var openDestinations: Set<ModelPurpose> = []
+    @ObservationIgnored private var presentedSnapshot: TrustedCatalogSnapshot?
+    @ObservationIgnored private var stagedSnapshot: TrustedCatalogSnapshot?
+    @ObservationIgnored private var refreshInProgress = false
+
     private(set) var manifest: ModelManifest?
-    private(set) var isLoading = false
-    private(set) var errorMessage: String?
+    private(set) var stagedManifest: ModelManifest?
+    private(set) var highestAcceptedRevision: String?
+    private(set) var presentedRevision: String?
+    private(set) var stagedRevision: String?
+    private(set) var securityIssue: TrustedCatalogSecurityIssue?
+    private(set) var status: ModelCatalogCoordinatorStatus
 
-    init(loadOperation: @escaping LoadOperation) {
-        self.loadOperation = loadOperation
+    var isLoading: Bool {
+        refreshInProgress || manifest == nil && status == .checking
+    }
+
+    var errorMessage: String? {
+        switch status {
+        case .checking, .checkingForUpdates, .trusted, .updateAvailable:
+            return nil
+        case .offline:
+            return "Using the last trusted catalog while Textify is offline."
+        case let .securityFailure(reason):
+            return "Textify rejected an untrusted catalog update (\(reason.displayName)). The last trusted catalog remains available."
+        case let .requiresNewerTextify(manifestVersion):
+            return "Catalog version \(manifestVersion) requires a newer version of Textify."
+        case .unavailable:
+            return "The signed model catalog is unavailable. Installed models still work offline."
+        }
+    }
+
+    init(
+        initialManifest: ModelManifest? = nil,
+        loadOperation: @escaping LoadOperation,
+        diagnosticOperation: @escaping DiagnosticOperation = { _ in }
+    ) {
+        self.loadCandidate = {
+            .manifest(try await loadOperation())
+        }
+        self.saveOperation = nil
+        self.diagnosticOperation = diagnosticOperation
+        self.manifest = initialManifest
+        self.highestAcceptedRevision = initialManifest?.generatedAt
+        self.presentedRevision = initialManifest?.generatedAt
+        self.status = initialManifest == nil ? .checking : .trusted
+    }
+
+    init(
+        storedState: TrustedCatalogStoredState,
+        bundledSnapshot: TrustedCatalogSnapshot?,
+        snapshotLoadOperation: @escaping SnapshotLoadOperation,
+        saveOperation: @escaping SaveOperation,
+        diagnosticOperation: @escaping DiagnosticOperation = { _ in }
+    ) {
+        self.loadCandidate = {
+            .snapshot(try await snapshotLoadOperation())
+        }
+        self.saveOperation = saveOperation
+        self.diagnosticOperation = diagnosticOperation
+
+        var resolved = storedState
+        if let staged = resolved.stagedSnapshot {
+            resolved.presentedSnapshot = staged
+            resolved.stagedSnapshot = nil
+        }
+        if let bundledSnapshot {
+            let bundledDate = Self.revisionDate(bundledSnapshot.revision)
+            let highestDate = resolved.highestAcceptedRevision.flatMap(
+                Self.revisionDate
+            )
+            if highestDate == nil || bundledDate.map({
+                $0 > highestDate!
+            }) == true {
+                resolved.highestAcceptedRevision = bundledSnapshot.revision
+                resolved.presentedSnapshot = bundledSnapshot
+                resolved.stagedSnapshot = nil
+            } else if resolved.presentedSnapshot == nil,
+                      resolved.highestAcceptedRevision == bundledSnapshot.revision {
+                resolved.presentedSnapshot = bundledSnapshot
+            }
+        }
+
+        if resolved != storedState {
+            do {
+                try saveOperation(resolved)
+            } catch {
+                resolved = storedState
+            }
+        }
+
+        presentedSnapshot = resolved.presentedSnapshot
+        stagedSnapshot = resolved.stagedSnapshot
+        manifest = resolved.presentedSnapshot?.manifest
+        stagedManifest = resolved.stagedSnapshot?.manifest
+        highestAcceptedRevision = resolved.highestAcceptedRevision
+        presentedRevision = resolved.presentedSnapshot?.revision
+        stagedRevision = resolved.stagedSnapshot?.revision
+        securityIssue = resolved.securityIssue
+        if let issue = resolved.securityIssue {
+            status = .securityFailure(issue.reason)
+        } else {
+            status = resolved.presentedSnapshot == nil ? .checking : .trusted
+        }
     }
 
     func refresh() async {
-        guard !isLoading else {
+        guard !refreshInProgress else {
             return
         }
-        isLoading = true
-        defer { isLoading = false }
+        refreshInProgress = true
+        status = manifest == nil ? .checking : .checkingForUpdates
+        defer { refreshInProgress = false }
         do {
-            manifest = try await loadOperation()
-            errorMessage = nil
+            try accept(try await loadCandidate())
+        } catch let error as ModelCatalogRefreshError {
+            handle(error)
+        } catch let error as ManifestVerificationError {
+            switch error {
+            case let .unsupportedManifestVersion(version):
+                handle(
+                    .requiresNewerTextify(manifestVersion: version)
+                )
+            default:
+                reject(reason: .invalidSignature)
+            }
+        } catch is DecodingError {
+            reject(reason: .strictDecoding)
+        } catch is ModelManifestDecodingError {
+            reject(reason: .strictDecoding)
+        } catch let error as ProductionModelPolicyError {
+            switch error {
+            case let .unsupportedManifestVersion(version):
+                handle(
+                    .requiresNewerTextify(manifestVersion: version)
+                )
+            default:
+                reject(reason: .schemaValidation)
+            }
         } catch {
-            errorMessage = "The signed model catalog is unavailable. Your installed model still works offline."
+            handle(.unavailable)
+        }
+    }
+
+    func destinationOpened(_ purpose: ModelPurpose) {
+        openDestinations.insert(purpose)
+    }
+
+    func destinationClosed(_ purpose: ModelPurpose) {
+        openDestinations.remove(purpose)
+        if openDestinations.isEmpty {
+            applyStagedUpdate()
+        }
+    }
+
+    func destinationChanged(
+        from previousPurpose: ModelPurpose?,
+        to nextPurpose: ModelPurpose?
+    ) {
+        if let nextPurpose {
+            openDestinations.insert(nextPurpose)
+        }
+        if let previousPurpose {
+            openDestinations.remove(previousPurpose)
+        }
+        if openDestinations.isEmpty {
+            applyStagedUpdate()
+        }
+    }
+
+    func applyStagedUpdate() {
+        guard let stagedManifest else {
+            return
+        }
+        let nextState = TrustedCatalogStoredState(
+            highestAcceptedRevision: highestAcceptedRevision,
+            presentedSnapshot: stagedSnapshot ?? presentedSnapshot,
+            stagedSnapshot: nil,
+            securityIssue: securityIssue
+        )
+        guard persist(nextState) else {
+            return
+        }
+        manifest = stagedManifest
+        presentedRevision = stagedRevision
+        presentedSnapshot = stagedSnapshot ?? presentedSnapshot
+        self.stagedManifest = nil
+        stagedRevision = nil
+        stagedSnapshot = nil
+        status = securityIssue.map {
+            .securityFailure($0.reason)
+        } ?? .trusted
+    }
+
+    private func accept(_ candidate: Candidate) throws {
+        let candidateManifest = candidate.manifest
+        guard let candidateDate = Self.revisionDate(
+            candidateManifest.generatedAt
+        ) else {
+            reject(
+                reason: .schemaValidation,
+                candidateRevision: candidateManifest.generatedAt
+            )
+            return
+        }
+
+        if let highestAcceptedRevision,
+           let highestDate = Self.revisionDate(highestAcceptedRevision) {
+            if candidateDate < highestDate
+                || candidateDate == highestDate
+                    && !matchesAcceptedCandidate(candidateManifest) {
+                reject(
+                    reason: .rollback,
+                    candidateRevision: candidateManifest.generatedAt
+                )
+                return
+            }
+            if candidateDate == highestDate {
+                securityIssue = nil
+                let nextState = storedState(securityIssue: nil)
+                guard persist(nextState) else {
+                    return
+                }
+                status = stagedManifest == nil
+                    ? .trusted
+                    : .updateAvailable
+                return
+            }
+        }
+
+        let shouldStage = !openDestinations.isEmpty && manifest != nil
+        let nextState = TrustedCatalogStoredState(
+            highestAcceptedRevision: candidateManifest.generatedAt,
+            presentedSnapshot: shouldStage
+                ? presentedSnapshot
+                : candidate.snapshot ?? presentedSnapshot,
+            stagedSnapshot: shouldStage ? candidate.snapshot : nil,
+            securityIssue: nil
+        )
+        guard persist(nextState) else {
+            return
+        }
+
+        highestAcceptedRevision = candidateManifest.generatedAt
+        securityIssue = nil
+        if shouldStage {
+            stagedManifest = candidateManifest
+            stagedRevision = candidateManifest.generatedAt
+            stagedSnapshot = candidate.snapshot
+            status = .updateAvailable
+        } else {
+            manifest = candidateManifest
+            presentedRevision = candidateManifest.generatedAt
+            presentedSnapshot = candidate.snapshot ?? presentedSnapshot
+            stagedManifest = nil
+            stagedRevision = nil
+            stagedSnapshot = nil
+            status = .trusted
+        }
+    }
+
+    private func matchesAcceptedCandidate(_ candidate: ModelManifest) -> Bool {
+        stagedManifest == candidate || manifest == candidate
+    }
+
+    private func handle(_ error: ModelCatalogRefreshError) {
+        switch error {
+        case .unavailable:
+            if let securityIssue {
+                status = .securityFailure(securityIssue.reason)
+            } else if stagedManifest != nil {
+                status = .updateAvailable
+            } else {
+                status = manifest == nil ? .unavailable : .offline
+            }
+        case let .requiresNewerTextify(manifestVersion):
+            status = .requiresNewerTextify(
+                manifestVersion: manifestVersion
+            )
+        }
+    }
+
+    private func reject(
+        reason: TrustedCatalogSecurityReason,
+        candidateRevision: String? = nil
+    ) {
+        let issue = TrustedCatalogSecurityIssue(
+            reason: reason,
+            candidateRevision: candidateRevision,
+            highestAcceptedRevision: highestAcceptedRevision
+        )
+        securityIssue = issue
+        _ = persist(storedState(securityIssue: issue))
+        status = .securityFailure(reason)
+        diagnosticOperation(issue)
+    }
+
+    private func storedState(
+        securityIssue: TrustedCatalogSecurityIssue?
+    ) -> TrustedCatalogStoredState {
+        TrustedCatalogStoredState(
+            highestAcceptedRevision: highestAcceptedRevision,
+            presentedSnapshot: presentedSnapshot,
+            stagedSnapshot: stagedSnapshot,
+            securityIssue: securityIssue
+        )
+    }
+
+    @discardableResult
+    private func persist(_ state: TrustedCatalogStoredState) -> Bool {
+        guard let saveOperation else {
+            return true
+        }
+        do {
+            try saveOperation(state)
+            return true
+        } catch {
+            status = manifest == nil ? .unavailable : .offline
+            return false
+        }
+    }
+
+    private static func revisionDate(_ revision: String) -> Date? {
+        ISO8601DateFormatter().date(from: revision)
+    }
+}
+
+enum ModelCatalogRefreshError: Error, Equatable {
+    case unavailable
+    case requiresNewerTextify(manifestVersion: Int)
+}
+
+enum ModelCatalogCoordinatorStatus: Equatable {
+    case checking
+    case checkingForUpdates
+    case trusted
+    case updateAvailable
+    case offline
+    case securityFailure(TrustedCatalogSecurityReason)
+    case requiresNewerTextify(manifestVersion: Int)
+    case unavailable
+}
+
+extension TrustedCatalogSecurityReason {
+    var displayName: String {
+        switch self {
+        case .invalidSignature:
+            "invalid signature"
+        case .rollback:
+            "rollback revision"
+        case .strictDecoding:
+            "invalid catalog structure"
+        case .schemaValidation:
+            "invalid catalog policy"
+        case .cacheCorruption:
+            "invalid cached catalog"
+        case .bundledCatalogInvalid:
+            "invalid bundled catalog"
         }
     }
 }
