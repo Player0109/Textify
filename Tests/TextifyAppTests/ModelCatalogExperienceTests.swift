@@ -86,6 +86,165 @@ final class ModelCatalogExperienceTests: XCTestCase {
         XCTAssertFalse(cleanerRow.actions.contains(.use))
     }
 
+    func testPurposeQueryFiltersRowsAndSignedHierarchyWithoutInferringFromNames() throws {
+        let manifest = try productionManifest()
+
+        let transcription = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            query: ModelCatalogQuery(purpose: .transcription)
+        )
+        let cleaning = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            query: ModelCatalogQuery(purpose: .voiceCleaning)
+        )
+
+        XCTAssertFalse(transcription.rows.isEmpty)
+        XCTAssertTrue(transcription.rows.allSatisfy { $0.model.purpose == .transcription })
+        XCTAssertTrue(transcription.families.allSatisfy { $0.metadata.purpose == .transcription })
+        XCTAssertEqual(
+            Set(cleaning.rows.map(\.id)),
+            [
+                "mossformer2-se-fp32",
+                "mossformer2-se-fp16",
+                "mossformer2-se-int8",
+            ]
+        )
+        XCTAssertTrue(cleaning.rows.allSatisfy { $0.model.purpose == .voiceCleaning })
+        XCTAssertTrue(cleaning.families.allSatisfy { $0.metadata.purpose == .voiceCleaning })
+    }
+
+    func testCompatibilityResolverUsesSignedRequirementsForSettingsAndOnboarding() throws {
+        let manifest = try productionManifest()
+        let resolver = ModelCatalogCompatibilityResolver(
+            context: ModelCatalogCompatibilityContext(
+                appVersion: "1.1.0",
+                macOSVersion: "14.0.0",
+                architecture: .arm64,
+                physicalMemoryBytes: 8_589_934_592
+            )
+        )
+        let compatibleIDs = try XCTUnwrap(resolver.compatibleModelIDs(in: manifest))
+
+        XCTAssertTrue(compatibleIDs.contains("ggml-small.en-q5_1"))
+        XCTAssertFalse(compatibleIDs.contains("parakeet-tdt-0.6b-v3"))
+        XCTAssertFalse(compatibleIDs.contains("parakeet-rnnt-1.1b"))
+
+        let experience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            query: ModelCatalogQuery(
+                purpose: .transcription,
+                compatibleModelIDs: compatibleIDs
+            )
+        )
+        let onboarding = OnboardingModelCatalog(experience: experience)
+
+        XCTAssertEqual(Set(experience.rows.map(\.id)), Set(onboarding.choices.map(\.id)))
+        XCTAssertFalse(onboarding.choices.contains { $0.id == "parakeet-rnnt-1.1b" })
+    }
+
+    func testOnboardingUsesSignedRecommendationThenRequiresExplicitActivation() throws {
+        let manifest = try productionManifest()
+        let recommendedID = try XCTUnwrap(
+            manifest.presentationGraph?.families
+                .first { $0.purpose == .transcription }?
+                .checkpointIDs.first
+        )
+        let recommendedArtifactID = try XCTUnwrap(
+            manifest.presentationGraph?.checkpoints
+                .first { $0.id == recommendedID }?
+                .recommendedArtifactID
+        )
+        let recommendedModel = try XCTUnwrap(
+            manifest.models.first { $0.id == recommendedArtifactID }
+        )
+        let uninstalledExperience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            query: ModelCatalogQuery(purpose: .transcription)
+        )
+        let uninstalledCatalog = OnboardingModelCatalog(
+            experience: uninstalledExperience
+        )
+
+        XCTAssertEqual(uninstalledCatalog.selectedModelID, recommendedArtifactID)
+        XCTAssertEqual(
+            uninstalledCatalog.action(for: recommendedArtifactID),
+            .install
+        )
+
+        let installedExperience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [installed(recommendedModel)],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            query: ModelCatalogQuery(purpose: .transcription)
+        )
+        let installedCatalog = OnboardingModelCatalog(
+            experience: installedExperience,
+            selectedModelID: recommendedArtifactID
+        )
+
+        XCTAssertEqual(
+            installedCatalog.action(for: recommendedArtifactID),
+            .activate
+        )
+
+        let activeExperience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [installed(recommendedModel)],
+            activePreferences: ModelCatalogActivePreferences(
+                transcriptionModelID: recommendedArtifactID
+            ),
+            transferState: nil,
+            query: ModelCatalogQuery(purpose: .transcription)
+        )
+        let activeCatalog = OnboardingModelCatalog(
+            experience: activeExperience,
+            selectedModelID: recommendedArtifactID
+        )
+
+        XCTAssertEqual(activeCatalog.action(for: recommendedArtifactID), .active)
+    }
+
+    func testOnboardingScopesTransferRecoveryToTheSelectedExactArtifact() {
+        let failed = model(id: "failed")
+        let other = model(id: "other")
+        let experience = ModelCatalogExperience(
+            trustedModels: [failed, other],
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: DownloadState(
+                modelID: failed.id,
+                phase: .failed,
+                message: "Network unavailable"
+            )
+        )
+        let onboarding = OnboardingModelCatalog(
+            experience: experience,
+            selectedModelID: other.id
+        )
+
+        XCTAssertEqual(onboarding.action(for: failed.id), .retryInstall)
+        XCTAssertEqual(onboarding.action(for: other.id), .install)
+        XCTAssertEqual(onboarding.selectedModelID, other.id)
+        XCTAssertNil(onboarding.transferState(for: onboarding.selectedModelID))
+        XCTAssertEqual(
+            onboarding.transferState(for: failed.id),
+            experience.rows.first { $0.id == failed.id }?.installState
+        )
+    }
+
     func testAppliesQueryAfterCombiningCatalogAndLocalState() {
         let mlx = model(id: "mlx", engine: .mlxAudio)
         let gguf = model(id: "gguf-q5", engine: .transcribeCpp)
@@ -101,7 +260,7 @@ final class ModelCatalogExperienceTests: XCTestCase {
         XCTAssertEqual(experience.rows.map(\.id), [gguf.id])
     }
 
-    func testPreservesCurrentFallbackWhenTrustedModelsAreUnavailable() {
+    func testDoesNotInventCatalogChoicesWhenTrustedModelsAreUnavailable() {
         let experience = ModelCatalogExperience(
             trustedModels: [],
             installedRecords: [],
@@ -109,10 +268,7 @@ final class ModelCatalogExperienceTests: XCTestCase {
             transferState: nil
         )
 
-        XCTAssertEqual(
-            experience.rows.map(\.id),
-            ProductionModelPresentation.visibleCatalog.map(\.id)
-        )
+        XCTAssertTrue(experience.rows.isEmpty)
     }
 
     func testFailedTransferOffersRetryOnlyOnItsExactRow() throws {

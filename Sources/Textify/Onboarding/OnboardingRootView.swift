@@ -14,6 +14,7 @@ struct OnboardingRootView: View {
     @State private var launchAtLogin = true
     @State private var permissionMessage: String?
     @State private var modelMessage: String?
+    @State private var selectedOnboardingModelID: String?
     @State private var launchAtLoginCompletionStatus: LaunchAtLoginStatus?
     @State private var didCompleteOnboarding = false
     @State private var triggerTest = OnboardingTriggerTestController()
@@ -96,9 +97,11 @@ struct OnboardingRootView: View {
             launchAtLogin = services.preferences.onboardingCompleted
                 ? services.preferences.launchAtLoginEnabled
                 : true
-            Task {
-                _ = await services.dictation.refreshReadiness()
-            }
+        }
+        .task {
+            _ = await services.dictation.refreshReadiness()
+            await services.modelCatalogCoordinator.refresh()
+            reconcileOnboardingModelSelection()
         }
         .onDisappear {
             triggerTest.stop()
@@ -113,6 +116,9 @@ struct OnboardingRootView: View {
                 launchAtLoginCompletionStatus = nil
                 didCompleteOnboarding = false
             }
+        }
+        .onChange(of: services.modelCatalogCoordinator.manifest) {
+            reconcileOnboardingModelSelection()
         }
     }
 
@@ -186,27 +192,61 @@ struct OnboardingRootView: View {
             VStack(alignment: .leading, spacing: 12) {
                 ModelSummaryView(readiness: services.dictation.readiness.model)
 
-                HStack {
-                    Button("Verify Installed Model") {
-                        Task {
-                            _ = await services.dictation.refreshReadiness()
-                            modelMessage = modelReadinessText
+                if onboardingModelCatalog.choices.isEmpty {
+                    ContentUnavailableView {
+                        Label(
+                            onboardingCatalogUnavailable
+                                ? ModelCatalogPurposeDestination.transcription.unavailableTitle
+                                : ModelCatalogPurposeDestination.transcription.emptyTitle,
+                            systemImage: "waveform.badge.exclamationmark"
+                        )
+                    } description: {
+                        Text(
+                            onboardingCatalogUnavailable
+                                ? ModelCatalogPurposeDestination.transcription.unavailableDetail
+                                : ModelCatalogPurposeDestination.transcription.emptyDetail
+                        )
+                    } actions: {
+                        Button("Refresh Catalog") {
+                            refreshOnboardingCatalog()
                         }
                     }
-
-                    Button(services.isModelInstalled(ProductionModelPresentation.v1_1.id) ? "Reinstall Model" : "Install Model") {
-                        services.modelInstallCoordinator.start()
-                    }
-                    .disabled(services.modelInstallCoordinator.isActive || ProductionModelInstallConfiguration.current == nil)
-
-                    if services.modelInstallCoordinator.isActive {
-                        Button("Cancel") {
-                            services.modelInstallCoordinator.cancel()
+                } else {
+                    Picker(
+                        "Transcription Model",
+                        selection: onboardingModelSelectionBinding
+                    ) {
+                        ForEach(onboardingModelCatalog.choices) { choice in
+                            Text(choice.model.catalogDisplayName)
+                                .tag(Optional(choice.id))
                         }
-                    } else if services.modelInstallCoordinator.state?.phase == .failed
-                        || services.modelInstallCoordinator.state?.phase == .cancelled {
-                        Button("Retry") {
-                            services.modelInstallCoordinator.retry()
+                    }
+                    .disabled(services.modelInstallCoordinator.isActive)
+
+                    if let selectedModel = selectedOnboardingModel {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(selectedModel.model.description)
+                                .foregroundStyle(.secondary)
+                            Text(
+                                [
+                                    selectedModel.model.engineName,
+                                    selectedModel.model.acceleratorName,
+                                    selectedModel.model.sizeDescription,
+                                ].joined(separator: " • ")
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                        }
+
+                        HStack {
+                            Button("Verify Installed Model") {
+                                Task {
+                                    _ = await services.dictation.refreshReadiness()
+                                    modelMessage = modelReadinessText
+                                }
+                            }
+
+                            onboardingModelActionButton(for: selectedModel)
                         }
                     }
                 }
@@ -216,7 +256,9 @@ struct OnboardingRootView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                if let modelDownloadState = services.modelInstallCoordinator.state {
+                if let modelDownloadState = onboardingModelCatalog.transferState(
+                    for: onboardingModelCatalog.selectedModelID
+                ) {
                     ModelInstallProgressView(state: modelDownloadState)
                 }
 
@@ -353,6 +395,35 @@ struct OnboardingRootView: View {
         services.dictation.readiness.model.settingsModelStatus
     }
 
+    private var onboardingModelCatalog: OnboardingModelCatalog {
+        OnboardingModelCatalog(
+            experience: services.modelCatalogExperience(for: .transcription),
+            selectedModelID: selectedOnboardingModelID
+        )
+    }
+
+    private var selectedOnboardingModel: ModelCatalogRowPresentation? {
+        guard let selectedModelID = onboardingModelCatalog.selectedModelID else {
+            return nil
+        }
+        return onboardingModelCatalog.choices.first {
+            $0.id == selectedModelID
+        }
+    }
+
+    private var onboardingCatalogUnavailable: Bool {
+        services.modelCatalogCoordinator.manifest == nil
+            && (services.modelCatalogCoordinator.errorMessage != nil
+                || ProductionModelInstallConfiguration.current == nil)
+    }
+
+    private var onboardingModelSelectionBinding: Binding<String?> {
+        Binding(
+            get: { onboardingModelCatalog.selectedModelID },
+            set: { selectedOnboardingModelID = $0 }
+        )
+    }
+
     private var triggerBinding: Binding<TextifySettings.TriggerPreference> {
         Binding(
             get: { services.preferences.trigger },
@@ -372,6 +443,60 @@ struct OnboardingRootView: View {
         }
 
         moveForward()
+    }
+
+    @ViewBuilder
+    private func onboardingModelActionButton(
+        for row: ModelCatalogRowPresentation
+    ) -> some View {
+        switch onboardingModelCatalog.action(for: row.id) {
+        case .install:
+            Button("Install Model") {
+                selectedOnboardingModelID = row.id
+                services.modelInstallCoordinator.start(modelID: row.id)
+            }
+            .disabled(
+                services.modelInstallCoordinator.isActive
+                    || ProductionModelInstallConfiguration.current == nil
+            )
+        case .cancelInstall:
+            Button("Cancel") {
+                services.modelInstallCoordinator.cancel()
+            }
+        case .retryInstall:
+            Button("Retry") {
+                selectedOnboardingModelID = row.id
+                services.modelInstallCoordinator.retry()
+            }
+        case .activate:
+            Button("Use Model") {
+                selectedOnboardingModelID = row.id
+                Task {
+                    let activated = await services.activateInstalledModel(row.id)
+                    modelMessage = activated
+                        ? row.model.activationMessage
+                        : "Textify kept the previous model because this model could not be prepared."
+                    _ = await services.dictation.refreshReadiness()
+                }
+            }
+            .disabled(services.modelInstallCoordinator.isActive)
+        case .active:
+            Label("Active", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(TextifyVisualIdentity.readyMint)
+        case nil:
+            EmptyView()
+        }
+    }
+
+    private func refreshOnboardingCatalog() {
+        Task {
+            await services.modelCatalogCoordinator.refresh()
+            reconcileOnboardingModelSelection()
+        }
+    }
+
+    private func reconcileOnboardingModelSelection() {
+        selectedOnboardingModelID = onboardingModelCatalog.selectedModelID
     }
 
     private func moveForward() {

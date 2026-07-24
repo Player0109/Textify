@@ -243,6 +243,50 @@ final class ManifestV3Tests: XCTestCase {
         XCTAssertNoThrow(try ProductionModelPolicy.validateProductionManifest(manifest))
     }
 
+    func testCompatibilityResolverUsesSignedAppSystemArchitectureAndMemoryRequirements() throws {
+        let manifest = try ModelManifest.decode(try fixtureData("manifest_v3.json"))
+        func compatibleIDs(
+            appVersion: String = "1.1.0",
+            macOSVersion: String = "14.0.0",
+            physicalMemoryBytes: Int64 = 8_589_934_592
+        ) throws -> Set<String> {
+            try XCTUnwrap(
+                ModelCatalogCompatibilityResolver(
+                    context: ModelCatalogCompatibilityContext(
+                        appVersion: appVersion,
+                        macOSVersion: macOSVersion,
+                        architecture: .arm64,
+                        physicalMemoryBytes: physicalMemoryBytes
+                    )
+                ).compatibleModelIDs(in: manifest)
+            )
+        }
+
+        XCTAssertEqual(
+            try compatibleIDs(),
+            ["whisper-small-q5_1", "whisper-small-q8_0", "whisper-tiny-f16"]
+        )
+        XCTAssertEqual(
+            try compatibleIDs(physicalMemoryBytes: 536_870_912),
+            ["whisper-tiny-f16"]
+        )
+        XCTAssertTrue(try compatibleIDs(appVersion: "1.0.9").isEmpty)
+        XCTAssertTrue(try compatibleIDs(macOSVersion: "13.6.9").isEmpty)
+    }
+
+    func testCompatibilityResolverHasNoAuthorityWithoutATrustedManifest() {
+        let resolver = ModelCatalogCompatibilityResolver(
+            context: ModelCatalogCompatibilityContext(
+                appVersion: "1.1.0",
+                macOSVersion: "14.0.0",
+                architecture: .arm64,
+                physicalMemoryBytes: 8_589_934_592
+            )
+        )
+
+        XCTAssertNil(resolver.compatibleModelIDs(in: nil))
+    }
+
     private func assertGraphPolicyError(
         _ json: [String: Any],
         equals expected: ModelCatalogGraphValidationError,

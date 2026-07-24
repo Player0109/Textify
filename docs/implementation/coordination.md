@@ -873,3 +873,31 @@ Task 1 must merge before parallel Wave 1 work begins.
   `Sources/Textify/`, but the checked-in project predates the catalog files
   added by issues #2–#7; regeneration is required so production Xcode builds
   compile the same settings UI sources as SwiftPM.
+
+## Purpose-Specific Model Destinations Handoff - 2026-07-24
+
+- GitHub issue #8 owns the narrow Task 11 settings and onboarding changes under
+  `Sources/Textify/{App,SettingsUI,Onboarding,UI}/` plus focused semantic
+  coverage in `Tests/TextifyAppTests/`.
+- Transcription Models and Voice Cleaning remain projections of the same
+  signed catalog, compatibility resolver, installer, installed-model store,
+  active preferences, hierarchy, selection, and inspector semantics. Purpose
+  filtering uses the signed `ModelPurpose` value and never filename or display
+  title inference.
+- Onboarding may replace its legacy fixed-model shortcut with compatible
+  transcription choices from those shared services. Installation and
+  activation remain separate operations; voice cleaning stays optional and
+  independently disableable.
+- Persistent queues, storage inventory, revocation, deletion transactions, and
+  runtime switching transactions remain owned by later tickets.
+
+## Model Compatibility Boundary Handoff - 2026-07-24
+
+- The issue #8 standards review identified that the compatibility predicate is
+  pure model-domain logic, so this ticket additionally owns a narrow extraction
+  into `Sources/TextifyModels/` with focused coverage in
+  `Tests/TextifyModelsTests/`.
+- The app target retains only capture of the current bundle, operating-system,
+  architecture, and physical-memory values plus dependency composition.
+- This handoff does not expand issue #8 into installer policy, runtime
+  switching, storage inventory, revocation, or queue ownership.

@@ -69,10 +69,14 @@ struct ModelCatalogQuery: Equatable {
     var sort: ModelCatalogSort = .catalog
     var format: ModelArtifactFormat?
     var precision: ModelArtifactPrecision?
+    var purpose: ModelPurpose?
+    var compatibleModelIDs: Set<String>?
 
     func apply(to models: [ProductionModelPresentation]) -> [ProductionModelPresentation] {
         let matches = models.enumerated().filter { _, model in
-            (format == nil || model.artifactFormat == format)
+            (purpose == nil || model.purpose == purpose)
+                && (compatibleModelIDs == nil || compatibleModelIDs?.contains(model.id) == true)
+                && (format == nil || model.artifactFormat == format)
                 && (precision == nil || model.artifactPrecision == precision)
         }
 
@@ -98,6 +102,161 @@ struct ModelCatalogQuery: Equatable {
             }
             .map(\.element)
         }
+    }
+
+    var hasUserFilters: Bool {
+        sort != .catalog || format != nil || precision != nil
+    }
+}
+
+extension ModelCatalogCompatibilityResolver {
+    static func current(
+        bundle: Bundle = .main,
+        processInfo: ProcessInfo = .processInfo
+    ) -> ModelCatalogCompatibilityResolver {
+        let operatingSystem = processInfo.operatingSystemVersion
+        return ModelCatalogCompatibilityResolver(
+            context: ModelCatalogCompatibilityContext(
+                appVersion: bundle.object(
+                    forInfoDictionaryKey: "CFBundleShortVersionString"
+                ) as? String ?? "1.1.0",
+                macOSVersion: [
+                    operatingSystem.majorVersion,
+                    operatingSystem.minorVersion,
+                    operatingSystem.patchVersion,
+                ].map(String.init).joined(separator: "."),
+                architecture: .arm64,
+                physicalMemoryBytes: Int64(clamping: processInfo.physicalMemory)
+            )
+        )
+    }
+}
+
+enum ModelCatalogPurposeDestination: Equatable {
+    case transcription
+    case voiceCleaning
+
+    var purpose: ModelPurpose {
+        switch self {
+        case .transcription:
+            return .transcription
+        case .voiceCleaning:
+            return .voiceCleaning
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .transcription:
+            return "Transcription Models"
+        case .voiceCleaning:
+            return "Voice Cleaning"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .transcription:
+            return "Choose the local model that turns speech into text."
+        case .voiceCleaning:
+            return "Optionally reduce background noise before transcription."
+        }
+    }
+
+    var emptyTitle: String {
+        switch self {
+        case .transcription:
+            return "No transcription models are available"
+        case .voiceCleaning:
+            return "No voice-cleaning models are available"
+        }
+    }
+
+    var emptyDetail: String {
+        switch self {
+        case .transcription:
+            return "Refresh the signed catalog or update Textify to find a compatible transcription model."
+        case .voiceCleaning:
+            return "Voice cleaning is optional. Refresh the signed catalog or continue dictating with raw audio."
+        }
+    }
+
+    var unavailableTitle: String {
+        switch self {
+        case .transcription:
+            return "Transcription catalog unavailable"
+        case .voiceCleaning:
+            return "Voice-cleaning catalog unavailable"
+        }
+    }
+
+    var unavailableDetail: String {
+        switch self {
+        case .transcription:
+            return "Textify could not load the trusted catalog. Installed transcription models remain available offline."
+        case .voiceCleaning:
+            return "Textify could not load the trusted catalog. Voice cleaning is optional, and installed cleaners remain available offline."
+        }
+    }
+
+    var unavailableActionTitle: String {
+        "Refresh Catalog"
+    }
+}
+
+enum OnboardingModelAction: Equatable {
+    case install
+    case cancelInstall
+    case retryInstall
+    case activate
+    case active
+}
+
+struct OnboardingModelCatalog: Equatable {
+    let choices: [ModelCatalogRowPresentation]
+    let selectedModelID: String?
+
+    init(
+        experience: ModelCatalogExperience,
+        selectedModelID: String? = nil
+    ) {
+        choices = experience.rows
+        if let selectedModelID,
+           choices.contains(where: { $0.id == selectedModelID }) {
+            self.selectedModelID = selectedModelID
+        } else if let activeModelID = choices.first(where: \.isActive)?.id {
+            self.selectedModelID = activeModelID
+        } else {
+            self.selectedModelID = experience.families
+                .flatMap(\.checkpoints)
+                .compactMap(\.referenceArtifact)
+                .first?
+                .id
+                ?? choices.first?.id
+        }
+    }
+
+    func action(for modelID: String) -> OnboardingModelAction? {
+        guard let row = choices.first(where: { $0.id == modelID }) else {
+            return nil
+        }
+        if row.actions.contains(.cancelInstall) {
+            return .cancelInstall
+        }
+        if row.actions.contains(.retryInstall) {
+            return .retryInstall
+        }
+        if row.isActive {
+            return .active
+        }
+        return row.isInstalled ? .activate : .install
+    }
+
+    func transferState(for modelID: String?) -> DownloadState? {
+        guard let modelID else {
+            return nil
+        }
+        return choices.first { $0.id == modelID }?.installState
     }
 }
 
@@ -251,6 +410,7 @@ enum ModelCatalogHierarchyRowID: Equatable, Hashable {
     case family(String)
     case checkpoint(String)
     case exactArtifact(String)
+    case standaloneArtifact(String)
 }
 
 enum ModelCatalogHierarchySelection: Equatable, Hashable {
@@ -267,6 +427,7 @@ struct ModelCatalogHierarchyRow: Equatable, Identifiable {
             artifact: ModelCatalogExactArtifactPresentation,
             isSingleVariant: Bool
         )
+        case standaloneArtifact(ModelCatalogRowPresentation)
     }
 
     let content: Content
@@ -280,6 +441,8 @@ struct ModelCatalogHierarchyRow: Equatable, Identifiable {
             .checkpoint(checkpoint.id)
         case let .exactArtifact(_, artifact, _):
             .exactArtifact(artifact.id)
+        case let .standaloneArtifact(row):
+            .standaloneArtifact(row.id)
         }
     }
 }
@@ -332,7 +495,7 @@ struct ModelCatalogHierarchyState: Equatable {
     }
 
     func visibleRows(in experience: ModelCatalogExperience) -> [ModelCatalogHierarchyRow] {
-        experience.families.flatMap { family in
+        let hierarchyRows = experience.families.flatMap { family in
             var rows = [
                 ModelCatalogHierarchyRow(
                     content: .family(family),
@@ -381,6 +544,21 @@ struct ModelCatalogHierarchyState: Equatable {
             }
             return rows
         }
+        let representedModelIDs = Set(
+            experience.families
+                .flatMap(\.checkpoints)
+                .flatMap(\.artifacts)
+                .map(\.id)
+        )
+        let standaloneRows = experience.rows
+            .filter { !representedModelIDs.contains($0.id) }
+            .map {
+                ModelCatalogHierarchyRow(
+                    content: .standaloneArtifact($0),
+                    isExpanded: false
+                )
+            }
+        return hierarchyRows + standaloneRows
     }
 }
 
@@ -452,14 +630,12 @@ struct ModelCatalogExperience: Equatable {
         ) {
             $0[$1.id] = $1
         } ?? [:]
-        let trustedCatalog = trustedModels.isEmpty
-            ? ProductionModelPresentation.visibleCatalog
-            : trustedModels.map {
-                ProductionModelPresentation(
-                    model: $0,
-                    signedArtifact: signedArtifactsByID[$0.id]
-                )
-            }
+        let trustedCatalog = trustedModels.map {
+            ProductionModelPresentation(
+                model: $0,
+                signedArtifact: signedArtifactsByID[$0.id]
+            )
+        }
         let trustedIDs = Set(trustedCatalog.map(\.id))
         let trustedModelsByID = trustedModels.reduce(into: [String: ModelEntry]()) {
             $0[$1.id] = $1
@@ -1144,7 +1320,7 @@ struct ProductionModelPresentation: Equatable, Identifiable {
     }
 
     var installLabel: String {
-        purpose == .voiceCleaning ? "Install & Enable" : "Install"
+        "Install"
     }
 
     var speedSignalLevel: Int {

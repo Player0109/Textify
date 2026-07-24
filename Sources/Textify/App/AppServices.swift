@@ -20,6 +20,7 @@ final class AppServices {
     let hotkeyMonitor: GlobalHotkeyMonitor
     let launchAtLogin: any LaunchAtLoginManaging
     let launchAtLoginLocation: any LaunchAtLoginLocationChecking
+    let modelCatalogCompatibilityResolver: ModelCatalogCompatibilityResolver
     let startupIssue: AppStartupIssue?
 
     private var installedModelsStore: InstalledModelsStore
@@ -57,52 +58,18 @@ final class AppServices {
             guard let installedModel = manifest.models.first(where: { $0.id == modelID }) else {
                 throw ModelInstallCoordinatorError.modelPreparationFailed
             }
-            if installedModel.purpose == .voiceCleaning {
-                onStateChange(DownloadState(
-                    modelID: modelID,
-                    phase: .installing,
-                    message: "Preparing voice cleaning."
-                ))
-                self.preferences.activeVoiceCleaningModelID = modelID
-                self.savePreferences()
+            if self.isModelActive(modelID) {
                 _ = await self.dictation.prepareActiveModelIfAvailable()
-                try Task.checkCancellation()
-                onStateChange(DownloadState(
-                    modelID: modelID,
-                    phase: .installed,
-                    bytesDownloaded: installedModel.sizeBytes,
-                    totalBytes: installedModel.sizeBytes,
-                    message: "Voice cleaner installed and enabled."
-                ))
-                return
             }
-            onStateChange(DownloadState(
-                modelID: modelID,
-                phase: .installing,
-                message: "Preparing model for dictation."
-            ))
-            let previousModelID = self.preferences.activeModelID
-            let previousLanguage = self.preferences.transcriptionLanguage
-            self.preferences.activeModelID = modelID
-            if !self.availableTranscriptionLanguages.contains(self.preferences.transcriptionLanguage) {
-                self.preferences.transcriptionLanguage = self.availableTranscriptionLanguages.first ?? .english
-            }
-            self.savePreferences()
-            let snapshot = await self.dictation.prepareActiveModelIfAvailable()
             try Task.checkCancellation()
-            guard case .ready(modelID: modelID) = snapshot.model else {
-                self.preferences.activeModelID = previousModelID
-                self.preferences.transcriptionLanguage = previousLanguage
-                self.savePreferences()
-                _ = await self.dictation.prepareActiveModelIfAvailable()
-                throw ModelInstallCoordinatorError.modelPreparationFailed
-            }
             onStateChange(DownloadState(
                 modelID: modelID,
                 phase: .installed,
                 bytesDownloaded: installedModel.sizeBytes,
                 totalBytes: installedModel.sizeBytes,
-                message: "Model installed and ready."
+                message: installedModel.purpose == .voiceCleaning
+                    ? "Voice cleaner installed. Enable it when you are ready."
+                    : "Model installed. Select Use Model to activate it."
             ))
         }
     )
@@ -176,6 +143,7 @@ final class AppServices {
         hotkeyMonitor: GlobalHotkeyMonitor,
         launchAtLogin: any LaunchAtLoginManaging,
         launchAtLoginLocation: any LaunchAtLoginLocationChecking = LaunchAtLoginLocationChecker(),
+        modelCatalogCompatibilityResolver: ModelCatalogCompatibilityResolver = .current(),
         overlayPresenter: (any RecordingOverlayPresenting)? = nil,
         waitBeforeProcessingIndicator: @escaping @Sendable () async -> Void = {
             try? await Task.sleep(nanoseconds: 900_000_000)
@@ -192,6 +160,7 @@ final class AppServices {
         self.hotkeyMonitor = hotkeyMonitor
         self.launchAtLogin = launchAtLogin
         self.launchAtLoginLocation = launchAtLoginLocation
+        self.modelCatalogCompatibilityResolver = modelCatalogCompatibilityResolver
         self.overlayPresenter = overlayPresenter ?? RecordingOverlayPresenter()
         self.waitBeforeProcessingIndicator = waitBeforeProcessingIndicator
         self.waitBeforeTerminalStatusDismissal = waitBeforeTerminalStatusDismissal
@@ -406,6 +375,29 @@ final class AppServices {
 
     var installedModelRecords: [InstalledModelRecord] {
         installedModelsStore.records
+    }
+
+    func modelCatalogExperience(
+        for purpose: ModelPurpose,
+        query: ModelCatalogQuery = ModelCatalogQuery()
+    ) -> ModelCatalogExperience {
+        var scopedQuery = query
+        scopedQuery.purpose = purpose
+        let compatibleModelIDs = modelCatalogCompatibilityResolver
+            .compatibleModelIDs(in: modelCatalogCoordinator.manifest) ?? []
+        scopedQuery.compatibleModelIDs = compatibleModelIDs.union(
+            installedModelRecords.map(\.model.id)
+        )
+        return ModelCatalogExperience(
+            trustedManifest: modelCatalogCoordinator.manifest,
+            installedRecords: installedModelRecords,
+            activePreferences: ModelCatalogActivePreferences(
+                transcriptionModelID: preferences.activeModelID,
+                voiceCleaningModelID: preferences.activeVoiceCleaningModelID
+            ),
+            transferState: modelInstallCoordinator.state,
+            query: scopedQuery
+        )
     }
 
     func refreshInstalledModels() {
@@ -836,7 +828,8 @@ final class SettingsRouter {
 enum SettingsPane: String, CaseIterable, Identifiable {
     case general
     case dictation
-    case models
+    case transcriptionModels
+    case voiceCleaning
     case privacy
     case logs
     case advanced
@@ -849,8 +842,10 @@ enum SettingsPane: String, CaseIterable, Identifiable {
             return "General"
         case .dictation:
             return "Dictation"
-        case .models:
-            return "Models"
+        case .transcriptionModels:
+            return "Transcription Models"
+        case .voiceCleaning:
+            return "Voice Cleaning"
         case .privacy:
             return "Privacy"
         case .logs:
@@ -866,14 +861,27 @@ enum SettingsPane: String, CaseIterable, Identifiable {
             return "gearshape"
         case .dictation:
             return "mic"
-        case .models:
+        case .transcriptionModels:
             return "externaldrive"
+        case .voiceCleaning:
+            return "waveform.badge.minus"
         case .privacy:
             return "hand.raised"
         case .logs:
             return "doc.text.magnifyingglass"
         case .advanced:
             return "slider.horizontal.3"
+        }
+    }
+
+    var modelPurpose: ModelPurpose? {
+        switch self {
+        case .transcriptionModels:
+            return .transcription
+        case .voiceCleaning:
+            return .voiceCleaning
+        case .general, .dictation, .privacy, .logs, .advanced:
+            return nil
         }
     }
 }

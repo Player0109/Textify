@@ -20,10 +20,41 @@ final class ProductionUITests: XCTestCase {
     func testSettingsProductionPaneSetExcludesScaffoldPanes() {
         XCTAssertEqual(
             SettingsPane.productionVisiblePanes,
-            [.general, .dictation, .models, .privacy, .logs, .advanced]
+            [
+                .general,
+                .dictation,
+                .transcriptionModels,
+                .voiceCleaning,
+                .privacy,
+                .logs,
+                .advanced,
+            ]
         )
+        XCTAssertEqual(SettingsPane.transcriptionModels.modelPurpose, .transcription)
+        XCTAssertEqual(SettingsPane.voiceCleaning.modelPurpose, .voiceCleaning)
+        XCTAssertEqual(SettingsPane.transcriptionModels.sidebarTitle, "Transcription Models")
+        XCTAssertEqual(SettingsPane.voiceCleaning.sidebarTitle, "Voice Cleaning")
         XCTAssertEqual(SettingsPane.logs.sidebarTitle, "Logs")
-        XCTAssertEqual(SettingsPane.logs.productionSystemImage, "doc.text.magnifyingglass")
+        XCTAssertEqual(SettingsPane.logs.systemImage, "doc.text.magnifyingglass")
+    }
+
+    func testPurposeDestinationsHaveSpecificEmptyAndUnavailableRecoveryCopy() {
+        XCTAssertEqual(
+            ModelCatalogPurposeDestination.transcription.emptyTitle,
+            "No transcription models are available"
+        )
+        XCTAssertEqual(
+            ModelCatalogPurposeDestination.voiceCleaning.emptyTitle,
+            "No voice-cleaning models are available"
+        )
+        XCTAssertEqual(
+            ModelCatalogPurposeDestination.transcription.unavailableActionTitle,
+            "Refresh Catalog"
+        )
+        XCTAssertTrue(
+            ModelCatalogPurposeDestination.voiceCleaning.unavailableDetail
+                .contains("optional")
+        )
     }
 
     func testVisualIdentitySupportsTheNativeSidebarRedesign() {
@@ -331,7 +362,7 @@ final class ProductionUITests: XCTestCase {
         XCTAssertEqual(TextifyReadinessPresentation.title(canDictate: false), "Finish setup")
         XCTAssertEqual(
             TextifyReadinessPresentation.detail(canDictate: false, triggerName: "Right Command"),
-            "Review Dictation, Models, and Privacy before your first dictation."
+            "Review Dictation, Transcription Models, and Privacy before your first dictation."
         )
     }
 

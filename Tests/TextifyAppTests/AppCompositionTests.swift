@@ -69,6 +69,118 @@ final class AppCompositionTests: XCTestCase {
     }
 
     @MainActor
+    func testApplicationCompositionProvidesOnePurposeScopedCatalogExperience() async throws {
+        let manifestURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("models/manifest.json")
+        let manifest = try ModelManifest.decode(Data(contentsOf: manifestURL))
+        let compatibilityResolver = ModelCatalogCompatibilityResolver(
+            context: ModelCatalogCompatibilityContext(
+                appVersion: "1.1.0",
+                macOSVersion: "14.0.0",
+                architecture: .arm64,
+                physicalMemoryBytes: 8_589_934_592
+            )
+        )
+        let services = try Self.makeServices(
+            modelCatalogCompatibilityResolver: compatibilityResolver
+        )
+        services.modelCatalogCoordinator = ModelCatalogCoordinator(
+            loadOperation: { manifest }
+        )
+        await services.modelCatalogCoordinator.refresh()
+
+        let transcription = services.modelCatalogExperience(
+            for: .transcription
+        )
+        let cleaning = services.modelCatalogExperience(
+            for: .voiceCleaning
+        )
+
+        XCTAssertTrue(
+            transcription.rows.allSatisfy { $0.model.purpose == .transcription }
+        )
+        XCTAssertTrue(
+            cleaning.rows.allSatisfy { $0.model.purpose == .voiceCleaning }
+        )
+        XCTAssertFalse(cleaning.rows.isEmpty)
+        XCTAssertFalse(transcription.rows.contains { $0.id == "parakeet-rnnt-1.1b" })
+        XCTAssertTrue(
+            services.modelCatalogCompatibilityResolver === compatibilityResolver
+        )
+    }
+
+    @MainActor
+    func testPurposeCatalogKeepsInstalledModelsWhenTrustOrCompatibilityChanges() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let removedModel = try Self.catalogModel(id: "parakeet-rnnt-1.1b")
+        let storeURL = ModelStorageLayout(rootDirectory: paths.modelsDirectory).installedStoreURL
+        try JSONEncoder().encode(
+            InstalledModelsStore(records: [
+                InstalledModelRecord(
+                    model: removedModel,
+                    installedAt: "2026-07-24T00:00:00Z",
+                    localFilesByManifestFilename: [:]
+                ),
+            ])
+        ).write(to: storeURL, options: .atomic)
+        let resolver = ModelCatalogCompatibilityResolver(
+            context: ModelCatalogCompatibilityContext(
+                appVersion: "1.1.0",
+                macOSVersion: "14.0.0",
+                architecture: .arm64,
+                physicalMemoryBytes: 8_589_934_592
+            )
+        )
+        let services = try Self.makeServices(
+            paths: paths,
+            modelCatalogCompatibilityResolver: resolver
+        )
+
+        let unavailableCatalog = services.modelCatalogExperience(for: .transcription)
+        XCTAssertEqual(unavailableCatalog.rows.map(\.id), [removedModel.id])
+        XCTAssertTrue(unavailableCatalog.rows[0].isInstalled)
+        XCTAssertTrue(
+            ModelCatalogHierarchyState()
+                .visibleRows(in: unavailableCatalog)
+                .contains { hierarchyRow in
+                    guard case let .standaloneArtifact(row) = hierarchyRow.content else {
+                        return false
+                    }
+                    return row.id == removedModel.id && row.isInstalled
+                }
+        )
+
+        let manifestURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("models/manifest.json")
+        let manifest = try ModelManifest.decode(Data(contentsOf: manifestURL))
+        services.modelCatalogCoordinator = ModelCatalogCoordinator(
+            loadOperation: { manifest }
+        )
+        await services.modelCatalogCoordinator.refresh()
+
+        let incompatibleCatalog = services.modelCatalogExperience(for: .transcription)
+        XCTAssertTrue(incompatibleCatalog.rows.contains { row in
+            row.id == removedModel.id && row.isInstalled
+        })
+        XCTAssertTrue(
+            ModelCatalogHierarchyState()
+                .visibleRows(in: incompatibleCatalog)
+                .contains { hierarchyRow in
+                    guard case let .exactArtifact(_, artifact, _) = hierarchyRow.content else {
+                        return false
+                    }
+                    return artifact.id == removedModel.id && artifact.row.isInstalled
+                }
+        )
+    }
+
+    @MainActor
     func testInstalledModelQueriesUseCachedStoreUntilExplicitRefresh() throws {
         let paths = try Self.makeTemporaryPaths()
         let model = try Self.catalogModel(id: ProductionModelPolicy.requiredModelID)
@@ -782,6 +894,7 @@ final class AppCompositionTests: XCTestCase {
         hotkeyMonitor: GlobalHotkeyMonitor? = nil,
         launchAtLogin: FakeLaunchAtLoginManager? = nil,
         launchAtLoginLocation: any LaunchAtLoginLocationChecking = FixedLaunchAtLoginLocation(isSupported: true),
+        modelCatalogCompatibilityResolver: ModelCatalogCompatibilityResolver = .current(),
         models: any RuntimeModelResolving = FakeRuntimeModelResolver(),
         overlayPresenter: (any RecordingOverlayPresenting)? = nil,
         waitBeforeProcessingIndicator: @escaping @Sendable () async -> Void = {}
@@ -817,6 +930,7 @@ final class AppCompositionTests: XCTestCase {
             hotkeyMonitor: hotkeyMonitor,
             launchAtLogin: launchAtLogin,
             launchAtLoginLocation: launchAtLoginLocation,
+            modelCatalogCompatibilityResolver: modelCatalogCompatibilityResolver,
             overlayPresenter: overlayPresenter,
             waitBeforeProcessingIndicator: waitBeforeProcessingIndicator
         )

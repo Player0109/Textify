@@ -48,8 +48,10 @@ struct SettingsRootView: View {
             GeneralSettingsPane()
         case .dictation:
             DictationSettingsPane()
-        case .models:
-            ModelsSettingsPane()
+        case .transcriptionModels:
+            ModelsSettingsPane(destination: .transcription)
+        case .voiceCleaning:
+            ModelsSettingsPane(destination: .voiceCleaning)
         case .privacy:
             PrivacySettingsPane()
         case .logs:
@@ -82,7 +84,7 @@ private struct SettingsSidebar: View {
                         selection = pane
                     } label: {
                         HStack(spacing: 11) {
-                            Image(systemName: pane.productionSystemImage)
+                            Image(systemName: pane.systemImage)
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(selection == pane ? TextifyVisualIdentity.voiceViolet : Color.white.opacity(0.62))
                                 .frame(width: 18)
@@ -102,7 +104,7 @@ private struct SettingsSidebar: View {
                     .buttonStyle(.plain)
                     .accessibilityAddTraits(selection == pane ? .isSelected : [])
 
-                    if pane == .models {
+                    if pane == .voiceCleaning {
                         Divider()
                             .padding(.horizontal, 8)
                             .padding(.vertical, 8)
@@ -183,28 +185,12 @@ extension SettingsPane {
     static let productionVisiblePanes: [SettingsPane] = [
         .general,
         .dictation,
-        .models,
+        .transcriptionModels,
+        .voiceCleaning,
         .privacy,
         .logs,
         .advanced
     ]
-
-    var productionSystemImage: String {
-        switch self {
-        case .general:
-            return "gearshape"
-        case .dictation:
-            return "mic"
-        case .models:
-            return "externaldrive"
-        case .privacy:
-            return "hand.raised"
-        case .logs:
-            return "doc.text.magnifyingglass"
-        case .advanced:
-            return "slider.horizontal.3"
-        }
-    }
 
     var sidebarTitle: String {
         switch self {
@@ -212,8 +198,10 @@ extension SettingsPane {
             return "General Settings"
         case .dictation:
             return "Dictation"
-        case .models:
-            return "Dictation Models"
+        case .transcriptionModels:
+            return "Transcription Models"
+        case .voiceCleaning:
+            return "Voice Cleaning"
         case .privacy:
             return "Privacy"
         case .logs:
@@ -529,6 +517,8 @@ extension TranscriptionLanguage {
 
 private struct ModelsSettingsPane: View {
     @Environment(AppServices.self) private var services
+    let destination: ModelCatalogPurposeDestination
+
     @State private var modelMessage: String?
     @State private var activatingModelID: String?
     @State private var pendingImportURL: URL?
@@ -544,20 +534,14 @@ private struct ModelsSettingsPane: View {
     @State private var showsModelVariantsHelp = false
 
     var body: some View {
-        let catalogExperience = ModelCatalogExperience(
-            trustedManifest: services.modelCatalogCoordinator.manifest,
-            installedRecords: services.installedModelRecords,
-            activePreferences: ModelCatalogActivePreferences(
-                transcriptionModelID: services.preferences.activeModelID,
-                voiceCleaningModelID: services.preferences.activeVoiceCleaningModelID
-            ),
-            transferState: services.modelInstallCoordinator.state,
+        let catalogExperience = services.modelCatalogExperience(
+            for: destination.purpose,
             query: catalogQuery
         )
 
         return SettingsPaneLayout(
-            title: "Dictation Models",
-            subtitle: "Choose how transcription runs on your Mac.",
+            title: destination.title,
+            subtitle: destination.subtitle,
             maxContentWidth: 1_360
         ) {
             if services.modelCatalogCoordinator.isLoading {
@@ -600,7 +584,9 @@ private struct ModelsSettingsPane: View {
                 precision: $catalogPrecision,
                 onReset: resetCatalogQuery,
                 onVerify: verifyInstalledModels,
-                onImport: chooseCustomWhisperModel,
+                onImport: destination == .transcription
+                    ? chooseCustomWhisperModel
+                    : nil,
                 onShowVariantHelp: {
                     showsModelVariantsHelp = true
                 },
@@ -707,9 +693,32 @@ private struct ModelsSettingsPane: View {
                     in: catalogExperience
                 )
             },
-            onReset: resetCatalogQuery
+            onReset: performEmptyStateAction,
+            emptyPresentation: emptyPresentation
         ) { row, context in
             catalogRow(row, context: context)
+        }
+    }
+
+    private var emptyPresentation: ModelCatalogEmptyPresentation {
+        if catalogQuery.hasUserFilters {
+            return .filtered
+        }
+        if services.modelCatalogCoordinator.manifest == nil,
+           services.modelCatalogCoordinator.errorMessage != nil
+                || ProductionModelInstallConfiguration.current == nil {
+            return .unavailable(destination)
+        }
+        return .purpose(destination)
+    }
+
+    private func performEmptyStateAction() {
+        if catalogQuery.hasUserFilters {
+            resetCatalogQuery()
+            return
+        }
+        Task {
+            await services.modelCatalogCoordinator.refresh()
         }
     }
 
@@ -1022,7 +1031,7 @@ private struct ModelCatalogToolbar: View {
     @Binding var precision: ModelArtifactPrecision?
     let onReset: () -> Void
     let onVerify: () -> Void
-    let onImport: () -> Void
+    let onImport: (() -> Void)?
     let onShowVariantHelp: () -> Void
     let isImportDisabled: Bool
 
@@ -1064,8 +1073,14 @@ private struct ModelCatalogToolbar: View {
                     action: onShowVariantHelp
                 )
                 Button("Verify Installed", systemImage: "checkmark.seal", action: onVerify)
-                Button("Import Whisper Model…", systemImage: "square.and.arrow.down", action: onImport)
+                if let onImport {
+                    Button(
+                        "Import Whisper Model…",
+                        systemImage: "square.and.arrow.down",
+                        action: onImport
+                    )
                     .disabled(isImportDisabled)
+                }
             } label: {
                 Image(systemName: hasFilters ? "ellipsis.circle.fill" : "ellipsis.circle")
                     .font(.system(size: 15, weight: .medium))
@@ -1383,6 +1398,7 @@ private struct ModelCatalogSurface<Row: View>: View {
     let onSelect: (ModelCatalogHierarchySelection) -> Void
     let onToggleCheckpoint: (ModelCatalogCheckpointPresentation) -> Void
     let onReset: () -> Void
+    let emptyPresentation: ModelCatalogEmptyPresentation
     let row: (ModelCatalogRowPresentation, ModelCatalogArtifactRowContext?) -> Row
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -1394,6 +1410,7 @@ private struct ModelCatalogSurface<Row: View>: View {
         onSelect: @escaping (ModelCatalogHierarchySelection) -> Void,
         onToggleCheckpoint: @escaping (ModelCatalogCheckpointPresentation) -> Void,
         onReset: @escaping () -> Void,
+        emptyPresentation: ModelCatalogEmptyPresentation,
         @ViewBuilder row: @escaping (
             ModelCatalogRowPresentation,
             ModelCatalogArtifactRowContext?
@@ -1405,6 +1422,7 @@ private struct ModelCatalogSurface<Row: View>: View {
         self.onSelect = onSelect
         self.onToggleCheckpoint = onToggleCheckpoint
         self.onReset = onReset
+        self.emptyPresentation = emptyPresentation
         self.row = row
     }
 
@@ -1413,7 +1431,10 @@ private struct ModelCatalogSurface<Row: View>: View {
             ModelCatalogColumnHeader()
             Divider()
             if rows.isEmpty {
-                ModelCatalogEmptyState(onReset: onReset)
+                ModelCatalogEmptyState(
+                    presentation: emptyPresentation,
+                    onAction: onReset
+                )
             } else {
                 LazyVStack(spacing: 0) {
                     if hierarchyRows.isEmpty {
@@ -1472,6 +1493,8 @@ private struct ModelCatalogSurface<Row: View>: View {
                                         }
                                     )
                                 )
+                            case let .standaloneArtifact(standaloneRow):
+                                row(standaloneRow, nil)
                             }
                         }
                     }
@@ -1483,6 +1506,54 @@ private struct ModelCatalogSurface<Row: View>: View {
         .overlay {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(TextifyVisualIdentity.separator, lineWidth: 1)
+        }
+    }
+}
+
+private enum ModelCatalogEmptyPresentation {
+    case filtered
+    case purpose(ModelCatalogPurposeDestination)
+    case unavailable(ModelCatalogPurposeDestination)
+
+    var icon: String {
+        switch self {
+        case .filtered:
+            return "line.3.horizontal.decrease.circle"
+        case .purpose:
+            return "shippingbox"
+        case .unavailable:
+            return "wifi.exclamationmark"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .filtered:
+            return "No models match these filters"
+        case let .purpose(destination):
+            return destination.emptyTitle
+        case let .unavailable(destination):
+            return destination.unavailableTitle
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .filtered:
+            return "Reset the catalog controls to see every compatible model."
+        case let .purpose(destination):
+            return destination.emptyDetail
+        case let .unavailable(destination):
+            return destination.unavailableDetail
+        }
+    }
+
+    var actionTitle: String {
+        switch self {
+        case .filtered:
+            return "Reset Filters"
+        case let .purpose(destination), let .unavailable(destination):
+            return destination.unavailableActionTitle
         }
     }
 }
@@ -1647,19 +1718,21 @@ private struct ModelCatalogCheckpointRow: View {
 }
 
 private struct ModelCatalogEmptyState: View {
-    let onReset: () -> Void
+    let presentation: ModelCatalogEmptyPresentation
+    let onAction: () -> Void
 
     var body: some View {
         VStack(spacing: 9) {
-            Image(systemName: "line.3.horizontal.decrease.circle")
+            Image(systemName: presentation.icon)
                 .font(.system(size: 28, weight: .medium))
                 .foregroundStyle(TextifyVisualIdentity.voiceViolet)
-            Text("No models match these filters")
+            Text(presentation.title)
                 .font(.system(.headline, design: .rounded, weight: .semibold))
-            Text("Reset the catalog controls to see every local model.")
+            Text(presentation.detail)
                 .font(.callout)
                 .foregroundStyle(.secondary)
-            Button("Reset Filters", action: onReset)
+                .multilineTextAlignment(.center)
+            Button(presentation.actionTitle, action: onAction)
                 .buttonStyle(.bordered)
                 .controlSize(.small)
         }

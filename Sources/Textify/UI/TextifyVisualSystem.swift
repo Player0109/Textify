@@ -40,7 +40,7 @@ enum TextifyReadinessPresentation {
         if canDictate {
             return "Hold \(triggerName), speak, then release to type."
         }
-        return "Review Dictation, Models, and Privacy before your first dictation."
+        return "Review Dictation, Transcription Models, and Privacy before your first dictation."
     }
 }
 
@@ -227,8 +227,10 @@ extension SettingsPane {
             return "Readiness, startup, and the way Textify lives on your Mac."
         case .dictation:
             return "Choose how dictation starts and confirm your trigger."
-        case .models:
+        case .transcriptionModels:
             return "Pick the local speech model that fits your language and speed."
+        case .voiceCleaning:
+            return "Optionally clean recorded speech before it reaches transcription."
         case .privacy:
             return "Control permissions and the apps where Textify stays silent."
         case .logs:
