@@ -1257,15 +1257,9 @@ enum ModelCatalogHierarchyRowID: Equatable, Hashable {
     }
 }
 
-struct ModelCatalogViewportRowPosition: Equatable {
-    let id: ModelCatalogHierarchyRowID
-    let minY: CGFloat
-}
-
 struct ModelCatalogViewportRestoration: Equatable {
     let generation: UInt64
     let rowID: ModelCatalogHierarchyRowID
-    let pixelOffset: CGFloat
 }
 
 enum ModelCatalogHierarchySelection: Equatable, Hashable {
@@ -1398,20 +1392,17 @@ struct ModelCatalogHierarchyState: Equatable {
     private(set) var expandedCheckpointIDs: Set<String>
     private(set) var focusedRowID: ModelCatalogHierarchyRowID?
     private(set) var scrollAnchorID: ModelCatalogHierarchyRowID?
-    private(set) var scrollAnchorPixelOffset: CGFloat
 
     init(
         selection: ModelCatalogHierarchySelection? = nil,
         expandedCheckpointIDs: Set<String> = [],
         focusedRowID: ModelCatalogHierarchyRowID? = nil,
-        scrollAnchorID: ModelCatalogHierarchyRowID? = nil,
-        scrollAnchorPixelOffset: CGFloat = 0
+        scrollAnchorID: ModelCatalogHierarchyRowID? = nil
     ) {
         self.selection = selection
         self.expandedCheckpointIDs = expandedCheckpointIDs
         self.focusedRowID = focusedRowID
         self.scrollAnchorID = scrollAnchorID
-        self.scrollAnchorPixelOffset = scrollAnchorPixelOffset
     }
 
     mutating func select(_ selection: ModelCatalogHierarchySelection) {
@@ -1422,18 +1413,11 @@ struct ModelCatalogHierarchyState: Equatable {
         focusedRowID = rowID
     }
 
-    mutating func scroll(
-        to rowID: ModelCatalogHierarchyRowID?,
-        pixelOffset: CGFloat = 0
-    ) {
-        let normalizedOffset = max(0, pixelOffset)
-        guard scrollAnchorID != rowID
-                || scrollAnchorPixelOffset != normalizedOffset
-        else {
+    mutating func scroll(to rowID: ModelCatalogHierarchyRowID?) {
+        guard scrollAnchorID != rowID else {
             return
         }
         scrollAnchorID = rowID
-        scrollAnchorPixelOffset = normalizedOffset
     }
 
     mutating func toggleExpansion(of checkpoint: ModelCatalogCheckpointPresentation) {
@@ -1452,7 +1436,6 @@ struct ModelCatalogHierarchyState: Equatable {
             }
             if let scrollAnchorID, childRowIDs.contains(scrollAnchorID) {
                 self.scrollAnchorID = .checkpoint(checkpoint.id)
-                scrollAnchorPixelOffset = 0
             }
         } else {
             expandedCheckpointIDs.insert(checkpoint.id)
@@ -1540,7 +1523,6 @@ struct ModelCatalogHierarchyState: Equatable {
                     previousRowIDs: previousRowIDs,
                     updatedRowIDs: updatedRowIDs
                 )
-            scrollAnchorPixelOffset = 0
         }
         return recovery
     }

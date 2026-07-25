@@ -593,20 +593,7 @@ struct ModelsSettingsPane: View {
             title: destination.title,
             subtitle: destination.subtitle,
             maxContentWidth: 1_360,
-            scrollPosition: Binding(
-                get: { hierarchyState.scrollAnchorID },
-                set: { rowID in
-                    hierarchyState.scroll(
-                        to: rowID,
-                        pixelOffset:
-                            rowID == hierarchyState.scrollAnchorID
-                                ? hierarchyState.scrollAnchorPixelOffset
-                                : 0
-                    )
-                }
-            ),
-            catalogViewportRestoration: viewportRestoration,
-            onCatalogViewportChange: updateCatalogViewport
+            catalogViewportRestoration: viewportRestoration
         ) {
             catalogStatus(hasRows: !catalogExperience.rows.isEmpty)
 
@@ -737,6 +724,10 @@ struct ModelsSettingsPane: View {
                 to: updatedExperience
             )
             reconciledCatalogExperience = updatedExperience
+            if recovery != nil,
+               hierarchyState.scrollAnchorID == nil {
+                hierarchyState.scroll(to: hierarchyState.focusedRowID)
+            }
             if hierarchyState.scrollAnchorID != nil {
                 viewportRestorationGeneration &+= 1
             }
@@ -983,27 +974,9 @@ struct ModelsSettingsPane: View {
         hierarchyState.scrollAnchorID.map {
             ModelCatalogViewportRestoration(
                 generation: viewportRestorationGeneration,
-                rowID: $0,
-                pixelOffset: hierarchyState.scrollAnchorPixelOffset
+                rowID: $0
             )
         }
-    }
-
-    private func updateCatalogViewport(
-        _ positions: [ModelCatalogViewportRowPosition]
-    ) {
-        guard !positions.isEmpty else {
-            return
-        }
-        let ordered = positions.sorted { $0.minY < $1.minY }
-        let top = ordered
-            .filter { $0.minY <= 0 }
-            .max { $0.minY < $1.minY }
-            ?? ordered[0]
-        hierarchyState.scroll(
-            to: top.id,
-            pixelOffset: max(0, -top.minY)
-        )
     }
 
     private func verifyInstalledModels() {
@@ -1054,7 +1027,12 @@ struct ModelsSettingsPane: View {
                 showsInspector = true
             },
             onToggleCheckpoint: { checkpoint in
+                let previousScrollAnchorID =
+                    hierarchyState.scrollAnchorID
                 hierarchyState.toggleExpansion(of: checkpoint)
+                requestCatalogScrollIfChanged(
+                    from: previousScrollAnchorID
+                )
                 inspectorController.select(
                     hierarchyState.selection,
                     in: catalogExperience
@@ -1124,10 +1102,12 @@ struct ModelsSettingsPane: View {
             return .ignored
         }
 
+        let previousScrollAnchorID = hierarchyState.scrollAnchorID
         let action = hierarchyState.handleKeyboardCommand(
             command,
             in: catalogExperience
         )
+        requestCatalogScrollIfChanged(from: previousScrollAnchorID)
         focusedCatalogRowID = hierarchyState.focusedRowID
         switch action {
         case .none:
@@ -1144,6 +1124,17 @@ struct ModelsSettingsPane: View {
             beginSelectedRemoval(in: catalogExperience)
         }
         return .handled
+    }
+
+    private func requestCatalogScrollIfChanged(
+        from previousScrollAnchorID: ModelCatalogHierarchyRowID?
+    ) {
+        guard hierarchyState.scrollAnchorID != nil,
+              hierarchyState.scrollAnchorID != previousScrollAnchorID
+        else {
+            return
+        }
+        viewportRestorationGeneration &+= 1
     }
 
     private func announce(_ message: String) {
@@ -2869,16 +2860,11 @@ private struct ModelCatalogSurface<Row: View>: View {
                     onAction: onReset
                 )
             } else {
-                LazyVStack(spacing: 0) {
+                VStack(spacing: 0) {
                     if hierarchyRows.isEmpty {
                         ForEach(rows) { catalogRow in
                             row(catalogRow, nil)
                                 .id(ModelCatalogHierarchyRowID.standaloneArtifact(catalogRow.id))
-                                .modifier(
-                                    ModelCatalogViewportRowModifier(
-                                        id: .standaloneArtifact(catalogRow.id)
-                                    )
-                                )
                                 .onAppear {
                                     ModelCatalogPerformanceTrace.event(
                                         "row-visible"
@@ -2964,11 +2950,6 @@ private struct ModelCatalogSurface<Row: View>: View {
                                 }
                             }
                             .id(hierarchyRow.id)
-                            .modifier(
-                                ModelCatalogViewportRowModifier(
-                                    id: hierarchyRow.id
-                                )
-                            )
                             .onAppear {
                                 ModelCatalogPerformanceTrace.event(
                                     "row-visible"
@@ -2995,7 +2976,6 @@ private struct ModelCatalogSurface<Row: View>: View {
                         }
                     }
                 }
-                .scrollTargetLayout()
             }
         }
         .background(TextifyVisualIdentity.cardSurface)
@@ -3010,42 +2990,6 @@ private struct ModelCatalogSurface<Row: View>: View {
                         colorSchemeContrast == .increased ? 2 : 1
                 )
         }
-    }
-}
-
-private struct ModelCatalogViewportRowModifier: ViewModifier {
-    let id: ModelCatalogHierarchyRowID
-
-    func body(content: Content) -> some View {
-        content.background {
-            GeometryReader { proxy in
-                Color.clear.preference(
-                    key: ModelCatalogViewportPreferenceKey.self,
-                    value: [
-                        ModelCatalogViewportRowPosition(
-                            id: id,
-                            minY: proxy.frame(
-                                in: .named(
-                                    SettingsPaneLayout<EmptyView>
-                                        .catalogCoordinateSpace
-                                )
-                            ).minY
-                        ),
-                    ]
-                )
-            }
-        }
-    }
-}
-
-private struct ModelCatalogViewportPreferenceKey: PreferenceKey {
-    static var defaultValue: [ModelCatalogViewportRowPosition] = []
-
-    static func reduce(
-        value: inout [ModelCatalogViewportRowPosition],
-        nextValue: () -> [ModelCatalogViewportRowPosition]
-    ) {
-        value.append(contentsOf: nextValue())
     }
 }
 
@@ -5262,69 +5206,40 @@ extension MicrophonePermissionStatus {
 }
 
 private struct SettingsPaneLayout<Content: View>: View {
-    static var catalogCoordinateSpace: String {
-        "model-catalog-scroll"
-    }
-
     let title: String
     let subtitleOverride: String?
     let maxContentWidth: CGFloat
-    let scrollPosition: Binding<ModelCatalogHierarchyRowID?>?
     let catalogViewportRestoration: ModelCatalogViewportRestoration?
-    let onCatalogViewportChange:
-        (([ModelCatalogViewportRowPosition]) -> Void)?
     @ViewBuilder var content: Content
 
     init(
         title: String,
         subtitle: String? = nil,
         maxContentWidth: CGFloat = TextifyWindowMetrics.readableContentWidth,
-        scrollPosition: Binding<ModelCatalogHierarchyRowID?>? = nil,
         catalogViewportRestoration:
             ModelCatalogViewportRestoration? = nil,
-        onCatalogViewportChange:
-            (([ModelCatalogViewportRowPosition]) -> Void)? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
         self.subtitleOverride = subtitle
         self.maxContentWidth = maxContentWidth
-        self.scrollPosition = scrollPosition
         self.catalogViewportRestoration = catalogViewportRestoration
-        self.onCatalogViewportChange = onCatalogViewportChange
         self.content = content()
     }
 
-    @ViewBuilder
     var body: some View {
-        if let scrollPosition {
-            ScrollViewReader { proxy in
-                paneScrollView
-                    .coordinateSpace(name: Self.catalogCoordinateSpace)
-                    .scrollPosition(id: scrollPosition, anchor: .top)
-                    .onPreferenceChange(
-                        ModelCatalogViewportPreferenceKey.self
-                    ) {
-                        onCatalogViewportChange?($0)
-                    }
-                    .onChange(
-                        of: catalogViewportRestoration?.generation
-                    ) { _, _ in
-                        guard let request =
-                                catalogViewportRestoration
-                        else {
-                            return
-                        }
-                        proxy.scrollTo(request.rowID, anchor: .top)
-                    }
-                    .background {
-                        ModelCatalogScrollOffsetRestorer(
-                            request: catalogViewportRestoration
-                        )
-                    }
-            }
-        } else {
+        ScrollViewReader { proxy in
             paneScrollView
+                .onChange(
+                    of: catalogViewportRestoration?.generation
+                ) { _, _ in
+                    guard let request =
+                            catalogViewportRestoration
+                    else {
+                        return
+                    }
+                    proxy.scrollTo(request.rowID, anchor: .top)
+                }
         }
     }
 
@@ -5350,48 +5265,6 @@ private struct SettingsPaneLayout<Content: View>: View {
         subtitleOverride
             ?? SettingsPane.productionVisiblePanes.first { $0.title == title }?.productionSubtitle
             ?? ""
-    }
-}
-
-private struct ModelCatalogScrollOffsetRestorer: NSViewRepresentable {
-    let request: ModelCatalogViewportRestoration?
-
-    final class Coordinator {
-        var appliedGeneration: UInt64?
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
-
-    func makeNSView(context: Context) -> NSView {
-        NSView()
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        guard let request,
-              context.coordinator.appliedGeneration != request.generation
-        else {
-            return
-        }
-        context.coordinator.appliedGeneration = request.generation
-        DispatchQueue.main.async {
-            guard let scrollView = nsView.enclosingScrollView,
-                  let documentView = scrollView.documentView
-            else {
-                return
-            }
-            var origin = scrollView.contentView.bounds.origin
-            origin.y += request.pixelOffset
-            let maximumY = max(
-                0,
-                documentView.bounds.height
-                    - scrollView.contentView.bounds.height
-            )
-            origin.y = min(max(0, origin.y), maximumY)
-            scrollView.contentView.scroll(to: origin)
-            scrollView.reflectScrolledClipView(scrollView.contentView)
-        }
     }
 }
 

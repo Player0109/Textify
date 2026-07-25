@@ -1486,3 +1486,16 @@ Task 1 must merge before parallel Wave 1 work begins.
   matrix and real queue/partial soak did not replace production failpoints or
   forced process relaunches. The Production Model Fault Injection handoff above
   supersedes that limitation.
+
+## Model Catalog Scroll Performance Follow-up - 2026-07-26
+
+- The Models pane no longer publishes passive viewport changes into pane-wide
+  SwiftUI state. Keyboard navigation and selection recovery retain explicit,
+  one-way semantic scrolling; exact pixel-offset restoration during catalog
+  mutations is intentionally no longer preserved.
+- The 43-model catalog uses an eager `VStack` and no
+  `scrollTargetLayout()`. This moves its mixed-height row layout out of the
+  scrolling path and avoids the repeated lazy row creation and size fitting
+  that made trackpad scrolling visibly hitch.
+- The final Release build was validated interactively and all 800 automated
+  tests passed with 12 expected environment-gated skips and zero failures.

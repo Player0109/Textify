@@ -1945,7 +1945,7 @@ final class ModelCatalogExperienceTests: XCTestCase {
         XCTAssertNil(recovery)
     }
 
-    func testRoutinePublicationPreservesTopSemanticRowAndPixelOffset() throws {
+    func testRoutinePublicationPreservesExplicitSemanticScrollAnchor() throws {
         let experience = ModelCatalogExperience(
             trustedManifest: try signedV3FixtureManifest(),
             installedRecords: [],
@@ -1956,8 +1956,7 @@ final class ModelCatalogExperienceTests: XCTestCase {
             experience.families.first?.checkpoints.first
         )
         var state = ModelCatalogHierarchyState(
-            scrollAnchorID: .checkpoint(checkpoint.id),
-            scrollAnchorPixelOffset: 19.5
+            scrollAnchorID: .checkpoint(checkpoint.id)
         )
 
         state.reconcile(from: experience, to: experience)
@@ -1966,7 +1965,6 @@ final class ModelCatalogExperienceTests: XCTestCase {
             state.scrollAnchorID,
             .checkpoint(checkpoint.id)
         )
-        XCTAssertEqual(state.scrollAnchorPixelOffset, 19.5)
     }
 
     func testRoutineQueryPublicationPreservesHiddenExpansionIDs() throws {
@@ -2081,8 +2079,7 @@ final class ModelCatalogExperienceTests: XCTestCase {
             selection: .exactArtifact(selectedArtifact.id),
             expandedCheckpointIDs: [checkpoint.id],
             focusedRowID: .exactArtifact(selectedArtifact.id),
-            scrollAnchorID: .exactArtifact(selectedArtifact.id),
-            scrollAnchorPixelOffset: 17
+            scrollAnchorID: .exactArtifact(selectedArtifact.id)
         )
         let filteredExperience = ModelCatalogExperience(
             trustedManifest: manifest,
@@ -2100,7 +2097,6 @@ final class ModelCatalogExperienceTests: XCTestCase {
         XCTAssertEqual(state.selection, .checkpoint(checkpoint.id))
         XCTAssertEqual(state.focusedRowID, .checkpoint(checkpoint.id))
         XCTAssertEqual(state.scrollAnchorID, .checkpoint(checkpoint.id))
-        XCTAssertEqual(state.scrollAnchorPixelOffset, 0)
     }
 
     func testKeyboardNavigationMovesAcrossOffscreenRowsAndKeepsFocusScrollAndSelectionTogether() throws {
