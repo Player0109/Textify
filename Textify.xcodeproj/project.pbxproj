@@ -15,6 +15,7 @@
 		20CC47763A7B676444BE009F /* ModelCatalogVariantComparison.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5FCFD81E2C513F4D4C26431 /* ModelCatalogVariantComparison.swift */; };
 		214BD35622CF9B9C7D5AB31C /* ONNX_Runtime.txt in Resources */ = {isa = PBXBuildFile; fileRef = 261F5703526A4920FC4DFF9D /* ONNX_Runtime.txt */; };
 		225D483CCD7F74E4320FCAA1 /* TextifyInsertion in Frameworks */ = {isa = PBXBuildFile; productRef = 07F283ACA2766E166455A5EF /* TextifyInsertion */; };
+		22631822F1C68FA854A8A32B /* ModelCatalogDerivation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0F79371515ABA39DCF665F7 /* ModelCatalogDerivation.swift */; };
 		24B9C8C0EB665F386AC9A049 /* TextifyTranscription in Frameworks */ = {isa = PBXBuildFile; productRef = 5A754B4772812D6F6B03E1B5 /* TextifyTranscription */; };
 		2669C055AEE16289EA593996 /* ModelCatalogExperience.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B1C934AC2E7D23F6CF6020 /* ModelCatalogExperience.swift */; };
 		2BA724319382989A1C583610 /* MLXSwiftLM.txt in Resources */ = {isa = PBXBuildFile; fileRef = 626CE18A6793738D87F81A13 /* MLXSwiftLM.txt */; };
@@ -102,6 +103,7 @@
 		A832DFCDACE99CAE41017E5F /* SwiftNumerics.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftNumerics.txt; sourceTree = "<group>"; };
 		AC943A14D084BC8D112A71EB /* SettingsRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRootView.swift; sourceTree = "<group>"; };
 		AEFEFF555251FEBD7FDD9B9A /* SwiftAtomics.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftAtomics.txt; sourceTree = "<group>"; };
+		B0F79371515ABA39DCF665F7 /* ModelCatalogDerivation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogDerivation.swift; sourceTree = "<group>"; };
 		B5E142BEBD39AA35B2C2A16F /* whisper.cpp.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = whisper.cpp.txt; sourceTree = "<group>"; };
 		B96F34B62CE298F0736DC70F /* SwiftSyntax.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftSyntax.txt; sourceTree = "<group>"; };
 		C32C98F05AD92486666F9717 /* MenuBarRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarRoot.swift; sourceTree = "<group>"; };
@@ -164,6 +166,7 @@
 			isa = PBXGroup;
 			children = (
 				58F5611F5BE94FA64F4648CB /* ModelCatalogArtifactInspection.swift */,
+				B0F79371515ABA39DCF665F7 /* ModelCatalogDerivation.swift */,
 				18B1C934AC2E7D23F6CF6020 /* ModelCatalogExperience.swift */,
 				5B64C10E76B28DCB342D30DE /* ModelCatalogInspectorController.swift */,
 				4CC623827B3C6D9A378CDFB3 /* ModelCatalogInspectorPresentation.swift */,
@@ -533,6 +536,7 @@
 				A144C92E74AAF7D61126BDC4 /* LaunchAtLoginController.swift in Sources */,
 				503BE9FCFD1D80B2DF7C9BA3 /* MenuBarRoot.swift in Sources */,
 				1D4C90A954214718ED04E602 /* ModelCatalogArtifactInspection.swift in Sources */,
+				22631822F1C68FA854A8A32B /* ModelCatalogDerivation.swift in Sources */,
 				2669C055AEE16289EA593996 /* ModelCatalogExperience.swift in Sources */,
 				4FA01A6BE22246F5969661A2 /* ModelCatalogInspectorController.swift in Sources */,
 				E412A5C9120B41D1B543D9F7 /* ModelCatalogInspectorPresentation.swift in Sources */,

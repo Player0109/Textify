@@ -1945,6 +1945,70 @@ final class ModelCatalogExperienceTests: XCTestCase {
         XCTAssertNil(recovery)
     }
 
+    func testRoutinePublicationPreservesTopSemanticRowAndPixelOffset() throws {
+        let experience = ModelCatalogExperience(
+            trustedManifest: try signedV3FixtureManifest(),
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        let checkpoint = try XCTUnwrap(
+            experience.families.first?.checkpoints.first
+        )
+        var state = ModelCatalogHierarchyState(
+            scrollAnchorID: .checkpoint(checkpoint.id),
+            scrollAnchorPixelOffset: 19.5
+        )
+
+        state.reconcile(from: experience, to: experience)
+
+        XCTAssertEqual(
+            state.scrollAnchorID,
+            .checkpoint(checkpoint.id)
+        )
+        XCTAssertEqual(state.scrollAnchorPixelOffset, 19.5)
+    }
+
+    func testRoutineQueryPublicationPreservesHiddenExpansionIDs() throws {
+        let manifest = try signedV3FixtureManifest()
+        let initialExperience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        let checkpoint = try XCTUnwrap(
+            initialExperience.families
+                .flatMap(\.checkpoints)
+                .first { $0.metadata.artifactIDs.count > 1 }
+        )
+        var state = ModelCatalogHierarchyState(
+            expandedCheckpointIDs: [checkpoint.id]
+        )
+        let filteredExperience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            query: ModelCatalogQuery(searchText: "no matching artifact")
+        )
+
+        state.reconcile(
+            from: initialExperience,
+            to: filteredExperience
+        )
+        state.reconcile(
+            from: filteredExperience,
+            to: initialExperience
+        )
+
+        XCTAssertTrue(
+            state.visibleRows(in: initialExperience).contains {
+                $0.id == .exactArtifact(checkpoint.artifacts[0].id)
+            }
+        )
+    }
+
     func testRemovedSelectionMovesToTheNextSurvivingSelectableRowAndAnnouncesIt() throws {
         let manifest = try signedV3FixtureManifest()
         let initialExperience = ModelCatalogExperience(
@@ -1990,6 +2054,53 @@ final class ModelCatalogExperienceTests: XCTestCase {
                 announcement: "Selection moved to Whisper Tiny, row 2 of 2."
             )
         )
+    }
+
+    func testRemovedArtifactSelectionFallsBackToItsSurvivingCheckpointFirst() throws {
+        let manifest = try signedV3FixtureManifest()
+        let initialExperience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil
+        )
+        let checkpoint = try XCTUnwrap(
+            initialExperience.families.first?.checkpoints.first
+        )
+        let selectedArtifact = try XCTUnwrap(
+            checkpoint.artifacts.first {
+                $0.id != checkpoint.metadata.recommendedArtifactID
+            }
+        )
+        let survivingArtifact = try XCTUnwrap(
+            checkpoint.artifacts.first {
+                $0.id != selectedArtifact.id
+            }
+        )
+        var state = ModelCatalogHierarchyState(
+            selection: .exactArtifact(selectedArtifact.id),
+            expandedCheckpointIDs: [checkpoint.id],
+            focusedRowID: .exactArtifact(selectedArtifact.id),
+            scrollAnchorID: .exactArtifact(selectedArtifact.id),
+            scrollAnchorPixelOffset: 17
+        )
+        let filteredExperience = ModelCatalogExperience(
+            trustedManifest: manifest,
+            installedRecords: [],
+            activePreferences: ModelCatalogActivePreferences(),
+            transferState: nil,
+            query: ModelCatalogQuery(searchText: survivingArtifact.id)
+        )
+
+        _ = state.reconcile(
+            from: initialExperience,
+            to: filteredExperience
+        )
+
+        XCTAssertEqual(state.selection, .checkpoint(checkpoint.id))
+        XCTAssertEqual(state.focusedRowID, .checkpoint(checkpoint.id))
+        XCTAssertEqual(state.scrollAnchorID, .checkpoint(checkpoint.id))
+        XCTAssertEqual(state.scrollAnchorPixelOffset, 0)
     }
 
     func testKeyboardNavigationMovesAcrossOffscreenRowsAndKeepsFocusScrollAndSelectionTogether() throws {

@@ -2,6 +2,42 @@
 
 This file records cross-agent handoffs during implementation.
 
+## Large Catalog Virtualization Handoff - 2026-07-25
+
+- GitHub issue #22 owns the narrow cross-task changes needed to keep the
+  Models destinations responsive and state-stable at production and stress
+  catalog sizes.
+- This slice may update Task 11 catalog derivation, hierarchy state,
+  virtualized presentation, focused app performance tests, and Task 14 manual
+  performance guidance and retained trace artifacts. It may regenerate the
+  Task 14-owned Xcode project only to add the new Task 11 derivation source to
+  the app target. It may make only the AppServices integration changes needed
+  to publish immutable catalog, eligibility, local-state, and query-result
+  snapshots.
+- Catalog and eligibility indexes, local-state overlays, and query results
+  retain independent immutable versions. Cancellable derivation runs away from
+  the main actor; byte-progress updates do not invalidate catalog,
+  eligibility, or query indexes.
+- Query derivation consumes the immutable Catalog Index's precomputed trusted
+  presentations and ID maps rather than rebuilding them from the raw manifest
+  for every search, filter, scope, or sort publication.
+- Routine publication preserves surviving selection, expansion, focus, and the
+  top semantic row plus pixel offset. Removed selection falls back to its
+  Checkpoint, then the next row, previous row, and first result.
+- This work preserves the signed catalog, queue, inventory, revocation,
+  deletion, Purpose Runtime Boundary, and accessibility behavior completed by
+  issues #3–#21. It does not change model trust, installation, activation,
+  deletion, or runtime transaction semantics.
+- The opt-in Apple M4 Max Release stress gate passed with 85.9 ms search p95,
+  72.2 ms filter/scope/sort p95, and 43.0 ms byte-progress publication p95. It
+  completed the 2,000-Checkpoint/10,000-Exact-Artifact fixture with the exact
+  row count and stable Catalog, Eligibility, and Query Result versions across
+  progress ticks. Representative exact-search and installed-scope identities
+  stayed correct, with 0.0 MiB resident growth across 30 post-warmup queries.
+- Cold, warm, and VoiceOver Instruments traces on the oldest supported Apple
+  Silicon configuration remain a release-maintainer hardware gate; this
+  implementation session had an Apple M4 Max, not an M1-class Mac.
+
 ## Adaptive Model Catalog Accessibility Handoff - 2026-07-24
 
 - GitHub issue #21 owns the narrow cross-task changes needed to make the

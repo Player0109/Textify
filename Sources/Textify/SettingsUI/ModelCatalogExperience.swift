@@ -1257,6 +1257,17 @@ enum ModelCatalogHierarchyRowID: Equatable, Hashable {
     }
 }
 
+struct ModelCatalogViewportRowPosition: Equatable {
+    let id: ModelCatalogHierarchyRowID
+    let minY: CGFloat
+}
+
+struct ModelCatalogViewportRestoration: Equatable {
+    let generation: UInt64
+    let rowID: ModelCatalogHierarchyRowID
+    let pixelOffset: CGFloat
+}
+
 enum ModelCatalogHierarchySelection: Equatable, Hashable {
     case checkpoint(String)
     case exactArtifact(String)
@@ -1387,17 +1398,20 @@ struct ModelCatalogHierarchyState: Equatable {
     private(set) var expandedCheckpointIDs: Set<String>
     private(set) var focusedRowID: ModelCatalogHierarchyRowID?
     private(set) var scrollAnchorID: ModelCatalogHierarchyRowID?
+    private(set) var scrollAnchorPixelOffset: CGFloat
 
     init(
         selection: ModelCatalogHierarchySelection? = nil,
         expandedCheckpointIDs: Set<String> = [],
         focusedRowID: ModelCatalogHierarchyRowID? = nil,
-        scrollAnchorID: ModelCatalogHierarchyRowID? = nil
+        scrollAnchorID: ModelCatalogHierarchyRowID? = nil,
+        scrollAnchorPixelOffset: CGFloat = 0
     ) {
         self.selection = selection
         self.expandedCheckpointIDs = expandedCheckpointIDs
         self.focusedRowID = focusedRowID
         self.scrollAnchorID = scrollAnchorID
+        self.scrollAnchorPixelOffset = scrollAnchorPixelOffset
     }
 
     mutating func select(_ selection: ModelCatalogHierarchySelection) {
@@ -1408,8 +1422,18 @@ struct ModelCatalogHierarchyState: Equatable {
         focusedRowID = rowID
     }
 
-    mutating func scroll(to rowID: ModelCatalogHierarchyRowID?) {
+    mutating func scroll(
+        to rowID: ModelCatalogHierarchyRowID?,
+        pixelOffset: CGFloat = 0
+    ) {
+        let normalizedOffset = max(0, pixelOffset)
+        guard scrollAnchorID != rowID
+                || scrollAnchorPixelOffset != normalizedOffset
+        else {
+            return
+        }
         scrollAnchorID = rowID
+        scrollAnchorPixelOffset = normalizedOffset
     }
 
     mutating func toggleExpansion(of checkpoint: ModelCatalogCheckpointPresentation) {
@@ -1428,6 +1452,7 @@ struct ModelCatalogHierarchyState: Equatable {
             }
             if let scrollAnchorID, childRowIDs.contains(scrollAnchorID) {
                 self.scrollAnchorID = .checkpoint(checkpoint.id)
+                scrollAnchorPixelOffset = 0
             }
         } else {
             expandedCheckpointIDs.insert(checkpoint.id)
@@ -1451,9 +1476,7 @@ struct ModelCatalogHierarchyState: Equatable {
         let validArtifactIDs = Set(experience.rows.map(\.id))
 
         expandedCheckpointIDs.formIntersection(
-            checkpoints
-                .filter { $0.metadata.artifactIDs.count > 1 }
-                .map(\.id)
+            experience.allExpandableCheckpointIDs
         )
 
         let updatedRowIDs = keyboardRowIDs(in: experience)
@@ -1464,12 +1487,24 @@ struct ModelCatalogHierarchyState: Equatable {
         case let .checkpoint(id) where !validCheckpointIDs.contains(id),
              let .exactArtifact(id) where !validArtifactIDs.contains(id):
             let removedRowID = rowID(for: selection)
-            let replacement = nearestSelectableRow(
-                to: removedRowID,
-                previousRowIDs: previousRowIDs,
-                updatedRowIDs: updatedRowIDs,
-                in: experience
-            )
+            let parentCheckpointID = previousExperience.flatMap {
+                containingCheckpointID(
+                    for: selection,
+                    in: $0
+                )
+            }
+            let replacement: ModelCatalogHierarchyRowID?
+            if let parentCheckpointID,
+               validCheckpointIDs.contains(parentCheckpointID) {
+                replacement = .checkpoint(parentCheckpointID)
+            } else {
+                replacement = nearestSelectableRow(
+                    to: removedRowID,
+                    previousRowIDs: previousRowIDs,
+                    updatedRowIDs: updatedRowIDs,
+                    in: experience
+                )
+            }
             selection = replacement.flatMap {
                 selection(for: $0, in: experience)
             }
@@ -1505,6 +1540,7 @@ struct ModelCatalogHierarchyState: Equatable {
                     previousRowIDs: previousRowIDs,
                     updatedRowIDs: updatedRowIDs
                 )
+            scrollAnchorPixelOffset = 0
         }
         return recovery
     }
@@ -1826,6 +1862,22 @@ struct ModelCatalogHierarchyState: Equatable {
             .lazy
             .flatMap(\.checkpoints)
             .first { $0.id == checkpointID }
+    }
+
+    private func containingCheckpointID(
+        for selection: ModelCatalogHierarchySelection?,
+        in experience: ModelCatalogExperience
+    ) -> String? {
+        guard case let .exactArtifact(artifactID) = selection else {
+            return nil
+        }
+        return experience.families
+            .lazy
+            .flatMap(\.checkpoints)
+            .first {
+                $0.metadata.artifactIDs.contains(artifactID)
+            }?
+            .id
     }
 
     private func collapsibleCheckpoint(
@@ -2229,6 +2281,51 @@ struct ModelCatalogStorageSummaryPresentation: Equatable {
     }
 }
 
+struct ModelCatalogPresentationIndex: @unchecked Sendable {
+    let trustedManifest: ModelManifest?
+    let trustedCatalog: [ProductionModelPresentation]
+    let trustedIDs: Set<String>
+    let trustedModelsByID: [String: ModelEntry]
+    let familiesByID: [String: ModelFamilyPresentationNode]
+    let checkpointsByID: [String: ModelCheckpointPresentationNode]
+    let artifactsByID: [String: ModelExactArtifactPresentationNode]
+
+    init(trustedManifest: ModelManifest?) {
+        self.trustedManifest = trustedManifest
+        let trustedModelsByID = Dictionary(
+            uniqueKeysWithValues:
+                (trustedManifest?.models ?? []).map { ($0.id, $0) }
+        )
+        let familiesByID = Dictionary(
+            uniqueKeysWithValues:
+                (trustedManifest?.presentationGraph?.families ?? [])
+                .map { ($0.id, $0) }
+        )
+        let checkpointsByID = Dictionary(
+            uniqueKeysWithValues:
+                (trustedManifest?.presentationGraph?.checkpoints ?? [])
+                .map { ($0.id, $0) }
+        )
+        let artifactsByID = Dictionary(
+            uniqueKeysWithValues:
+                (trustedManifest?.presentationGraph?.artifacts ?? [])
+                .map { ($0.id, $0) }
+        )
+        let trustedCatalog = (trustedManifest?.models ?? []).map {
+            ProductionModelPresentation(
+                model: $0,
+                signedArtifact: artifactsByID[$0.id]
+            )
+        }
+        self.trustedModelsByID = trustedModelsByID
+        self.familiesByID = familiesByID
+        self.checkpointsByID = checkpointsByID
+        self.artifactsByID = artifactsByID
+        self.trustedCatalog = trustedCatalog
+        trustedIDs = Set(trustedCatalog.map(\.id))
+    }
+}
+
 struct ModelCatalogExperience: Equatable {
     let rows: [ModelCatalogRowPresentation]
     let families: [ModelCatalogFamilyPresentation]
@@ -2237,6 +2334,33 @@ struct ModelCatalogExperience: Equatable {
     let sizeLabel: String
     private let inspectorFamilies: [ModelCatalogFamilyPresentation]
     private let inspectorRowsByID: [String: ModelCatalogRowPresentation]
+
+    var allExpandableCheckpointIDs: Set<String> {
+        Set(
+            inspectorFamilies
+                .flatMap(\.checkpoints)
+                .filter { $0.metadata.artifactIDs.count > 1 }
+                .map(\.id)
+        )
+    }
+
+    private init(
+        rows: [ModelCatalogRowPresentation],
+        families: [ModelCatalogFamilyPresentation],
+        filterOptions: ModelCatalogFilterOptions,
+        pinnedReveal: ModelCatalogPinnedRevealPresentation?,
+        sizeLabel: String,
+        inspectorFamilies: [ModelCatalogFamilyPresentation],
+        inspectorRowsByID: [String: ModelCatalogRowPresentation]
+    ) {
+        self.rows = rows
+        self.families = families
+        self.filterOptions = filterOptions
+        self.pinnedReveal = pinnedReveal
+        self.sizeLabel = sizeLabel
+        self.inspectorFamilies = inspectorFamilies
+        self.inspectorRowsByID = inspectorRowsByID
+    }
 
     init(
         trustedModels: [ModelEntry],
@@ -2250,10 +2374,15 @@ struct ModelCatalogExperience: Equatable {
         installedSizeStatus: ModelCatalogInstalledSizeStatus = .measured,
         query: ModelCatalogQuery = ModelCatalogQuery()
     ) {
+        let trustedManifest = ModelManifest(
+            manifestVersion: 1,
+            generatedAt: "1970-01-01T00:00:00Z",
+            models: trustedModels
+        )
         self.init(
-            trustedModels: trustedModels,
-            presentationGraph: nil,
-            artifactAliases: [],
+            catalogIndex: ModelCatalogPresentationIndex(
+                trustedManifest: trustedManifest
+            ),
             installedRecords: installedRecords,
             activePreferences: activePreferences,
             transferStatesByModelID: Self.transferStatesByModelID(
@@ -2286,9 +2415,9 @@ struct ModelCatalogExperience: Equatable {
         let checkpointResolutions = compatibilityResolver?
             .checkpointResolutions(in: trustedManifest) ?? [:]
         self.init(
-            trustedModels: trustedManifest?.models ?? [],
-            presentationGraph: trustedManifest?.presentationGraph,
-            artifactAliases: trustedManifest?.artifactAliases ?? [],
+            catalogIndex: ModelCatalogPresentationIndex(
+                trustedManifest: trustedManifest
+            ),
             compatibilityByModelID: compatibilityByModelID,
             checkpointResolutions: checkpointResolutions,
             installedRecords: installedRecords,
@@ -2307,7 +2436,8 @@ struct ModelCatalogExperience: Equatable {
 
     init(
         trustedManifest: ModelManifest?,
-        compatibilityResolver: ModelCatalogCompatibilityResolver? = nil,
+        compatibilityByModelID: [String: ModelCatalogCompatibility],
+        checkpointResolutions: [String: ModelCatalogCheckpointResolution],
         installedRecords: [InstalledModelRecord],
         activePreferences: ModelCatalogActivePreferences,
         transferStatesByModelID: [String: DownloadState],
@@ -2318,14 +2448,10 @@ struct ModelCatalogExperience: Equatable {
         installedSizeStatus: ModelCatalogInstalledSizeStatus = .measured,
         query: ModelCatalogQuery = ModelCatalogQuery()
     ) {
-        let compatibilityByModelID = compatibilityResolver?
-            .compatibilityByModelID(in: trustedManifest) ?? [:]
-        let checkpointResolutions = compatibilityResolver?
-            .checkpointResolutions(in: trustedManifest) ?? [:]
         self.init(
-            trustedModels: trustedManifest?.models ?? [],
-            presentationGraph: trustedManifest?.presentationGraph,
-            artifactAliases: trustedManifest?.artifactAliases ?? [],
+            catalogIndex: ModelCatalogPresentationIndex(
+                trustedManifest: trustedManifest
+            ),
             compatibilityByModelID: compatibilityByModelID,
             checkpointResolutions: checkpointResolutions,
             installedRecords: installedRecords,
@@ -2340,10 +2466,43 @@ struct ModelCatalogExperience: Equatable {
         )
     }
 
-    private init(
-        trustedModels: [ModelEntry],
-        presentationGraph: ModelCatalogPresentationGraph?,
-        artifactAliases: [ModelArtifactAlias],
+    init(
+        trustedManifest: ModelManifest?,
+        compatibilityResolver: ModelCatalogCompatibilityResolver? = nil,
+        installedRecords: [InstalledModelRecord],
+        activePreferences: ModelCatalogActivePreferences,
+        transferStatesByModelID: [String: DownloadState],
+        revocationOverlay: ModelRevocationOverlay = .init(),
+        managedReadinessByModelID: [String: ModelCatalogManagedReadiness] = [:],
+        onDiskBytesByModelID: [String: Int64] = [:],
+        storageInventoryByModelID: [String: ModelStorageArtifactInventory] = [:],
+        installedSizeStatus: ModelCatalogInstalledSizeStatus = .measured,
+        query: ModelCatalogQuery = ModelCatalogQuery()
+    ) {
+        let compatibilityByModelID = compatibilityResolver?
+            .compatibilityByModelID(in: trustedManifest) ?? [:]
+        let checkpointResolutions = compatibilityResolver?
+            .checkpointResolutions(in: trustedManifest) ?? [:]
+        self.init(
+            catalogIndex: ModelCatalogPresentationIndex(
+                trustedManifest: trustedManifest
+            ),
+            compatibilityByModelID: compatibilityByModelID,
+            checkpointResolutions: checkpointResolutions,
+            installedRecords: installedRecords,
+            activePreferences: activePreferences,
+            transferStatesByModelID: transferStatesByModelID,
+            revocationOverlay: revocationOverlay,
+            managedReadinessByModelID: managedReadinessByModelID,
+            onDiskBytesByModelID: onDiskBytesByModelID,
+            storageInventoryByModelID: storageInventoryByModelID,
+            installedSizeStatus: installedSizeStatus,
+            query: query
+        )
+    }
+
+    init(
+        catalogIndex: ModelCatalogPresentationIndex,
         compatibilityByModelID: [String: ModelCatalogCompatibility] = [:],
         checkpointResolutions: [String: ModelCatalogCheckpointResolution] = [:],
         installedRecords: [InstalledModelRecord],
@@ -2356,13 +2515,7 @@ struct ModelCatalogExperience: Equatable {
         installedSizeStatus: ModelCatalogInstalledSizeStatus,
         query: ModelCatalogQuery
     ) {
-        let trustedManifest = ModelManifest(
-            manifestVersion: presentationGraph == nil ? 1 : 3,
-            generatedAt: "1970-01-01T00:00:00Z",
-            models: trustedModels,
-            presentationGraph: presentationGraph,
-            artifactAliases: artifactAliases
-        )
+        let trustedManifest = catalogIndex.trustedManifest
         let placementSnapshot = ModelArtifactPlacementResolver().reconcile(
             records: installedRecords,
             trustedManifest: trustedManifest
@@ -2370,21 +2523,9 @@ struct ModelCatalogExperience: Equatable {
         let installedRecords = placementSnapshot.records
         let sizeLabel = query.scope == .installed ? "On Disk" : "Download Size"
         self.sizeLabel = sizeLabel
-        let signedArtifactsByID = presentationGraph?.artifacts.reduce(
-            into: [String: ModelExactArtifactPresentationNode]()
-        ) {
-            $0[$1.id] = $1
-        } ?? [:]
-        let trustedCatalog = trustedModels.map {
-            ProductionModelPresentation(
-                model: $0,
-                signedArtifact: signedArtifactsByID[$0.id]
-            )
-        }
-        let trustedIDs = Set(trustedCatalog.map(\.id))
-        let trustedModelsByID = trustedModels.reduce(into: [String: ModelEntry]()) {
-            $0[$1.id] = $1
-        }
+        let trustedCatalog = catalogIndex.trustedCatalog
+        let trustedIDs = catalogIndex.trustedIDs
+        let trustedModelsByID = catalogIndex.trustedModelsByID
         let installedByID = installedRecords.reduce(into: [String: ModelEntry]()) {
             $0[$1.model.id] = $1.model
         }
@@ -2467,7 +2608,7 @@ struct ModelCatalogExperience: Equatable {
                 )
             )
         }
-        let allFamilies = presentationGraph.map {
+        let allFamilies = trustedManifest?.presentationGraph.map {
             Self.makeFamilyPresentations(
                 graph: $0,
                 rows: allRows,
@@ -2492,7 +2633,7 @@ struct ModelCatalogExperience: Equatable {
             rows: allRows
         )
 
-        if presentationGraph != nil {
+        if trustedManifest?.presentationGraph != nil {
             let queriedFamilies = Self.queryFamilies(
                 allFamilies,
                 query: query
@@ -2517,6 +2658,92 @@ struct ModelCatalogExperience: Equatable {
             families = []
             rows = Self.queryStandaloneRows(allRows, query: query)
         }
+    }
+
+    func applyingTransferStates(
+        _ transferStatesByModelID: [String: DownloadState]
+    ) -> ModelCatalogExperience {
+        func patch(
+            _ row: ModelCatalogRowPresentation
+        ) -> ModelCatalogRowPresentation {
+            guard let state = ModelInstallRowPresentation.state(
+                for: row.id,
+                from: transferStatesByModelID
+            ) else {
+                return row
+            }
+            return ModelCatalogRowPresentation(
+                model: row.model,
+                operationalModel: row.operationalModel,
+                installedRecord: row.installedRecord,
+                storageInventory: row.storageInventory,
+                installedSizeStatus: row.installedSizeStatus,
+                onDiskBytes: row.onDiskBytes,
+                sizeLabel: row.sizeLabel,
+                sizeDescription: row.sizeDescription,
+                compatibility: row.compatibility,
+                placement: row.placement,
+                isRevoked: row.isRevoked,
+                isInstalled: row.isInstalled,
+                isActive: row.isActive,
+                install: ModelCatalogInstallPresentation(state: state),
+                stateTokens: row.stateTokens,
+                actions: row.actions
+            )
+        }
+
+        func patch(
+            _ families: [ModelCatalogFamilyPresentation]
+        ) -> [ModelCatalogFamilyPresentation] {
+            families.map { family in
+                ModelCatalogFamilyPresentation(
+                    metadata: family.metadata,
+                    checkpoints: family.checkpoints.map { checkpoint in
+                        let artifacts = checkpoint.artifacts.map { artifact in
+                            ModelCatalogExactArtifactPresentation(
+                                metadata: artifact.metadata,
+                                row: patch(artifact.row)
+                            )
+                        }
+                        let artifactsByID = Dictionary(
+                            uniqueKeysWithValues: artifacts.map {
+                                ($0.id, $0)
+                            }
+                        )
+                        return ModelCatalogCheckpointPresentation(
+                            metadata: checkpoint.metadata,
+                            artifacts: artifacts,
+                            referenceArtifact: checkpoint.referenceArtifact
+                                .flatMap { artifactsByID[$0.id] },
+                            defaultInstallArtifact:
+                                checkpoint.defaultInstallArtifact
+                                    .flatMap { artifactsByID[$0.id] },
+                            resolution: checkpoint.resolution,
+                            installedOnDiskBytes:
+                                checkpoint.installedOnDiskBytes
+                        )
+                    }
+                )
+            }
+        }
+
+        let updatedRows = rows.map(patch)
+        let updatedFamilies = patch(families)
+        let updatedInspectorFamilies = patch(inspectorFamilies)
+        let updatedInspectorRowsByID = inspectorRowsByID.mapValues(patch)
+        return ModelCatalogExperience(
+            rows: updatedRows,
+            families: updatedFamilies,
+            filterOptions: filterOptions,
+            pinnedReveal: Self.makePinnedReveal(
+                artifactID: pinnedReveal?.artifactID,
+                families: updatedInspectorFamilies,
+                rows: Array(updatedInspectorRowsByID.values)
+            ),
+            sizeLabel: sizeLabel,
+            inspectorFamilies: updatedInspectorFamilies,
+            inspectorRowsByID: updatedInspectorRowsByID
+        )
     }
 
     private static func transferStatesByModelID(

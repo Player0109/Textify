@@ -511,3 +511,49 @@ was restored after the audit.
   installed models and user data were not modified. Their semantics and
   focus/announcement transitions are covered by the focused automated fixtures
   above.
+
+## Large Catalog Performance Verification - 2026-07-25
+
+The Models destinations now derive four independently versioned immutable
+layers away from the main actor: Catalog Index, Eligibility Index, Local-State
+Overlay, and Query Result. Release builds retain `ModelCatalog` signposts for
+catalog indexing, eligibility, local overlay projection, query derivation,
+publication, and lazy row visibility/recycling.
+
+Automated release stress is opt-in so the ordinary suite does not allocate the
+10,000-artifact fixture:
+
+```bash
+TEXTIFY_RUN_CATALOG_STRESS=1 \
+  swift test -c release \
+  --filter ModelCatalogDerivationTests.testReleaseStressCatalogBudgets
+```
+
+- PASS: a 500-Checkpoint/2,000-Exact-Artifact fixture enforces search and
+  filter/scope/sort p95 under 250 ms, with a submitted warm search under
+  100 ms. The Apple M4 Max Release run measured 85.9 ms search p95 and 72.2 ms
+  filter/scope/sort p95.
+- PASS: an approximately 2,000-Checkpoint/10,000-Exact-Artifact fixture
+  derives without a crash, hang, incorrect row count, or query-index rebuild
+  across repeated byte-progress mutations. Exact search and installed-scope
+  identities remain correct, and 30 repeated queries after warmup measured
+  0.0 MiB resident-memory growth.
+- PASS: 10,000-artifact byte-progress publication enforces p95 under 100 ms
+  while Catalog Index, Eligibility Index, and Query Result versions remain
+  unchanged. The same Release run measured 43.0 ms progress-publication p95.
+- PASS with focused state fixtures: collapsed Checkpoints construct no child
+  hierarchy rows; routine publication retains surviving selection, expansion,
+  focus, and semantic scroll anchor state; removed Exact Artifact selection
+  falls back to its surviving Checkpoint before next, previous, or first row.
+
+Before release certification, capture cold, warm, and VoiceOver Instruments
+traces on the oldest supported Apple Silicon configuration. Use the
+`ModelCatalog` points of interest to verify that `row-visible` remains bounded
+to the viewport plus accessibility overscan, `row-recycled` follows scripted
+scrolling, no unexplained main-thread stall exceeds 100 ms, and fewer than one
+percent of frames exceed two display frames. Store the resulting trace bundle
+with the release evidence; do not commit machine-specific `.trace` data.
+
+- BLOCKED for this implementation session: the available Apple M4 Max is not
+  the oldest supported Apple Silicon configuration, so the required M1 cold,
+  warm, and VoiceOver trace capture remains a release-maintainer hardware gate.

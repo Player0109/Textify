@@ -555,6 +555,11 @@ struct ModelsSettingsPane: View {
         ModelRemovalConfirmationPresentation?
     @State private var discoveryQuery = ModelCatalogQuery()
     @State private var hierarchyState = ModelCatalogHierarchyState()
+    @State private var derivationCoordinator =
+        ModelCatalogDerivationCoordinator()
+    @State private var reconciledCatalogExperience:
+        ModelCatalogExperience?
+    @State private var viewportRestorationGeneration: UInt64 = 0
     @State private var inspectorController = ModelCatalogInspectorController()
     @State private var verificationRestorationIDsByArtifact:
         [String: [String]] = [:]
@@ -571,13 +576,18 @@ struct ModelsSettingsPane: View {
     }
 
     var body: some View {
-        let catalogExperience = services.modelCatalogExperience(
+        let derivationRequest = services.modelCatalogDerivationRequest(
             for: destination.purpose,
             query: catalogQuery
         )
-        let announcementRows = services.modelCatalogExperience(
-            for: destination.purpose
-        ).rows
+        let catalogExperience = derivationCoordinator.snapshot?.experience
+            ?? ModelCatalogExperience(
+                trustedModels: [],
+                installedRecords: [],
+                activePreferences: ModelCatalogActivePreferences(),
+                transferState: nil,
+                query: catalogQuery
+            )
 
         return SettingsPaneLayout(
             title: destination.title,
@@ -585,8 +595,18 @@ struct ModelsSettingsPane: View {
             maxContentWidth: 1_360,
             scrollPosition: Binding(
                 get: { hierarchyState.scrollAnchorID },
-                set: { hierarchyState.scroll(to: $0) }
-            )
+                set: { rowID in
+                    hierarchyState.scroll(
+                        to: rowID,
+                        pixelOffset:
+                            rowID == hierarchyState.scrollAnchorID
+                                ? hierarchyState.scrollAnchorPixelOffset
+                                : 0
+                    )
+                }
+            ),
+            catalogViewportRestoration: viewportRestoration,
+            onCatalogViewportChange: updateCatalogViewport
         ) {
             catalogStatus(hasRows: !catalogExperience.rows.isEmpty)
 
@@ -668,7 +688,11 @@ struct ModelsSettingsPane: View {
                 }
             }
 
-            catalogSurface(catalogExperience)
+            catalogSurface(
+                catalogExperience,
+                isDerivationPending:
+                    derivationCoordinator.snapshot == nil
+            )
         }
         .inspector(isPresented: $showsInspector) {
             ScrollView {
@@ -689,16 +713,33 @@ struct ModelsSettingsPane: View {
             _ = announcementTracker.update(
                 attempts: services.modelInstallCoordinator.attempts
             )
-            _ = announcementTracker.update(rows: announcementRows)
             services.refreshModelStorageInventory()
             _ = await services.dictation.refreshReadiness()
             await services.modelCatalogCoordinator.refresh()
         }
-        .onChange(of: catalogExperience) { previousExperience, updatedExperience in
+        .onChange(of: derivationRequest, initial: true) { _, request in
+            derivationCoordinator.submit(request)
+        }
+        .onDisappear {
+            derivationCoordinator.cancel()
+        }
+        .onChange(
+            of: derivationCoordinator.snapshot?.versions.queryResult,
+            initial: true
+        ) { _, _ in
+            guard let updatedExperience =
+                    derivationCoordinator.snapshot?.experience
+            else {
+                return
+            }
             let recovery = hierarchyState.reconcile(
-                from: previousExperience,
+                from: reconciledCatalogExperience,
                 to: updatedExperience
             )
+            reconciledCatalogExperience = updatedExperience
+            if hierarchyState.scrollAnchorID != nil {
+                viewportRestorationGeneration &+= 1
+            }
             focusedCatalogRowID = hierarchyState.focusedRowID
             inspectorController.select(
                 hierarchyState.selection,
@@ -712,6 +753,25 @@ struct ModelsSettingsPane: View {
                 accessibilityFocusedCatalogRowID = rowID
                 announce(recovery.announcement)
             }
+            for announcement in announcementTracker.update(
+                rows: updatedExperience.rows
+            ) {
+                announce(announcement)
+            }
+        }
+        .onChange(
+            of: derivationCoordinator.snapshot?.versions.localStateOverlay
+        ) { _, _ in
+            guard showsInspector,
+                  let updatedExperience =
+                    derivationCoordinator.snapshot?.experience
+            else {
+                return
+            }
+            inspectorController.select(
+                hierarchyState.selection,
+                in: updatedExperience
+            )
         }
         .onChange(of: focusedCatalogRowID) { _, rowID in
             hierarchyState.focus(rowID)
@@ -729,11 +789,6 @@ struct ModelsSettingsPane: View {
             for announcement in announcementTracker.update(
                 attempts: attempts
             ) {
-                announce(announcement)
-            }
-        }
-        .onChange(of: announcementRows) { _, rows in
-            for announcement in announcementTracker.update(rows: rows) {
                 announce(announcement)
             }
         }
@@ -923,6 +978,34 @@ struct ModelsSettingsPane: View {
         services.settingsRouter.dismissModelReveal()
     }
 
+    private var viewportRestoration:
+        ModelCatalogViewportRestoration? {
+        hierarchyState.scrollAnchorID.map {
+            ModelCatalogViewportRestoration(
+                generation: viewportRestorationGeneration,
+                rowID: $0,
+                pixelOffset: hierarchyState.scrollAnchorPixelOffset
+            )
+        }
+    }
+
+    private func updateCatalogViewport(
+        _ positions: [ModelCatalogViewportRowPosition]
+    ) {
+        guard !positions.isEmpty else {
+            return
+        }
+        let ordered = positions.sorted { $0.minY < $1.minY }
+        let top = ordered
+            .filter { $0.minY <= 0 }
+            .max { $0.minY < $1.minY }
+            ?? ordered[0]
+        hierarchyState.scroll(
+            to: top.id,
+            pixelOffset: max(0, -top.minY)
+        )
+    }
+
     private func verifyInstalledModels() {
         Task {
             _ = await services.dictation.refreshReadiness()
@@ -948,15 +1031,18 @@ struct ModelsSettingsPane: View {
     }
 
     private func catalogSurface(
-        _ catalogExperience: ModelCatalogExperience
+        _ catalogExperience: ModelCatalogExperience,
+        isDerivationPending: Bool
     ) -> some View {
         ModelCatalogSurface(
-            rows: isInitialCatalogCheck ? [] : catalogExperience.rows,
+            rows: isInitialCatalogCheck || isDerivationPending
+                ? []
+                : catalogExperience.rows,
             sizeLabel: catalogExperience.sizeLabel,
-            hierarchyRows: isInitialCatalogCheck
+            hierarchyRows: isInitialCatalogCheck || isDerivationPending
                 ? []
                 : hierarchyState.visibleRows(in: catalogExperience),
-            accessibilityRows: isInitialCatalogCheck
+            accessibilityRows: isInitialCatalogCheck || isDerivationPending
                 ? []
                 : hierarchyState.accessibilityRows(in: catalogExperience),
             selection: hierarchyState.selection,
@@ -975,7 +1061,9 @@ struct ModelsSettingsPane: View {
                 )
             },
             onReset: performEmptyStateAction,
-            emptyPresentation: emptyPresentation
+            emptyPresentation: isDerivationPending
+                ? .checking
+                : emptyPresentation
         ) { row, context in
             catalogRow(
                 row,
@@ -2786,6 +2874,21 @@ private struct ModelCatalogSurface<Row: View>: View {
                         ForEach(rows) { catalogRow in
                             row(catalogRow, nil)
                                 .id(ModelCatalogHierarchyRowID.standaloneArtifact(catalogRow.id))
+                                .modifier(
+                                    ModelCatalogViewportRowModifier(
+                                        id: .standaloneArtifact(catalogRow.id)
+                                    )
+                                )
+                                .onAppear {
+                                    ModelCatalogPerformanceTrace.event(
+                                        "row-visible"
+                                    )
+                                }
+                                .onDisappear {
+                                    ModelCatalogPerformanceTrace.event(
+                                        "row-recycled"
+                                    )
+                                }
                                 .focusable()
                                 .focused(
                                     focusedRowID,
@@ -2861,6 +2964,21 @@ private struct ModelCatalogSurface<Row: View>: View {
                                 }
                             }
                             .id(hierarchyRow.id)
+                            .modifier(
+                                ModelCatalogViewportRowModifier(
+                                    id: hierarchyRow.id
+                                )
+                            )
+                            .onAppear {
+                                ModelCatalogPerformanceTrace.event(
+                                    "row-visible"
+                                )
+                            }
+                            .onDisappear {
+                                ModelCatalogPerformanceTrace.event(
+                                    "row-recycled"
+                                )
+                            }
                             .focusable()
                             .focused(focusedRowID, equals: hierarchyRow.id)
                             .accessibilityFocused(
@@ -2892,6 +3010,42 @@ private struct ModelCatalogSurface<Row: View>: View {
                         colorSchemeContrast == .increased ? 2 : 1
                 )
         }
+    }
+}
+
+private struct ModelCatalogViewportRowModifier: ViewModifier {
+    let id: ModelCatalogHierarchyRowID
+
+    func body(content: Content) -> some View {
+        content.background {
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: ModelCatalogViewportPreferenceKey.self,
+                    value: [
+                        ModelCatalogViewportRowPosition(
+                            id: id,
+                            minY: proxy.frame(
+                                in: .named(
+                                    SettingsPaneLayout<EmptyView>
+                                        .catalogCoordinateSpace
+                                )
+                            ).minY
+                        ),
+                    ]
+                )
+            }
+        }
+    }
+}
+
+private struct ModelCatalogViewportPreferenceKey: PreferenceKey {
+    static var defaultValue: [ModelCatalogViewportRowPosition] = []
+
+    static func reduce(
+        value: inout [ModelCatalogViewportRowPosition],
+        nextValue: () -> [ModelCatalogViewportRowPosition]
+    ) {
+        value.append(contentsOf: nextValue())
     }
 }
 
@@ -5119,10 +5273,17 @@ extension MicrophonePermissionStatus {
 }
 
 private struct SettingsPaneLayout<Content: View>: View {
+    static var catalogCoordinateSpace: String {
+        "model-catalog-scroll"
+    }
+
     let title: String
     let subtitleOverride: String?
     let maxContentWidth: CGFloat
     let scrollPosition: Binding<ModelCatalogHierarchyRowID?>?
+    let catalogViewportRestoration: ModelCatalogViewportRestoration?
+    let onCatalogViewportChange:
+        (([ModelCatalogViewportRowPosition]) -> Void)?
     @ViewBuilder var content: Content
 
     init(
@@ -5130,20 +5291,49 @@ private struct SettingsPaneLayout<Content: View>: View {
         subtitle: String? = nil,
         maxContentWidth: CGFloat = TextifyWindowMetrics.readableContentWidth,
         scrollPosition: Binding<ModelCatalogHierarchyRowID?>? = nil,
+        catalogViewportRestoration:
+            ModelCatalogViewportRestoration? = nil,
+        onCatalogViewportChange:
+            (([ModelCatalogViewportRowPosition]) -> Void)? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
         self.subtitleOverride = subtitle
         self.maxContentWidth = maxContentWidth
         self.scrollPosition = scrollPosition
+        self.catalogViewportRestoration = catalogViewportRestoration
+        self.onCatalogViewportChange = onCatalogViewportChange
         self.content = content()
     }
 
     @ViewBuilder
     var body: some View {
         if let scrollPosition {
-            paneScrollView
-                .scrollPosition(id: scrollPosition, anchor: .top)
+            ScrollViewReader { proxy in
+                paneScrollView
+                    .coordinateSpace(name: Self.catalogCoordinateSpace)
+                    .scrollPosition(id: scrollPosition, anchor: .top)
+                    .onPreferenceChange(
+                        ModelCatalogViewportPreferenceKey.self
+                    ) {
+                        onCatalogViewportChange?($0)
+                    }
+                    .onChange(
+                        of: catalogViewportRestoration?.generation
+                    ) { _, _ in
+                        guard let request =
+                                catalogViewportRestoration
+                        else {
+                            return
+                        }
+                        proxy.scrollTo(request.rowID, anchor: .top)
+                    }
+                    .background {
+                        ModelCatalogScrollOffsetRestorer(
+                            request: catalogViewportRestoration
+                        )
+                    }
+            }
         } else {
             paneScrollView
         }
@@ -5171,6 +5361,48 @@ private struct SettingsPaneLayout<Content: View>: View {
         subtitleOverride
             ?? SettingsPane.productionVisiblePanes.first { $0.title == title }?.productionSubtitle
             ?? ""
+    }
+}
+
+private struct ModelCatalogScrollOffsetRestorer: NSViewRepresentable {
+    let request: ModelCatalogViewportRestoration?
+
+    final class Coordinator {
+        var appliedGeneration: UInt64?
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        NSView()
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        guard let request,
+              context.coordinator.appliedGeneration != request.generation
+        else {
+            return
+        }
+        context.coordinator.appliedGeneration = request.generation
+        DispatchQueue.main.async {
+            guard let scrollView = nsView.enclosingScrollView,
+                  let documentView = scrollView.documentView
+            else {
+                return
+            }
+            var origin = scrollView.contentView.bounds.origin
+            origin.y += request.pixelOffset
+            let maximumY = max(
+                0,
+                documentView.bounds.height
+                    - scrollView.contentView.bounds.height
+            )
+            origin.y = min(max(0, origin.y), maximumY)
+            scrollView.contentView.scroll(to: origin)
+            scrollView.reflectScrolledClipView(scrollView.contentView)
+        }
     }
 }
 

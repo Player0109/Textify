@@ -730,6 +730,69 @@ final class AppServices {
     ) -> ModelCatalogExperience {
         var scopedQuery = query
         scopedQuery.purpose = purpose
+        let localState = modelCatalogPresentationLocalState(
+            onDiskBytesByModelID: onDiskBytesByModelID
+        )
+        return ModelCatalogExperience(
+            trustedManifest: modelCatalogCoordinator.manifest,
+            compatibilityResolver: modelCatalogCompatibilityResolver,
+            installedRecords: installedModelRecords,
+            activePreferences: ModelCatalogActivePreferences(
+                transcriptionModelID: preferences.activeModelID,
+                voiceCleaningModelID: preferences.activeVoiceCleaningModelID
+            ),
+            transferStatesByModelID: modelInstallCoordinator.artifactStates,
+            revocationOverlay: modelCatalogCoordinator.revocationOverlay,
+            managedReadinessByModelID: localState.readiness,
+            onDiskBytesByModelID: localState.measuredBytes,
+            storageInventoryByModelID:
+                localState.storageInventoryByModelID,
+            installedSizeStatus: localState.installedSizeStatus,
+            query: scopedQuery
+        )
+    }
+
+    func modelCatalogDerivationRequest(
+        for purpose: ModelPurpose,
+        query: ModelCatalogQuery = ModelCatalogQuery()
+    ) -> ModelCatalogDerivationRequest {
+        var scopedQuery = query
+        scopedQuery.purpose = purpose
+        let localState = modelCatalogPresentationLocalState(
+            onDiskBytesByModelID: nil
+        )
+        return ModelCatalogDerivationRequest(
+            catalogRevision: modelCatalogCoordinator.presentedRevision
+                ?? modelCatalogCoordinator.manifest?.generatedAt,
+            trustedManifest: modelCatalogCoordinator.manifest,
+            compatibilityContext: modelCatalogCompatibilityResolver.context,
+            localRevision: UInt64(
+                max(0, modelInstallCoordinator.revision)
+            ),
+            installedRecords: installedModelRecords,
+            activeTranscriptionModelID: preferences.activeModelID,
+            activeVoiceCleaningModelID:
+                preferences.activeVoiceCleaningModelID,
+            transferStatesByModelID: modelInstallCoordinator.artifactStates,
+            revocationOverlay: modelCatalogCoordinator.revocationOverlay,
+            managedReadinessByModelID: localState.readiness,
+            onDiskBytesByModelID: localState.measuredBytes,
+            storageInventoryByModelID:
+                localState.storageInventoryByModelID,
+            installedSizeStatus: localState.installedSizeStatus,
+            query: scopedQuery
+        )
+    }
+
+    private func modelCatalogPresentationLocalState(
+        onDiskBytesByModelID: [String: Int64]?
+    ) -> (
+        readiness: [String: ModelCatalogManagedReadiness],
+        measuredBytes: [String: Int64],
+        storageInventoryByModelID:
+            [String: ModelStorageArtifactInventory],
+        installedSizeStatus: ModelCatalogInstalledSizeStatus
+    ) {
         var readiness = managedReadinessByModelID
         let measuredBytes: [String: Int64]
         let storageInventoryByModelID: [String: ModelStorageArtifactInventory]
@@ -769,21 +832,11 @@ final class AppServices {
                 }
             }
         }
-        return ModelCatalogExperience(
-            trustedManifest: modelCatalogCoordinator.manifest,
-            compatibilityResolver: modelCatalogCompatibilityResolver,
-            installedRecords: installedModelRecords,
-            activePreferences: ModelCatalogActivePreferences(
-                transcriptionModelID: preferences.activeModelID,
-                voiceCleaningModelID: preferences.activeVoiceCleaningModelID
-            ),
-            transferStatesByModelID: modelInstallCoordinator.artifactStates,
-            revocationOverlay: modelCatalogCoordinator.revocationOverlay,
-            managedReadinessByModelID: readiness,
-            onDiskBytesByModelID: measuredBytes,
+        return (
+            readiness: readiness,
+            measuredBytes: measuredBytes,
             storageInventoryByModelID: storageInventoryByModelID,
-            installedSizeStatus: installedSizeStatus,
-            query: scopedQuery
+            installedSizeStatus: installedSizeStatus
         )
     }
 
