@@ -1,11 +1,22 @@
 import Foundation
+import TextifyModels
 
 struct AppPaths: Equatable {
-    let applicationSupportDirectory: URL
-    let settingsFileURL: URL
-    let modelsDirectory: URL
-    let manifestCacheDirectory: URL
+    let rollbackStateLayout: ModelV3RollbackStateLayout
     let logsDirectory: URL
+
+    var applicationSupportDirectory: URL {
+        rollbackStateLayout.applicationSupportDirectory
+    }
+    var settingsFileURL: URL {
+        rollbackStateLayout.settingsFileURL
+    }
+    var modelsDirectory: URL {
+        rollbackStateLayout.modelStorageLayout.rootDirectory
+    }
+    var manifestCacheDirectory: URL {
+        rollbackStateLayout.manifestCacheDirectory
+    }
 
     static func production(fileManager: FileManager = .default) throws -> AppPaths {
         let applicationSupportBase = try fileManager.url(
@@ -34,10 +45,9 @@ struct AppPaths: Equatable {
     ) throws -> AppPaths {
         let applicationSupportDirectory = applicationSupportBase
             .appendingPathComponent("Textify", isDirectory: true)
-        let modelsDirectory = applicationSupportDirectory
-            .appendingPathComponent("Models", isDirectory: true)
-        let manifestCacheDirectory = applicationSupportDirectory
-            .appendingPathComponent("ManifestCache", isDirectory: true)
+        let rollbackStateLayout = ModelV3RollbackStateLayout(
+            applicationSupportDirectory: applicationSupportDirectory
+        )
         let logsDirectory = libraryDirectory
             .appendingPathComponent("Logs", isDirectory: true)
             .appendingPathComponent("Textify", isDirectory: true)
@@ -47,11 +57,11 @@ struct AppPaths: Equatable {
             withIntermediateDirectories: true
         )
         try fileManager.createDirectory(
-            at: modelsDirectory,
+            at: rollbackStateLayout.modelStorageLayout.rootDirectory,
             withIntermediateDirectories: true
         )
         try fileManager.createDirectory(
-            at: manifestCacheDirectory,
+            at: rollbackStateLayout.manifestCacheDirectory,
             withIntermediateDirectories: true
         )
         try fileManager.createDirectory(
@@ -60,10 +70,7 @@ struct AppPaths: Equatable {
         )
 
         return AppPaths(
-            applicationSupportDirectory: applicationSupportDirectory,
-            settingsFileURL: applicationSupportDirectory.appendingPathComponent("settings.json"),
-            modelsDirectory: modelsDirectory,
-            manifestCacheDirectory: manifestCacheDirectory,
+            rollbackStateLayout: rollbackStateLayout,
             logsDirectory: logsDirectory
         )
     }
@@ -83,12 +90,8 @@ struct AppPaths: Equatable {
             .appendingPathComponent("Application Support", isDirectory: true)
             .appendingPathComponent("Textify", isDirectory: true)
         return AppPaths(
-            applicationSupportDirectory: applicationSupportDirectory,
-            settingsFileURL: applicationSupportDirectory.appendingPathComponent("settings.json"),
-            modelsDirectory: applicationSupportDirectory.appendingPathComponent("Models", isDirectory: true),
-            manifestCacheDirectory: applicationSupportDirectory.appendingPathComponent(
-                "ManifestCache",
-                isDirectory: true
+            rollbackStateLayout: ModelV3RollbackStateLayout(
+                applicationSupportDirectory: applicationSupportDirectory
             ),
             logsDirectory: root
                 .appendingPathComponent("Library", isDirectory: true)

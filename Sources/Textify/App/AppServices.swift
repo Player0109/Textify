@@ -504,13 +504,11 @@ final class AppServices {
             legacyPolicy: .publishedV1_1
         )
         let store = TrustedCatalogStore(
-            fileURL: paths.manifestCacheDirectory
-                .appendingPathComponent("catalog-state.json"),
+            fileURL: paths.rollbackStateLayout.catalogStateFileURL,
             verifier: verifier
         )
         let revocationStore = TrustedModelRevocationStore(
-            fileURL: paths.manifestCacheDirectory
-                .appendingPathComponent("revocation-state.json"),
+            fileURL: paths.rollbackStateLayout.revocationStateFileURL,
             verifier: ModelRevocationVerifier(
                 trustedKeys: configuration.trustedKeys
             ),

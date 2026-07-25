@@ -497,6 +497,12 @@ public struct ModelRevocationSignature: Codable, Equatable, Sendable {
     public let contentSHA256: String
     public let signature: String
 
+    public static func decode(
+        _ data: Data
+    ) throws -> ModelRevocationSignature {
+        try JSONDecoder().decode(ModelRevocationSignature.self, from: data)
+    }
+
     public init(from decoder: Decoder) throws {
         try StrictJSONKeys.validate(
             decoder: decoder,

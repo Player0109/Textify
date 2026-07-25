@@ -197,6 +197,25 @@ Textify GitHub Release assets or exact commit-pinned Hugging Face URLs.
    script/models/verify_model_manifest.sh path/to/manifest.json path/to/manifest.json.sig
    ```
 
+   For manifest v3 publication, also run the complete catalog/revocation
+   publication gate and retain its JSON evidence. The gate binds both signer
+   identities, both monotonic revisions, and the exact app build identity:
+
+   ```bash
+   script/models/prepublish_model_catalog.sh \
+     path/to/manifest.json \
+     path/to/manifest.json.sig \
+     path/to/revocations.json \
+     path/to/revocations.json.sig \
+     build/release/Textify.app \
+     build/release/catalog-publication-evidence.json \
+     path/to/previous-catalog-publication-evidence.json
+   ```
+
+   The previous evidence argument is mandatory for normal publication. Only
+   the audited first v3 authority baseline may use a leading `--bootstrap` and
+   omit it; retain that baseline evidence permanently.
+
 10. Replace the tracked `models/manifest.json` and `.sig`, build the app, and
    verify the exact same bytes are embedded under
    `Contents/Resources/ModelCatalog/`. A valid remote catalog older than this
@@ -238,6 +257,24 @@ Textify GitHub Release assets or exact commit-pinned Hugging Face URLs.
    Engine, or the explicitly declared CPU provider and that offline dictation
    still works after network access is disabled.
 
+14. Before changing the live GitHub Pages files, run the real endpoint smoke
+    against the staged HTTPS endpoint. This verifies both exact signed pairs
+    and writes endpoint evidence without downloading model artifacts:
+
+    ```bash
+    script/models/smoke_model_catalog_endpoint.sh \
+      'https://<staging-host>/Textify/models' \
+      build/release/Textify.app \
+      build/release/catalog-endpoint-evidence.json \
+      path/to/previous-catalog-publication-evidence.json
+    ```
+
+15. Rehearse withdrawal with the designated v3 rollback bridge and retain its
+    log. Never present an arbitrary pre-v3 application downgrade as recovery.
+    Catalog corrections require a higher revision; security withdrawal uses a
+    higher signed revocation; restoration follows the signed restoration
+    protocol and never silently reactivates a model.
+
 A catalog entry is not release-ready until every immutable URL returns the
 signed size/hash and a clean signed-app test passes for that backend. Remote
 catalog publication is optional for a new app whose newer bundled catalog is
@@ -245,7 +282,9 @@ authoritative, but it remains required when updating already-installed builds
 without shipping an app update.
 
 More detail lives in `docs/models/curated-models.md` and
-`docs/models/model-manifest-signing.md`.
+`docs/models/model-manifest-signing.md`. Publication identities, revision
+rules, additive state ownership, and the designated rollback contract are in
+`docs/models/catalog-publication-and-rollback.md`.
 
 ## Public Docs And Manual QA Gate
 

@@ -83,6 +83,10 @@ let package = Package(
             name: "TextifyModelManifestVerifier",
             targets: ["TextifyModelManifestVerifier"]
         ),
+        .executable(
+            name: "TextifyCatalogPublicationVerifier",
+            targets: ["TextifyCatalogPublicationVerifier"]
+        ),
         .executable(name: "Textify", targets: ["Textify"])
     ],
     dependencies: [
@@ -183,6 +187,10 @@ let package = Package(
         .target(name: "TextifySettings", dependencies: ["TextifyModels"]),
         .executableTarget(
             name: "TextifyModelManifestVerifier",
+            dependencies: ["TextifyModels"]
+        ),
+        .executableTarget(
+            name: "TextifyCatalogPublicationVerifier",
             dependencies: ["TextifyModels"]
         ),
         .target(

@@ -37,6 +37,9 @@ public enum ProductionModelPolicyError: Error, Equatable {
     case missingInstallationStorage(modelID: String)
     case invalidInstallationStorage(modelID: String)
     case invalidModelFileURL(modelID: String, url: String)
+    case missingLicense(modelID: String)
+    case invalidLicense(modelID: String)
+    case invalidProvenance(modelID: String)
     case invalidGeneratedAt(String)
     case benchmarkNotAllowedInV1(modelID: String)
     case invalidBenchmark(modelID: String)
@@ -102,6 +105,7 @@ public enum ProductionModelPolicy {
             guard model.sizeBytes > 0 else {
                 throw ProductionModelPolicyError.invalidModelSize(modelID: model.id)
             }
+            try validateLicensesAndProvenance(for: model)
             try validateInstallationStorage(for: model)
             guard !model.capabilities.languages.isEmpty,
                   model.capabilities.languages.allSatisfy({ !$0.isEmpty })
@@ -343,6 +347,65 @@ public enum ProductionModelPolicy {
                 modelID: model.id
             )
         }
+    }
+
+    private static func validateLicensesAndProvenance(
+        for model: ModelEntry
+    ) throws {
+        guard !model.licenses.isEmpty else {
+            throw ProductionModelPolicyError.missingLicense(
+                modelID: model.id
+            )
+        }
+        for license in model.licenses {
+            guard [
+                license.scope,
+                license.spdxId,
+                license.name,
+            ].allSatisfy({
+                !$0.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ).isEmpty
+            }),
+            isHTTPSURL(license.licenseTextUrl)
+            else {
+                throw ProductionModelPolicyError.invalidLicense(
+                    modelID: model.id
+                )
+            }
+        }
+        let provenance = model.provenance
+        guard [
+            provenance.sourceName,
+            provenance.sourceFile,
+            provenance.originalModelName,
+            provenance.mirroredBy,
+        ].allSatisfy({
+            !$0.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ).isEmpty
+        }),
+        isHTTPSURL(provenance.sourceUrl),
+        isHTTPSURL(provenance.originalModelUrl),
+        isGitRevision(provenance.sourceRevision),
+        ISO8601DateFormatter().date(
+            from: provenance.mirroredAt + "T00:00:00Z"
+        ) != nil
+        else {
+            throw ProductionModelPolicyError.invalidProvenance(
+                modelID: model.id
+            )
+        }
+    }
+
+    private static func isHTTPSURL(_ value: String) -> Bool {
+        guard let url = URL(string: value) else {
+            return false
+        }
+        return url.scheme == "https"
+            && url.host != nil
+            && url.user == nil
+            && url.password == nil
     }
 
     private static func parsedVersion(_ version: String) -> [Int]? {

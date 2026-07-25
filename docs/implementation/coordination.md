@@ -1349,3 +1349,38 @@ Task 1 must merge before parallel Wave 1 work begins.
   Models destinations with trusted content remaining usable under a persistent
   rejection banner. Independent Standards and Spec reviews report no
   remaining actionable findings.
+
+## Catalog Publication And V3 Rollback Bridge Handoff - 2026-07-25
+
+- GitHub issue #23 owns the release-facing catalog publication policy and
+  evidence types under `Sources/TextifyModels/Release/`, focused model tests
+  and fixtures, the minimum production-manifest policy tightening required to
+  reject incomplete license/provenance metadata, and catalog prepublication
+  scripts and release documentation. It also owns the minimum Task 1
+  `Package.swift` integration needed to expose the publication verifier as a
+  Swift package executable; no other package products, targets, or dependency
+  declarations are in scope. The handoff also includes replacing the duplicate
+  production catalog endpoint/key literals in
+  `Sources/Textify/SettingsUI/SettingsRootView.swift` with the shared embedded
+  trust definition used by that verifier; no surrounding Settings UI behavior
+  is in scope. It additionally owns the mechanical `AppPaths`/`AppServices`
+  adoption of the shared typed rollback-state layout so catalog, revocation,
+  settings, and Models paths retain one owner; no other app composition
+  behavior is in scope.
+- The publication gate composes the existing manifest, production-policy, and
+  revocation verifiers. It does not introduce another signature path or place
+  private signing material in the repository.
+- The designated v3 rollback bridge is evidence-only and non-mutating. It
+  decodes the existing Installation Receipt, Queue Attempt, placement, active
+  identity, trusted-catalog, and sticky-revocation formats and proves that
+  application withdrawal retains byte ownership and blocks revoked content.
+- Endpoint smoke remains an explicit prepublication operation so ordinary CI
+  does not fetch model artifacts or depend on live catalog hosting.
+- This handoff does not own generalized installer fault injection, queue and
+  storage recovery matrices, or final production release sign-off; those
+  remain issues #24 and #25.
+- Final verification completed with 766 tests (12 expected opt-in native/
+  stress smokes skipped, zero failures), the arm64 production build, signed
+  bundled catalog verification, native dependency checks, and shell syntax
+  checks. Independent Standards and Spec re-reviews report no remaining
+  actionable findings.

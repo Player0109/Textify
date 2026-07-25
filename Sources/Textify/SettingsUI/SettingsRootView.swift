@@ -5127,24 +5127,13 @@ struct ProductionModelInstallConfiguration: Equatable {
     }
 
     static let current: ProductionModelInstallConfiguration? = ProductionModelInstallConfiguration(
-        manifestURL: URL(string: "https://player0109.github.io/Textify/models/manifest.json")!,
-        signatureURL: URL(string: "https://player0109.github.io/Textify/models/manifest.json.sig")!,
-        revocationURL: URL(string: "https://player0109.github.io/Textify/models/revocations.json")!,
-        revocationSignatureURL: URL(string: "https://player0109.github.io/Textify/models/revocations.json.sig")!,
-        trustedKeys: [
-            TrustedModelManifestKey(
-                keyId: "textify-model-manifest-2026-primary",
-                publicKeyBase64: "mLO7nEpXKrM6LkuQrMrpXtGDaJFEQWQivS9Hxm8RWY0="
-            ),
-            TrustedModelManifestKey(
-                keyId: "textify-model-manifest-2026-reserve",
-                publicKeyBase64: "4U2qV+TakjtL2HleKRPAhpd9LTTIfhGEmvZR4Opc1ZM="
-            ),
-            TrustedModelManifestKey(
-                keyId: "textify-model-manifest-2026-huggingface",
-                publicKeyBase64: "eg6XVGVQ4Kqh1dtN3B8JcFTtK0RSxkxd79W5tfIlfos="
-            )
-        ]
+        manifestURL: ProductionModelCatalogTrust.manifestURL,
+        signatureURL:
+            ProductionModelCatalogTrust.manifestSignatureURL,
+        revocationURL: ProductionModelCatalogTrust.revocationURL,
+        revocationSignatureURL:
+            ProductionModelCatalogTrust.revocationSignatureURL,
+        trustedKeys: ProductionModelCatalogTrust.trustedKeys
     )
 }
 

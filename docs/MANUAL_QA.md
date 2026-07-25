@@ -86,12 +86,20 @@ release-blocking.
   confirming Disable Purpose and Delete. The previous active identity remains
   selected after switch failure; deletion stops before filesystem mutation,
   and relaunch never restores an active identity whose bytes were removed.
+- [ ] 40. Run the staged HTTPS catalog endpoint smoke and retain evidence that
+  binds the exact catalog revision/signer, revocation revision/signer, and
+  candidate app build identity. Confirm the smoke does not fetch model bytes.
+- [ ] 41. On a copy of populated v3 Application Support, rehearse application
+  withdrawal with the designated rollback bridge. Revoked active content stays
+  blocked, active identities do not change, and Installation Receipts, Queue
+  Attempts, placements, and all attributed bytes remain owned afterward.
 
 ## Supporting Commands
 
 ```bash
 git diff --check
 bash script/release/validate_release.sh
+swift test --filter ModelCatalogPublicationTests
 ```
 
 Use `docs/RELEASING.md` for the archive, model publishing, signing,
@@ -557,3 +565,36 @@ with the release evidence; do not commit machine-specific `.trace` data.
 - BLOCKED for this implementation session: the available Apple M4 Max is not
   the oldest supported Apple Silicon configuration, so the required M1 cold,
   warm, and VoiceOver trace capture remains a release-maintainer hardware gate.
+
+## Catalog Publication And Rollback Verification - 2026-07-25
+
+- PASS: the focused publication tests bind catalog revision/hash/signer,
+  revocation revision/hash/signer, candidate-app bundle identity and executable
+  digest, and accepted sticky revocation/restoration evidence. The production
+  verifier accepts only the same embedded trust table as the app. Tests reject
+  lower revisions, corrections at an unchanged revision, mutable revocation
+  records, and restorations that do not repeat an exact prior target.
+- PASS: the v3 rollback rehearsal loads persisted Installation Receipts and
+  Queue Attempts plus settings, trusted catalog, and sticky revocation archives
+  from a real temporary Application Support layout. Receipt, queue, and active
+  identity inputs are frozen pre-bridge fixtures. The bridge strictly verifies
+  a candidate app, matches its derived identity to publication evidence,
+  retains artifact/storage/attempt identities and Curated placement, and proves
+  a revoked active artifact remains blocked. Evidence retains state and
+  owned-file SHA-256 values plus byte count; exact state and model bytes are
+  unchanged after rehearsal.
+- PASS: `bash script/release/validate_release.sh` completed 766 tests with 12
+  expected opt-in skips and zero failures, verified the tracked signed
+  43-model v3 catalog, built the arm64 Release executable, and passed release
+  metadata, native dependency, and shell-syntax checks.
+- PARTIAL live endpoint evidence: anonymous HTTPS fetched the current public
+  catalog and detached signature without fetching model bytes. The signature
+  names `textify-model-manifest-2026-huggingface`, but the public body is the
+  older schema-v2 revision `2026-07-23T12:30:59Z`; the new publication gate
+  correctly rejects it because it lacks v3 installation bounds.
+- BLOCKED external publication gate: the public `revocations.json` and
+  `revocations.json.sig` endpoints currently return HTTP 404. A credentialed
+  maintainer must publish the reviewed signed revocation baseline and staged
+  v3 catalog, then run
+  `script/models/smoke_model_catalog_endpoint.sh` and retain its evidence
+  before checking release item 40.
