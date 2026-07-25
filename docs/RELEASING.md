@@ -19,6 +19,26 @@ checksums. The campaign is release-only and uses generated localhost fixture
 bytes; it does not contact the production catalog or fetch model artifacts.
 See `docs/models/model-fault-campaign.md` for the covered matrix.
 
+## Release-candidate evidence sign-off
+
+Start from `docs/release/release-evidence-template.json`, retain every evidence
+attachment below one release-candidate directory, and fill the declaration
+with exact relative paths and lowercase SHA-256 values. Then run:
+
+```bash
+script/release/assemble_release_evidence.sh \
+  dist/release-evidence/declaration.json \
+  dist/release-evidence \
+  dist/release-evidence/release-evidence-bundle.json
+```
+
+The gate binds the declaration to the current Git commit and current
+`docs/SPEC.md`. It fails on incomplete semantic UI or manual accessibility
+coverage, insufficient real-device performance, an unexercised Compute Route,
+unacceptable defects, missing independent critical reviews, changed
+attachments, or fewer than two distinct human approvals. See
+`docs/release/release-evidence.md` for the full declaration contract.
+
 ## Prerequisites
 
 - Xcode with Swift 6.2 or later and macOS 14 SDK support. The pinned MLX Audio

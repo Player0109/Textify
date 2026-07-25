@@ -1410,3 +1410,17 @@ Task 1 must merge before parallel Wave 1 work begins.
   passing. The retained focused production-path log covers 142 installer,
   queue, storage, revocation/restoration, deletion, coordinator, diagnostics,
   and release-verification tests with zero failures.
+- Issue #25 adds a strict release-evidence declaration and atomic bundle
+  verifier. It binds the current release commit, parent specification, build
+  artifacts, catalog/revocation identities, and every retained attachment
+  digest; requires complete semantic UI and genuine manual accessibility
+  coverage; enforces 30 warm iterations and three cold launches on both a real
+  oldest-supported M1-class device and a later supported device; requires
+  real-device evidence for every declared Compute Route; applies the declared
+  defect and independent-review policies; and requires two distinct human
+  approvals.
+- The implementation session does not claim final release sign-off. Public v3
+  catalog/revocation publication, oldest-supported hardware measurements,
+  manual accessibility passes, independent human review, and two human
+  approvals remain external release gates. The verifier rejects their absence
+  and the checked-in template is intentionally incomplete.

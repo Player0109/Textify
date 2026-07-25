@@ -598,3 +598,34 @@ with the release evidence; do not commit machine-specific `.trace` data.
   v3 catalog, then run
   `script/models/smoke_model_catalog_endpoint.sh` and retain its evidence
   before checking release item 40.
+
+## Final Release Evidence Sign-Off
+
+- [ ] Retain the release commit, signed build hashes, catalog/revocation
+  revisions, and signer identities.
+- [ ] Attach schema, property, transition, malformed-input, migration, fault
+  campaign, and seeded soak results.
+- [ ] Attach semantic UI evidence for hierarchy, selection, comparison,
+  actions, scopes, query, pinned reveal, inspector, Downloads, onboarding,
+  trust states, revocation, and deletion.
+- [ ] Attach genuine manual VoiceOver, Full Keyboard Access, supported text
+  scaling, Reduce Motion, Increase Contrast, and Reduce Transparency results.
+- [ ] Attach 30 or more warm measurements and three cold launches from a real
+  oldest-supported M1-class device and a later supported device.
+- [ ] Exercise every signed catalog Compute Route on at least one real
+  supported device and attach the result.
+- [ ] Attach security review, publication report, diagnostics review,
+  packaging validation, and rollback rehearsal.
+- [ ] Record zero open Critical/High defects and no Medium defect in a
+  trust-critical domain; attach a product-and-engineering waiver and safe
+  workaround for any other Medium defect.
+- [ ] Record independent review of trust, migration, revocation, and
+  destructive filesystem behavior.
+- [ ] Record two distinct human approvals.
+- [ ] Run `script/release/assemble_release_evidence.sh` and retain the validated
+  bundle beside its attachments.
+
+The current implementation session cannot check the real-device, manual
+accessibility, credentialed publication, independent human review, or two-human
+approval boxes. The evidence validator intentionally rejects placeholders for
+those release gates.

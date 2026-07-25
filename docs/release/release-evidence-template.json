@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "parentIssueNumber": 1,
+  "parentSpecificationSHA256": "replace-with-current-spec-sha256",
+  "parentSpecificationUnchanged": true,
+  "primaryAuthor": "replace-with-primary-author",
+  "releaseCommitSHA": "replace-with-40-character-release-commit",
+  "buildArtifacts": [],
+  "catalogIdentity": {
+    "catalogRevision": "replace-with-signed-catalog-revision",
+    "catalogSignerID": "replace-with-catalog-signer-id",
+    "revocationRevision": "replace-with-signed-revocation-revision",
+    "revocationSignerID": "replace-with-revocation-signer-id"
+  },
+  "attachments": [],
+  "performanceEvidence": [],
+  "declaredComputeRoutes": [],
+  "computeRouteEvidence": [],
+  "defects": [],
+  "independentReviews": [],
+  "approvals": []
+}

@@ -95,6 +95,10 @@ let package = Package(
             name: "TextifyModelFaultVerifier",
             targets: ["TextifyModelFaultVerifier"]
         ),
+        .executable(
+            name: "TextifyReleaseEvidenceVerifier",
+            targets: ["TextifyReleaseEvidenceVerifier"]
+        ),
         .executable(name: "Textify", targets: ["Textify"])
     ],
     dependencies: [
@@ -207,6 +211,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "TextifyModelFaultVerifier",
+            dependencies: ["TextifyReleaseVerification"]
+        ),
+        .executableTarget(
+            name: "TextifyReleaseEvidenceVerifier",
             dependencies: ["TextifyReleaseVerification"]
         ),
         .target(
