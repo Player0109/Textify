@@ -13,7 +13,7 @@ enum TextifyModelFaultVerifier {
         }
 
         let service = DeterministicModelDownloadService(
-            payload: Data("textify-deterministic-model-fixture".utf8)
+            payload: Data(repeating: 0x5a, count: 512 * 1_024)
         )
         try await service.start()
         let downloadReport: DeterministicModelDownloadReport

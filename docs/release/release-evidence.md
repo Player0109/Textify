@@ -4,13 +4,17 @@ Textify signs off a release candidate only from a validated evidence
 declaration and the exact attachment bytes it names. Start from
 `docs/release/release-evidence-template.json`; the template is intentionally
 incomplete and must fail validation until genuine evidence replaces every
-placeholder.
+placeholder. Use `docs/release/release-evidence-record-template.json` for each
+categorized evidence record.
 
 Each attachment uses a contained relative path, a lowercase SHA-256, a manual
-or automated kind, and one or more closed evidence categories. The validator
-rejects missing, changed, symlinked, hard-linked, or escaping attachment paths.
-Every build artifact also names its attachment ID, so its declared digest must
-match retained bytes.
+or automated kind, and at most one closed evidence category. Categorized
+attachments must decode as a structured `ReleaseEvidenceRecord` binding that
+category, the release commit, recorder, time, notes, and one or more separately
+hashed subject attachments. The validator rejects generic label-only files,
+missing or changed files, symlinks, hard links, and path escapes. Every build
+artifact also names its attachment ID, so its declared digest must match
+retained bytes.
 
 The declaration must cover:
 
@@ -28,6 +32,16 @@ The declaration must cover:
   unchanged parent-specification hash, defect disposition, independent
   trust/migration/revocation/destructive-filesystem reviews, and two distinct
   human approvals.
+
+Performance records carry the complete warm and cold measurement arrays rather
+than self-declared counts. They also bind the real-device flag and
+oldest-supported-M1 classification to the recorded device identity; the
+oldest-supported entry must name an Apple M1-class device. Compute Routes are
+derived from the attached v3 manifest and must match route records from real
+devices. Catalog and revocation identity is decoded from the attached
+publication evidence and bound to the exact manifest and release executable
+hash. Review and approval records must match their declared reviewer, scope,
+approver, and timestamp.
 
 Critical or High defects always block. Medium defects in trust, migration,
 activation, deletion, queue durability, recovery, privacy, or primary

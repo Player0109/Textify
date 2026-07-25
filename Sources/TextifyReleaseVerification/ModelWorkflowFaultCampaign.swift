@@ -1,6 +1,5 @@
 import CryptoKit
 import Foundation
-import TextifyModels
 
 public enum ModelWorkflowDurableBoundary: String, CaseIterable, Codable, Sendable {
     case queueAuthorizationPersisted
@@ -35,7 +34,7 @@ public enum ModelWorkflowSecurityProbe: String, CaseIterable, Codable, Sendable 
     case traversal
     case symbolicLinkEscape
     case hardLinkEscape
-    case archiveLimits
+    case peakStorageAdmission
     case canonicalDigestAliasing
     case unsafeHelpURL
     case atomicFilesystemContainment
@@ -61,13 +60,14 @@ public struct ModelDiagnosticsPrivacyEvidence: Codable, Equatable, Sendable {
 public struct ModelWorkflowFaultExecution: Codable, Equatable, Sendable {
     public let boundary: ModelWorkflowDurableBoundary
     public let fault: ModelWorkflowInjectedFault
-    public let recovered: Bool
+    public let modelInvariantHeld: Bool
 }
 
 public struct ModelWorkflowFaultCampaignReport: Codable, Equatable, Sendable {
     public let schemaVersion: Int
     public let seed: UInt64
     public let operationCount: Int
+    public let durableQueueSoak: ModelDurableQueueSoakReport
     public let coveredBoundaries: [ModelWorkflowDurableBoundary]
     public let injectedFaults: [ModelWorkflowInjectedFault]
     public let faultExecutions: [ModelWorkflowFaultExecution]
@@ -92,6 +92,7 @@ public struct ModelWorkflowFaultCampaign: Sendable {
         var generator = SeededGenerator(seed: seed)
         var state = WorkflowState()
         var violations: [String] = []
+        var executions: [ModelWorkflowFaultExecution] = []
 
         for operationIndex in 0..<operationCount {
             let snapshot = state
@@ -99,11 +100,14 @@ public struct ModelWorkflowFaultCampaign: Sendable {
             let artifactID = "artifact-\(generator.next() % 17)"
             apply(operation: operation, artifactID: artifactID, to: &state)
 
+            let matrixSize = ModelWorkflowDurableBoundary.allCases.count
+                * ModelWorkflowInjectedFault.allCases.count
+            let matrixIndex = operationIndex % matrixSize
             let boundary = ModelWorkflowDurableBoundary.allCases[
-                operationIndex % ModelWorkflowDurableBoundary.allCases.count
+                matrixIndex / ModelWorkflowInjectedFault.allCases.count
             ]
             let fault = ModelWorkflowInjectedFault.allCases[
-                operationIndex % ModelWorkflowInjectedFault.allCases.count
+                matrixIndex % ModelWorkflowInjectedFault.allCases.count
             ]
             recover(
                 from: fault,
@@ -111,22 +115,46 @@ public struct ModelWorkflowFaultCampaign: Sendable {
                 snapshot: snapshot,
                 state: &state
             )
-            violations.append(contentsOf: state.invariantViolations())
+            let operationViolations = state.invariantViolations()
+            violations.append(contentsOf: operationViolations)
+            executions.append(
+                ModelWorkflowFaultExecution(
+                    boundary: boundary,
+                    fault: fault,
+                    modelInvariantHeld: operationViolations.isEmpty
+                )
+            )
         }
 
-        let executions = faultExecutions()
-        let probes = securityProbeResults()
-        let requests = catalogRequestEvidence()
-        let exportedDiagnostics = ModelDiagnosticsPrivacyEvidence(
-            containsFullSHA256: false
+        let durableQueueSoak = try ModelDurableQueueSoak().run(
+            operationCount: operationCount
         )
+        if durableQueueSoak.lostAttemptCount != 0 {
+            violations.append("durable_queue_lost_attempt")
+        }
+        if durableQueueSoak.partialCleanupMismatchCount != 0 {
+            violations.append("retained_partial_cleanup_mismatch")
+        }
+        let probes = ModelWorkflowSecurityProbeRunner().run()
+        let requests = ModelCatalogPrivacyProbe.catalogRequests()
+        let exportedDiagnostics =
+            ModelCatalogPrivacyProbe.diagnosticsEvidence()
+        let coveredBoundaries = ModelWorkflowDurableBoundary.allCases.filter {
+            boundary in executions.contains { $0.boundary == boundary }
+        }
+        let injectedFaults = ModelWorkflowInjectedFault.allCases.filter {
+            fault in executions.contains { $0.fault == fault }
+        }
         let payload = ReportPayload(
             schemaVersion: 1,
             seed: seed,
             operationCount: operationCount,
+            durableQueueSoak: durableQueueSoak,
             faultExecutions: executions,
             invariantViolations: violations,
-            unexplainedManagedBytes: state.unexplainedManagedBytes,
+            unexplainedManagedBytes:
+                state.unexplainedManagedBytes
+                    + durableQueueSoak.unexplainedManagedBytes,
             securityProbes: probes,
             catalogRequests: requests,
             exportedDiagnostics: exportedDiagnostics
@@ -137,11 +165,12 @@ public struct ModelWorkflowFaultCampaign: Sendable {
             schemaVersion: payload.schemaVersion,
             seed: seed,
             operationCount: operationCount,
-            coveredBoundaries: ModelWorkflowDurableBoundary.allCases,
-            injectedFaults: ModelWorkflowInjectedFault.allCases,
+            durableQueueSoak: durableQueueSoak,
+            coveredBoundaries: coveredBoundaries,
+            injectedFaults: injectedFaults,
             faultExecutions: executions,
             invariantViolations: violations,
-            unexplainedManagedBytes: state.unexplainedManagedBytes,
+            unexplainedManagedBytes: payload.unexplainedManagedBytes,
             securityProbes: probes,
             catalogRequests: requests,
             exportedDiagnostics: exportedDiagnostics,
@@ -153,27 +182,6 @@ public struct ModelWorkflowFaultCampaign: Sendable {
         _ report: ModelWorkflowFaultCampaignReport
     ) throws -> Data {
         try encoder.encode(report)
-    }
-
-    private func faultExecutions() -> [ModelWorkflowFaultExecution] {
-        let boundaryExecutions = ModelWorkflowDurableBoundary.allCases.map {
-            ModelWorkflowFaultExecution(
-                boundary: $0,
-                fault: .processTermination,
-                recovered: true
-            )
-        }
-        let mappedFaults = ModelWorkflowInjectedFault.allCases.enumerated().map {
-            index, fault in
-            ModelWorkflowFaultExecution(
-                boundary: ModelWorkflowDurableBoundary.allCases[
-                    index % ModelWorkflowDurableBoundary.allCases.count
-                ],
-                fault: fault,
-                recovered: true
-            )
-        }
-        return boundaryExecutions + mappedFaults
     }
 
     private func apply(
@@ -257,71 +265,6 @@ public struct ModelWorkflowFaultCampaign: Sendable {
         }
     }
 
-    private func securityProbeResults() -> [ModelWorkflowSecurityProbeResult] {
-        ModelWorkflowSecurityProbe.allCases.map {
-            ModelWorkflowSecurityProbeResult(
-                probe: $0,
-                passed: securityProbePassed($0)
-            )
-        }
-    }
-
-    private func securityProbePassed(_ probe: ModelWorkflowSecurityProbe) -> Bool {
-        switch probe {
-        case .traversal:
-            let layout = ModelStorageLayout(
-                rootDirectory: URL(fileURLWithPath: "/tmp/Textify/Models")
-            )
-            return (try? layout.installedArtifactURL(
-                modelID: "../escape",
-                relativePath: "model.bin"
-            )) == nil
-        case .symbolicLinkEscape, .hardLinkEscape, .atomicFilesystemContainment:
-            return true
-        case .archiveLimits:
-            return ArchiveSafetyPolicy().accepts(
-                fileCount: 100,
-                expandedBytes: 100_000,
-                maximumDepth: 3
-            ) && !ArchiveSafetyPolicy().accepts(
-                fileCount: 10_001,
-                expandedBytes: 100_000,
-                maximumDepth: 3
-            )
-        case .canonicalDigestAliasing:
-            return DigestAliasPolicy.accepts(
-                aliasDigest: String(repeating: "a", count: 64),
-                canonicalDigest: String(repeating: "a", count: 64)
-            ) && !DigestAliasPolicy.accepts(
-                aliasDigest: String(repeating: "a", count: 64),
-                canonicalDigest: String(repeating: "b", count: 64)
-            )
-        case .unsafeHelpURL:
-            return !HelpURLPolicy.isSafe(
-                URL(string: "javascript:alert(1)")!
-            ) && HelpURLPolicy.isSafe(
-                URL(string: "https://github.com/Player0109/Textify")!
-            )
-        }
-    }
-
-    private func catalogRequestEvidence() -> [ModelCatalogRequestEvidence] {
-        [
-            "/models/manifest.json",
-            "/models/manifest.json.sig",
-            "/models/revocations.json",
-            "/models/revocations.json.sig"
-        ].map {
-            ModelCatalogRequestEvidence(
-                method: "GET",
-                path: $0,
-                query: nil,
-                bodyBytes: 0,
-                localIdentityHeaders: []
-            )
-        }
-    }
-
     private static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
@@ -333,6 +276,7 @@ private struct ReportPayload: Codable {
     let schemaVersion: Int
     let seed: UInt64
     let operationCount: Int
+    let durableQueueSoak: ModelDurableQueueSoakReport
     let faultExecutions: [ModelWorkflowFaultExecution]
     let invariantViolations: [String]
     let unexplainedManagedBytes: Int64
@@ -387,38 +331,6 @@ private struct SeededGenerator {
         state ^= state << 25
         state ^= state >> 27
         return state &* 2_685_821_657_736_338_717
-    }
-}
-
-private struct ArchiveSafetyPolicy {
-    let maximumFileCount = 10_000
-    let maximumExpandedBytes: Int64 = 20_000_000_000
-    let maximumDepth = 16
-
-    func accepts(fileCount: Int, expandedBytes: Int64, maximumDepth: Int) -> Bool {
-        fileCount >= 0
-            && fileCount <= maximumFileCount
-            && expandedBytes >= 0
-            && expandedBytes <= maximumExpandedBytes
-            && maximumDepth >= 0
-            && maximumDepth <= self.maximumDepth
-    }
-}
-
-private enum DigestAliasPolicy {
-    static func accepts(aliasDigest: String, canonicalDigest: String) -> Bool {
-        aliasDigest.count == 64
-            && aliasDigest == canonicalDigest
-            && aliasDigest.allSatisfy { $0.isHexDigit && !$0.isUppercase }
-    }
-}
-
-private enum HelpURLPolicy {
-    static func isSafe(_ url: URL) -> Bool {
-        url.scheme == "https"
-            && url.user == nil
-            && url.password == nil
-            && url.host?.isEmpty == false
     }
 }
 

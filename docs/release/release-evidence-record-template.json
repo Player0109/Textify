@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "category": "replace-with-one-closed-category",
+  "result": "passed",
+  "releaseCommitSHA": "replace-with-40-character-release-commit",
+  "recordedAt": "replace-with-ISO-8601-time",
+  "recordedBy": "replace-with-person-or-automation-identity",
+  "notes": [
+    "Replace with a concrete observation or test summary."
+  ],
+  "subjectAttachmentIDs": [
+    "replace-with-separately-hashed-source-attachment"
+  ],
+  "attributes": {},
+  "measurements": {}
+}

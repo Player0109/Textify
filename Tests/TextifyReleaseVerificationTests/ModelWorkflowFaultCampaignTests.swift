@@ -8,6 +8,22 @@ final class ModelWorkflowFaultCampaignTests: XCTestCase {
         XCTAssertEqual(Set(report.coveredBoundaries), Set(ModelWorkflowDurableBoundary.allCases))
         XCTAssertEqual(Set(report.injectedFaults), Set(ModelWorkflowInjectedFault.allCases))
         XCTAssertEqual(report.operationCount, 1_000)
+        XCTAssertEqual(report.durableQueueSoak.operationCount, 1_000)
+        XCTAssertEqual(report.durableQueueSoak.relaunchCount, 3_000)
+        XCTAssertEqual(report.durableQueueSoak.lostAttemptCount, 0)
+        XCTAssertEqual(
+            report.durableQueueSoak.partialCleanupMismatchCount,
+            0
+        )
+        for boundary in ModelWorkflowDurableBoundary.allCases {
+            for fault in ModelWorkflowInjectedFault.allCases {
+                XCTAssertTrue(report.faultExecutions.contains {
+                    $0.boundary == boundary
+                        && $0.fault == fault
+                        && $0.modelInvariantHeld
+                })
+            }
+        }
         XCTAssertTrue(report.invariantViolations.isEmpty)
         XCTAssertEqual(report.unexplainedManagedBytes, 0)
     }

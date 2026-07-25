@@ -114,6 +114,14 @@ public enum ModelDownloadPolicyError: Error, Equatable {
 }
 
 public enum ModelDownloadURLPolicy {
+    public static func anonymousGET(_ url: URL) -> URLRequest {
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.httpBody = nil
+        request.allHTTPHeaderFields = [:]
+        return request
+    }
+
     public static func requireHTTPS(_ url: URL) throws {
         guard url.scheme?.lowercased() == "https" else {
             throw ModelDownloadPolicyError.nonHTTPSURL(url.absoluteString)
@@ -760,8 +768,12 @@ public struct ModelDownloader {
         try ModelDownloadURLPolicy.requireHTTPS(manifestURL)
         try ModelDownloadURLPolicy.requireHTTPS(signatureURL)
 
-        let manifestResponse = try await transport.fetch(URLRequest(url: manifestURL))
-        let signatureResponse = try await transport.fetch(URLRequest(url: signatureURL))
+        let manifestResponse = try await transport.fetch(
+            ModelDownloadURLPolicy.anonymousGET(manifestURL)
+        )
+        let signatureResponse = try await transport.fetch(
+            ModelDownloadURLPolicy.anonymousGET(signatureURL)
+        )
 
         return try TrustedCatalogSnapshot(
             manifestData: manifestResponse.data,

@@ -1,6 +1,6 @@
 import CryptoKit
-import Darwin
 import Foundation
+import TextifyModels
 
 public enum ReleaseCandidateEvidenceError: Error, Equatable {
     case unsupportedSchemaVersion(Int)
@@ -11,11 +11,13 @@ public enum ReleaseCandidateEvidenceError: Error, Equatable {
     case unsafeAttachmentPath(String)
     case attachmentNotFound(String)
     case attachmentHashMismatch(String)
+    case invalidEvidenceRecord(String)
     case missingEvidenceCategory(ReleaseEvidenceCategory)
     case manualEvidenceRequired(ReleaseEvidenceCategory)
+    case catalogEvidenceMismatch
     case insufficientOldestSupportedPerformanceEvidence
     case missingLaterDevicePerformanceEvidence
-    case missingComputeRouteEvidence(String)
+    case missingComputeRouteEvidence(ModelComputeRoute)
     case blockingDefect(String)
     case invalidDefectWaiver(String)
     case missingIndependentReview(ReleaseCriticalReviewScope)
@@ -46,34 +48,46 @@ public struct ReleaseCandidateEvidenceValidator: Sendable {
         {
             throw ReleaseCandidateEvidenceError.releaseCommitMismatch
         }
-        let attachmentDigests = try validateAttachments(
+        let attachments = try validateAttachments(
             declaration.attachments,
             evidenceRoot: evidenceRoot
         )
         try validateBuildArtifacts(
             declaration.buildArtifacts,
-            attachmentDigests: attachmentDigests
+            attachmentDigests: attachments.digests
         )
-        try validateCategoryCoverage(declaration.attachments)
+        let records = try validateEvidenceRecords(
+            declaration,
+            attachmentData: attachments.data
+        )
+        try validateCategoryCoverage(
+            declaration.attachments,
+            records: records
+        )
+        let manifestRoutes = try validateCatalogIdentity(
+            declaration,
+            attachmentData: attachments.data
+        )
         try validatePerformance(
             declaration.performanceEvidence,
-            attachmentIDs: Set(attachmentDigests.keys)
+            records: records
         )
         try validateComputeRoutes(
             declaration,
-            attachmentIDs: Set(attachmentDigests.keys)
+            manifestRoutes: manifestRoutes,
+            records: records
         )
         try validateDefects(
             declaration.defects,
-            attachmentIDs: Set(attachmentDigests.keys)
+            attachmentIDs: Set(attachments.digests.keys)
         )
         try validateIndependentReviews(
             declaration,
-            attachmentIDs: Set(attachmentDigests.keys)
+            records: records
         )
         try validateApprovals(
             declaration.approvals,
-            attachmentIDs: Set(attachmentDigests.keys)
+            records: records
         )
 
         let declarationData = try Self.encoder.encode(declaration)
@@ -81,8 +95,8 @@ public struct ReleaseCandidateEvidenceValidator: Sendable {
             schemaVersion: 1,
             releaseCommitSHA: declaration.releaseCommitSHA,
             declarationSHA256: Self.sha256(declarationData),
-            attachmentSHA256ByID: attachmentDigests,
-            attachmentCount: attachmentDigests.count,
+            attachmentSHA256ByID: attachments.digests,
+            attachmentCount: attachments.digests.count,
             approvalCount: Set(declaration.approvals.map(\.approver)).count,
             isReleaseApproved: true
         )
@@ -130,10 +144,11 @@ public struct ReleaseCandidateEvidenceValidator: Sendable {
     private func validateAttachments(
         _ attachments: [ReleaseEvidenceAttachment],
         evidenceRoot: URL
-    ) throws -> [String: String] {
-        var result: [String: String] = [:]
+    ) throws -> (digests: [String: String], data: [String: Data]) {
+        var digests: [String: String] = [:]
+        var dataByID: [String: Data] = [:]
         for attachment in attachments {
-            guard result[attachment.id] == nil else {
+            guard digests[attachment.id] == nil else {
                 throw ReleaseCandidateEvidenceError.duplicateAttachmentID(
                     attachment.id
                 )
@@ -150,7 +165,7 @@ public struct ReleaseCandidateEvidenceValidator: Sendable {
                 attachment.relativePath,
                 isDirectory: false
             )
-            guard Self.isContainedRegularFile(url, in: evidenceRoot),
+            guard ReleaseEvidenceFilePolicy.accepts(url, in: evidenceRoot),
                   let data = try? Data(contentsOf: url)
             else {
                 throw ReleaseCandidateEvidenceError.attachmentNotFound(
@@ -163,17 +178,67 @@ public struct ReleaseCandidateEvidenceValidator: Sendable {
                     attachment.id
                 )
             }
-            result[attachment.id] = digest
+            digests[attachment.id] = digest
+            dataByID[attachment.id] = data
         }
-        return result
+        return (digests, dataByID)
+    }
+
+    private func validateEvidenceRecords(
+        _ declaration: ReleaseCandidateEvidenceDeclaration,
+        attachmentData: [String: Data]
+    ) throws -> [String: ReleaseEvidenceRecord] {
+        var records: [String: ReleaseEvidenceRecord] = [:]
+        let attachmentIDs = Set(attachmentData.keys)
+        for attachment in declaration.attachments
+        where !attachment.categories.isEmpty {
+            guard attachment.categories.count == 1,
+                  let data = attachmentData[attachment.id],
+                  let record = try? JSONDecoder().decode(
+                      ReleaseEvidenceRecord.self,
+                      from: data
+                  ),
+                  record.schemaVersion == 1,
+                  record.category == attachment.categories[0],
+                  record.result == .passed,
+                  record.releaseCommitSHA == declaration.releaseCommitSHA,
+                  Self.isISO8601(record.recordedAt),
+                  !record.recordedBy.trimmingCharacters(
+                      in: .whitespacesAndNewlines
+                  ).isEmpty,
+                  record.notes.contains(where: {
+                      !$0.trimmingCharacters(
+                          in: .whitespacesAndNewlines
+                      ).isEmpty
+                  }),
+                  !record.subjectAttachmentIDs.isEmpty,
+                  record.subjectAttachmentIDs.allSatisfy({
+                      $0 != attachment.id && attachmentIDs.contains($0)
+                  })
+            else {
+                throw ReleaseCandidateEvidenceError.invalidEvidenceRecord(
+                    attachment.id
+                )
+            }
+            if record.category.requiresManualEvidence,
+               attachment.kind != .manual
+            {
+                throw ReleaseCandidateEvidenceError.manualEvidenceRequired(
+                    record.category
+                )
+            }
+            records[attachment.id] = record
+        }
+        return records
     }
 
     private func validateCategoryCoverage(
-        _ attachments: [ReleaseEvidenceAttachment]
+        _ attachments: [ReleaseEvidenceAttachment],
+        records: [String: ReleaseEvidenceRecord]
     ) throws {
         for category in ReleaseEvidenceCategory.allCases {
             let matching = attachments.filter {
-                $0.categories.contains(category)
+                $0.categories == [category] && records[$0.id] != nil
             }
             guard !matching.isEmpty else {
                 throw ReleaseCandidateEvidenceError.missingEvidenceCategory(
@@ -190,6 +255,39 @@ public struct ReleaseCandidateEvidenceValidator: Sendable {
         }
     }
 
+    private func validateCatalogIdentity(
+        _ declaration: ReleaseCandidateEvidenceDeclaration,
+        attachmentData: [String: Data]
+    ) throws -> Set<ModelComputeRoute> {
+        let identity = declaration.catalogIdentity
+        guard let publicationData =
+                attachmentData[identity.publicationEvidenceAttachmentID],
+              let manifestData =
+                attachmentData[identity.catalogManifestAttachmentID],
+              let publication = try? JSONDecoder().decode(
+                  ModelCatalogPublicationEvidence.self,
+                  from: publicationData
+              ),
+              let manifest = try? ModelManifest.decode(manifestData),
+              manifest.manifestVersion == 3,
+              let graph = manifest.presentationGraph,
+              publication.catalogRevision == identity.catalogRevision,
+              publication.catalogSignerKeyID == identity.catalogSignerID,
+              publication.revocationRevision == identity.revocationRevision,
+              publication.revocationSignerKeyID
+                == identity.revocationSignerID,
+              publication.catalogContentSHA256 == Self.sha256(manifestData),
+              publication.artifactCount == graph.artifacts.count,
+              declaration.buildArtifacts.contains(where: {
+                  $0.sha256
+                    == publication.buildIdentity.executableSHA256
+              })
+        else {
+            throw ReleaseCandidateEvidenceError.catalogEvidenceMismatch
+        }
+        return Set(graph.artifacts.map(\.computeRoute))
+    }
+
     private func validateBuildArtifacts(
         _ artifacts: [ReleaseBuildArtifact],
         attachmentDigests: [String: String]
@@ -203,16 +301,35 @@ public struct ReleaseCandidateEvidenceValidator: Sendable {
 
     private func validatePerformance(
         _ evidence: [ReleasePerformanceEvidence],
-        attachmentIDs: Set<String>
+        records: [String: ReleaseEvidenceRecord]
     ) throws {
         let valid: (ReleasePerformanceEvidence) -> Bool = {
-            $0.isRealDevice
-                && !$0.deviceID.isEmpty
+            guard $0.isRealDevice,
+                  let record = records[$0.attachmentID],
+                  record.category == .performance
+            else {
+                return false
+            }
+            return !$0.deviceID.isEmpty
                 && !$0.deviceClass.isEmpty
                 && !$0.macOSVersion.isEmpty
                 && $0.warmIterationCount >= 30
                 && $0.coldLaunchCount >= 3
-                && attachmentIDs.contains($0.attachmentID)
+                && record.attributes["deviceID"] == $0.deviceID
+                && record.attributes["deviceClass"] == $0.deviceClass
+                && record.attributes["macOSVersion"] == $0.macOSVersion
+                && record.attributes["isRealDevice"] == "true"
+                && record.attributes["isOldestSupportedM1Class"]
+                    == String($0.isOldestSupportedM1Class)
+                && (
+                    $0.isOldestSupportedM1Class
+                        ? $0.deviceClass == "Apple M1"
+                        : $0.deviceClass != "Apple M1"
+                )
+                && record.measurements["warm"]?.count
+                    == $0.warmIterationCount
+                && record.measurements["cold"]?.count
+                    == $0.coldLaunchCount
         }
         guard evidence.contains(where: {
             $0.isOldestSupportedM1Class && valid($0)
@@ -230,9 +347,12 @@ public struct ReleaseCandidateEvidenceValidator: Sendable {
 
     private func validateComputeRoutes(
         _ declaration: ReleaseCandidateEvidenceDeclaration,
-        attachmentIDs: Set<String>
+        manifestRoutes: Set<ModelComputeRoute>,
+        records: [String: ReleaseEvidenceRecord]
     ) throws {
-        guard !declaration.declaredComputeRoutes.isEmpty else {
+        guard !manifestRoutes.isEmpty,
+              Set(declaration.declaredComputeRoutes) == manifestRoutes
+        else {
             throw ReleaseCandidateEvidenceError.invalidReleaseIdentity
         }
         let performanceDeviceIDs = Set(
@@ -240,13 +360,19 @@ public struct ReleaseCandidateEvidenceValidator: Sendable {
                 .filter(\.isRealDevice)
                 .map(\.deviceID)
         )
-        for route in Set(declaration.declaredComputeRoutes) {
-            guard !route.isEmpty,
-                  declaration.computeRouteEvidence.contains(where: {
-                      $0.route == route
-                          && $0.isRealDevice
-                          && performanceDeviceIDs.contains($0.deviceID)
-                          && attachmentIDs.contains($0.attachmentID)
+        for route in manifestRoutes {
+            guard declaration.computeRouteEvidence.contains(where: {
+                      guard $0.route == route,
+                            $0.isRealDevice,
+                            performanceDeviceIDs.contains($0.deviceID),
+                            let record = records[$0.attachmentID]
+                      else {
+                          return false
+                      }
+                      return record.category == .computeRoutes
+                          && record.attributes["route"] == route.rawValue
+                          && record.attributes["deviceID"] == $0.deviceID
+                          && record.attributes["isRealDevice"] == "true"
                   })
             else {
                 throw ReleaseCandidateEvidenceError
@@ -285,14 +411,20 @@ public struct ReleaseCandidateEvidenceValidator: Sendable {
 
     private func validateIndependentReviews(
         _ declaration: ReleaseCandidateEvidenceDeclaration,
-        attachmentIDs: Set<String>
+        records: [String: ReleaseEvidenceRecord]
     ) throws {
         for scope in ReleaseCriticalReviewScope.allCases {
             guard declaration.independentReviews.contains(where: {
-                $0.scope == scope
-                    && !$0.reviewer.isEmpty
-                    && $0.reviewer != declaration.primaryAuthor
-                    && attachmentIDs.contains($0.attachmentID)
+                guard $0.scope == scope,
+                      !$0.reviewer.isEmpty,
+                      $0.reviewer != declaration.primaryAuthor,
+                      let record = records[$0.attachmentID]
+                else {
+                    return false
+                }
+                return record.category == .securityReview
+                    && record.recordedBy == $0.reviewer
+                    && record.attributes["scope"] == scope.rawValue
             }) else {
                 throw ReleaseCandidateEvidenceError.missingIndependentReview(
                     scope
@@ -303,15 +435,19 @@ public struct ReleaseCandidateEvidenceValidator: Sendable {
 
     private func validateApprovals(
         _ approvals: [ReleaseHumanApproval],
-        attachmentIDs: Set<String>
+        records: [String: ReleaseEvidenceRecord]
     ) throws {
         let validApprovers: Set<String> = Set(approvals.compactMap {
             approval -> String? in
-            guard !approval.approver.trimmingCharacters(
+            guard let record = records[approval.attachmentID],
+            record.category == .humanApprovals,
+            record.recordedBy == approval.approver,
+            record.attributes["approvedAt"] == approval.approvedAt,
+            !approval.approver.trimmingCharacters(
                 in: .whitespacesAndNewlines
             ).isEmpty,
             Self.isISO8601(approval.approvedAt),
-            attachmentIDs.contains(approval.attachmentID)
+            record.subjectAttachmentIDs.count >= 2
             else {
                 return nil
             }
@@ -335,26 +471,6 @@ public struct ReleaseCandidateEvidenceValidator: Sendable {
         ).allSatisfy {
             !$0.isEmpty && $0 != "." && $0 != ".."
         }
-    }
-
-    private static func isContainedRegularFile(
-        _ url: URL,
-        in root: URL
-    ) -> Bool {
-        let standardizedRoot = root.resolvingSymlinksInPath().standardizedFileURL
-        let standardizedURL = url.resolvingSymlinksInPath().standardizedFileURL
-        let rootPath = standardizedRoot.path.hasSuffix("/")
-            ? standardizedRoot.path
-            : standardizedRoot.path + "/"
-        guard standardizedURL.path.hasPrefix(rootPath) else {
-            return false
-        }
-        var information = stat()
-        guard lstat(url.path, &information) == 0 else {
-            return false
-        }
-        return information.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG)
-            && information.st_nlink == 1
     }
 
     private static func isISO8601(_ value: String) -> Bool {

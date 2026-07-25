@@ -11,28 +11,22 @@ EVIDENCE_DIR="$1"
 mkdir -p "$EVIDENCE_DIR"
 EVIDENCE_DIR="$(cd "$EVIDENCE_DIR" && pwd)"
 TEST_LOG="$EVIDENCE_DIR/fault-tests.log"
+TEST_RESULTS="$EVIDENCE_DIR/fault-tests.tsv"
 CAMPAIGN_REPORT="$EVIDENCE_DIR/fault-campaign.json"
 CHECKSUMS="$EVIDENCE_DIR/checksums.txt"
 
 : >"$TEST_LOG"
 
-run_test() {
-  local filter="$1"
-  (
-    cd "$ROOT_DIR"
-    swift test --filter "$filter"
-  ) 2>&1 | tee -a "$TEST_LOG"
-}
+TEST_FILTER='TextifyReleaseVerificationTests|TextifyModelsTests.DownloadTests|TextifyModelsTests.ManifestV3Tests|TextifyModelsTests.ModelInstallerTests|TextifyModelsTests.ModelInstallQueueTests|TextifyModelsTests.ModelStorageAdmissionTests|TextifyModelsTests.ModelStorageInventoryTests|TextifyModelsTests.ModelRevocationTests|TextifyModelsTests.InstalledModelManagerTests|TextifyAppTests.ModelInstallCoordinatorQueueTests|TextifyDiagnosticsTests.DiagnosticsTests'
+(
+  cd "$ROOT_DIR"
+  swift test --filter "$TEST_FILTER"
+) 2>&1 | tee "$TEST_LOG"
 
-run_test "TextifyReleaseVerificationTests"
-run_test "TextifyModelsTests.ModelInstallerTests"
-run_test "TextifyModelsTests.ModelInstallQueueTests"
-run_test "TextifyModelsTests.ModelStorageAdmissionTests"
-run_test "TextifyModelsTests.ModelStorageInventoryTests"
-run_test "TextifyModelsTests.ModelRevocationTests"
-run_test "TextifyModelsTests.InstalledModelManagerTests"
-run_test "TextifyAppTests.ModelInstallCoordinatorQueueTests"
-run_test "TextifyDiagnosticsTests.DiagnosticsTests"
+awk -F"'" '/^Test Case .* passed/ {
+  print $2 "\tpassed"
+}' "$TEST_LOG" >"$TEST_RESULTS"
+test -s "$TEST_RESULTS"
 
 (
   cd "$ROOT_DIR"
@@ -41,7 +35,10 @@ run_test "TextifyDiagnosticsTests.DiagnosticsTests"
 
 (
   cd "$EVIDENCE_DIR"
-  shasum -a 256 fault-campaign.json fault-tests.log >"$CHECKSUMS"
+  shasum -a 256 \
+    fault-campaign.json \
+    fault-tests.log \
+    fault-tests.tsv >"$CHECKSUMS"
 )
 
 echo "Model fault evidence written to $EVIDENCE_DIR"

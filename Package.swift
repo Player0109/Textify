@@ -261,7 +261,10 @@ let package = Package(
         .testTarget(name: "TextifyRuntimeTests", dependencies: ["TextifyRuntime"]),
         .testTarget(
             name: "TextifyReleaseVerificationTests",
-            dependencies: ["TextifyReleaseVerification"]
+            dependencies: [
+                "TextifyModels",
+                "TextifyReleaseVerification",
+            ]
         ),
         .testTarget(
             name: "TextifyAppTests",

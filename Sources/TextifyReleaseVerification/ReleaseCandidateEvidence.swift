@@ -1,4 +1,5 @@
 import Foundation
+import TextifyModels
 
 public enum ReleaseEvidenceCategory: String, CaseIterable, Codable, Sendable {
     case schemaTests = "schema_tests"
@@ -39,7 +40,8 @@ public enum ReleaseEvidenceCategory: String, CaseIterable, Codable, Sendable {
     var requiresManualEvidence: Bool {
         switch self {
         case .voiceOver, .fullKeyboardAccess, .textScaling, .reduceMotion,
-             .increaseContrast, .reduceTransparency:
+             .increaseContrast, .reduceTransparency, .securityReview,
+             .humanApprovals:
             true
         default:
             false
@@ -74,6 +76,48 @@ public struct ReleaseEvidenceAttachment: Codable, Equatable, Sendable {
     }
 }
 
+public enum ReleaseEvidenceResult: String, Codable, Sendable {
+    case passed
+    case failed
+}
+
+public struct ReleaseEvidenceRecord: Codable, Equatable, Sendable {
+    public var schemaVersion: Int
+    public var category: ReleaseEvidenceCategory
+    public var result: ReleaseEvidenceResult
+    public var releaseCommitSHA: String
+    public var recordedAt: String
+    public var recordedBy: String
+    public var notes: [String]
+    public var subjectAttachmentIDs: [String]
+    public var attributes: [String: String]
+    public var measurements: [String: [Double]]
+
+    public init(
+        schemaVersion: Int = 1,
+        category: ReleaseEvidenceCategory,
+        result: ReleaseEvidenceResult,
+        releaseCommitSHA: String,
+        recordedAt: String,
+        recordedBy: String,
+        notes: [String],
+        subjectAttachmentIDs: [String],
+        attributes: [String: String] = [:],
+        measurements: [String: [Double]] = [:]
+    ) {
+        self.schemaVersion = schemaVersion
+        self.category = category
+        self.result = result
+        self.releaseCommitSHA = releaseCommitSHA
+        self.recordedAt = recordedAt
+        self.recordedBy = recordedBy
+        self.notes = notes
+        self.subjectAttachmentIDs = subjectAttachmentIDs
+        self.attributes = attributes
+        self.measurements = measurements
+    }
+}
+
 public struct ReleaseBuildArtifact: Codable, Equatable, Sendable {
     public var name: String
     public var sha256: String
@@ -91,17 +135,24 @@ public struct ReleaseCatalogIdentity: Codable, Equatable, Sendable {
     public var catalogSignerID: String
     public var revocationRevision: String
     public var revocationSignerID: String
+    public var publicationEvidenceAttachmentID: String
+    public var catalogManifestAttachmentID: String
 
     public init(
         catalogRevision: String,
         catalogSignerID: String,
         revocationRevision: String,
-        revocationSignerID: String
+        revocationSignerID: String,
+        publicationEvidenceAttachmentID: String,
+        catalogManifestAttachmentID: String
     ) {
         self.catalogRevision = catalogRevision
         self.catalogSignerID = catalogSignerID
         self.revocationRevision = revocationRevision
         self.revocationSignerID = revocationSignerID
+        self.publicationEvidenceAttachmentID =
+            publicationEvidenceAttachmentID
+        self.catalogManifestAttachmentID = catalogManifestAttachmentID
     }
 }
 
@@ -137,13 +188,13 @@ public struct ReleasePerformanceEvidence: Codable, Equatable, Sendable {
 }
 
 public struct ReleaseComputeRouteEvidence: Codable, Equatable, Sendable {
-    public var route: String
+    public var route: ModelComputeRoute
     public var deviceID: String
     public var isRealDevice: Bool
     public var attachmentID: String
 
     public init(
-        route: String,
+        route: ModelComputeRoute,
         deviceID: String,
         isRealDevice: Bool,
         attachmentID: String
@@ -254,7 +305,7 @@ public struct ReleaseCandidateEvidenceDeclaration:
     public var catalogIdentity: ReleaseCatalogIdentity
     public var attachments: [ReleaseEvidenceAttachment]
     public var performanceEvidence: [ReleasePerformanceEvidence]
-    public var declaredComputeRoutes: [String]
+    public var declaredComputeRoutes: [ModelComputeRoute]
     public var computeRouteEvidence: [ReleaseComputeRouteEvidence]
     public var defects: [ReleaseEvidenceDefect]
     public var independentReviews: [ReleaseIndependentReview]
@@ -271,7 +322,7 @@ public struct ReleaseCandidateEvidenceDeclaration:
         catalogIdentity: ReleaseCatalogIdentity,
         attachments: [ReleaseEvidenceAttachment],
         performanceEvidence: [ReleasePerformanceEvidence],
-        declaredComputeRoutes: [String],
+        declaredComputeRoutes: [ModelComputeRoute],
         computeRouteEvidence: [ReleaseComputeRouteEvidence],
         defects: [ReleaseEvidenceDefect],
         independentReviews: [ReleaseIndependentReview],

@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Network
 import TextifyModels
@@ -26,6 +27,7 @@ public final class DeterministicModelDownloadService: @unchecked Sendable {
     private let lock = NSLock()
     private var listener: NWListener?
     private var servicePort: UInt16?
+    private var flakyRequestCount = 0
 
     public init(payload: Data) {
         self.payload = payload
@@ -80,152 +82,271 @@ public final class DeterministicModelDownloadService: @unchecked Sendable {
             throw DeterministicModelDownloadServiceError.failedToStart
         }
 
-        let session = URLSession(configuration: .ephemeral)
-        let (redirectData, redirectResponse) = try await session.data(
-            from: baseURL.appendingPathComponent("redirect")
-        )
-        let redirectFollowed = redirectData == payload
-            && (redirectResponse as? HTTPURLResponse)?.statusCode == 200
-
-        var rangeRequest = URLRequest(url: baseURL.appendingPathComponent("range"))
-        rangeRequest.setValue("bytes=3-", forHTTPHeaderField: "Range")
-        rangeRequest.setValue("\"v1\"", forHTTPHeaderField: "If-Range")
-        let (rangeData, rangeResponse) = try await session.data(for: rangeRequest)
-        let validRangeResumed = rangeData == payload.dropFirst(3)
-            && (rangeResponse as? HTTPURLResponse)?.statusCode == 206
-            && (rangeResponse as? HTTPURLResponse)?
-                .value(forHTTPHeaderField: "Content-Range")?
-                .hasPrefix("bytes 3-") == true
-
-        var invalidRangeRequest = URLRequest(
-            url: baseURL.appendingPathComponent("invalid-range")
-        )
-        invalidRangeRequest.setValue("bytes=3-", forHTTPHeaderField: "Range")
-        let (_, invalidRangeResponse) = try await session.data(for: invalidRangeRequest)
-        let invalidRangeRejected = (invalidRangeResponse as? HTTPURLResponse)?
-            .value(forHTTPHeaderField: "Content-Range")?
-            .hasPrefix("bytes 0-") == true
-
-        var changedRequest = URLRequest(url: baseURL.appendingPathComponent("changed"))
-        changedRequest.setValue("bytes=3-", forHTTPHeaderField: "Range")
-        changedRequest.setValue("\"v1\"", forHTTPHeaderField: "If-Range")
-        let (changedData, changedResponse) = try await session.data(for: changedRequest)
-        let changedValidatorRestarted = changedData == payload
-            && (changedResponse as? HTTPURLResponse)?.statusCode == 200
-            && (changedResponse as? HTTPURLResponse)?
-                .value(forHTTPHeaderField: "ETag") == "\"v2\""
-
-        let disconnectRetainedOnlyVerifiedPrefix: Bool
-        do {
-            _ = try await session.data(
-                from: baseURL.appendingPathComponent("disconnect")
-            )
-            disconnectRetainedOnlyVerifiedPrefix = false
-        } catch {
-            disconnectRetainedOnlyVerifiedPrefix = true
-        }
-
-        let (retryData, _) = try await session.data(
-            from: baseURL.appendingPathComponent("file")
-        )
-        let retrySucceeded = retryData == payload
-
-        let cancelledTask = session.dataTask(
-            with: baseURL.appendingPathComponent("disconnect")
-        )
-        cancelledTask.resume()
-        cancelledTask.cancel()
-
-        let queueEvidence = try durableQueueEvidence()
-
-        return DeterministicModelDownloadReport(
-            redirectFollowed: redirectFollowed,
-            validRangeResumed: validRangeResumed,
-            invalidRangeRejected: invalidRangeRejected,
-            changedValidatorRestarted: changedValidatorRestarted,
-            disconnectRetainedOnlyVerifiedPrefix: disconnectRetainedOnlyVerifiedPrefix,
-            retrySucceeded: retrySucceeded,
-            cancelRemovedPartial: queueEvidence.cancelRemovedPartial,
-            restartRecoveredQueue: queueEvidence.restartRecoveredQueue,
-            offlineQueueStayedDurable: queueEvidence.offlineQueueStayedDurable,
-            freshnessExpiryBlockedTransfer: queueEvidence.freshnessExpiryBlockedTransfer
-        )
-    }
-
-    private func durableQueueEvidence() throws -> DurableQueueEvidence {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(
             "TextifyDownloadService-\(UUID().uuidString)",
             isDirectory: true
         )
-        defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(
             at: root,
             withIntermediateDirectories: true
         )
-        let store = ModelInstallQueueStore(
-            fileURL: root.appendingPathComponent("install-queue.json")
-        )
-        var queue = ModelInstallQueue()
-        let attemptID = "offline-attempt"
-        try queue.authorize(
-            artifactID: "fixture-artifact",
-            purpose: .transcription,
-            action: .install,
-            attemptID: attemptID,
-            createdAt: "2026-07-25T00:00:00Z"
-        )
-        try queue.transition(
-            attemptID: attemptID,
-            to: DownloadState(
-                modelID: "fixture-artifact",
-                phase: .waitingForNetwork,
-                message: "Waiting for network.",
-                attemptID: attemptID
-            )
-        )
-        try store.save(queue)
-        let offlineQueueStayedDurable =
-            try store.load().attempt(id: attemptID)?.state.phase == .waitingForNetwork
+        defer { try? FileManager.default.removeItem(at: root) }
 
-        try queue.transition(
-            attemptID: attemptID,
-            to: DownloadState(
-                modelID: "fixture-artifact",
-                phase: .queued,
-                message: "Queued",
-                attemptID: attemptID
-            )
-        )
-        try queue.transition(
-            attemptID: attemptID,
-            to: DownloadState(
-                modelID: "fixture-artifact",
-                phase: .checkingSpace,
-                message: "Checking space",
-                attemptID: attemptID
-            )
-        )
-        try store.save(queue)
-        let restartRecoveredQueue =
-            try store.loadForRelaunch().attempt(id: attemptID)?.state.phase == .queued
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        let transport = URLSessionDownloadTransport(session: session)
+        let checksum = SHA256.hash(data: payload)
+            .map { String(format: "%02x", $0) }
+            .joined()
 
-        let partial = root.appendingPathComponent("fixture.partial")
-        try Data("partial".utf8).write(to: partial)
-        try FileManager.default.removeItem(at: partial)
-        let cancelRemovedPartial = !FileManager.default.fileExists(
-            atPath: partial.path
+        let redirectURL = root.appendingPathComponent("redirect.partial")
+        let redirectResponse = try await transport.downloadFile(
+            URLRequest(url: baseURL.appendingPathComponent("redirect")),
+            to: redirectURL
+        )
+        let redirectFollowed = try Data(contentsOf: redirectURL) == payload
+            && redirectResponse.statusCode == 200
+
+        let validRange = try await exerciseResume(
+            path: "range",
+            initialBytes: 3,
+            validator: "\"v1\"",
+            root: root,
+            baseURL: baseURL,
+            checksum: checksum,
+            transport: transport
+        )
+        let validRangeResumed = validRange.succeeded
+            && validRange.statusCode == 206
+
+        let invalidRange = try await exerciseInvalidRange(
+            root: root,
+            baseURL: baseURL,
+            checksum: checksum,
+            transport: transport
         )
 
-        let policy = ModelTransferFreshnessPolicy()
-        let freshnessExpiryBlockedTransfer = !policy.isFresh(
-            lastSuccessfulCheckAt: Date(timeIntervalSince1970: 0),
-            now: Date(timeIntervalSince1970: 12 * 60 * 60 + 1)
+        let changed = try await exerciseResume(
+            path: "changed",
+            initialBytes: 3,
+            validator: "\"v1\"",
+            root: root,
+            baseURL: baseURL,
+            checksum: checksum,
+            transport: transport
         )
-        return DurableQueueEvidence(
+        let changedValidatorRestarted = changed.succeeded
+            && changed.statusCode == 200
+
+        let flaky = try await exerciseDisconnectAndRetry(
+            root: root,
+            baseURL: baseURL,
+            checksum: checksum,
+            transport: transport
+        )
+        let cancelRemovedPartial = try await exerciseCancellation(
+            root: root,
+            baseURL: baseURL,
+            transport: transport
+        )
+        let queueEvidence = try ModelDurableQueueRecoveryProbe().run(
+            root: root
+        )
+        let freshnessExpiryBlockedTransfer =
+            !ModelTransferFreshnessPolicy().isFresh(
+                lastSuccessfulCheckAt: Date(timeIntervalSince1970: 0),
+                now: Date(timeIntervalSince1970: 12 * 60 * 60 + 1)
+            )
+
+        return DeterministicModelDownloadReport(
+            redirectFollowed: redirectFollowed,
+            validRangeResumed: validRangeResumed,
+            invalidRangeRejected: invalidRange,
+            changedValidatorRestarted: changedValidatorRestarted,
+            disconnectRetainedOnlyVerifiedPrefix: flaky.retainedVerifiedPrefix,
+            retrySucceeded: flaky.retrySucceeded,
             cancelRemovedPartial: cancelRemovedPartial,
-            restartRecoveredQueue: restartRecoveredQueue,
-            offlineQueueStayedDurable: offlineQueueStayedDurable,
+            restartRecoveredQueue: queueEvidence.restartRecoveredQueue,
+            offlineQueueStayedDurable: queueEvidence.offlineQueueStayedDurable,
             freshnessExpiryBlockedTransfer: freshnessExpiryBlockedTransfer
+        )
+    }
+
+    private func exerciseResume(
+        path: String,
+        initialBytes: Int,
+        validator: String,
+        root: URL,
+        baseURL: URL,
+        checksum: String,
+        transport: URLSessionDownloadTransport
+    ) async throws -> (succeeded: Bool, statusCode: Int?) {
+        let partialURL = root.appendingPathComponent("\(path).partial")
+        let metadataURL = partialURL.appendingPathExtension("resume.json")
+        try Data(payload.prefix(initialBytes)).write(to: partialURL)
+        try writeMetadata(
+            modelID: path,
+            url: baseURL.appendingPathComponent(path),
+            checksum: checksum,
+            validator: validator,
+            bytesDownloaded: initialBytes,
+            to: metadataURL
+        )
+        let response = try await transport.downloadFileResuming(
+            URLRequest(url: baseURL.appendingPathComponent(path)),
+            to: partialURL,
+            metadataURL: metadataURL,
+            modelID: path,
+            expectedSHA256: checksum,
+            maximumBytes: Int64(payload.count),
+            progress: { _ in }
+        )
+        return (
+            try Data(contentsOf: partialURL) == payload
+                && !FileManager.default.fileExists(atPath: metadataURL.path),
+            response.statusCode
+        )
+    }
+
+    private func exerciseInvalidRange(
+        root: URL,
+        baseURL: URL,
+        checksum: String,
+        transport: URLSessionDownloadTransport
+    ) async throws -> Bool {
+        let partialURL = root.appendingPathComponent("invalid-range.partial")
+        let metadataURL = partialURL.appendingPathExtension("resume.json")
+        try Data(payload.prefix(3)).write(to: partialURL)
+        try writeMetadata(
+            modelID: "invalid-range",
+            url: baseURL.appendingPathComponent("invalid-range"),
+            checksum: checksum,
+            validator: "\"v1\"",
+            bytesDownloaded: 3,
+            to: metadataURL
+        )
+        do {
+            _ = try await transport.downloadFileResuming(
+                URLRequest(
+                    url: baseURL.appendingPathComponent("invalid-range")
+                ),
+                to: partialURL,
+                metadataURL: metadataURL,
+                modelID: "invalid-range",
+                expectedSHA256: checksum,
+                maximumBytes: Int64(payload.count),
+                progress: { _ in }
+            )
+            return false
+        } catch let error as DownloadTransportError {
+            return error == .invalidRangeResponse(expectedStartByte: 3)
+                && !FileManager.default.fileExists(atPath: partialURL.path)
+                && !FileManager.default.fileExists(atPath: metadataURL.path)
+        }
+    }
+
+    private func exerciseDisconnectAndRetry(
+        root: URL,
+        baseURL: URL,
+        checksum: String,
+        transport: URLSessionDownloadTransport
+    ) async throws -> (
+        retainedVerifiedPrefix: Bool,
+        retrySucceeded: Bool
+    ) {
+        let url = baseURL.appendingPathComponent("flaky")
+        let partialURL = root.appendingPathComponent("flaky.partial")
+        let metadataURL = partialURL.appendingPathExtension("resume.json")
+        do {
+            _ = try await transport.downloadFileResuming(
+                URLRequest(url: url),
+                to: partialURL,
+                metadataURL: metadataURL,
+                modelID: "flaky",
+                expectedSHA256: checksum,
+                maximumBytes: Int64(payload.count),
+                progress: { _ in }
+            )
+            return (false, false)
+        } catch {
+            let retained = try? Data(contentsOf: partialURL)
+            let metadata = try? JSONDecoder().decode(
+                DownloadResumeMetadata.self,
+                from: Data(contentsOf: metadataURL)
+            )
+            let retainedVerifiedPrefix =
+                retained?.isEmpty == false
+                    && payload.starts(with: retained ?? Data())
+                    && metadata?.bytesDownloaded == Int64(retained?.count ?? 0)
+                    && metadata?.eTag == "\"v1\""
+            let response = try await transport.downloadFileResuming(
+                URLRequest(url: url),
+                to: partialURL,
+                metadataURL: metadataURL,
+                modelID: "flaky",
+                expectedSHA256: checksum,
+                maximumBytes: Int64(payload.count),
+                progress: { _ in }
+            )
+            let completedPayload = try Data(contentsOf: partialURL)
+            return (
+                retainedVerifiedPrefix,
+                response.statusCode == 206
+                    && completedPayload == payload
+                    && !FileManager.default.fileExists(atPath: metadataURL.path)
+            )
+        }
+    }
+
+    private func exerciseCancellation(
+        root: URL,
+        baseURL: URL,
+        transport: URLSessionDownloadTransport
+    ) async throws -> Bool {
+        let partialURL = root.appendingPathComponent("cancel.partial")
+        let task = Task {
+            try await transport.downloadFile(
+                URLRequest(url: baseURL.appendingPathComponent("slow")),
+                to: partialURL
+            )
+        }
+        for _ in 0..<200 {
+            if (try? partialURL.resourceValues(
+                forKeys: [.fileSizeKey]
+            ).fileSize) ?? 0 > 0 {
+                break
+            }
+            try await Task.sleep(nanoseconds: 2_000_000)
+        }
+        task.cancel()
+        do {
+            _ = try await task.value
+            return false
+        } catch {
+            return !FileManager.default.fileExists(atPath: partialURL.path)
+        }
+    }
+
+    private func writeMetadata(
+        modelID: String,
+        url: URL,
+        checksum: String,
+        validator: String,
+        bytesDownloaded: Int,
+        to metadataURL: URL
+    ) throws {
+        let metadata = DownloadResumeMetadata(
+            modelID: modelID,
+            url: url.absoluteString,
+            expectedSize: Int64(payload.count),
+            sha256: checksum,
+            eTag: validator,
+            lastModified: nil,
+            bytesDownloaded: Int64(bytesDownloaded)
+        )
+        try JSONEncoder().encode(metadata).write(
+            to: metadataURL,
+            options: [.atomic]
         )
     }
 
@@ -259,8 +380,22 @@ public final class DeterministicModelDownloadService: @unchecked Sendable {
 
     private func respond(to requestData: Data, on connection: NWConnection) {
         let request = String(decoding: requestData, as: UTF8.self)
-        let firstLine = request.split(separator: "\r\n", maxSplits: 1).first ?? ""
-        let path = firstLine.split(separator: " ").dropFirst().first.map(String.init) ?? "/"
+        let lines = request.components(separatedBy: "\r\n")
+        let requestParts = lines.first?.split(separator: " ") ?? []
+        let method = requestParts.first.map(String.init) ?? "GET"
+        let path = requestParts.dropFirst().first.map(String.init) ?? "/"
+        let headers = Dictionary<String, String>(
+            uniqueKeysWithValues: lines.dropFirst().compactMap { line in
+                guard let separator = line.firstIndex(of: ":") else {
+                    return nil
+                }
+                return (
+                    line[..<separator].lowercased(),
+                    line[line.index(after: separator)...]
+                        .trimmingCharacters(in: .whitespaces)
+                )
+            }
+        )
 
         switch path {
         case "/redirect":
@@ -271,52 +406,144 @@ public final class DeterministicModelDownloadService: @unchecked Sendable {
                 on: connection
             )
         case "/range":
-            let body = Data(payload.dropFirst(3))
-            send(
-                status: "206 Partial Content",
-                headers: [
-                    "Content-Range": "bytes 3-\(payload.count - 1)/\(payload.count)",
-                    "ETag": "\"v1\""
-                ],
-                body: body,
+            respondWithRange(
+                method: method,
+                headers: headers,
+                validator: "\"v1\"",
+                invalidStart: false,
                 on: connection
             )
         case "/invalid-range":
-            let body = Data(payload.dropFirst(3))
-            send(
-                status: "206 Partial Content",
-                headers: [
-                    "Content-Range": "bytes 0-\(body.count - 1)/\(payload.count)",
-                    "ETag": "\"v1\""
-                ],
-                body: body,
+            respondWithRange(
+                method: method,
+                headers: headers,
+                validator: "\"v1\"",
+                invalidStart: true,
                 on: connection
             )
         case "/changed":
             send(
                 status: "200 OK",
                 headers: ["ETag": "\"v2\""],
-                body: payload,
+                body: method == "HEAD" ? Data() : payload,
                 on: connection
             )
-        case "/disconnect":
-            let header = Data(
-                "HTTP/1.1 200 OK\r\nContent-Length: \(payload.count + 100)\r\nConnection: close\r\n\r\n"
-                    .utf8
-            )
-            let partial = payload.prefix(max(1, payload.count / 2))
-            connection.send(
-                content: header + partial,
-                completion: .contentProcessed { _ in connection.cancel() }
-            )
+        case "/flaky":
+            if method == "HEAD" {
+                send(
+                    status: "200 OK",
+                    headers: ["ETag": "\"v1\""],
+                    body: Data(),
+                    on: connection
+                )
+            } else if lock.withLock({
+                flakyRequestCount += 1
+                return flakyRequestCount
+            }) == 1 {
+                disconnectHalfway(on: connection)
+            } else {
+                respondWithRange(
+                    method: method,
+                    headers: headers,
+                    validator: "\"v1\"",
+                    invalidStart: false,
+                    on: connection
+                )
+            }
+        case "/slow":
+            sendSlowResponse(on: connection)
         default:
             send(
                 status: "200 OK",
                 headers: ["ETag": "\"v1\""],
-                body: payload,
+                body: method == "HEAD" ? Data() : payload,
                 on: connection
             )
         }
+    }
+
+    private func respondWithRange(
+        method: String,
+        headers: [String: String],
+        validator: String,
+        invalidStart: Bool,
+        on connection: NWConnection
+    ) {
+        guard method != "HEAD" else {
+            send(
+                status: "200 OK",
+                headers: ["ETag": validator],
+                body: Data(),
+                on: connection
+            )
+            return
+        }
+        let requestedStart = headers["range"]
+            .flatMap { $0.split(separator: "=").last }
+            .flatMap { $0.split(separator: "-").first }
+            .flatMap { Int($0) } ?? 0
+        guard requestedStart > 0 else {
+            send(
+                status: "200 OK",
+                headers: ["ETag": validator],
+                body: payload,
+                on: connection
+            )
+            return
+        }
+        let responseStart = invalidStart ? 0 : requestedStart
+        let body = Data(payload.dropFirst(requestedStart))
+        send(
+            status: "206 Partial Content",
+            headers: [
+                "Content-Range":
+                    "bytes \(responseStart)-\(payload.count - 1)/\(payload.count)",
+                "ETag": validator,
+            ],
+            body: body,
+            on: connection
+        )
+    }
+
+    private func disconnectHalfway(on connection: NWConnection) {
+        let header = Data(
+            "HTTP/1.1 200 OK\r\nContent-Length: \(payload.count)\r\nETag: \"v1\"\r\nConnection: close\r\n\r\n"
+                .utf8
+        )
+        let partial = payload.prefix(max(1, payload.count / 2))
+        connection.send(
+            content: header + partial,
+            completion: .contentProcessed { [weak self] _ in
+                self?.queue.asyncAfter(deadline: .now() + 0.05) {
+                    connection.cancel()
+                }
+            }
+        )
+    }
+
+    private func sendSlowResponse(on connection: NWConnection) {
+        let header = Data(
+            "HTTP/1.1 200 OK\r\nContent-Length: \(payload.count)\r\nETag: \"v1\"\r\nConnection: close\r\n\r\n"
+                .utf8
+        )
+        let split = max(1, payload.count / 2)
+        connection.send(
+            content: header + payload.prefix(split),
+            completion: .contentProcessed { [weak self] error in
+                guard error == nil, let self else {
+                    connection.cancel()
+                    return
+                }
+                self.queue.asyncAfter(deadline: .now() + 1) {
+                    connection.send(
+                        content: self.payload.dropFirst(split),
+                        completion: .contentProcessed {
+                            _ in connection.cancel()
+                        }
+                    )
+                }
+            }
+        )
     }
 
     private func send(
@@ -339,13 +566,6 @@ public final class DeterministicModelDownloadService: @unchecked Sendable {
             completion: .contentProcessed { _ in connection.cancel() }
         )
     }
-}
-
-private struct DurableQueueEvidence {
-    let cancelRemovedPartial: Bool
-    let restartRecoveredQueue: Bool
-    let offlineQueueStayedDurable: Bool
-    let freshnessExpiryBlockedTransfer: Bool
 }
 
 private final class ListenerContinuationGate: @unchecked Sendable {

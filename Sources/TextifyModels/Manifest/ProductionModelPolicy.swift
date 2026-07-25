@@ -304,9 +304,10 @@ public enum ProductionModelPolicy {
                     .canonicalArtifactIsAlias(alias.canonicalArtifactID)
                 )
             }
-            let aliasDigests = Set(aliasModel.artifactTypedDigests())
-            let canonicalDigests = Set(canonicalModel.artifactTypedDigests())
-            guard !aliasDigests.isDisjoint(with: canonicalDigests) else {
+            guard artifactAliasDigestsMatch(
+                aliasDigests: aliasModel.artifactTypedDigests(),
+                canonicalDigests: canonicalModel.artifactTypedDigests()
+            ) else {
                 throw ProductionModelPolicyError.invalidArtifactAlias(
                     .digestMismatch(
                         aliasArtifactID: alias.aliasArtifactID,
@@ -326,6 +327,23 @@ public enum ProductionModelPolicy {
             return false
         }
         return current.lexicographicallyPrecedes(minimum) == false
+    }
+
+    public static func artifactAliasDigestsMatch(
+        aliasDigests: [ModelArtifactTypedDigest],
+        canonicalDigests: [ModelArtifactTypedDigest]
+    ) -> Bool {
+        !Set(aliasDigests).isDisjoint(with: Set(canonicalDigests))
+    }
+
+    public static func isApprovedHTTPSURL(_ value: String) -> Bool {
+        guard let url = URL(string: value) else {
+            return false
+        }
+        return url.scheme == "https"
+            && url.host != nil
+            && url.user == nil
+            && url.password == nil
     }
 
     private static func validateInstallationStorage(
@@ -367,7 +385,7 @@ public enum ProductionModelPolicy {
                     in: .whitespacesAndNewlines
                 ).isEmpty
             }),
-            isHTTPSURL(license.licenseTextUrl)
+            isApprovedHTTPSURL(license.licenseTextUrl)
             else {
                 throw ProductionModelPolicyError.invalidLicense(
                     modelID: model.id
@@ -385,8 +403,8 @@ public enum ProductionModelPolicy {
                 in: .whitespacesAndNewlines
             ).isEmpty
         }),
-        isHTTPSURL(provenance.sourceUrl),
-        isHTTPSURL(provenance.originalModelUrl),
+        isApprovedHTTPSURL(provenance.sourceUrl),
+        isApprovedHTTPSURL(provenance.originalModelUrl),
         isGitRevision(provenance.sourceRevision),
         ISO8601DateFormatter().date(
             from: provenance.mirroredAt + "T00:00:00Z"
@@ -396,16 +414,6 @@ public enum ProductionModelPolicy {
                 modelID: model.id
             )
         }
-    }
-
-    private static func isHTTPSURL(_ value: String) -> Bool {
-        guard let url = URL(string: value) else {
-            return false
-        }
-        return url.scheme == "https"
-            && url.host != nil
-            && url.user == nil
-            && url.password == nil
     }
 
     private static func parsedVersion(_ version: String) -> [Int]? {

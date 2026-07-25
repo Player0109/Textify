@@ -754,10 +754,10 @@ public struct ModelRevocationDownloader {
         try ModelDownloadURLPolicy.requireHTTPS(signatureURL)
 
         let revocationResponse = try await transport.fetch(
-            Self.anonymousGET(revocationURL)
+            ModelDownloadURLPolicy.anonymousGET(revocationURL)
         )
         let signatureResponse = try await transport.fetch(
-            Self.anonymousGET(signatureURL)
+            ModelDownloadURLPolicy.anonymousGET(signatureURL)
         )
         return try TrustedModelRevocationSnapshot(
             revocationData: revocationResponse.data,
@@ -766,13 +766,6 @@ public struct ModelRevocationDownloader {
         )
     }
 
-    private static func anonymousGET(_ url: URL) -> URLRequest {
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.httpBody = nil
-        request.allHTTPHeaderFields = [:]
-        return request
-    }
 }
 
 public struct ModelRevocationOverlay: Equatable, Sendable {

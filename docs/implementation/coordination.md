@@ -1403,13 +1403,14 @@ Task 1 must merge before parallel Wave 1 work begins.
   validation. Missing real-device measurements, manual accessibility results,
   independent security review, or two distinct human approvals remain
   release-blocking; automation must never synthesize or waive them.
-- Issue #24 verification retained a fixed-seed 1,000-operation report with all
-  12 durable boundaries and all 11 required injected fault classes covered,
-  zero invariant violations, zero unexplained managed bytes, all security and
-  privacy probes passing, and every localhost transfer/recovery scenario
-  passing. The retained focused production-path log covers 142 installer,
-  queue, storage, revocation/restoration, deletion, coordinator, diagnostics,
-  and release-verification tests with zero failures.
+- Issue #24 verification separates its fixed-seed property model from
+  production evidence. The report includes a 1,000-operation real
+  `ModelInstallQueueStore` soak with 3,000 store reconstructions, plus
+  production `URLSessionDownloadTransport` loopback scenarios and executed
+  security/privacy probes. The retained focused production-path log and
+  machine-readable test-case index cover installer, queue, storage,
+  revocation/restoration, deletion,
+  coordinator, diagnostics, and release-verification behavior.
 - Issue #25 adds a strict release-evidence declaration and atomic bundle
   verifier. It binds the current release commit, parent specification, build
   artifacts, catalog/revocation identities, and every retained attachment
@@ -1424,3 +1425,32 @@ Task 1 must merge before parallel Wave 1 work begins.
   manual accessibility passes, independent human review, and two human
   approvals remain external release gates. The verifier rejects their absence
   and the checked-in template is intentionally incomplete.
+- Review hardening requires every release category to use a distinct structured
+  evidence record bound to the release commit and separately hashed source
+  attachments. Performance counts are checked against retained sample arrays;
+  Compute Routes are derived from the attached v3 manifest; publication
+  identity is decoded from retained publication evidence and bound to that
+  manifest and an attached executable hash; review and approval declarations
+  must match their own retained records.
+- Review hardening needs two read-only production-policy entry points in
+  `ProductionModelPolicy.swift` so issue #24 can execute the same HTTPS and
+  typed-digest-alias decisions used by manifest validation instead of copying
+  release-only stand-ins. This is a narrow Task 4 handoff: existing validation
+  behavior is unchanged and no other model-domain files are owned.
+- The same hardening also centralizes anonymous catalog GET construction in
+  `ModelDownloadURLPolicy`. Adding that policy to
+  `Sources/TextifyModels/Downloads/ModelDownloader.swift` is a narrow Task 12
+  handoff. Reusing it from the manifest and revocation downloaders is a
+  separate narrow Task 4 handoff. Neither change alters endpoints or payloads;
+  together they make the production anonymity rule directly executable by
+  release checks.
+- Final local validation after review hardening executed 784 tests with 12
+  expected environment-gated skips and zero failures, then completed the
+  production build and vendor integrity checks. The retained-evidence script
+  separately executed 198 focused tests with zero failures and verified all
+  generated checksums.
+- Issue #24 remains open after review: the modeled 12-by-11 matrix and real
+  queue/partial soak do not replace a production failpoint matrix spanning
+  installer, activation, revocation/restoration, deletion, and reconciliation
+  with forced process crashes and relaunches. Release evidence must not claim
+  that missing proof.
