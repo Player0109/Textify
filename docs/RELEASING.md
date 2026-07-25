@@ -44,6 +44,7 @@ attachments, or fewer than two distinct human approvals. See
 - Xcode with Swift 6.2 or later and macOS 14 SDK support. The pinned MLX Audio
   package declares Swift tools 6.2 while Textify continues to deploy to macOS 14.
 - XcodeGen installed locally: `brew install xcodegen`.
+- `jq` installed locally for strict release-evidence JSON validation.
 - A clean worktree except for intentional release files.
 - The production model-manifest public key and `keyId` are embedded in the app.
 - The model-manifest private key is available only from the maintainer's macOS

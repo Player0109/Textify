@@ -3,6 +3,37 @@ import Foundation
 import XCTest
 
 final class ModelStorageAdmissionTests: XCTestCase {
+    func testInstallationExpansionRejectsCountSizeAndDepthLimits() {
+        let policy = ModelInstallationExpansionPolicy(
+            maximumEntryCount: 2,
+            maximumExpandedBytes: 10,
+            maximumPathDepth: 2
+        )
+
+        XCTAssertThrowsError(try policy.validate([
+            .init(relativePath: "a", expandedBytes: 1),
+            .init(relativePath: "b", expandedBytes: 1),
+            .init(relativePath: "c", expandedBytes: 1),
+        ]))
+        XCTAssertThrowsError(try policy.validate([
+            .init(relativePath: "model.bin", expandedBytes: 11),
+        ]))
+        XCTAssertThrowsError(try policy.validate([
+            .init(relativePath: "a/b/c", expandedBytes: 1),
+        ]))
+    }
+
+    func testInstallationExpansionAcceptsDeclaredLimits() throws {
+        try ModelInstallationExpansionPolicy(
+            maximumEntryCount: 2,
+            maximumExpandedBytes: 10,
+            maximumPathDepth: 2
+        ).validate([
+            .init(relativePath: "a/one", expandedBytes: 4),
+            .init(relativePath: "b/two", expandedBytes: 6),
+        ])
+    }
+
     func testFreshDirectFileRequiresPeakBytesAndCompleteArtifactMargin() {
         let requirement = ModelStorageAdmissionRequirement(
             completeTransferBytes: 100,

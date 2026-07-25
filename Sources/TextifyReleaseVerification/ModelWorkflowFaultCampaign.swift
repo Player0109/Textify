@@ -1,20 +1,6 @@
 import CryptoKit
 import Foundation
-
-public enum ModelWorkflowDurableBoundary: String, CaseIterable, Codable, Sendable {
-    case queueAuthorizationPersisted
-    case queueAttemptStartedPersisted
-    case partialMetadataPersisted
-    case installationStaged
-    case installationReceiptPersisted
-    case activationPrepared
-    case activationPreferencePersisted
-    case revocationRestorationPersisted
-    case restorationIntegrityAcknowledged
-    case deletionRenamedPending
-    case deletionBytesRemoved
-    case deletionReceiptRemoved
-}
+import TextifyModels
 
 public enum ModelWorkflowInjectedFault: String, CaseIterable, Codable, Sendable {
     case processTermination
@@ -34,6 +20,7 @@ public enum ModelWorkflowSecurityProbe: String, CaseIterable, Codable, Sendable 
     case traversal
     case symbolicLinkEscape
     case hardLinkEscape
+    case archiveExpansionLimits
     case peakStorageAdmission
     case canonicalDigestAliasing
     case unsafeHelpURL
@@ -57,6 +44,39 @@ public struct ModelDiagnosticsPrivacyEvidence: Codable, Equatable, Sendable {
     public let containsFullSHA256: Bool
 }
 
+public struct ModelWorkflowCoverageEvidence:
+    Codable,
+    Equatable,
+    Sendable
+{
+    public let declaredTransitions: [String]
+    public let transitionHitCounts: [String: Int]
+    public let declaredInvariants: [String]
+    public let invariantEvaluationCounts: [String: Int]
+    public let invariantEvaluationCount: Int
+    public let isComplete: Bool
+
+    public init(
+        declaredTransitions: [String],
+        transitionHitCounts: [String: Int],
+        declaredInvariants: [String],
+        invariantEvaluationCounts: [String: Int]
+    ) {
+        self.declaredTransitions = declaredTransitions
+        self.transitionHitCounts = transitionHitCounts
+        self.declaredInvariants = declaredInvariants
+        self.invariantEvaluationCounts = invariantEvaluationCounts
+        invariantEvaluationCount =
+            invariantEvaluationCounts.values.reduce(0, +)
+        isComplete =
+            Set(transitionHitCounts.keys) == Set(declaredTransitions)
+            && transitionHitCounts.values.allSatisfy { $0 > 0 }
+            && Set(invariantEvaluationCounts.keys)
+                == Set(declaredInvariants)
+            && invariantEvaluationCounts.values.allSatisfy { $0 > 0 }
+    }
+}
+
 public struct ModelWorkflowFaultExecution: Codable, Equatable, Sendable {
     public let boundary: ModelWorkflowDurableBoundary
     public let fault: ModelWorkflowInjectedFault
@@ -71,6 +91,7 @@ public struct ModelWorkflowFaultCampaignReport: Codable, Equatable, Sendable {
     public let coveredBoundaries: [ModelWorkflowDurableBoundary]
     public let injectedFaults: [ModelWorkflowInjectedFault]
     public let faultExecutions: [ModelWorkflowFaultExecution]
+    public let transitionCoverage: ModelWorkflowCoverageEvidence
     public let invariantViolations: [String]
     public let unexplainedManagedBytes: Int64
     public let securityProbes: [ModelWorkflowSecurityProbeResult]
@@ -93,12 +114,25 @@ public struct ModelWorkflowFaultCampaign: Sendable {
         var state = WorkflowState()
         var violations: [String] = []
         var executions: [ModelWorkflowFaultExecution] = []
+        var transitionHitCounts: [String: Int] = [:]
+        var invariantEvaluationCounts: [String: Int] =
+            Dictionary(
+                uniqueKeysWithValues: Self.declaredInvariants.map {
+                    ($0, 0)
+                }
+            )
 
         for operationIndex in 0..<operationCount {
             let snapshot = state
             let operation = Int(generator.next() % 6)
             let artifactID = "artifact-\(generator.next() % 17)"
             apply(operation: operation, artifactID: artifactID, to: &state)
+            if state != snapshot {
+                transitionHitCounts[
+                    Self.declaredTransitions[operation],
+                    default: 0
+                ] += 1
+            }
 
             let matrixSize = ModelWorkflowDurableBoundary.allCases.count
                 * ModelWorkflowInjectedFault.allCases.count
@@ -116,6 +150,9 @@ public struct ModelWorkflowFaultCampaign: Sendable {
                 state: &state
             )
             let operationViolations = state.invariantViolations()
+            for invariant in Self.declaredInvariants {
+                invariantEvaluationCounts[invariant, default: 0] += 1
+            }
             violations.append(contentsOf: operationViolations)
             executions.append(
                 ModelWorkflowFaultExecution(
@@ -151,6 +188,13 @@ public struct ModelWorkflowFaultCampaign: Sendable {
             operationCount: operationCount,
             durableQueueSoak: durableQueueSoak,
             faultExecutions: executions,
+            transitionCoverage: ModelWorkflowCoverageEvidence(
+                declaredTransitions: Self.declaredTransitions,
+                transitionHitCounts: transitionHitCounts,
+                declaredInvariants: Self.declaredInvariants,
+                invariantEvaluationCounts:
+                    invariantEvaluationCounts
+            ),
             invariantViolations: violations,
             unexplainedManagedBytes:
                 state.unexplainedManagedBytes
@@ -169,6 +213,7 @@ public struct ModelWorkflowFaultCampaign: Sendable {
             coveredBoundaries: coveredBoundaries,
             injectedFaults: injectedFaults,
             faultExecutions: executions,
+            transitionCoverage: payload.transitionCoverage,
             invariantViolations: violations,
             unexplainedManagedBytes: payload.unexplainedManagedBytes,
             securityProbes: probes,
@@ -224,6 +269,22 @@ public struct ModelWorkflowFaultCampaign: Sendable {
         }
     }
 
+    private static let declaredTransitions = [
+        "authorize_install",
+        "persist_installation_receipt",
+        "activate_installed_artifact",
+        "delete_artifact",
+        "accept_revocation",
+        "accept_restoration",
+    ]
+
+    private static let declaredInvariants = [
+        "active_identity_has_receipt",
+        "revoked_identity_is_not_active",
+        "owned_byte_accounting_is_nonnegative",
+        "managed_bytes_are_attributable",
+    ]
+
     private func recover(
         from fault: ModelWorkflowInjectedFault,
         at boundary: ModelWorkflowDurableBoundary,
@@ -278,6 +339,7 @@ private struct ReportPayload: Codable {
     let operationCount: Int
     let durableQueueSoak: ModelDurableQueueSoakReport
     let faultExecutions: [ModelWorkflowFaultExecution]
+    let transitionCoverage: ModelWorkflowCoverageEvidence
     let invariantViolations: [String]
     let unexplainedManagedBytes: Int64
     let securityProbes: [ModelWorkflowSecurityProbeResult]
@@ -285,7 +347,7 @@ private struct ReportPayload: Codable {
     let exportedDiagnostics: ModelDiagnosticsPrivacyEvidence
 }
 
-private struct WorkflowState {
+private struct WorkflowState: Equatable {
     var receipts: Set<String> = []
     var queueAttempts: Set<String> = []
     var ownedBytes: [String: Int64] = [:]

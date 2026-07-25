@@ -36,13 +36,16 @@ public enum InstalledModelManagerError: Error, Equatable, LocalizedError {
 public struct InstalledModelManager: @unchecked Sendable {
     private let layout: ModelStorageLayout
     private let fileManager: FileManager
+    private let durabilityObserver: ModelWorkflowDurabilityObserver
 
     public init(
         layout: ModelStorageLayout,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        durabilityObserver: ModelWorkflowDurabilityObserver = .none
     ) {
         self.layout = layout
         self.fileManager = fileManager
+        self.durabilityObserver = durabilityObserver
     }
 
     @discardableResult
@@ -76,17 +79,29 @@ public struct InstalledModelManager: @unchecked Sendable {
         let hasPendingRemoval = fileManager.fileExists(
             atPath: removalDirectory.path
         )
-        if hasInstalledDirectory && hasPendingRemoval {
-            throw InstalledModelManagerError.filesystemOperationFailed(
-                modelID: modelID,
-                stage: .rename
-            )
+        if hasPendingRemoval {
+            do {
+                try fileManager.removeItem(at: removalDirectory)
+                try durabilityObserver.didReach(
+                    .deletionBytesRemoved,
+                    artifactID: modelID
+                )
+            } catch {
+                throw InstalledModelManagerError.filesystemOperationFailed(
+                    modelID: modelID,
+                    stage: .removeManagedBytes
+                )
+            }
         }
         if hasInstalledDirectory {
             do {
                 try fileManager.moveItem(
                     at: installedDirectory,
                     to: removalDirectory
+                )
+                try durabilityObserver.didReach(
+                    .deletionRenamedPending,
+                    artifactID: modelID
                 )
             } catch {
                 throw InstalledModelManagerError.filesystemOperationFailed(
@@ -99,6 +114,10 @@ public struct InstalledModelManager: @unchecked Sendable {
         if fileManager.fileExists(atPath: removalDirectory.path) {
             do {
                 try fileManager.removeItem(at: removalDirectory)
+                try durabilityObserver.didReach(
+                    .deletionBytesRemoved,
+                    artifactID: modelID
+                )
             } catch {
                 throw InstalledModelManagerError.filesystemOperationFailed(
                     modelID: modelID,
@@ -110,9 +129,13 @@ public struct InstalledModelManager: @unchecked Sendable {
         var updatedStore = store
         _ = updatedStore.remove(modelID: modelID)
         do {
-            try JSONEncoder().encode(updatedStore).write(
-                to: layout.installedStoreURL,
-                options: [.atomic]
+            try InstalledModelsStorePersistence(
+                fileURL: layout.installedStoreURL,
+                fileManager: fileManager,
+                durabilityObserver: durabilityObserver
+            ).persistDeletion(
+                updatedStore,
+                artifactID: modelID
             )
         } catch {
             throw InstalledModelManagerError.filesystemOperationFailed(
@@ -124,12 +147,9 @@ public struct InstalledModelManager: @unchecked Sendable {
     }
 
     private func loadStore() throws -> InstalledModelsStore {
-        guard fileManager.fileExists(atPath: layout.installedStoreURL.path) else {
-            return InstalledModelsStore()
-        }
-        return try JSONDecoder().decode(
-            InstalledModelsStore.self,
-            from: Data(contentsOf: layout.installedStoreURL)
-        )
+        try InstalledModelsStorePersistence(
+            fileURL: layout.installedStoreURL,
+            fileManager: fileManager
+        ).load()
     }
 }

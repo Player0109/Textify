@@ -549,9 +549,14 @@ public struct ModelInstallQueue: Codable, Equatable, Sendable {
 
 public struct ModelInstallQueueStore: Sendable {
     public let fileURL: URL
+    private let durabilityObserver: ModelWorkflowDurabilityObserver
 
-    public init(fileURL: URL) {
+    public init(
+        fileURL: URL,
+        durabilityObserver: ModelWorkflowDurabilityObserver = .none
+    ) {
         self.fileURL = fileURL
+        self.durabilityObserver = durabilityObserver
     }
 
     public func load() throws -> ModelInstallQueue {
@@ -569,11 +574,33 @@ public struct ModelInstallQueueStore: Sendable {
     }
 
     public func save(_ queue: ModelInstallQueue) throws {
+        let previous = try? load()
         try FileManager.default.createDirectory(
             at: fileURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
         try JSONEncoder().encode(queue).write(to: fileURL, options: [.atomic])
+        let previousByID = Dictionary(
+            uniqueKeysWithValues: (previous?.attempts ?? []).map {
+                ($0.id, $0)
+            }
+        )
+        for attempt in queue.attempts {
+            guard let prior = previousByID[attempt.id] else {
+                try durabilityObserver.didReach(
+                    .queueAuthorizationPersisted,
+                    artifactID: attempt.artifactID
+                )
+                continue
+            }
+            if prior.state.phase != attempt.state.phase,
+               attempt.state.phase.isPipelineActive {
+                try durabilityObserver.didReach(
+                    .queueAttemptStartedPersisted,
+                    artifactID: attempt.artifactID
+                )
+            }
+        }
     }
 }
 

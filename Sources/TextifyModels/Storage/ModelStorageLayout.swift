@@ -91,7 +91,7 @@ public struct ModelStorageLayout: Equatable, Sendable {
         )
     }
 
-    func pendingRemovalDirectory(modelID: String) throws -> URL {
+    public func pendingRemovalDirectory(modelID: String) throws -> URL {
         let safeModelID = try Self.validatePathComponent(modelID)
         return try containedURL(
             downloadsDirectory.appendingPathComponent(

@@ -1,4 +1,5 @@
 import XCTest
+import TextifyModels
 @testable import TextifyReleaseVerification
 
 final class ModelWorkflowFaultCampaignTests: XCTestCase {
@@ -11,6 +12,7 @@ final class ModelWorkflowFaultCampaignTests: XCTestCase {
         XCTAssertEqual(report.durableQueueSoak.operationCount, 1_000)
         XCTAssertEqual(report.durableQueueSoak.relaunchCount, 3_000)
         XCTAssertEqual(report.durableQueueSoak.lostAttemptCount, 0)
+        XCTAssertTrue(report.transitionCoverage.isComplete)
         XCTAssertEqual(
             report.durableQueueSoak.partialCleanupMismatchCount,
             0

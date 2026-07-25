@@ -26,6 +26,8 @@ final class AppServices {
     let startupIssue: AppStartupIssue?
     @ObservationIgnored private let modelTransferNetworkObserver:
         ModelTransferNetworkObserver?
+    @ObservationIgnored private let modelWorkflowDurabilityObserver:
+        ModelWorkflowDurabilityObserver
 
     private var installedModelsStore: InstalledModelsStore
 
@@ -33,7 +35,8 @@ final class AppServices {
         queueStore: ModelInstallQueueStore(
             fileURL: ModelStorageLayout(
                 rootDirectory: paths.modelsDirectory
-            ).installQueueURL
+            ).installQueueURL,
+            durabilityObserver: modelWorkflowDurabilityObserver
         ),
         installOperation: { [weak self] modelID, onStateChange in
             guard let self,
@@ -49,11 +52,15 @@ final class AppServices {
             }
             let installer = ModelInstaller(
                 layout: ModelStorageLayout(rootDirectory: self.paths.modelsDirectory),
-                transport: URLSessionDownloadTransport(),
+                transport: URLSessionDownloadTransport(
+                    durabilityObserver:
+                        self.modelWorkflowDurabilityObserver
+                ),
                 currentAppVersion: Bundle.main.object(
                     forInfoDictionaryKey: "CFBundleShortVersionString"
                 ) as? String ?? "1.1.0",
-                retainsValidatedStagingOnCancellation: true
+                retainsValidatedStagingOnCancellation: true,
+                durabilityObserver: self.modelWorkflowDurabilityObserver
             )
             let installedRecord: InstalledModelRecord
             do {
@@ -326,6 +333,8 @@ final class AppServices {
             try? await Task.sleep(nanoseconds: 2_500_000_000)
         },
         modelTransferNetworkObserver: ModelTransferNetworkObserver? = nil,
+        modelWorkflowDurabilityObserver:
+            ModelWorkflowDurabilityObserver = .none,
         startupIssue: AppStartupIssue? = nil
     ) {
         self.paths = paths
@@ -348,6 +357,8 @@ final class AppServices {
         self.waitBeforeProcessingIndicator = waitBeforeProcessingIndicator
         self.waitBeforeTerminalStatusDismissal = waitBeforeTerminalStatusDismissal
         self.modelTransferNetworkObserver = modelTransferNetworkObserver
+        self.modelWorkflowDurabilityObserver =
+            modelWorkflowDurabilityObserver
         self.startupIssue = startupIssue
         self.runtimeIssue = startupIssue == nil ? nil : .persistentStorageUnavailable
         let installedModelsStore = Self.loadInstalledModelsStore(paths: paths)
@@ -512,7 +523,8 @@ final class AppServices {
             verifier: ModelRevocationVerifier(
                 trustedKeys: configuration.trustedKeys
             ),
-            catalogVerifier: verifier
+            catalogVerifier: verifier,
+            durabilityObserver: modelWorkflowDurabilityObserver
         )
         let loader = ProductionModelManifestLoader(
             configuration: configuration
@@ -973,6 +985,17 @@ final class AppServices {
         )
         switch preparation {
         case .ready:
+            do {
+                try PreparedModelActivationPersistence(
+                    store: settingsStore,
+                    durabilityObserver:
+                        modelWorkflowDurabilityObserver
+                ).recordPrepared(modelID: modelID)
+            } catch {
+                _ = await dictation
+                    .prepareActiveModelAtPurposeRuntimeBoundary()
+                return .preparationFailed
+            }
             guard let preparedRecord = installedModel(modelID),
                   !modelCatalogCoordinator.revocationOverlay.isRevoked(
                       record: preparedRecord,
@@ -995,7 +1018,16 @@ final class AppServices {
             managedReadinessByModelID[modelID] = .ready
             let previousPreferences = preferences
             preferences = candidatePreferences
-            guard savePreferences() else {
+            do {
+                try PreparedModelActivationPersistence(
+                    store: settingsStore,
+                    durabilityObserver:
+                        modelWorkflowDurabilityObserver
+                ).persistSelection(
+                    preferences,
+                    modelID: modelID
+                )
+            } catch {
                 preferences = previousPreferences
                 _ = await dictation
                     .prepareActiveModelAtPurposeRuntimeBoundary()
@@ -1142,7 +1174,9 @@ final class AppServices {
             let manager = InstalledModelManager(
                 layout: ModelStorageLayout(
                     rootDirectory: self.paths.modelsDirectory
-                )
+                ),
+                durabilityObserver:
+                    self.modelWorkflowDurabilityObserver
             )
             _ = try await Task.detached(priority: .utility) {
                 try manager.remove(modelID: modelID)
@@ -1232,9 +1266,12 @@ final class AppServices {
             rootDirectory: paths.modelsDirectory
         ).installedStoreURL
         do {
-            try JSONEncoder().encode(updatedStore).write(
-                to: storeURL,
-                options: [.atomic]
+            try InstalledModelsStorePersistence(
+                fileURL: storeURL,
+                durabilityObserver: modelWorkflowDurabilityObserver
+            ).persistRestorationAcknowledgment(
+                updatedStore,
+                artifactID: modelID
             )
         } catch {
             return
@@ -1455,10 +1492,10 @@ final class AppServices {
             rootDirectory: paths.modelsDirectory
         ).installedStoreURL
         do {
-            try JSONEncoder().encode(updatedStore).write(
-                to: storeURL,
-                options: [.atomic]
-            )
+            try InstalledModelsStorePersistence(
+                fileURL: storeURL,
+                durabilityObserver: modelWorkflowDurabilityObserver
+            ).persistReconciliation(updatedStore)
         } catch {
             return
         }

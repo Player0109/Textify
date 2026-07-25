@@ -2,6 +2,39 @@
 
 This file records cross-agent handoffs during implementation.
 
+## Production Model Fault Injection Handoff - 2026-07-25
+
+- GitHub issue #24 owns the narrow production failpoint seam and forced
+  subprocess-relaunch evidence needed to replace the release-only modeled
+  boundary matrix.
+- This slice may update Task 4 model trust and receipt persistence, Task 12
+  download/installer/queue persistence, Task 5 active-model settings
+  persistence, Task 11 app activation/restoration/reconciliation composition,
+  the release-verification target and executable, focused tests, and the
+  minimum `Package.swift` wiring needed to execute the worker in a subprocess.
+- Shipping code exposes one inert-by-default durability-observer interface.
+  It never reads environment variables or terminates the app. Release-only
+  adapters own deterministic fault mutation and process termination.
+- The declared matrix covers queue authorization/start, resumable metadata,
+  installation staging/receipt, activation preparation/preference,
+  revocation/restoration, restoration acknowledgment, deletion rename/byte/
+  receipt stages, and installed-receipt reconciliation. Recovery must reload
+  the same production stores and preserve ownership and activation invariants.
+- This work does not alter model selection, catalog presentation, runtime
+  engine behavior, public endpoints, or issue #25's external approval and
+  real-device evidence gates.
+- Final issue #24 verification executes 143 production observer cells in
+  isolated subprocesses, including 13 forced terminations, with a fresh
+  recovery process for every cell. The seeded 1,000-operation soak schedules
+  20 additional forced crashes and relaunches while actually performing all
+  1,000 install, reinstall, cancel, delete, and refresh operations. All cells
+  recover with zero invariant violations and zero unexplained managed bytes.
+- The campaign exposed one deletion-relaunch case in which new attributed
+  bytes appeared beside an existing pending-removal directory. The shipping
+  remover now removes the prior pending root, renames the newly appeared live
+  root to the deterministic pending identity, removes it, and only then
+  removes the Installation Receipt.
+
 ## Large Catalog Virtualization Handoff - 2026-07-25
 
 - GitHub issue #22 owns the narrow cross-task changes needed to keep the
@@ -1449,8 +1482,7 @@ Task 1 must merge before parallel Wave 1 work begins.
   production build and vendor integrity checks. The retained-evidence script
   separately executed 198 focused tests with zero failures and verified all
   generated checksums.
-- Issue #24 remains open after review: the modeled 12-by-11 matrix and real
-  queue/partial soak do not replace a production failpoint matrix spanning
-  installer, activation, revocation/restoration, deletion, and reconciliation
-  with forced process crashes and relaunches. Release evidence must not claim
-  that missing proof.
+- At commit `b79f299`, issue #24 remained open because its modeled 12-by-11
+  matrix and real queue/partial soak did not replace production failpoints or
+  forced process relaunches. The Production Model Fault Injection handoff above
+  supersedes that limitation.

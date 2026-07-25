@@ -199,7 +199,11 @@ let package = Package(
         .target(name: "TextifySettings", dependencies: ["TextifyModels"]),
         .target(
             name: "TextifyReleaseVerification",
-            dependencies: ["TextifyModels", "TextifyDiagnostics"]
+            dependencies: [
+                "TextifyModels",
+                "TextifyDiagnostics",
+                "TextifySettings",
+            ]
         ),
         .executableTarget(
             name: "TextifyModelManifestVerifier",

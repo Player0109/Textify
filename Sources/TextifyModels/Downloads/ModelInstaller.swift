@@ -60,6 +60,7 @@ public struct ModelInstaller {
     private let capacityRecheckIntervalBytes: Int64
     private let availableCapacity: @Sendable (URL) throws -> Int64
     private let retainsValidatedStagingOnCancellation: Bool
+    private let durabilityObserver: ModelWorkflowDurabilityObserver
 
     public init(
         layout: ModelStorageLayout,
@@ -70,6 +71,7 @@ public struct ModelInstaller {
         nowISO8601: @escaping @Sendable () -> String = { ISO8601DateFormatter().string(from: Date()) },
         capacityRecheckIntervalBytes: Int64 = 64_000_000,
         retainsValidatedStagingOnCancellation: Bool = false,
+        durabilityObserver: ModelWorkflowDurabilityObserver = .none,
         availableCapacity: @escaping @Sendable (URL) throws -> Int64 = { url in
             try ModelVolumeCapacityProvider().availableCapacity(at: url)
         }
@@ -86,6 +88,7 @@ public struct ModelInstaller {
         )
         self.retainsValidatedStagingOnCancellation =
             retainsValidatedStagingOnCancellation
+        self.durabilityObserver = durabilityObserver
         self.availableCapacity = availableCapacity
     }
 
@@ -284,6 +287,10 @@ public struct ModelInstaller {
             try? fileManager.removeItem(at: replacementURL)
             throw error
         }
+        try durabilityObserver.didReach(
+            .installationStaged,
+            artifactID: model.id
+        )
 
         let record = InstalledModelRecord(
             model: model,
@@ -305,6 +312,17 @@ public struct ModelInstaller {
         _ model: ModelEntry,
         onStateChange: @escaping @Sendable (DownloadState) -> Void
     ) async throws -> InstalledModelRecord {
+        try ModelInstallationExpansionPolicy(
+            maximumExpandedBytes:
+                model.installationStorage?.peakInstallationBytes ?? 0
+        ).validate(
+            model.files.map {
+                ModelInstallationExpansionEntry(
+                    relativePath: $0.relativePath ?? $0.filename,
+                    expandedBytes: $0.sizeBytes
+                )
+            }
+        )
         let downloads = try model.files.map { file -> (ModelFile, URL) in
             guard let url = URL(string: file.url) else {
                 throw ModelInstallError.invalidDownloadURL(file.url)
@@ -501,6 +519,10 @@ public struct ModelInstaller {
         } else {
             try fileManager.moveItem(at: stagingDirectory, to: installedDirectory)
         }
+        try durabilityObserver.didReach(
+            .installationStaged,
+            artifactID: model.id
+        )
 
         let record = InstalledModelRecord(
             model: model,
@@ -654,10 +676,11 @@ public struct ModelInstaller {
     }
 
     private func upsertInstalledRecord(_ record: InstalledModelRecord) throws {
-        var store = try loadStore()
-        store.upsert(record)
-        let data = try JSONEncoder().encode(store)
-        try data.write(to: layout.installedStoreURL, options: [.atomic])
+        try InstalledModelsStorePersistence(
+            fileURL: layout.installedStoreURL,
+            fileManager: fileManager,
+            durabilityObserver: durabilityObserver
+        ).persistInstallation(record)
     }
 
     private func replaceInstalledFile(
@@ -673,11 +696,10 @@ public struct ModelInstaller {
     }
 
     private func loadStore() throws -> InstalledModelsStore {
-        guard fileManager.fileExists(atPath: layout.installedStoreURL.path) else {
-            return InstalledModelsStore()
-        }
-        let data = try Data(contentsOf: layout.installedStoreURL)
-        return try JSONDecoder().decode(InstalledModelsStore.self, from: data)
+        try InstalledModelsStorePersistence(
+            fileURL: layout.installedStoreURL,
+            fileManager: fileManager
+        ).load()
     }
 
     private func existingValidInstalledRecord(

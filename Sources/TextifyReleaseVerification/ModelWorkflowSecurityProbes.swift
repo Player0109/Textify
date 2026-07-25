@@ -20,6 +20,8 @@ struct ModelWorkflowSecurityProbeRunner {
             symbolicLinkEscapeIsRejected()
         case .hardLinkEscape:
             hardLinkedEvidenceIsRejected()
+        case .archiveExpansionLimits:
+            unsupportedArchiveExpansionIsRejected()
         case .peakStorageAdmission:
             peakStorageAdmissionIsEnforced()
         case .canonicalDigestAliasing:
@@ -28,6 +30,51 @@ struct ModelWorkflowSecurityProbeRunner {
             unsafeHelpURLsAreRejected()
         case .atomicFilesystemContainment:
             atomicDestinationIsContained()
+        }
+    }
+
+    private func unsupportedArchiveExpansionIsRejected() -> Bool {
+        let unsupportedLayoutsAreRejected =
+            ["archive", "zip", "tar"].allSatisfy { layout in
+            (try? JSONDecoder().decode(
+                ModelArtifactLayout.self,
+                from: Data("\"\(layout)\"".utf8)
+            )) == nil
+        }
+        let policy = ModelInstallationExpansionPolicy(
+            maximumEntryCount: 2,
+            maximumExpandedBytes: 10,
+            maximumPathDepth: 2
+        )
+        let entryCountRejected = throwsError {
+            try policy.validate([
+                .init(relativePath: "a", expandedBytes: 1),
+                .init(relativePath: "b", expandedBytes: 1),
+                .init(relativePath: "c", expandedBytes: 1),
+            ])
+        }
+        let expandedSizeRejected = throwsError {
+            try policy.validate([
+                .init(relativePath: "model.bin", expandedBytes: 11),
+            ])
+        }
+        let pathDepthRejected = throwsError {
+            try policy.validate([
+                .init(relativePath: "a/b/c", expandedBytes: 1),
+            ])
+        }
+        return unsupportedLayoutsAreRejected
+            && entryCountRejected
+            && expandedSizeRejected
+            && pathDepthRejected
+    }
+
+    private func throwsError(_ operation: () throws -> Void) -> Bool {
+        do {
+            try operation()
+            return false
+        } catch {
+            return true
         }
     }
 

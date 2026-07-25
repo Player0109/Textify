@@ -82,8 +82,43 @@ public struct DownloadResumeMetadata: Codable, Equatable, Sendable {
     }
 }
 
-enum ModelDownloadStorageValidation {
-    static func validatedPartialURL(
+public struct DownloadResumeMetadataPersistence: Sendable {
+    public let fileURL: URL
+    private let durabilityObserver: ModelWorkflowDurabilityObserver
+
+    public init(
+        fileURL: URL,
+        durabilityObserver: ModelWorkflowDurabilityObserver = .none
+    ) {
+        self.fileURL = fileURL
+        self.durabilityObserver = durabilityObserver
+    }
+
+    public func load() throws -> DownloadResumeMetadata {
+        try JSONDecoder().decode(
+            DownloadResumeMetadata.self,
+            from: Data(contentsOf: fileURL)
+        )
+    }
+
+    public func save(_ metadata: DownloadResumeMetadata) throws {
+        try FileManager.default.createDirectory(
+            at: fileURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try JSONEncoder().encode(metadata).write(
+            to: fileURL,
+            options: .atomic
+        )
+        try durabilityObserver.didReach(
+            .partialMetadataPersisted,
+            artifactID: metadata.modelID
+        )
+    }
+}
+
+public enum ModelDownloadStorageValidation {
+    public static func validatedPartialURL(
         for metadataURL: URL,
         expectedModelID: String? = nil,
         expectedFiles: [ModelFile]? = nil,

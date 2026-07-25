@@ -5,6 +5,12 @@ import TextifyReleaseVerification
 enum TextifyModelFaultVerifier {
     static func main() async throws {
         let arguments = CommandLine.arguments
+        if arguments.dropFirst().first == "--fault-worker" {
+            try await ModelProductionFaultWorker.run(
+                arguments: Array(arguments.dropFirst())
+            )
+            return
+        }
         guard arguments.count == 2 else {
             FileHandle.standardError.write(
                 Data("usage: TextifyModelFaultVerifier <evidence-output.json>\n".utf8)
@@ -25,12 +31,22 @@ enum TextifyModelFaultVerifier {
         }
         service.stop()
 
+        let productionCampaign = try ModelProductionFaultCampaign().run(
+            workerExecutableURL: URL(
+                fileURLWithPath: arguments[0]
+            ),
+            repositoryRoot: URL(
+                fileURLWithPath: FileManager.default.currentDirectoryPath,
+                isDirectory: true
+            )
+        )
         let campaign = try ModelWorkflowFaultCampaign(seed: 24).run(
             operationCount: 1_000
         )
         let evidence = ModelFaultVerifierEvidence(
-            schemaVersion: 1,
+            schemaVersion: 2,
             campaign: campaign,
+            productionCampaign: productionCampaign,
             downloadService: downloadReport
         )
         let encoder = JSONEncoder()
@@ -50,6 +66,7 @@ enum TextifyModelFaultVerifier {
 private struct ModelFaultVerifierEvidence: Codable {
     let schemaVersion: Int
     let campaign: ModelWorkflowFaultCampaignReport
+    let productionCampaign: ModelProductionFaultCampaignReport
     let downloadService: DeterministicModelDownloadReport
 }
 

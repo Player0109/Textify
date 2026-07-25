@@ -3,6 +3,49 @@ import TextifyModels
 import XCTest
 
 final class ModelInstallQueueTests: XCTestCase {
+    func testQueueStoreReportsAuthorizationAndStartedPersistence() throws {
+        let root = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let recorder = ModelWorkflowBoundaryRecorder()
+        let store = ModelInstallQueueStore(
+            fileURL: root.appendingPathComponent("queue.json"),
+            durabilityObserver: recorder.observer
+        )
+        var queue = ModelInstallQueue()
+        try queue.authorize(
+            artifactID: "artifact-a",
+            purpose: .transcription,
+            action: .install,
+            attemptID: "attempt-a",
+            createdAt: "2026-07-25T00:00:00Z"
+        )
+        try store.save(queue)
+        try queue.transition(
+            attemptID: "attempt-a",
+            to: DownloadState(
+                modelID: "artifact-a",
+                phase: .checkingSpace,
+                message: "Checking space",
+                attemptID: "attempt-a"
+            )
+        )
+        try store.save(queue)
+
+        XCTAssertEqual(
+            recorder.events,
+            [
+                ModelWorkflowBoundaryEvent(
+                    boundary: .queueAuthorizationPersisted,
+                    artifactID: "artifact-a"
+                ),
+                ModelWorkflowBoundaryEvent(
+                    boundary: .queueAttemptStartedPersisted,
+                    artifactID: "artifact-a"
+                ),
+            ]
+        )
+    }
+
     func testTransferFreshnessIncludesExactTwelveHourBoundaryAndRejectsFutureClockValues() throws {
         let policy = ModelTransferFreshnessPolicy()
         let now = try XCTUnwrap(

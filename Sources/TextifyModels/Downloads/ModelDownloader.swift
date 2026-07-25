@@ -201,9 +201,14 @@ public enum ModelDownloadURLPolicy {
 
 public final class URLSessionDownloadTransport: ResumableDownloadTransport {
     private let session: URLSession
+    private let durabilityObserver: ModelWorkflowDurabilityObserver
 
-    public init(session: URLSession = .shared) {
+    public init(
+        session: URLSession = .shared,
+        durabilityObserver: ModelWorkflowDurabilityObserver = .none
+    ) {
         self.session = session
+        self.durabilityObserver = durabilityObserver
     }
 
     public func fetch(_ request: URLRequest) async throws -> DownloadResponse {
@@ -314,10 +319,9 @@ public final class URLSessionDownloadTransport: ResumableDownloadTransport {
         }
         let validators = try await remoteValidators(for: request)
         let existingSize = fileSize(at: temporaryURL)
-        let metadata = try? JSONDecoder().decode(
-            DownloadResumeMetadata.self,
-            from: Data(contentsOf: metadataURL)
-        )
+        let metadata = try? DownloadResumeMetadataPersistence(
+            fileURL: metadataURL
+        ).load()
         let canResume = existingSize > 0
             && existingSize < maximumBytes
             && metadata?.bytesDownloaded == existingSize
@@ -378,16 +382,23 @@ public final class URLSessionDownloadTransport: ResumableDownloadTransport {
             if partialSize > 0,
                partialSize < maximumBytes,
                validators.eTag != nil || validators.lastModified != nil {
-                try? writeResumeMetadata(
-                    modelID: modelID,
-                    url: url.absoluteString,
-                    expectedSize: maximumBytes,
-                    sha256: expectedSHA256,
-                    eTag: validators.eTag,
-                    lastModified: validators.lastModified,
-                    bytesDownloaded: partialSize,
-                    to: metadataURL
-                )
+                do {
+                    try writeResumeMetadata(
+                        modelID: modelID,
+                        url: url.absoluteString,
+                        expectedSize: maximumBytes,
+                        sha256: expectedSHA256,
+                        eTag: validators.eTag,
+                        lastModified: validators.lastModified,
+                        bytesDownloaded: partialSize,
+                        to: metadataURL
+                    )
+                } catch {
+                    removeDownloadState(
+                        temporaryURL: temporaryURL,
+                        metadataURL: metadataURL
+                    )
+                }
             } else {
                 removeDownloadState(temporaryURL: temporaryURL, metadataURL: metadataURL)
             }
@@ -506,7 +517,10 @@ public final class URLSessionDownloadTransport: ResumableDownloadTransport {
             lastModified: lastModified,
             bytesDownloaded: bytesDownloaded
         )
-        try JSONEncoder().encode(metadata).write(to: metadataURL, options: [.atomic])
+        try DownloadResumeMetadataPersistence(
+            fileURL: metadataURL,
+            durabilityObserver: durabilityObserver
+        ).save(metadata)
     }
 
     private func removeDownloadState(temporaryURL: URL, metadataURL: URL) {

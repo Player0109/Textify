@@ -374,7 +374,11 @@ final class DownloadTests: XCTestCase {
         try JSONEncoder().encode(metadata).write(to: metadataURL)
 
         let progressRecorder = DownloadProgressRecorder()
-        _ = try await URLSessionDownloadTransport(session: session).downloadFileResuming(
+        let durabilityRecorder = ModelWorkflowBoundaryRecorder()
+        _ = try await URLSessionDownloadTransport(
+            session: session,
+            durabilityObserver: durabilityRecorder.observer
+        ).downloadFileResuming(
             URLRequest(url: modelURL),
             to: temporaryURL,
             metadataURL: metadataURL,
@@ -387,6 +391,15 @@ final class DownloadTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: temporaryURL), expectedData)
         XCTAssertEqual(RangeURLProtocol.rangeHeaders(), ["bytes=10-"])
         XCTAssertFalse(FileManager.default.fileExists(atPath: metadataURL.path))
+        XCTAssertEqual(
+            durabilityRecorder.events,
+            [
+                ModelWorkflowBoundaryEvent(
+                    boundary: .partialMetadataPersisted,
+                    artifactID: "parakeet-v3"
+                ),
+            ]
+        )
         XCTAssertEqual(
             progressRecorder.events().last,
             DownloadFileProgress(

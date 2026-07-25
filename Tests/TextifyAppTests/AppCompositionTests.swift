@@ -701,6 +701,46 @@ final class AppCompositionTests: XCTestCase {
     }
 
     @MainActor
+    func testActivationReportsPreparedThenPersistedDurableBoundaries() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let candidate = try Self.catalogModel(
+            id: ProductionModelPolicy.requiredModelID
+        )
+        try Self.writeInstalledStore(models: [candidate], to: paths)
+        let recorder = AppWorkflowBoundaryRecorder()
+        let services = try Self.makeServices(
+            paths: paths,
+            models: CandidateRuntimeModelResolver(
+                models: [Self.runtimeModel(candidate)]
+            ),
+            transcriber: ActivationTranscriberSpy(),
+            modelWorkflowDurabilityObserver: recorder.observer
+        )
+
+        let result = await services.activateInstalledModel(candidate.id)
+
+        XCTAssertEqual(result, .activated)
+        XCTAssertEqual(
+            recorder.events.filter {
+                [
+                    ModelWorkflowDurableBoundary.activationPrepared,
+                    .activationPreferencePersisted,
+                ].contains($0.boundary)
+            },
+            [
+                AppWorkflowBoundaryEvent(
+                    boundary: .activationPrepared,
+                    artifactID: candidate.id
+                ),
+                AppWorkflowBoundaryEvent(
+                    boundary: .activationPreferencePersisted,
+                    artifactID: candidate.id
+                ),
+            ]
+        )
+    }
+
+    @MainActor
     func testActivationWaitsForTheCurrentSegmentBoundary() async throws {
         let paths = try Self.makeTemporaryPaths()
         let previous = try Self.catalogModel(
@@ -1570,6 +1610,7 @@ final class AppCompositionTests: XCTestCase {
         var preferences = AppPreferences.defaults
         preferences.activeModelID = model.id
         let transcriber = ActivationTranscriberSpy()
+        let durabilityRecorder = AppWorkflowBoundaryRecorder()
         let services = try Self.makeServices(
             preferences: preferences,
             paths: paths,
@@ -1585,7 +1626,8 @@ final class AppCompositionTests: XCTestCase {
             models: CandidateRuntimeModelResolver(
                 models: [Self.runtimeModel(model)]
             ),
-            transcriber: transcriber
+            transcriber: transcriber,
+            modelWorkflowDurabilityObserver: durabilityRecorder.observer
         )
         let manifest = ModelManifest(
             manifestVersion: 1,
@@ -1646,6 +1688,14 @@ final class AppCompositionTests: XCTestCase {
             [restorationID]
         )
         await services.acknowledgeRestoredModelIntegrity(model.id)
+        XCTAssertTrue(
+            durabilityRecorder.events.contains(
+                AppWorkflowBoundaryEvent(
+                    boundary: .restorationIntegrityAcknowledged,
+                    artifactID: model.id
+                )
+            )
+        )
         XCTAssertNil(
             services.preferences.activeModelID,
             "Verification must not activate restored content."
@@ -2626,7 +2676,9 @@ final class AppCompositionTests: XCTestCase {
         transcriber: any RuntimeTranscribing = FakeRuntimeTranscriber(),
         voiceCleaner: any RuntimeVoiceCleaning = DisabledRuntimeVoiceCleaning(),
         overlayPresenter: (any RecordingOverlayPresenting)? = nil,
-        waitBeforeProcessingIndicator: @escaping @Sendable () async -> Void = {}
+        waitBeforeProcessingIndicator: @escaping @Sendable () async -> Void = {},
+        modelWorkflowDurabilityObserver:
+            ModelWorkflowDurabilityObserver = .none
     ) throws -> AppServices {
         let paths = try providedPaths ?? makeTemporaryPaths()
         let settingsStore = providedSettingsStore
@@ -2665,7 +2717,9 @@ final class AppCompositionTests: XCTestCase {
             launchAtLoginLocation: launchAtLoginLocation,
             modelCatalogCompatibilityResolver: modelCatalogCompatibilityResolver,
             overlayPresenter: overlayPresenter,
-            waitBeforeProcessingIndicator: waitBeforeProcessingIndicator
+            waitBeforeProcessingIndicator: waitBeforeProcessingIndicator,
+            modelWorkflowDurabilityObserver:
+                modelWorkflowDurabilityObserver
         )
     }
 
@@ -3205,5 +3259,37 @@ private actor SuspendedModelInstallGate {
         let continuation = continuation
         self.continuation = nil
         continuation?.resume()
+    }
+}
+
+private struct AppWorkflowBoundaryEvent: Equatable {
+    let boundary: ModelWorkflowDurableBoundary
+    let artifactID: String?
+}
+
+private final class AppWorkflowBoundaryRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recordedEvents: [AppWorkflowBoundaryEvent] = []
+
+    var observer: ModelWorkflowDurabilityObserver {
+        ModelWorkflowDurabilityObserver { [weak self] boundary, artifactID in
+            guard let self else {
+                return
+            }
+            lock.lock()
+            recordedEvents.append(
+                AppWorkflowBoundaryEvent(
+                    boundary: boundary,
+                    artifactID: artifactID
+                )
+            )
+            lock.unlock()
+        }
+    }
+
+    var events: [AppWorkflowBoundaryEvent] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recordedEvents
     }
 }

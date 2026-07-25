@@ -4,6 +4,36 @@ import TextifyModels
 import XCTest
 
 final class ModelInstallerTests: XCTestCase {
+    func testInstallerReportsStagingBeforeReceiptPersistence() async throws {
+        let manifest = try Self.fixtureManifest()
+        let model = try XCTUnwrap(manifest.models.first)
+        let file = try XCTUnwrap(model.files.first)
+        let root = Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let recorder = ModelWorkflowBoundaryRecorder()
+        let installer = ModelInstaller(
+            layout: ModelStorageLayout(rootDirectory: root),
+            transport: FixtureFileDownloadTransport(
+                dataByURL: [
+                    try XCTUnwrap(URL(string: file.url)):
+                        try Self.fixtureData("model.bin"),
+                ]
+            ),
+            durabilityObserver: recorder.observer
+        )
+
+        _ = try await installer.install(modelID: model.id, from: manifest)
+
+        XCTAssertEqual(
+            recorder.events.map(\.boundary),
+            [.installationStaged, .installationReceiptPersisted]
+        )
+        XCTAssertEqual(
+            Set(recorder.events.compactMap(\.artifactID)),
+            [model.id]
+        )
+    }
+
     func testProductionPolicyAcceptsFixtureManifest() throws {
         try ProductionModelPolicy.validateV1_1ProductionManifest(try Self.fixtureManifest())
     }

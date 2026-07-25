@@ -3,6 +3,31 @@ import Foundation
 import XCTest
 
 final class InstalledModelManagerTests: XCTestCase {
+    func testRemovalReportsDurableStagesInOwnershipOrder() throws {
+        let fixture = try removalFixture(modelID: "durability-order")
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let recorder = ModelWorkflowBoundaryRecorder()
+
+        _ = try InstalledModelManager(
+            layout: fixture.layout,
+            durabilityObserver: recorder.observer
+        ).remove(modelID: fixture.model.id)
+
+        XCTAssertEqual(
+            recorder.events.map(\.boundary),
+            [
+                .deletionRenamedPending,
+                .deletionBytesRemoved,
+                .deletionReceiptRemoved,
+            ]
+        )
+        XCTAssertTrue(
+            recorder.events.allSatisfy {
+                $0.artifactID == fixture.model.id
+            }
+        )
+    }
+
     func testRemoveAtomicallyUpdatesStoreAndDeletesManagedDirectory() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("TextifyModelRemoval-\(UUID().uuidString)", isDirectory: true)
@@ -236,6 +261,47 @@ final class InstalledModelManagerTests: XCTestCase {
         let relaunchedManager = InstalledModelManager(layout: fixture.layout)
         _ = try relaunchedManager.remove(modelID: fixture.model.id)
 
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: pendingDirectory.path)
+        )
+        XCTAssertNil(
+            try loadStore(fixture.layout).record(forModelID: fixture.model.id)
+        )
+    }
+
+    func testRelaunchDeletionRemovesNewAttributedBytesBesidePendingRemoval() throws {
+        let fixture = try removalFixture(modelID: "pending-with-extra")
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let pendingDirectory = try fixture.layout.pendingRemovalDirectory(
+            modelID: fixture.model.id
+        )
+        try FileManager.default.createDirectory(
+            at: fixture.layout.downloadsDirectory,
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.moveItem(
+            at: fixture.installedDirectory,
+            to: pendingDirectory
+        )
+        try FileManager.default.createDirectory(
+            at: fixture.installedDirectory,
+            withIntermediateDirectories: true
+        )
+        try Data("late attributed bytes".utf8).write(
+            to: fixture.installedDirectory.appendingPathComponent(
+                "late.bin"
+            )
+        )
+
+        _ = try InstalledModelManager(layout: fixture.layout).remove(
+            modelID: fixture.model.id
+        )
+
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: fixture.installedDirectory.path
+            )
+        )
         XCTAssertFalse(
             FileManager.default.fileExists(atPath: pendingDirectory.path)
         )

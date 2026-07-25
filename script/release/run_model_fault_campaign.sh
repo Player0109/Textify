@@ -33,6 +33,45 @@ test -s "$TEST_RESULTS"
   swift run TextifyModelFaultVerifier "$CAMPAIGN_REPORT"
 )
 
+jq -e '
+  .schemaVersion == 2
+  and (.productionCampaign.executions | length) == 143
+  and all(
+    .productionCampaign.executions[];
+    .failpointReached
+      and (.injectedMutation | length) > 0
+      and .relaunchRecovered
+      and (.invariantViolations | length) == 0
+      and .unexplainedManagedBytes == 0
+  )
+  and (
+    [.productionCampaign.executions[]
+      | select(.forcedProcessTermination)] | length
+  ) == 13
+  and .productionCampaign.invariantViolations == []
+  and .productionCampaign.unexplainedManagedBytes == 0
+  and .productionCampaign.crashSoak.operationCount == 1000
+  and .productionCampaign.crashSoak.completedOperationCount == 1000
+  and .productionCampaign.crashSoak.seed == 24
+  and (
+    .productionCampaign.crashSoak.operationCounts
+    | [.install, .reinstall, .cancel, .delete, .refresh]
+    | all(. > 0)
+  )
+  and .productionCampaign.crashSoak.scheduledCrashCount > 0
+  and (
+    .productionCampaign.crashSoak.forcedCrashCount
+      == .productionCampaign.crashSoak.scheduledCrashCount
+  )
+  and (
+    .productionCampaign.crashSoak.relaunchCount
+      == .productionCampaign.crashSoak.scheduledCrashCount
+  )
+  and .productionCampaign.crashSoak.invariantViolations == []
+  and .productionCampaign.crashSoak.unexplainedManagedBytes == 0
+  and .campaign.transitionCoverage.isComplete
+' "$CAMPAIGN_REPORT" >/dev/null
+
 (
   cd "$EVIDENCE_DIR"
   shasum -a 256 \

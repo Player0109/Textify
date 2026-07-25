@@ -3,6 +3,59 @@ import TextifyModels
 import XCTest
 
 final class ModelRevocationTests: XCTestCase {
+    func testRevocationStoreReportsPersistenceAfterAtomicSave() throws {
+        let privateKey = Curve25519.Signing.PrivateKey()
+        let revocationData = Data(
+            """
+            {
+              "revocationVersion": 1,
+              "generatedAt": "2026-07-25T00:00:00Z",
+              "records": [{
+                "recordID": "revocation-observed",
+                "exactArtifactID": "artifact-a",
+                "contentDigest": null
+              }]
+            }
+            """.utf8
+        )
+        let trustedKey = TrustedModelManifestKey(
+            keyId: "revocation-test-key",
+            publicKeyBase64: privateKey.publicKey.rawRepresentation
+                .base64EncodedString()
+        )
+        let verifier = ModelRevocationVerifier(trustedKeys: [trustedKey])
+        let snapshot = try TrustedModelRevocationSnapshot(
+            revocationData: revocationData,
+            signatureData: try signedEnvelope(
+                revocationData: revocationData,
+                privateKey: privateKey
+            ),
+            verifier: verifier
+        )
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "TextifyRevocationObserver-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        defer { try? FileManager.default.removeItem(at: root) }
+        let recorder = ModelWorkflowBoundaryRecorder()
+        let store = TrustedModelRevocationStore(
+            fileURL: root.appendingPathComponent("revocations.json"),
+            verifier: verifier,
+            catalogVerifier: ManifestVerifier(trustedKeys: [trustedKey]),
+            durabilityObserver: recorder.observer
+        )
+
+        try store.save(
+            try TrustedModelRevocationState().accepting(snapshot)
+        )
+
+        XCTAssertEqual(
+            recorder.events.map(\.boundary),
+            [.revocationRestorationPersisted]
+        )
+    }
+
     func testSignedRevocationSnapshotVerifiesWithoutCatalogData() throws {
         let privateKey = Curve25519.Signing.PrivateKey()
         let revocationData = Data(

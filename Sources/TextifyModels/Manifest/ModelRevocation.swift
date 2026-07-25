@@ -1239,17 +1239,20 @@ public struct TrustedModelRevocationStore {
     private let verifier: ModelRevocationVerifier
     private let catalogVerifier: ManifestVerifier
     private let fileManager: FileManager
+    private let durabilityObserver: ModelWorkflowDurabilityObserver
 
     public init(
         fileURL: URL,
         verifier: ModelRevocationVerifier,
         catalogVerifier: ManifestVerifier,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        durabilityObserver: ModelWorkflowDurabilityObserver = .none
     ) {
         self.fileURL = fileURL
         self.verifier = verifier
         self.catalogVerifier = catalogVerifier
         self.fileManager = fileManager
+        self.durabilityObserver = durabilityObserver
     }
 
     public func load() throws -> TrustedModelRevocationState {
@@ -1303,6 +1306,9 @@ public struct TrustedModelRevocationStore {
             withIntermediateDirectories: true
         )
         try JSONEncoder().encode(archive).write(to: fileURL, options: .atomic)
+        try durabilityObserver.didReach(
+            .revocationRestorationPersisted
+        )
     }
 
     private struct Archive: Codable {
