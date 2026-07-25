@@ -78,6 +78,10 @@ let package = Package(
         .library(name: "TextifyDiagnostics", targets: ["TextifyDiagnostics"]),
         .library(name: "TextifySettings", targets: ["TextifySettings"]),
         .library(name: "TextifyRuntime", targets: ["TextifyRuntime"]),
+        .library(
+            name: "TextifyReleaseVerification",
+            targets: ["TextifyReleaseVerification"]
+        ),
         .library(name: "TextifyWhisperShim", targets: ["TextifyWhisperShim"]),
         .executable(
             name: "TextifyModelManifestVerifier",
@@ -86,6 +90,10 @@ let package = Package(
         .executable(
             name: "TextifyCatalogPublicationVerifier",
             targets: ["TextifyCatalogPublicationVerifier"]
+        ),
+        .executable(
+            name: "TextifyModelFaultVerifier",
+            targets: ["TextifyModelFaultVerifier"]
         ),
         .executable(name: "Textify", targets: ["Textify"])
     ],
@@ -185,6 +193,10 @@ let package = Package(
         .target(name: "TextifyHotkeys", dependencies: ["TextifyCore", "TextifyDiagnostics"]),
         .target(name: "TextifyDiagnostics"),
         .target(name: "TextifySettings", dependencies: ["TextifyModels"]),
+        .target(
+            name: "TextifyReleaseVerification",
+            dependencies: ["TextifyModels", "TextifyDiagnostics"]
+        ),
         .executableTarget(
             name: "TextifyModelManifestVerifier",
             dependencies: ["TextifyModels"]
@@ -192,6 +204,10 @@ let package = Package(
         .executableTarget(
             name: "TextifyCatalogPublicationVerifier",
             dependencies: ["TextifyModels"]
+        ),
+        .executableTarget(
+            name: "TextifyModelFaultVerifier",
+            dependencies: ["TextifyReleaseVerification"]
         ),
         .target(
             name: "TextifyRuntime",
@@ -235,6 +251,10 @@ let package = Package(
         .testTarget(name: "TextifyDiagnosticsTests", dependencies: ["TextifyDiagnostics"]),
         .testTarget(name: "TextifySettingsTests", dependencies: ["TextifySettings"]),
         .testTarget(name: "TextifyRuntimeTests", dependencies: ["TextifyRuntime"]),
+        .testTarget(
+            name: "TextifyReleaseVerificationTests",
+            dependencies: ["TextifyReleaseVerification"]
+        ),
         .testTarget(
             name: "TextifyAppTests",
             dependencies: [

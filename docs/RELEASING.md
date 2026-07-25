@@ -6,6 +6,19 @@ weights. The small signed catalog is bundled as a trusted baseline. Sparkle
 remains deferred, so users update manually by downloading the next GitHub
 Release DMG.
 
+## Model workflow fault evidence
+
+Before assembling release-candidate evidence, run:
+
+```bash
+script/release/run_model_fault_campaign.sh dist/release-evidence/model-faults
+```
+
+Retain the generated report, focused production-path test log, seed, and
+checksums. The campaign is release-only and uses generated localhost fixture
+bytes; it does not contact the production catalog or fetch model artifacts.
+See `docs/models/model-fault-campaign.md` for the covered matrix.
+
 ## Prerequisites
 
 - Xcode with Swift 6.2 or later and macOS 14 SDK support. The pinned MLX Audio

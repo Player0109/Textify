@@ -1384,3 +1384,29 @@ Task 1 must merge before parallel Wave 1 work begins.
   bundled catalog verification, native dependency checks, and shell syntax
   checks. Independent Standards and Spec re-reviews report no remaining
   actionable findings.
+
+## Fault Campaign And Release Evidence Handoff - 2026-07-25
+
+- GitHub issues #24 and #25 own a separate `TextifyReleaseVerification`
+  package module, its focused tests, and release-only verifier executables and
+  scripts. The shipping `Textify` executable must not depend on this module.
+- This handoff permits the minimum Task 1 `Package.swift` additions needed to
+  expose those release-verification targets. It also permits release-process
+  documentation changes under Task 14 ownership and focused reuse of the
+  existing Task 4 model-domain public interfaces without changing their
+  runtime behavior.
+- Issue #24 owns deterministic localhost transfer scenarios, durable-boundary
+  fault and recovery campaigns, security/privacy probes, seeded soak evidence,
+  and retained machine-readable reports. It must not download production model
+  artifacts or send local inventory to a publisher.
+- Issue #25 owns strict release-candidate evidence declarations and bundle
+  validation. Missing real-device measurements, manual accessibility results,
+  independent security review, or two distinct human approvals remain
+  release-blocking; automation must never synthesize or waive them.
+- Issue #24 verification retained a fixed-seed 1,000-operation report with all
+  12 durable boundaries and all 11 required injected fault classes covered,
+  zero invariant violations, zero unexplained managed bytes, all security and
+  privacy probes passing, and every localhost transfer/recovery scenario
+  passing. The retained focused production-path log covers 142 installer,
+  queue, storage, revocation/restoration, deletion, coordinator, diagnostics,
+  and release-verification tests with zero failures.
