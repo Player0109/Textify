@@ -68,13 +68,14 @@ public struct ReleaseCandidateEvidenceValidator: Sendable {
             declaration,
             attachmentData: attachments.data
         )
-        try validatePerformance(
+        let supportedPerformanceDeviceIDs = try validatePerformance(
             declaration.performanceEvidence,
             records: records
         )
         try validateComputeRoutes(
             declaration,
             manifestRoutes: manifestRoutes,
+            supportedPerformanceDeviceIDs: supportedPerformanceDeviceIDs,
             records: records
         )
         try validateDefects(
@@ -302,7 +303,7 @@ public struct ReleaseCandidateEvidenceValidator: Sendable {
     private func validatePerformance(
         _ evidence: [ReleasePerformanceEvidence],
         records: [String: ReleaseEvidenceRecord]
-    ) throws {
+    ) throws -> Set<String> {
         let valid: (ReleasePerformanceEvidence) -> Bool = {
             guard $0.isRealDevice,
                   let record = records[$0.attachmentID],
@@ -313,6 +314,8 @@ public struct ReleaseCandidateEvidenceValidator: Sendable {
             return !$0.deviceID.isEmpty
                 && !$0.deviceClass.isEmpty
                 && !$0.macOSVersion.isEmpty
+                && Self.isSupportedAppleSiliconDeviceClass($0.deviceClass)
+                && Self.isSupportedMacOSVersion($0.macOSVersion)
                 && $0.warmIterationCount >= 30
                 && $0.coldLaunchCount >= 3
                 && record.attributes["deviceID"] == $0.deviceID
@@ -331,23 +334,30 @@ public struct ReleaseCandidateEvidenceValidator: Sendable {
                 && record.measurements["cold"]?.count
                     == $0.coldLaunchCount
         }
-        guard evidence.contains(where: {
-            $0.isOldestSupportedM1Class && valid($0)
-        }) else {
+        let validEvidence = evidence.filter(valid)
+        let oldestSupportedDeviceIDs = Set(
+            validEvidence
+                .filter(\.isOldestSupportedM1Class)
+                .map(\.deviceID)
+        )
+        guard !oldestSupportedDeviceIDs.isEmpty else {
             throw ReleaseCandidateEvidenceError
                 .insufficientOldestSupportedPerformanceEvidence
         }
-        guard evidence.contains(where: {
-            !$0.isOldestSupportedM1Class && valid($0)
+        guard validEvidence.contains(where: {
+            !$0.isOldestSupportedM1Class
+                && !oldestSupportedDeviceIDs.contains($0.deviceID)
         }) else {
             throw ReleaseCandidateEvidenceError
                 .missingLaterDevicePerformanceEvidence
         }
+        return Set(validEvidence.map(\.deviceID))
     }
 
     private func validateComputeRoutes(
         _ declaration: ReleaseCandidateEvidenceDeclaration,
         manifestRoutes: Set<ModelComputeRoute>,
+        supportedPerformanceDeviceIDs: Set<String>,
         records: [String: ReleaseEvidenceRecord]
     ) throws {
         guard !manifestRoutes.isEmpty,
@@ -355,16 +365,11 @@ public struct ReleaseCandidateEvidenceValidator: Sendable {
         else {
             throw ReleaseCandidateEvidenceError.invalidReleaseIdentity
         }
-        let performanceDeviceIDs = Set(
-            declaration.performanceEvidence
-                .filter(\.isRealDevice)
-                .map(\.deviceID)
-        )
         for route in manifestRoutes {
             guard declaration.computeRouteEvidence.contains(where: {
                       guard $0.route == route,
                             $0.isRealDevice,
-                            performanceDeviceIDs.contains($0.deviceID),
+                            supportedPerformanceDeviceIDs.contains($0.deviceID),
                             let record = records[$0.attachmentID]
                       else {
                           return false
@@ -475,6 +480,38 @@ public struct ReleaseCandidateEvidenceValidator: Sendable {
 
     private static func isISO8601(_ value: String) -> Bool {
         ISO8601DateFormatter().date(from: value) != nil
+    }
+
+    private static func isSupportedAppleSiliconDeviceClass(
+        _ value: String
+    ) -> Bool {
+        let components = value.split(separator: " ")
+        guard components.count == 2 || components.count == 3,
+              components[0] == "Apple",
+              components[1].first == "M",
+              let generation = Int(components[1].dropFirst()),
+              generation >= 1
+        else {
+            return false
+        }
+        return components.count == 2
+            || ["Pro", "Max", "Ultra"].contains(String(components[2]))
+    }
+
+    private static func isSupportedMacOSVersion(_ value: String) -> Bool {
+        let components = value.split(
+            separator: ".",
+            omittingEmptySubsequences: false
+        )
+        guard (1 ... 3).contains(components.count),
+              components.allSatisfy({
+                  !$0.isEmpty && $0.allSatisfy(\.isNumber)
+              }),
+              let majorVersion = Int(components[0])
+        else {
+            return false
+        }
+        return majorVersion >= 14
     }
 
     private static func isSHA256(_ value: String) -> Bool {

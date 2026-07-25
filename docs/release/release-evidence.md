@@ -38,7 +38,9 @@ than self-declared counts. They also bind the real-device flag and
 oldest-supported-M1 classification to the recorded device identity; the
 oldest-supported entry must name an Apple M1-class device. Compute Routes are
 derived from the attached v3 manifest and must match route records from real
-devices. Catalog and revocation identity is decoded from the attached
+devices. Device classes use Apple M-series names such as `Apple M1` or
+`Apple M4 Max`, and macOS versions use numeric components beginning at 14.
+Catalog and revocation identity is decoded from the attached
 publication evidence and bound to the exact manifest and release executable
 hash. Review and approval records must match their declared reviewer, scope,
 approver, and timestamp.

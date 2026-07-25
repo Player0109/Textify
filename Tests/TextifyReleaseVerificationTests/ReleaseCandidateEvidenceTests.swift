@@ -179,6 +179,98 @@ final class ReleaseCandidateEvidenceTests: XCTestCase {
         }
     }
 
+    func testPerformanceRejectsUnsupportedDeviceAndOperatingSystem() throws {
+        let unsupportedEvidence: [(deviceClass: String?, macOSVersion: String?)] = [
+            ("Intel Core i9", nil),
+            (nil, "13.6"),
+        ]
+        for evidence in unsupportedEvidence {
+            let fixture = try EvidenceFixture()
+            defer { fixture.remove() }
+            if let deviceClass = evidence.deviceClass {
+                try fixture.replacePerformanceDeviceClass(
+                    at: 1,
+                    with: deviceClass
+                )
+            }
+            if let macOSVersion = evidence.macOSVersion {
+                try fixture.replacePerformanceMacOSVersion(
+                    at: 1,
+                    with: macOSVersion
+                )
+            }
+
+            XCTAssertThrowsError(
+                try ReleaseCandidateEvidenceValidator().validate(
+                    fixture.declaration,
+                    evidenceRoot: fixture.root,
+                    specificationURL: fixture.specificationURL
+                )
+            ) { error in
+                XCTAssertEqual(
+                    error as? ReleaseCandidateEvidenceError,
+                    .missingLaterDevicePerformanceEvidence
+                )
+            }
+        }
+    }
+
+    func testOldestAndLaterPerformanceRequireDistinctDeviceIdentities() throws {
+        let fixture = try EvidenceFixture()
+        defer { fixture.remove() }
+        try fixture.replacePerformanceDeviceID(
+            at: 1,
+            with: fixture.declaration.performanceEvidence[0].deviceID
+        )
+
+        XCTAssertThrowsError(
+            try ReleaseCandidateEvidenceValidator().validate(
+                fixture.declaration,
+                evidenceRoot: fixture.root,
+                specificationURL: fixture.specificationURL
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? ReleaseCandidateEvidenceError,
+                .missingLaterDevicePerformanceEvidence
+            )
+        }
+    }
+
+    func testComputeRouteRequiresValidatedSupportedDeviceEvidence() throws {
+        let fixture = try EvidenceFixture()
+        defer { fixture.remove() }
+        fixture.declaration.performanceEvidence.append(
+            ReleasePerformanceEvidence(
+                deviceID: "unsupported-device",
+                deviceClass: "Intel Core i9",
+                macOSVersion: "13.6",
+                isRealDevice: true,
+                isOldestSupportedM1Class: false,
+                warmIterationCount: 30,
+                coldLaunchCount: 3,
+                attachmentID: "performance-later"
+            )
+        )
+        try fixture.replaceComputeRouteDeviceID(
+            at: 0,
+            with: "unsupported-device"
+        )
+
+        XCTAssertThrowsError(
+            try ReleaseCandidateEvidenceValidator().validate(
+                fixture.declaration,
+                evidenceRoot: fixture.root,
+                specificationURL: fixture.specificationURL
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? ReleaseCandidateEvidenceError,
+                .missingComputeRouteEvidence(.gpuViaMetal)
+            )
+        }
+    }
+
     func testSensitiveMediumDefectBlocksRelease() throws {
         let fixture = try EvidenceFixture()
         defer { fixture.remove() }
@@ -613,6 +705,58 @@ private final class EvidenceFixture {
     ) throws {
         let attachmentID =
             declaration.performanceEvidence[performanceIndex].attachmentID
+        try mutateRecord(attachmentID: attachmentID) {
+            $0.attributes["deviceClass"] = deviceClass
+        }
+
+        declaration.performanceEvidence[performanceIndex].deviceClass =
+            deviceClass
+    }
+
+    func replacePerformanceMacOSVersion(
+        at performanceIndex: Int,
+        with macOSVersion: String
+    ) throws {
+        let attachmentID =
+            declaration.performanceEvidence[performanceIndex].attachmentID
+        try mutateRecord(attachmentID: attachmentID) {
+            $0.attributes["macOSVersion"] = macOSVersion
+        }
+
+        declaration.performanceEvidence[performanceIndex].macOSVersion =
+            macOSVersion
+    }
+
+    func replacePerformanceDeviceID(
+        at performanceIndex: Int,
+        with deviceID: String
+    ) throws {
+        let attachmentID =
+            declaration.performanceEvidence[performanceIndex].attachmentID
+        try mutateRecord(attachmentID: attachmentID) {
+            $0.attributes["deviceID"] = deviceID
+        }
+
+        declaration.performanceEvidence[performanceIndex].deviceID = deviceID
+    }
+
+    func replaceComputeRouteDeviceID(
+        at routeIndex: Int,
+        with deviceID: String
+    ) throws {
+        let attachmentID =
+            declaration.computeRouteEvidence[routeIndex].attachmentID
+        try mutateRecord(attachmentID: attachmentID) {
+            $0.attributes["deviceID"] = deviceID
+        }
+
+        declaration.computeRouteEvidence[routeIndex].deviceID = deviceID
+    }
+
+    private func mutateRecord(
+        attachmentID: String,
+        _ mutation: (inout ReleaseEvidenceRecord) -> Void
+    ) throws {
         let attachmentIndex = try XCTUnwrap(
             declaration.attachments.firstIndex { $0.id == attachmentID }
         )
@@ -624,12 +768,10 @@ private final class EvidenceFixture {
             ReleaseEvidenceRecord.self,
             from: Data(contentsOf: attachmentURL)
         )
-        record.attributes["deviceClass"] = deviceClass
+        mutation(&record)
         let data = try JSONEncoder().encode(record)
         try data.write(to: attachmentURL)
 
-        declaration.performanceEvidence[performanceIndex].deviceClass =
-            deviceClass
         declaration.attachments[attachmentIndex].sha256 = Self.hash(data)
     }
 
