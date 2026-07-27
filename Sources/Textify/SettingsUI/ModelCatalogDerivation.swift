@@ -31,6 +31,10 @@ struct ModelCatalogDerivationRequest: Equatable, @unchecked Sendable {
     let storageInventoryByModelID: [String: ModelStorageArtifactInventory]
     let installedSizeStatus: ModelCatalogInstalledSizeStatus
     var query: ModelCatalogQuery
+    var screen = ModelCatalogScreenRequest(
+        purpose: .transcription,
+        selectedLanguage: "en"
+    )
 
     static func == (
         lhs: ModelCatalogDerivationRequest,
@@ -54,6 +58,7 @@ struct ModelCatalogDerivationRequest: Equatable, @unchecked Sendable {
                 == rhs.storageInventoryByModelID
             && lhs.installedSizeStatus == rhs.installedSizeStatus
             && lhs.query == rhs.query
+            && lhs.screen == rhs.screen
     }
 }
 
@@ -62,6 +67,8 @@ struct ModelCatalogDerivationSnapshot: Equatable, @unchecked Sendable {
     let indexStatistics: ModelCatalogIndexStatistics
     let query: ModelCatalogQuery
     let experience: ModelCatalogExperience
+    let overrideResolution: ModelCatalogOverrideResolution
+    let screenProjection: ModelCatalogScreenProjection
 }
 
 actor ModelCatalogDerivationEngine {
@@ -129,11 +136,23 @@ actor ModelCatalogDerivationEngine {
         let baseExperience: ModelCatalogExperience
     }
 
+    private struct ScreenKey: Equatable, Sendable {
+        let queryVersion: UInt64
+        let request: ModelCatalogScreenRequest
+    }
+
+    private struct ScreenResult: Sendable {
+        let key: ScreenKey
+        let overrideResolution: ModelCatalogOverrideResolution
+        let projection: ModelCatalogScreenProjection
+    }
+
     private let beforeDerivation: BeforeDerivation
     private var catalogIndex: CatalogIndex?
     private var eligibilityIndex: EligibilityIndex?
     private var localStateOverlay: LocalStateOverlay?
     private var queryResult: QueryResult?
+    private var screenResult: ScreenResult?
 
     init(
         beforeDerivation: @escaping BeforeDerivation = { _ in }
@@ -165,9 +184,21 @@ actor ModelCatalogDerivationEngine {
         )
         try Task.checkCancellation()
 
-        let experience = query.baseExperience.applyingTransferStates(
-            localState.transferStatesByModelID
+        let screen = deriveScreenResult(
+            experience: query.baseExperience,
+            queryVersion: query.version,
+            request: request.screen,
+            searchText: request.query.searchText,
+            validationAvailable:
+                catalog.presentation.trustedManifest?
+                    .presentationGraph != nil
         )
+        let experience =
+            request.screen.includesRichTransferState
+            ? query.baseExperience.applyingTransferStates(
+                localState.transferStatesByModelID
+            )
+            : query.baseExperience
         return ModelCatalogDerivationSnapshot(
             versions: ModelCatalogLayerVersions(
                 catalogIndex: catalog.version,
@@ -177,7 +208,9 @@ actor ModelCatalogDerivationEngine {
             ),
             indexStatistics: catalog.statistics,
             query: request.query,
-            experience: experience
+            experience: experience,
+            overrideResolution: screen.overrideResolution,
+            screenProjection: screen.projection
         )
     }
 
@@ -283,7 +316,11 @@ actor ModelCatalogDerivationEngine {
             DownloadState(
                 modelID: $0.modelID,
                 phase: $0.phase,
-                message: $0.phase.rawValue,
+                totalBytes: $0.totalBytes,
+                message:
+                    $0.phase == .downloading
+                    ? $0.phase.rawValue
+                    : $0.message ?? $0.phase.rawValue,
                 attemptID: $0.attemptID
             )
         }
@@ -344,6 +381,46 @@ actor ModelCatalogDerivationEngine {
             transcriptionModelID: request.activeTranscriptionModelID,
             voiceCleaningModelID: request.activeVoiceCleaningModelID
         )
+    }
+
+    private func deriveScreenResult(
+        experience: ModelCatalogExperience,
+        queryVersion: UInt64,
+        request: ModelCatalogScreenRequest,
+        searchText: String,
+        validationAvailable: Bool
+    ) -> ScreenResult {
+        let key = ScreenKey(
+            queryVersion: queryVersion,
+            request: request
+        )
+        if let screenResult, screenResult.key == key {
+            return screenResult
+        }
+        let overrideResolution = ModelCatalogOverrideResolution(
+            experience: experience,
+            purpose: request.purpose,
+            artifactOverrides: request.artifactOverrides,
+            validationAvailable: validationAvailable
+        )
+        let next = ScreenResult(
+            key: key,
+            overrideResolution: overrideResolution,
+            projection: ModelCatalogScreenProjection(
+                ModelCheckpointListPresentation(
+                    experience: experience,
+                    purpose: request.purpose,
+                    selectedLanguage: request.selectedLanguage,
+                    browseAllLanguages: request.browseAllLanguages,
+                    searchText: searchText,
+                    artifactOverrides:
+                        overrideResolution.legalArtifactIDsByCheckpoint,
+                    stableCheckpointOrder: request.stableCheckpointOrder
+                )
+            )
+        )
+        screenResult = next
+        return next
     }
 }
 
@@ -449,6 +526,8 @@ final class ModelCatalogFeatureModel {
     var verificationRestorationIDsByArtifact: [String: [String]] = [:]
     var announcementTracker = ModelCatalogAnnouncementTracker()
     var showsInspector = false
+    let transferStateRegistry = ModelCatalogTransferStateRegistry()
+    var transferTopologyVersion: UInt64 = 0
 
     @ObservationIgnored private let derivationCoordinator:
         ModelCatalogDerivationCoordinator
@@ -478,6 +557,11 @@ final class ModelCatalogFeatureModel {
     }
 
     func submit(_ request: ModelCatalogDerivationRequest) {
+        if transferStateRegistry.reconcile(
+            statesByArtifactID: request.transferStatesByModelID
+        ) {
+            transferTopologyVersion &+= 1
+        }
         derivationCoordinator.submit(request)
     }
 

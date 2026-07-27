@@ -22,6 +22,47 @@ final class ModelCatalogCheckpointExperienceTests: XCTestCase {
         XCTAssertEqual(turbo.versionRoute, .popover)
     }
 
+    func testScrollingSurfaceHasNoLazyOrPerRowFocusGraph() throws {
+        let source = try String(
+            contentsOf:
+                repositoryRoot
+                .appendingPathComponent(
+                    "Sources/Textify/SettingsUI/ModelCatalogCheckpointView.swift"
+                ),
+            encoding: .utf8
+        )
+        let surfaceStart = try XCTUnwrap(
+            source.range(of: "struct ModelCheckpointCatalogSurface")
+        )
+        let surfaceEnd = try XCTUnwrap(
+            source.range(
+                of: "private struct ModelCheckpointColumnHeader",
+                range: surfaceStart.upperBound..<source.endIndex
+            )
+        )
+        let surface = source[
+            surfaceStart.lowerBound..<surfaceEnd.lowerBound
+        ]
+
+        XCTAssertTrue(surface.contains("VStack(spacing: 0)"))
+        XCTAssertFalse(surface.contains("LazyVStack"))
+        XCTAssertFalse(source.contains(".accessibilityFocused("))
+        XCTAssertTrue(source.contains("ModelCheckpointProviderMark("))
+        XCTAssertTrue(surface.contains(".focused(keyboardFocus)"))
+        XCTAssertTrue(
+            surface.contains(
+                "}\n            .id(layoutMode)\n        }"
+            ),
+            "Responsive mode changes must recreate the complete section subtree."
+        )
+        XCTAssertFalse(
+            surface.contains(
+                ".id(layoutMode)\n                    .id(ModelCatalogHierarchyRowID.checkpoint"
+            ),
+            "Per-row identity allowed rows to retain a stale stacked layout."
+        )
+    }
+
     func testActiveCheckpointIsFirstAndExactlyOneOtherCheckpointIsRecommended() throws {
         let activeArtifactID = "ggml-small.en-q5_1"
         let presentation = try makePresentation(

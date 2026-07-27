@@ -288,8 +288,6 @@ final class AppServices {
     @ObservationIgnored private var modelRevocationEnforcementDeferred =
         false
     @ObservationIgnored private var pendingModelUseArtifactIDs = Set<String>()
-    @ObservationIgnored private var pendingArtifactOverrideRemovalKeys =
-        Set<String>()
     @ObservationIgnored private var overlayUpdateGeneration = 0
     private var managedReadinessByModelID:
         [String: ModelCatalogManagedReadiness] = [:]
@@ -784,7 +782,7 @@ final class AppServices {
         let localState = modelCatalogPresentationLocalState(
             onDiskBytesByModelID: nil
         )
-        return ModelCatalogDerivationRequest(
+        var request = ModelCatalogDerivationRequest(
             catalogRevision: modelCatalogCoordinator.presentedRevision
                 ?? modelCatalogCoordinator.manifest?.generatedAt,
             trustedManifest: modelCatalogCoordinator.manifest,
@@ -805,6 +803,16 @@ final class AppServices {
             installedSizeStatus: localState.installedSizeStatus,
             query: scopedQuery
         )
+        request.screen = ModelCatalogScreenRequest(
+            purpose: purpose,
+            selectedLanguage:
+                purpose == .transcription
+                ? preferences.transcriptionLanguage.rawValue
+                : nil,
+            artifactOverrides: modelArtifactOverrides(for: purpose),
+            includesRichTransferState: purpose == .voiceCleaning
+        )
+        return request
     }
 
     func modelCatalogFeature(
@@ -1002,7 +1010,7 @@ final class AppServices {
         for purpose: ModelPurpose
     ) -> [String: String] {
         let prefix = "\(purpose.rawValue)|"
-        let persisted: [String: String] = Dictionary(
+        return Dictionary(
             uniqueKeysWithValues:
                 preferences.modelArtifactOverridesByPurposeCheckpoint
                 .compactMap { key, artifactID in
@@ -1015,73 +1023,28 @@ final class AppServices {
                     )
                 }
         )
-        guard modelCatalogCoordinator.authoritativeManifest?
-            .presentationGraph != nil
-        else {
-            return persisted
-        }
-        let experience = modelCatalogExperience(
-            for: purpose,
-            query: ModelCatalogQuery(purpose: purpose)
-        )
-        let legalArtifactIDsByCheckpoint = Dictionary(
-            uniqueKeysWithValues: experience.families.flatMap(\.checkpoints)
-                .map { checkpoint in
-                    (
-                        checkpoint.id,
-                        Set(checkpoint.artifacts.compactMap {
-                            !$0.row.isRevoked
-                                && $0.row.compatibility
-                                    .allowsModelOperations
-                                ? $0.id
-                                : nil
-                        })
-                    )
-                }
-        )
-        let legal = persisted.filter { checkpointID, artifactID in
-            legalArtifactIDsByCheckpoint[checkpointID]?
-                .contains(artifactID) == true
-        }
-        if legal.count != persisted.count {
-            scheduleInvalidArtifactOverrideRemoval(
-                Dictionary(
-                    uniqueKeysWithValues: persisted.compactMap {
-                        checkpointID, artifactID in
-                        legal[checkpointID] == nil
-                            ? ("\(prefix)\(checkpointID)", artifactID)
-                            : nil
-                    }
-                )
-            )
-        }
-        return legal
     }
 
-    private func scheduleInvalidArtifactOverrideRemoval(
-        _ invalidValuesByKey: [String: String]
+    func removeInvalidModelArtifactOverrides(
+        _ invalidArtifactIDsByCheckpoint: [String: String],
+        for purpose: ModelPurpose
     ) {
-        let newKeys = Set(invalidValuesByKey.keys)
-            .subtracting(pendingArtifactOverrideRemovalKeys)
-        guard !newKeys.isEmpty else {
-            return
-        }
-        pendingArtifactOverrideRemovalKeys.formUnion(newKeys)
-        Task { @MainActor [weak self] in
-            await Task.yield()
-            guard let self else {
-                return
-            }
-            for key in newKeys
-            where self.preferences
+        let prefix = "\(purpose.rawValue)|"
+        var changed = false
+        for (checkpointID, artifactID)
+        in invalidArtifactIDsByCheckpoint {
+            let key = "\(prefix)\(checkpointID)"
+            guard preferences
                 .modelArtifactOverridesByPurposeCheckpoint[key]
-                    == invalidValuesByKey[key] {
-                self.preferences
-                    .modelArtifactOverridesByPurposeCheckpoint[key] = nil
+                    == artifactID
+            else {
+                continue
             }
-            self.pendingArtifactOverrideRemovalKeys
-                .subtract(newKeys)
-            self.savePreferences()
+            preferences.modelArtifactOverridesByPurposeCheckpoint[key] = nil
+            changed = true
+        }
+        if changed {
+            savePreferences()
         }
     }
 

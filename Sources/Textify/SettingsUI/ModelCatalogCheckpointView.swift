@@ -111,39 +111,38 @@ struct ModelCheckpointToolbar: View {
     }
 }
 
-struct ModelCheckpointCatalogSurface: View {
-    let presentation: ModelCheckpointListPresentation
+struct ModelCheckpointCatalogSurface: View, Equatable {
+    let presentation: ModelCatalogScreenProjection
     let isBusy: Bool
     let disabledReason: String?
-    let onInspect: (ModelCheckpointRowPresentation) -> Void
-    let onUse:
-        (
-            ModelCheckpointRowPresentation,
-            ModelCatalogExactArtifactPresentation
-        ) -> Void
-    let onInstallOnly:
-        (
-            ModelCheckpointRowPresentation,
-            ModelCatalogExactArtifactPresentation
-        ) -> Void
-    let onCancel: (ModelCheckpointRowPresentation) -> Void
-    let onRetry: (ModelCheckpointRowPresentation) -> Void
-    let onChooseVersion:
-        (
-            ModelCheckpointRowPresentation,
-            ModelCatalogExactArtifactPresentation
-        ) -> Void
-    let onVerify: (ModelCatalogExactArtifactPresentation) -> Void
-    let onReveal: (ModelCatalogExactArtifactPresentation) -> Void
-    let onDelete: (ModelCheckpointRowPresentation) -> Void
-    let focusedRowID: FocusState<ModelCatalogHierarchyRowID?>.Binding
-    let accessibilityFocusedRowID: AccessibilityFocusState<ModelCatalogHierarchyRowID?>.Binding
+    let focusedCheckpointID: String?
+    let selectedCheckpointID: String?
+    let keyboardFocus: FocusState<Bool>.Binding
+    let transferRegistry: ModelCatalogTransferStateRegistry
+    let transferTopologyVersion: UInt64
+    let onCommand: (ModelCatalogScreenCommand) -> Void
 
     @State private var layoutMode = ModelCheckpointLayoutMode.stacked
     private let layoutPolicy = ModelCheckpointLayoutPolicy()
 
+    static func == (
+        lhs: ModelCheckpointCatalogSurface,
+        rhs: ModelCheckpointCatalogSurface
+    ) -> Bool {
+        lhs.presentation == rhs.presentation
+            && lhs.isBusy == rhs.isBusy
+            && lhs.disabledReason == rhs.disabledReason
+            && lhs.focusedCheckpointID == rhs.focusedCheckpointID
+            && lhs.selectedCheckpointID == rhs.selectedCheckpointID
+            && lhs.keyboardFocus.wrappedValue
+                == rhs.keyboardFocus.wrappedValue
+            && lhs.transferRegistry === rhs.transferRegistry
+            && lhs.transferTopologyVersion
+                == rhs.transferTopologyVersion
+    }
+
     var body: some View {
-        LazyVStack(spacing: 0) {
+        VStack(spacing: 0) {
             ModelCheckpointColumnHeader(layoutMode: layoutMode)
             ForEach(presentation.sections) { section in
                 if let title = section.title {
@@ -158,34 +157,19 @@ struct ModelCheckpointCatalogSurface: View {
                         layoutMode: layoutMode,
                         isBusy: isBusy,
                         disabledReason: disabledReason,
-                        onInspect: { onInspect(row) },
-                        onUse: { artifact in
-                            onUse(row, artifact)
-                        },
-                        onInstallOnly: { artifact in
-                            onInstallOnly(row, artifact)
-                        },
-                        onCancel: { onCancel(row) },
-                        onRetry: { onRetry(row) },
-                        onChooseVersion: { artifact in
-                            onChooseVersion(row, artifact)
-                        },
-                        onVerify: onVerify,
-                        onReveal: onReveal,
-                        onDelete: { onDelete(row) }
+                        isKeyboardFocused:
+                            keyboardFocus.wrappedValue
+                                && focusedCheckpointID == row.id,
+                        isSelected: selectedCheckpointID == row.id,
+                        transferCell: transferRegistry.cellIfPresent(
+                            for: row.selectedArtifactID
+                        ),
+                        onCommand: onCommand
                     )
                     .id(ModelCatalogHierarchyRowID.checkpoint(row.id))
-                    .focusable()
-                    .focused(
-                        focusedRowID,
-                        equals: .checkpoint(row.id)
-                    )
-                    .accessibilityFocused(
-                        accessibilityFocusedRowID,
-                        equals: .checkpoint(row.id)
-                    )
                 }
             }
+            .id(layoutMode)
         }
         .background(TextifyVisualIdentity.cardSurface)
         .clipShape(
@@ -210,6 +194,9 @@ struct ModelCheckpointCatalogSurface: View {
                     }
             }
         }
+        .focusable()
+        .focused(keyboardFocus)
+        .accessibilityLabel("Model catalog")
     }
 
     private func updateLayoutMode(availableWidth: CGFloat) {
@@ -316,19 +303,14 @@ private struct ModelCheckpointFamilyHeader: View {
 }
 
 private struct ModelCheckpointCatalogRow: View {
-    let row: ModelCheckpointRowPresentation
+    let row: ModelCatalogScreenRow
     let layoutMode: ModelCheckpointLayoutMode
     let isBusy: Bool
     let disabledReason: String?
-    let onInspect: () -> Void
-    let onUse: (ModelCatalogExactArtifactPresentation) -> Void
-    let onInstallOnly: (ModelCatalogExactArtifactPresentation) -> Void
-    let onCancel: () -> Void
-    let onRetry: () -> Void
-    let onChooseVersion: (ModelCatalogExactArtifactPresentation) -> Void
-    let onVerify: (ModelCatalogExactArtifactPresentation) -> Void
-    let onReveal: (ModelCatalogExactArtifactPresentation) -> Void
-    let onDelete: () -> Void
+    let isKeyboardFocused: Bool
+    let isSelected: Bool
+    let transferCell: ModelCatalogTransferStateCell?
+    let onCommand: (ModelCatalogScreenCommand) -> Void
     private let metrics = ModelCheckpointLayoutMetrics.current
 
     var body: some View {
@@ -424,7 +406,9 @@ private struct ModelCheckpointCatalogRow: View {
         }
         .frame(minHeight: layoutMode == .wide ? 86 : 118)
         .contentShape(Rectangle())
-        .onTapGesture(perform: onInspect)
+        .onTapGesture {
+            onCommand(.inspect(checkpointID: row.checkpointID))
+        }
         .contextMenu {
             secondaryActions
         }
@@ -437,8 +421,28 @@ private struct ModelCheckpointCatalogRow: View {
             Divider()
                 .padding(.leading, 42)
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(row.accessibilityLabel(for: layoutMode))
+        .overlay {
+            if isKeyboardFocused {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(
+                        TextifyVisualIdentity.voiceViolet.opacity(0.72),
+                        lineWidth: 2
+                    )
+                    .padding(3)
+                    .accessibilityHidden(true)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(row.accessibilitySummary)
+        .accessibilityValue(
+            transferCell?.snapshot.accessibilityValue
+                ?? row.lifecycleState
+                ?? String(localized: "Not installed")
+        )
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityActions {
+            accessibilityActions
+        }
         .accessibilityIdentifier("model-checkpoint-\(row.id)")
         .help(disabledReason ?? "")
     }
@@ -459,6 +463,12 @@ private struct ModelCheckpointCatalogRow: View {
             )
             .accessibilityHidden(true)
 
+            ModelCheckpointProviderMark(
+                provider: row.provider,
+                logoKey: row.providerLogoKey,
+                isActive: row.isActive
+            )
+
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 7) {
                     Text(row.title)
@@ -476,8 +486,14 @@ private struct ModelCheckpointCatalogRow: View {
                     ModelCheckpointVersionControl(
                         row: row,
                         isBusy: isBusy,
-                        onChooseVersion: onChooseVersion,
-                        onUse: onUse
+                        onUse: {
+                            onCommand(
+                                .use(
+                                    checkpointID: row.checkpointID,
+                                    artifactID: $0
+                                )
+                            )
+                        }
                     )
                 }
                 Text(row.description)
@@ -496,7 +512,7 @@ private struct ModelCheckpointCatalogRow: View {
                     .foregroundStyle(TextifyVisualIdentity.warmWarning)
                 }
                 if row.versionCount == 1 {
-                    Text(row.selectedArtifact.metadata.presentation.displayName)
+                    Text(row.selectedArtifactName)
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
@@ -506,7 +522,9 @@ private struct ModelCheckpointCatalogRow: View {
 
     private var state: some View {
         Group {
-            if let lifecycleState = row.lifecycleState {
+            if let transferCell {
+                ModelCheckpointTransferStateView(cell: transferCell)
+            } else if let lifecycleState = row.lifecycleState {
                 Text(lifecycleState)
                     .foregroundStyle(
                         lifecycleState.hasPrefix("Failed")
@@ -529,15 +547,30 @@ private struct ModelCheckpointCatalogRow: View {
             switch row.primaryAction {
             case .use:
                 Button("Use") {
-                    onUse(row.selectedArtifact)
+                    onCommand(
+                        .use(
+                            checkpointID: row.checkpointID,
+                            artifactID: row.selectedArtifactID
+                        )
+                    )
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(isBusy)
             case .cancel:
-                Button("Cancel", action: onCancel)
+                Button("Cancel") {
+                    guard let attemptID = row.transferAttemptID else {
+                        return
+                    }
+                    onCommand(.cancel(attemptID: attemptID))
+                }
                     .disabled(isBusy)
             case .retry:
-                Button("Retry", action: onRetry)
+                Button("Retry") {
+                    guard let attemptID = row.transferAttemptID else {
+                        return
+                    }
+                    onCommand(.retry(attemptID: attemptID))
+                }
                     .disabled(isBusy)
             case .none:
                 EmptyView()
@@ -556,51 +589,117 @@ private struct ModelCheckpointCatalogRow: View {
     private var secondaryActions: some View {
         Button(
             "Inspect",
-            systemImage: "info.circle",
-            action: onInspect
-        )
+            systemImage: "info.circle"
+        ) {
+            onCommand(.inspect(checkpointID: row.checkpointID))
+        }
         if row.installOnlyAvailable {
             Button(
                 "Install Only",
                 systemImage: "arrow.down.circle"
             ) {
-                onInstallOnly(row.selectedArtifact)
+                onCommand(
+                    .installOnly(
+                        checkpointID: row.checkpointID,
+                        artifactID: row.selectedArtifactID
+                    )
+                )
             }
         }
-        if row.selectedArtifact.row.isInstalled {
+        if row.isInstalled {
             Button(
                 "Reveal in Finder",
                 systemImage: "folder"
             ) {
-                onReveal(row.selectedArtifact)
+                onCommand(.reveal(artifactID: row.selectedArtifactID))
             }
             .disabled(isBusy)
             Button(
                 "Verify Integrity",
                 systemImage: "checkmark.seal"
             ) {
-                onVerify(row.selectedArtifact)
+                onCommand(.verify(artifactID: row.selectedArtifactID))
             }
             .disabled(isBusy)
             Button(
                 "Reinstall (\(row.downloadSize))",
                 systemImage: "arrow.clockwise"
             ) {
-                onInstallOnly(row.selectedArtifact)
+                onCommand(
+                    .installOnly(
+                        checkpointID: row.checkpointID,
+                        artifactID: row.selectedArtifactID
+                    )
+                )
             }
             .disabled(
                 isBusy
-                    || row.selectedArtifact.row.isRevoked
-                    || !row.selectedArtifact.row.compatibility
-                        .allowsModelOperations
+                    || row.selectedArtifactIsRevoked
+                    || !row.selectedArtifactAllowsOperations
             )
             Button(
                 "Remove",
                 systemImage: "trash",
-                role: .destructive,
-                action: onDelete
-            )
+                role: .destructive
+            ) {
+                onCommand(.remove(artifactID: row.selectedArtifactID))
+            }
             .disabled(isBusy)
+        }
+    }
+
+    @ViewBuilder
+    private var accessibilityActions: some View {
+        Button("Inspect") {
+            onCommand(.inspect(checkpointID: row.checkpointID))
+        }
+        switch row.primaryAction {
+        case .use:
+            Button("Use") {
+                onCommand(
+                    .use(
+                        checkpointID: row.checkpointID,
+                        artifactID: row.selectedArtifactID
+                    )
+                )
+            }
+        case .cancel:
+            if let attemptID = row.transferAttemptID {
+                Button("Cancel") {
+                    onCommand(.cancel(attemptID: attemptID))
+                }
+            }
+        case .retry:
+            if let attemptID = row.transferAttemptID {
+                Button("Retry") {
+                    onCommand(.retry(attemptID: attemptID))
+                }
+            }
+        case .none:
+            EmptyView()
+        }
+        if row.versionCount > 1 {
+            ForEach(row.versionOptions.filter(\.isActionable)) { option in
+                Button("Use \(option.displayName)") {
+                    onCommand(
+                        .use(
+                            checkpointID: row.checkpointID,
+                            artifactID: option.id
+                        )
+                    )
+                }
+            }
+        }
+        if row.isInstalled {
+            Button("Verify Integrity") {
+                onCommand(.verify(artifactID: row.selectedArtifactID))
+            }
+            Button("Reveal in Finder") {
+                onCommand(.reveal(artifactID: row.selectedArtifactID))
+            }
+            Button("Remove") {
+                onCommand(.remove(artifactID: row.selectedArtifactID))
+            }
         }
     }
 
@@ -650,11 +749,66 @@ private struct ModelCheckpointSignalMetric: View {
     }
 }
 
+private struct ModelCheckpointProviderMark: View {
+    let provider: ModelProviderIdentity
+    let logoKey: ModelProviderLogoKey?
+    let isActive: Bool
+
+    var body: some View {
+        Group {
+            switch logoKey {
+            case let .asset(name):
+                Image(name)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(provider.logoInset)
+            case let .system(name):
+                Image(systemName: name)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(provider.accent)
+            case let .monogram(mark):
+                Text(mark)
+                    .font(
+                        .system(
+                            size: mark.count > 1 ? 9 : 14,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(provider.accent)
+            case .none:
+                EmptyView()
+            }
+        }
+        .frame(width: 30, height: 30)
+        .background(
+            Color.primary.opacity(0.055),
+            in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .stroke(
+                    provider.accent.opacity(isActive ? 0.58 : 0.24),
+                    lineWidth: isActive ? 1.5 : 1
+                )
+        }
+        .accessibilityLabel(provider.name)
+    }
+}
+
+private struct ModelCheckpointTransferStateView: View {
+    @Bindable var cell: ModelCatalogTransferStateCell
+
+    var body: some View {
+        Text(cell.snapshot.visualValue)
+            .foregroundStyle(.secondary)
+            .accessibilityValue(cell.snapshot.accessibilityValue)
+    }
+}
+
 private struct ModelCheckpointVersionControl: View {
-    let row: ModelCheckpointRowPresentation
+    let row: ModelCatalogScreenRow
     let isBusy: Bool
-    let onChooseVersion: (ModelCatalogExactArtifactPresentation) -> Void
-    let onUse: (ModelCatalogExactArtifactPresentation) -> Void
+    let onUse: (String) -> Void
 
     @State private var showsPopover = false
     @State private var showsComparison = false
@@ -675,7 +829,6 @@ private struct ModelCheckpointVersionControl: View {
                     ModelVersionChoiceView(
                         row: row,
                         isBusy: isBusy,
-                        onChooseVersion: onChooseVersion,
                         onUse: onUse
                     )
                 }
@@ -690,7 +843,6 @@ private struct ModelCheckpointVersionControl: View {
                     ModelVersionComparisonSheet(
                         row: row,
                         isBusy: isBusy,
-                        onChooseVersion: onChooseVersion,
                         onUse: onUse
                     )
                 }
@@ -700,25 +852,19 @@ private struct ModelCheckpointVersionControl: View {
 }
 
 private struct ModelVersionChoiceView: View {
-    let row: ModelCheckpointRowPresentation
+    let row: ModelCatalogScreenRow
     let isBusy: Bool
-    let onChooseVersion: (ModelCatalogExactArtifactPresentation) -> Void
-    let onUse: (ModelCatalogExactArtifactPresentation) -> Void
+    let onUse: (String) -> Void
 
     @State private var selectedArtifactID: String
 
     init(
-        row: ModelCheckpointRowPresentation,
+        row: ModelCatalogScreenRow,
         isBusy: Bool,
-        onChooseVersion:
-            @escaping (
-                ModelCatalogExactArtifactPresentation
-            ) -> Void,
-        onUse: @escaping (ModelCatalogExactArtifactPresentation) -> Void
+        onUse: @escaping (String) -> Void
     ) {
         self.row = row
         self.isBusy = isBusy
-        self.onChooseVersion = onChooseVersion
         self.onUse = onUse
         _selectedArtifactID = State(
             initialValue: row.selectedArtifactID
@@ -792,17 +938,16 @@ private struct ModelVersionChoiceView: View {
             HStack {
                 Spacer()
                 Button("Use Selected Version") {
-                    guard let artifact = selectedArtifact else {
+                    guard let option = selectedOption else {
                         return
                     }
-                    onChooseVersion(artifact)
-                    onUse(artifact)
+                    onUse(option.id)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(
                     isBusy
                         || selectedArtifactID == row.selectedArtifactID
-                        || selectedArtifact == nil
+                        || selectedOption == nil
                 )
             }
         }
@@ -810,36 +955,28 @@ private struct ModelVersionChoiceView: View {
         .frame(width: 420)
     }
 
-    private var selectedArtifact: ModelCatalogExactArtifactPresentation? {
-        row.checkpoint.artifacts.first {
-            $0.id == selectedArtifactID
-                && !$0.row.isRevoked
-                && $0.row.compatibility.allowsModelOperations
+    private var selectedOption: ModelCatalogScreenVersionOption? {
+        row.versionOptions.first {
+            $0.id == selectedArtifactID && $0.isActionable
         }
     }
 }
 
 private struct ModelVersionComparisonSheet: View {
-    let row: ModelCheckpointRowPresentation
+    let row: ModelCatalogScreenRow
     let isBusy: Bool
-    let onChooseVersion: (ModelCatalogExactArtifactPresentation) -> Void
-    let onUse: (ModelCatalogExactArtifactPresentation) -> Void
+    let onUse: (String) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var selectedArtifactID: String
 
     init(
-        row: ModelCheckpointRowPresentation,
+        row: ModelCatalogScreenRow,
         isBusy: Bool,
-        onChooseVersion:
-            @escaping (
-                ModelCatalogExactArtifactPresentation
-            ) -> Void,
-        onUse: @escaping (ModelCatalogExactArtifactPresentation) -> Void
+        onUse: @escaping (String) -> Void
     ) {
         self.row = row
         self.isBusy = isBusy
-        self.onChooseVersion = onChooseVersion
         self.onUse = onUse
         _selectedArtifactID = State(
             initialValue: row.selectedArtifactID
@@ -953,18 +1090,19 @@ private struct ModelVersionComparisonSheet: View {
                 .foregroundStyle(.secondary)
                 Spacer()
                 Button("Use Selected Version") {
-                    guard let artifact = selectedArtifact else {
+                    guard let option = selectedOption,
+                        option.isActionable
+                    else {
                         return
                     }
-                    onChooseVersion(artifact)
-                    onUse(artifact)
+                    onUse(option.id)
                     dismiss()
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(
                     isBusy
                         || selectedArtifactID == row.selectedArtifactID
-                        || selectedArtifact == nil
+                        || selectedOption?.isActionable != true
                 )
             }
             .padding(18)
@@ -972,16 +1110,8 @@ private struct ModelVersionComparisonSheet: View {
         .frame(minWidth: 760, minHeight: 500)
     }
 
-    private var selectedOption: ModelCheckpointVersionOption? {
+    private var selectedOption: ModelCatalogScreenVersionOption? {
         row.versionOptions.first { $0.id == selectedArtifactID }
-    }
-
-    private var selectedArtifact: ModelCatalogExactArtifactPresentation? {
-        row.checkpoint.artifacts.first {
-            $0.id == selectedArtifactID
-                && !$0.row.isRevoked
-                && $0.row.compatibility.allowsModelOperations
-        }
     }
 }
 
@@ -995,11 +1125,6 @@ struct VoiceCleaningFeatureCard: View {
             ModelCatalogExactArtifactPresentation
         ) -> Void
     let onDisable: () -> Void
-    let onChooseVersion:
-        (
-            ModelCheckpointRowPresentation,
-            ModelCatalogExactArtifactPresentation
-        ) -> Void
     let onInspect: (ModelCheckpointRowPresentation) -> Void
 
     var body: some View {
@@ -1037,13 +1162,17 @@ struct VoiceCleaningFeatureCard: View {
                             Text(row.title)
                                 .font(.headline)
                             ModelCheckpointVersionControl(
-                                row: row,
+                                row: ModelCatalogScreenRow(row),
                                 isBusy: isBusy,
-                                onChooseVersion: {
-                                    onChooseVersion(row, $0)
-                                },
-                                onUse: {
-                                    onUse(row, $0)
+                                onUse: { artifactID in
+                                    guard let artifact =
+                                        row.checkpoint.artifacts.first(
+                                            where: { $0.id == artifactID }
+                                        )
+                                    else {
+                                        return
+                                    }
+                                    onUse(row, artifact)
                                 }
                             )
                         }

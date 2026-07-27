@@ -1543,3 +1543,24 @@ Task 1 must merge before parallel Wave 1 work begins.
   proving that only Use may continue from verified installation into
   activation; Install Only, reinstall, and failed transfers retain the prior
   active identity.
+
+## Bounded Catalog Screen Projection Handoff - 2026-07-27
+
+- The active Models scrolling-performance implementation owns the narrow
+  derivation, checkpoint presentation, Settings composition, persisted
+  artifact-override admission, provider-logo, and focused-test changes needed
+  to keep rich catalog graphs out of the scrolling subtree.
+- It preserves issue #26's retained catalog lifetime and issue #27's
+  checkpoint-first interaction. For the bounded curated picker it replaces
+  lazy row realization and per-row keyboard/accessibility focus bindings with
+  an eager scalar screen projection and one composite keyboard focus target.
+- Override validation moves into the existing derivation actor. Settings may
+  persist cleanup only after the actor publishes an explicit invalid-override
+  result; rendering must not reconstruct a catalog or schedule preference
+  mutations.
+- Download byte progress is isolated in event-created per-artifact cells.
+  Structural phase changes may republish the screen projection, while
+  byte-only ticks must leave it equal.
+- Existing bundled-only catalog work in `AppServices.swift`,
+  `SettingsRootView.swift`, and coordination/release documentation remains
+  independent and must be preserved when this implementation is staged.

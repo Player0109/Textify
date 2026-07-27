@@ -2141,6 +2141,44 @@ final class AppCompositionTests: XCTestCase {
     }
 
     @MainActor
+    func testArtifactOverrideReadIsPureAndInvalidCleanupIsExplicit()
+        throws
+    {
+        let checkpointID = "missing-checkpoint"
+        let artifactID = "missing-artifact"
+        let key = "transcription|\(checkpointID)"
+        var preferences = AppPreferences.defaults
+        preferences.modelArtifactOverridesByPurposeCheckpoint[key] =
+            artifactID
+        let services = try Self.makeServices(preferences: preferences)
+
+        XCTAssertEqual(
+            services.modelArtifactOverrides(for: .transcription),
+            [checkpointID: artifactID]
+        )
+        XCTAssertEqual(
+            services.preferences
+                .modelArtifactOverridesByPurposeCheckpoint[key],
+            artifactID,
+            "Reading render input must not schedule preference mutations."
+        )
+
+        services.removeInvalidModelArtifactOverrides(
+            [checkpointID: artifactID],
+            for: .transcription
+        )
+
+        XCTAssertNil(
+            services.preferences
+                .modelArtifactOverridesByPurposeCheckpoint[key]
+        )
+        XCTAssertNil(
+            services.settingsStore.load()
+                .modelArtifactOverridesByPurposeCheckpoint[key]
+        )
+    }
+
+    @MainActor
     func testExplicitUseFailurePreservesThePreviousActiveModel() async throws {
         let paths = try Self.makeTemporaryPaths()
         let active = try Self.catalogModel(

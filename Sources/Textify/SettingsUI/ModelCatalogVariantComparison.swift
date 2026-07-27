@@ -1,7 +1,7 @@
 import Foundation
 import TextifyModels
 
-enum ModelCatalogVariantComparisonMetric: Equatable {
+enum ModelCatalogVariantComparisonMetric: Equatable, Sendable {
     case reference(label: String)
     case compared(label: String, scoreDelta: Int)
     case unrated

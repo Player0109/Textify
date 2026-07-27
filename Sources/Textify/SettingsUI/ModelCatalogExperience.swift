@@ -825,7 +825,7 @@ struct OnboardingModelCatalog: Equatable {
     }
 }
 
-enum ModelProviderIdentity: String, Equatable {
+enum ModelProviderIdentity: String, Equatable, Sendable {
     case openAI
     case nvidia
     case cohere
@@ -2324,6 +2324,42 @@ struct ModelCatalogExperience: Equatable {
                 .filter { $0.metadata.artifactIDs.count > 1 }
                 .map(\.id)
         )
+    }
+
+    func legalArtifactIDsByCheckpoint(
+        for purpose: ModelPurpose
+    ) -> [String: Set<String>] {
+        Dictionary(
+            uniqueKeysWithValues: inspectorFamilies
+                .flatMap(\.checkpoints)
+                .filter { checkpoint in
+                    checkpoint.artifacts.contains {
+                        $0.row.model.purpose == purpose
+                    }
+                }
+                .map { checkpoint in
+                    (
+                        checkpoint.id,
+                        Set(checkpoint.artifacts.compactMap {
+                            $0.row.model.purpose == purpose
+                                && !$0.row.isRevoked
+                                && $0.row.compatibility
+                                    .allowsModelOperations
+                                ? $0.id
+                                : nil
+                        })
+                    )
+                }
+        )
+    }
+
+    func exactArtifact(
+        id artifactID: String
+    ) -> ModelCatalogExactArtifactPresentation? {
+        inspectorFamilies.lazy
+            .flatMap(\.checkpoints)
+            .flatMap(\.artifacts)
+            .first { $0.id == artifactID }
     }
 
     private init(

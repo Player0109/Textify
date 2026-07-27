@@ -86,18 +86,18 @@ extension ModelCatalogExactArtifactPresentation {
     }
 }
 
-private func modelCheckpointIsSpecificLanguage(
+func modelCheckpointIsSpecificLanguage(
     _ language: String
 ) -> Bool {
     language != "*" && language != "auto"
 }
 
-private func modelCheckpointLanguageName(_ language: String) -> String {
+func modelCheckpointLanguageName(_ language: String) -> String {
     Locale.current.localizedString(forLanguageCode: language)?.capitalized
         ?? language.uppercased()
 }
 
-private func modelCheckpointPreferEnglish(
+func modelCheckpointPreferEnglish(
     _ lhs: String,
     _ rhs: String
 ) -> Bool {
@@ -108,6 +108,33 @@ private func modelCheckpointPreferEnglish(
         return false
     }
     return lhs < rhs
+}
+
+func modelCheckpointLanguageMismatch(
+    selectedLanguage: String?,
+    supportedLanguageCodes: [String]
+) -> ModelCheckpointLanguageMismatch? {
+    guard let selectedLanguage,
+        modelCheckpointIsSpecificLanguage(selectedLanguage),
+        !supportedLanguageCodes.contains("*"),
+        !supportedLanguageCodes.contains(where: {
+            $0.caseInsensitiveCompare(selectedLanguage) == .orderedSame
+        }),
+        let supportedLanguage = supportedLanguageCodes
+            .filter(modelCheckpointIsSpecificLanguage)
+            .sorted(by: modelCheckpointPreferEnglish)
+            .first
+    else {
+        return nil
+    }
+    return ModelCheckpointLanguageMismatch(
+        requestedLanguageCode: selectedLanguage,
+        requestedLanguageName:
+            modelCheckpointLanguageName(selectedLanguage),
+        supportedLanguageCode: supportedLanguage,
+        supportedLanguageName:
+            modelCheckpointLanguageName(supportedLanguage)
+    )
 }
 
 struct ModelCheckpointLayoutPolicy: Equatable {
@@ -178,7 +205,7 @@ struct ModelCheckpointInspectorLayoutPolicy: Equatable {
     }
 }
 
-enum ModelCheckpointAnnotation: Equatable {
+enum ModelCheckpointAnnotation: Equatable, Sendable {
     case inUse
     case recommended
     case none
@@ -195,7 +222,7 @@ enum ModelCheckpointAnnotation: Equatable {
     }
 }
 
-enum ModelCheckpointPrimaryAction: Equatable {
+enum ModelCheckpointPrimaryAction: Equatable, Sendable {
     case use
     case cancel
     case retry
@@ -215,7 +242,7 @@ enum ModelCheckpointPrimaryAction: Equatable {
     }
 }
 
-enum ModelCheckpointVersionRoute: Equatable {
+enum ModelCheckpointVersionRoute: Equatable, Sendable {
     case none
     case popover
     case comparisonSheet
@@ -494,22 +521,9 @@ struct ModelCheckpointRowPresentation: Equatable, Identifiable {
     func languageMismatch(
         for artifact: ModelCatalogExactArtifactPresentation
     ) -> ModelCheckpointLanguageMismatch? {
-        guard let selectedLanguage,
-            modelCheckpointIsSpecificLanguage(selectedLanguage),
-            !artifact.supports(language: selectedLanguage),
-            let supportedLanguage = artifact.supportedLanguageCodes
-                .sorted(by: modelCheckpointPreferEnglish)
-                .first
-        else {
-            return nil
-        }
-        return ModelCheckpointLanguageMismatch(
-            requestedLanguageCode: selectedLanguage,
-            requestedLanguageName:
-                modelCheckpointLanguageName(selectedLanguage),
-            supportedLanguageCode: supportedLanguage,
-            supportedLanguageName:
-                modelCheckpointLanguageName(supportedLanguage)
+        modelCheckpointLanguageMismatch(
+            selectedLanguage: selectedLanguage,
+            supportedLanguageCodes: artifact.supportedLanguageCodes
         )
     }
 
@@ -579,7 +593,7 @@ struct ModelCheckpointRowPresentation: Equatable, Identifiable {
     }
 }
 
-struct ModelCheckpointLanguageMismatch: Equatable {
+struct ModelCheckpointLanguageMismatch: Equatable, Sendable {
     let requestedLanguageCode: String
     let requestedLanguageName: String
     let supportedLanguageCode: String

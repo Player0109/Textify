@@ -38,10 +38,353 @@ final class ModelCatalogDerivationTests: XCTestCase {
             first.versions.localStateOverlay
         )
         XCTAssertEqual(
+            second.experience,
+            first.experience,
+            "Byte-only progress belongs to the transfer cell, not the rich catalog."
+        )
+        XCTAssertEqual(
+            second.screenProjection,
+            first.screenProjection,
+            "Byte-only progress ticks must not rebuild the scrolling projection."
+        )
+    }
+
+    func testRichTransferDetailsRemainAvailableWhenExplicitlyRequested()
+        async throws
+    {
+        let manifest = try productionManifest()
+        let modelID = try XCTUnwrap(manifest.models.first?.id)
+        let engine = ModelCatalogDerivationEngine()
+        var firstRequest = request(
+            manifest: manifest,
+            localRevision: 1,
+            transferState: transfer(
+                modelID: modelID,
+                bytesDownloaded: 10
+            )
+        )
+        firstRequest.screen = ModelCatalogScreenRequest(
+            purpose: .transcription,
+            selectedLanguage: "en",
+            includesRichTransferState: true
+        )
+        let first = try await engine.derive(firstRequest)
+        var secondRequest = request(
+            manifest: manifest,
+            localRevision: 2,
+            transferState: transfer(
+                modelID: modelID,
+                bytesDownloaded: 20
+            )
+        )
+        secondRequest.screen = firstRequest.screen
+        let second = try await engine.derive(secondRequest)
+
+        XCTAssertEqual(
+            first.experience.rows.first { $0.id == modelID }?
+                .installState?.bytesDownloaded,
+            10
+        )
+        XCTAssertEqual(
             second.experience.rows.first { $0.id == modelID }?
                 .installState?.bytesDownloaded,
             20
         )
+        XCTAssertEqual(first.screenProjection, second.screenProjection)
+    }
+
+    func testDerivationPublishesCheckedSendableScalarScreenProjection()
+        async throws
+    {
+        let manifest = try productionManifest()
+        let snapshot = try await ModelCatalogDerivationEngine().derive(
+            request(manifest: manifest, localRevision: 1)
+        )
+
+        requireSendable(snapshot.screenProjection)
+        XCTAssertEqual(
+            snapshot.screenProjection.rows.count,
+            Set(snapshot.screenProjection.rows.map(\.checkpointID)).count
+        )
+        XCTAssertTrue(
+            snapshot.screenProjection.rows.contains {
+                $0.provider != .community
+                    && $0.providerLogoKey != nil
+            },
+            "The screen projection must retain provider identity for row logos."
+        )
+        let rows = snapshot.screenProjection.rows
+        XCTAssertEqual(
+            rows.map(\.logicalPosition),
+            Array(1...rows.count)
+        )
+        XCTAssertTrue(rows.allSatisfy { $0.logicalCount == rows.count })
+        let firstRow = try XCTUnwrap(rows.first)
+        XCTAssertTrue(
+            firstRow.accessibilitySummary.contains(
+                "Checkpoint, level \(firstRow.outlineLevel)"
+            )
+        )
+        XCTAssertTrue(
+            firstRow.accessibilitySummary.contains(
+                "Quality \(firstRow.qualityLabel)"
+            )
+        )
+        XCTAssertTrue(
+            firstRow.accessibilitySummary.contains(
+                "Speed \(firstRow.speedLabel)"
+            )
+        )
+    }
+
+    func testOverrideResolutionRejectsInvalidPersistedChoicesOffMainActor()
+        async throws
+    {
+        let manifest = try productionManifest()
+        var derivedRequest = request(
+            manifest: manifest,
+            localRevision: 1
+        )
+        let checkpointID =
+            "checkpoint.openai.whisper-large-v3-turbo"
+        let validArtifactID = "whisper-large-v3-turbo-q5_0"
+        derivedRequest.screen = ModelCatalogScreenRequest(
+            purpose: .transcription,
+            selectedLanguage: "en",
+            browseAllLanguages: false,
+            artifactOverrides: [
+                checkpointID: validArtifactID,
+                "missing-checkpoint": "missing-artifact",
+            ],
+            stableCheckpointOrder: []
+        )
+        derivedRequest.query.searchText = "parakeet"
+
+        let engine = ModelCatalogDerivationEngine()
+        let snapshot = try await engine.derive(derivedRequest)
+
+        XCTAssertEqual(
+            snapshot.overrideResolution.legalArtifactIDsByCheckpoint[
+                checkpointID
+            ],
+            validArtifactID
+        )
+        XCTAssertFalse(
+            snapshot.screenProjection.rows.contains {
+                $0.checkpointID == checkpointID
+            },
+            "Search may hide a checkpoint without invalidating its preference."
+        )
+        XCTAssertEqual(
+            snapshot.overrideResolution.invalidArtifactIDsByCheckpoint,
+            ["missing-checkpoint": "missing-artifact"]
+        )
+        derivedRequest.query.searchText = ""
+        let visibleSnapshot = try await engine.derive(derivedRequest)
+        XCTAssertEqual(
+            visibleSnapshot.screenProjection.rows.first {
+                $0.checkpointID == checkpointID
+            }?.selectedArtifactID,
+            validArtifactID
+        )
+    }
+
+    func testOverrideResolutionDefersCleanupWithoutAuthoritativeGraph()
+        async throws
+    {
+        let overrides = [
+            "checkpoint.openai.whisper-large-v3-turbo":
+                "whisper-large-v3-turbo-q5_0",
+        ]
+        var derivedRequest = request(
+            manifest: nil,
+            localRevision: 1
+        )
+        derivedRequest.screen = ModelCatalogScreenRequest(
+            purpose: .transcription,
+            selectedLanguage: "en",
+            artifactOverrides: overrides
+        )
+
+        let snapshot = try await ModelCatalogDerivationEngine().derive(
+            derivedRequest
+        )
+
+        XCTAssertEqual(
+            snapshot.overrideResolution.legalArtifactIDsByCheckpoint,
+            overrides
+        )
+        XCTAssertTrue(
+            snapshot.overrideResolution.invalidArtifactIDsByCheckpoint.isEmpty
+        )
+    }
+
+    @MainActor
+    func testTransferRegistryKeepsExactBytesInItsLocalCell() {
+        let registry = ModelCatalogTransferStateRegistry(capacity: 2)
+        XCTAssertNil(registry.cellIfPresent(for: "artifact"))
+
+        XCTAssertTrue(registry.reconcile(
+            statesByArtifactID: [
+                "artifact": DownloadState(
+                    modelID: "artifact",
+                    phase: .downloading,
+                    bytesDownloaded: 10,
+                    totalBytes: 1_000,
+                    attemptID: "attempt"
+                ),
+            ]
+        ))
+        let cell = registry.cellIfPresent(for: "artifact")
+        XCTAssertNotNil(cell)
+        XCTAssertEqual(cell?.snapshot.percent, 1)
+        let initialSnapshot = cell?.snapshot
+
+        XCTAssertFalse(registry.reconcile(
+            statesByArtifactID: [
+                "artifact": DownloadState(
+                    modelID: "artifact",
+                    phase: .downloading,
+                    bytesDownloaded: 11,
+                    totalBytes: 1_000,
+                    attemptID: "attempt"
+                ),
+            ]
+        ))
+        XCTAssertNotEqual(cell?.snapshot, initialSnapshot)
+        XCTAssertEqual(cell?.snapshot.bytesDownloaded, 11)
+        XCTAssertEqual(cell?.snapshot.totalBytes, 1_000)
+
+        XCTAssertFalse(registry.reconcile(
+            statesByArtifactID: [
+                "artifact": DownloadState(
+                    modelID: "artifact",
+                    phase: .downloading,
+                    bytesDownloaded: 20,
+                    totalBytes: 1_000,
+                    attemptID: "attempt"
+                ),
+            ]
+        ))
+        XCTAssertEqual(cell?.snapshot.percent, 2)
+        XCTAssertEqual(cell?.snapshot.bytesDownloaded, 20)
+        XCTAssertTrue(
+            cell?.snapshot.accessibilityValue.contains(
+                ModelInstallProgressPresentation.detailText(
+                    for: DownloadState(
+                        modelID: "artifact",
+                        phase: .downloading,
+                        bytesDownloaded: 20,
+                        totalBytes: 1_000,
+                        attemptID: "attempt"
+                    )
+                )
+            ) == true
+        )
+
+        let additionalState = DownloadState(
+            modelID: "artifact-2",
+            phase: .queued,
+            attemptID: "attempt-2"
+        )
+        XCTAssertTrue(registry.reconcile(
+            statesByArtifactID: [
+                "artifact": DownloadState(
+                    modelID: "artifact",
+                    phase: .downloading,
+                    bytesDownloaded: 20,
+                    totalBytes: 1_000,
+                    attemptID: "attempt"
+                ),
+                "artifact-2": additionalState,
+                "artifact-3": DownloadState(
+                    modelID: "artifact-3",
+                    phase: .queued,
+                    attemptID: "attempt-3"
+                ),
+            ]
+        ))
+        XCTAssertTrue(
+            registry.cellIfPresent(for: "artifact") === cell,
+            "Capacity pressure must not orphan a row's live cell."
+        )
+        XCTAssertNotNil(registry.cellIfPresent(for: "artifact-2"))
+        XCTAssertNil(registry.cellIfPresent(for: "artifact-3"))
+
+        let restoredRegistry = ModelCatalogTransferStateRegistry(capacity: 2)
+        let queued = DownloadState(
+            modelID: "a-queued",
+            phase: .queued
+        )
+        XCTAssertTrue(restoredRegistry.reconcile(
+            statesByArtifactID: [
+                "a-queued": queued,
+                "b-queued": DownloadState(
+                    modelID: "b-queued",
+                    phase: .queued
+                ),
+            ]
+        ))
+        let retainedQueuedCell = restoredRegistry.cellIfPresent(
+            for: "a-queued"
+        )
+        XCTAssertTrue(restoredRegistry.reconcile(
+            statesByArtifactID: [
+                "a-queued": queued,
+                "b-queued": DownloadState(
+                    modelID: "b-queued",
+                    phase: .queued
+                ),
+                "z-downloading": DownloadState(
+                    modelID: "z-downloading",
+                    phase: .downloading,
+                    bytesDownloaded: 1,
+                    totalBytes: 10
+                ),
+            ]
+        ))
+        XCTAssertTrue(
+            restoredRegistry.cellIfPresent(for: "a-queued")
+                === retainedQueuedCell
+        )
+        XCTAssertNil(
+            restoredRegistry.cellIfPresent(for: "b-queued")
+        )
+        XCTAssertNotNil(
+            restoredRegistry.cellIfPresent(for: "z-downloading")
+        )
+
+        XCTAssertTrue(registry.reconcile(statesByArtifactID: [:]))
+        XCTAssertNil(registry.cellIfPresent(for: "artifact"))
+    }
+
+    @MainActor
+    func testSubmittingExistingTransferPublishesCellTopologyBeforeDerivation()
+        async throws
+    {
+        let manifest = try productionManifest()
+        let modelID = try XCTUnwrap(manifest.models.first?.id)
+        let feature = ModelCatalogFeatureModel(
+            purpose: .transcription,
+            engine: ModelCatalogDerivationEngine(),
+            searchDebounceNanoseconds: 0
+        )
+        let request = request(
+            manifest: manifest,
+            localRevision: 1,
+            transferState: transfer(
+                modelID: modelID,
+                bytesDownloaded: 10
+            )
+        )
+
+        feature.submit(request)
+
+        XCTAssertEqual(feature.transferTopologyVersion, 1)
+        XCTAssertNotNil(
+            feature.transferStateRegistry.cellIfPresent(for: modelID)
+        )
+        await feature.waitUntilSettled()
     }
 
     func testQueryAndCatalogHaveIndependentInvalidationBoundaries() async throws {
@@ -408,16 +751,16 @@ final class ModelCatalogDerivationTests: XCTestCase {
     }
 
     private func request(
-        manifest: ModelManifest,
+        manifest: ModelManifest?,
         localRevision: UInt64,
         transferState: DownloadState? = nil
     ) -> ModelCatalogDerivationRequest {
         ModelCatalogDerivationRequest(
-            catalogRevision: manifest.generatedAt,
+            catalogRevision: manifest?.generatedAt,
             trustedManifest: manifest,
             compatibilityContext: ModelCatalogCompatibilityContext(
                 appVersion: "1.1.0",
-                macOSVersion: "14.0",
+                macOSVersion: "14.0.0",
                 architecture: .arm64,
                 physicalMemoryBytes: 16_000_000_000
             ),
@@ -433,9 +776,15 @@ final class ModelCatalogDerivationTests: XCTestCase {
             onDiskBytesByModelID: [:],
             storageInventoryByModelID: [:],
             installedSizeStatus: .measured,
-            query: ModelCatalogQuery(purpose: .transcription)
+            query: ModelCatalogQuery(purpose: .transcription),
+            screen: ModelCatalogScreenRequest(
+                purpose: .transcription,
+                selectedLanguage: "en"
+            )
         )
     }
+
+    private func requireSendable<T: Sendable>(_: T) {}
 
     private func transfer(
         modelID: String,
