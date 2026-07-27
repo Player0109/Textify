@@ -1499,3 +1499,24 @@ Task 1 must merge before parallel Wave 1 work begins.
   that made trackpad scrolling visibly hitch.
 - The final Release build was validated interactively and all 800 automated
   tests passed with 12 expected environment-gated skips and zero failures.
+
+## Retained Model Catalog Navigation Handoff - 2026-07-27
+
+- Issue #26 owns the Settings model-catalog presentation lifetime, the
+  app-scoped derivation cache used by catalog destinations, the dedicated
+  catalog scrolling layout, and focused regression tests for warm navigation.
+- This work may extend the bundled-only production composition and Models
+  presentation files above, but it must preserve the bundled signed manifest
+  as the only runtime catalog source and must not restore page-entry catalog
+  refreshes or remote recovery actions.
+- Pane navigation must retain the last useful verified projection and
+  window-session query, hierarchy, selection, inspector, and scroll state.
+  Closing the Settings surface may reset presentation choices, but must not
+  discard the retained verified projection needed for the next open.
+- Scroll retention means restoring the last semantic row anchor on pane
+  re-entry. Exact passive pixel-offset tracking remains intentionally excluded
+  because publishing trackpad viewport churn previously caused visible hitching.
+- This handoff supersedes the 2026-07-26 eager-row choice with a conditional
+  lazy-row implementation. The M1 Instruments, VoiceOver, Full Keyboard
+  Access, variable-height scrolling, and trackpad-hitch gates decide whether
+  the lazy stack ships or must move to a stronger system-virtualized control.

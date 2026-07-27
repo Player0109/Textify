@@ -120,6 +120,93 @@ final class ModelCatalogDerivationTests: XCTestCase {
     }
 
     @MainActor
+    func testCoordinatorDoesNotRepublishAnIdenticalSettledRequest() async throws {
+        let manifest = try productionManifest()
+        let coordinator = ModelCatalogDerivationCoordinator(
+            searchDebounceNanoseconds: 0
+        )
+        let initialRequest = request(
+            manifest: manifest,
+            localRevision: 1
+        )
+
+        coordinator.submit(initialRequest)
+        await coordinator.waitUntilSettled()
+        let retainedSnapshot = try XCTUnwrap(coordinator.snapshot)
+        let retainedGeneration = coordinator.publishedGeneration
+
+        coordinator.submit(initialRequest)
+        await coordinator.waitUntilSettled()
+
+        XCTAssertEqual(coordinator.snapshot, retainedSnapshot)
+        XCTAssertEqual(
+            coordinator.publishedGeneration,
+            retainedGeneration,
+            "Warm pane navigation must not republish unchanged catalog state."
+        )
+    }
+
+    @MainActor
+    func testFeatureStoreRetainsPurposeStateAcrossDestinationLookup() async throws {
+        let manifest = try productionManifest()
+        let engine = ModelCatalogDerivationEngine()
+        let store = ModelCatalogFeatureStore(
+            engine: engine,
+            searchDebounceNanoseconds: 0
+        )
+        let feature = store.feature(for: .transcription)
+        feature.submit(
+            request(
+                manifest: manifest,
+                localRevision: 1
+            )
+        )
+        await feature.waitUntilSettled()
+        feature.discoveryQuery.searchText = "whisper"
+
+        let retainedSnapshot = try XCTUnwrap(feature.snapshot)
+        let retainedRowID = ModelCatalogHierarchyRowID.exactArtifact(
+            try XCTUnwrap(retainedSnapshot.experience.rows.first?.id)
+        )
+        feature.hierarchyState.focus(retainedRowID)
+        feature.hierarchyState.scroll(to: retainedRowID)
+        feature.showsInspector = true
+        let reenteredFeature = store.feature(for: .transcription)
+
+        XCTAssertTrue(feature === reenteredFeature)
+        XCTAssertEqual(reenteredFeature.snapshot, retainedSnapshot)
+        XCTAssertEqual(
+            reenteredFeature.discoveryQuery.searchText,
+            "whisper",
+            "Window-session presentation state must survive pane navigation."
+        )
+        XCTAssertFalse(
+            feature === store.feature(for: .voiceCleaning),
+            "Each purpose needs independent window-session presentation state."
+        )
+        XCTAssertEqual(
+            reenteredFeature.hierarchyState.scrollAnchorID,
+            retainedRowID
+        )
+        XCTAssertTrue(reenteredFeature.showsInspector)
+
+        let nextSession = ModelCatalogFeatureStore(
+            engine: engine,
+            searchDebounceNanoseconds: 0,
+            initialSnapshots: store.retainedSnapshots
+        )
+        let resetFeature = nextSession.feature(for: .transcription)
+
+        XCTAssertFalse(feature === resetFeature)
+        XCTAssertEqual(resetFeature.snapshot, retainedSnapshot)
+        XCTAssertEqual(resetFeature.discoveryQuery.searchText, "")
+        XCTAssertNil(resetFeature.hierarchyState.selection)
+        XCTAssertNil(resetFeature.hierarchyState.focusedRowID)
+        XCTAssertNil(resetFeature.hierarchyState.scrollAnchorID)
+        XCTAssertFalse(resetFeature.showsInspector)
+    }
+
+    @MainActor
     func testSearchDebouncesWithinSpecifiedWindow() async throws {
         let manifest = ModelManifest(
             manifestVersion: 1,

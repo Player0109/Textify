@@ -566,6 +566,29 @@ with the release evidence; do not commit machine-specific `.trace` data.
   the oldest supported Apple Silicon configuration, so the required M1 cold,
   warm, and VoiceOver trace capture remains a release-maintainer hardware gate.
 
+## Retained Model Catalog Navigation Verification - 2026-07-27
+
+- Catalog projections and window-session presentation state now outlive pane
+  navigation, including query, inspector visibility, focus, and the semantic
+  scroll anchor. Closing the window starts a fresh presentation session seeded
+  from the retained projection. Identical settled requests do not republish,
+  and the dedicated catalog scroll uses lazy rows with stable semantic IDs and
+  a precomputed accessibility lookup.
+- PASS: the app-level regression fixture navigated Transcription Models to
+  General and back, retained the same nonempty projection and publication
+  generation, and did not return to the initial-loading state.
+- PASS: the focused App Composition, Model Catalog Experience, and Model
+  Catalog Derivation suites completed with zero failures.
+- PASS on Apple M4 Max diagnostic hardware: the opt-in Release stress fixture
+  measured 87.4 ms search p95, 74.6 ms filter/scope/sort p95, 44.7 ms
+  progress-publication p95, and 0.0 MiB resident growth across repeated
+  10,000-artifact queries.
+- Release certification still requires the scripted 30-run warm-navigation
+  distribution and Instruments/VoiceOver/Full Keyboard Access passes on the
+  base M1 8 GB reference machine. Because lazy rows replace the prior eager
+  scroll follow-up, that pass must also repeat variable-height trackpad
+  scrolling and reject the change if row churn reintroduces visible hitching.
+
 ## Catalog Publication And Rollback Verification - 2026-07-25
 
 - PASS: the focused publication tests bind catalog revision/hash/signer,

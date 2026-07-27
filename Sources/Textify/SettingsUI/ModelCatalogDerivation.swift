@@ -359,16 +359,26 @@ final class ModelCatalogDerivationCoordinator {
     @ObservationIgnored private var requestedGeneration: UInt64 = 0
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var lastSubmittedQuery: ModelCatalogQuery?
+    @ObservationIgnored private var lastSubmittedRequest:
+        ModelCatalogDerivationRequest?
 
     init(
         engine: ModelCatalogDerivationEngine = ModelCatalogDerivationEngine(),
-        searchDebounceNanoseconds: UInt64 = 125_000_000
+        searchDebounceNanoseconds: UInt64 = 125_000_000,
+        initialSnapshot: ModelCatalogDerivationSnapshot? = nil
     ) {
         self.engine = engine
         self.searchDebounceNanoseconds = searchDebounceNanoseconds
+        snapshot = initialSnapshot
     }
 
     func submit(_ request: ModelCatalogDerivationRequest) {
+        guard request != lastSubmittedRequest
+                || (snapshot == nil && task == nil)
+        else {
+            return
+        }
+        lastSubmittedRequest = request
         requestedGeneration &+= 1
         let generation = requestedGeneration
         let previousSearch = lastSubmittedQuery?.searchText
@@ -404,6 +414,7 @@ final class ModelCatalogDerivationCoordinator {
                 }
                 isDeriving = false
                 task = nil
+                lastSubmittedRequest = nil
             }
         }
     }
@@ -413,12 +424,111 @@ final class ModelCatalogDerivationCoordinator {
         task?.cancel()
         task = nil
         isDeriving = false
+        lastSubmittedRequest = nil
     }
 
     func waitUntilSettled() async {
         while task != nil {
             await Task.yield()
         }
+    }
+}
+
+@MainActor
+@Observable
+final class ModelCatalogFeatureModel {
+    let purpose: ModelPurpose
+    var discoveryQuery: ModelCatalogQuery
+    var hierarchyState = ModelCatalogHierarchyState()
+    var reconciledCatalogExperience: ModelCatalogExperience?
+    var viewportRestorationGeneration: UInt64 = 0
+    let inspectorController = ModelCatalogInspectorController()
+    var verificationRestorationIDsByArtifact: [String: [String]] = [:]
+    var announcementTracker = ModelCatalogAnnouncementTracker()
+    var showsInspector = false
+
+    @ObservationIgnored private let derivationCoordinator:
+        ModelCatalogDerivationCoordinator
+
+    init(
+        purpose: ModelPurpose,
+        engine: ModelCatalogDerivationEngine,
+        searchDebounceNanoseconds: UInt64,
+        initialSnapshot: ModelCatalogDerivationSnapshot? = nil
+    ) {
+        self.purpose = purpose
+        discoveryQuery = ModelCatalogQuery(purpose: purpose)
+        reconciledCatalogExperience = initialSnapshot?.experience
+        derivationCoordinator = ModelCatalogDerivationCoordinator(
+            engine: engine,
+            searchDebounceNanoseconds: searchDebounceNanoseconds,
+            initialSnapshot: initialSnapshot
+        )
+    }
+
+    var snapshot: ModelCatalogDerivationSnapshot? {
+        derivationCoordinator.snapshot
+    }
+
+    var publishedGeneration: UInt64 {
+        derivationCoordinator.publishedGeneration
+    }
+
+    func submit(_ request: ModelCatalogDerivationRequest) {
+        derivationCoordinator.submit(request)
+    }
+
+    func waitUntilSettled() async {
+        await derivationCoordinator.waitUntilSettled()
+    }
+
+}
+
+@MainActor
+final class ModelCatalogFeatureStore {
+    private let transcription: ModelCatalogFeatureModel
+    private let voiceCleaning: ModelCatalogFeatureModel
+
+    init(
+        engine: ModelCatalogDerivationEngine =
+            ModelCatalogDerivationEngine(),
+        searchDebounceNanoseconds: UInt64 = 125_000_000,
+        initialSnapshots: [
+            ModelPurpose: ModelCatalogDerivationSnapshot
+        ] = [:]
+    ) {
+        transcription = ModelCatalogFeatureModel(
+            purpose: .transcription,
+            engine: engine,
+            searchDebounceNanoseconds: searchDebounceNanoseconds,
+            initialSnapshot: initialSnapshots[.transcription]
+        )
+        voiceCleaning = ModelCatalogFeatureModel(
+            purpose: .voiceCleaning,
+            engine: engine,
+            searchDebounceNanoseconds: searchDebounceNanoseconds,
+            initialSnapshot: initialSnapshots[.voiceCleaning]
+        )
+    }
+
+    func feature(for purpose: ModelPurpose) -> ModelCatalogFeatureModel {
+        switch purpose {
+        case .transcription:
+            transcription
+        case .voiceCleaning:
+            voiceCleaning
+        }
+    }
+
+    var retainedSnapshots: [
+        ModelPurpose: ModelCatalogDerivationSnapshot
+    ] {
+        var snapshots: [
+            ModelPurpose: ModelCatalogDerivationSnapshot
+        ] = [:]
+        snapshots[.transcription] = transcription.snapshot
+        snapshots[.voiceCleaning] = voiceCleaning.snapshot
+        return snapshots
     }
 }
 

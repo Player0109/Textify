@@ -25,7 +25,6 @@ struct SettingsRootView: View {
                     Divider()
 
                     paneView(for: router.selectedPane)
-                        .id(router.selectedPane)
                 }
             }
         }
@@ -41,10 +40,14 @@ struct SettingsRootView: View {
         )
         .onAppear {
             if let purpose = router.selectedPane.modelPurpose {
+                ModelCatalogPerformanceTrace.event("navigation-start")
                 services.modelCatalogCoordinator.destinationOpened(purpose)
             }
         }
         .onChange(of: router.selectedPane) { previousPane, nextPane in
+            if nextPane.modelPurpose != nil {
+                ModelCatalogPerformanceTrace.event("navigation-start")
+            }
             services.modelCatalogCoordinator.destinationChanged(
                 from: previousPane.modelPurpose,
                 to: nextPane.modelPurpose
@@ -65,9 +68,19 @@ struct SettingsRootView: View {
         case .dictation:
             DictationSettingsPane()
         case .transcriptionModels:
-            ModelsSettingsPane(destination: .transcription)
+            ModelsSettingsPane(
+                destination: .transcription,
+                featureModel: services.modelCatalogFeature(
+                    for: .transcription
+                )
+            )
         case .voiceCleaning:
-            ModelsSettingsPane(destination: .voiceCleaning)
+            ModelsSettingsPane(
+                destination: .voiceCleaning,
+                featureModel: services.modelCatalogFeature(
+                    for: .voiceCleaning
+                )
+            )
         case .privacy:
             PrivacySettingsPane()
         case .logs:
@@ -542,9 +555,33 @@ extension TranscriptionLanguage {
     }
 }
 
+struct ModelCatalogPaneLifecyclePresentation: Equatable {
+    let hasUsefulProjection: Bool
+    let showsInitialLoadingPlaceholder: Bool
+    let showsInspector: Bool
+    let focusedRowID: ModelCatalogHierarchyRowID?
+    let scrollAnchorID: ModelCatalogHierarchyRowID?
+
+    @MainActor
+    init(
+        featureModel: ModelCatalogFeatureModel,
+        coordinator: ModelCatalogCoordinator
+    ) {
+        hasUsefulProjection = featureModel.snapshot != nil
+        showsInitialLoadingPlaceholder =
+            featureModel.snapshot == nil
+            && coordinator.manifest == nil
+            && coordinator.status == .checking
+        showsInspector = featureModel.showsInspector
+        focusedRowID = featureModel.hierarchyState.focusedRowID
+        scrollAnchorID = featureModel.hierarchyState.scrollAnchorID
+    }
+}
+
 struct ModelsSettingsPane: View {
     @Environment(AppServices.self) private var services
     let destination: ModelCatalogPurposeDestination
+    @Bindable private var featureModel: ModelCatalogFeatureModel
 
     @State private var modelMessage: String?
     @State private var activatingModelID: String?
@@ -553,26 +590,18 @@ struct ModelsSettingsPane: View {
     @State private var isImporting = false
     @State private var pendingRemoval:
         ModelRemovalConfirmationPresentation?
-    @State private var discoveryQuery = ModelCatalogQuery()
-    @State private var hierarchyState = ModelCatalogHierarchyState()
-    @State private var derivationCoordinator =
-        ModelCatalogDerivationCoordinator()
-    @State private var reconciledCatalogExperience:
-        ModelCatalogExperience?
-    @State private var viewportRestorationGeneration: UInt64 = 0
-    @State private var inspectorController = ModelCatalogInspectorController()
-    @State private var verificationRestorationIDsByArtifact:
-        [String: [String]] = [:]
-    @State private var showsInspector = false
     @State private var showsModelVariantsHelp = false
     @State private var showsDownloads = false
-    @State private var announcementTracker = ModelCatalogAnnouncementTracker()
     @FocusState private var focusedCatalogRowID: ModelCatalogHierarchyRowID?
     @AccessibilityFocusState private var accessibilityFocusedCatalogRowID:
         ModelCatalogHierarchyRowID?
 
-    init(destination: ModelCatalogPurposeDestination) {
+    init(
+        destination: ModelCatalogPurposeDestination,
+        featureModel: ModelCatalogFeatureModel
+    ) {
         self.destination = destination
+        _featureModel = Bindable(wrappedValue: featureModel)
     }
 
     var body: some View {
@@ -580,7 +609,7 @@ struct ModelsSettingsPane: View {
             for: destination.purpose,
             query: catalogQuery
         )
-        let catalogExperience = derivationCoordinator.snapshot?.experience
+        let catalogExperience = featureModel.snapshot?.experience
             ?? ModelCatalogExperience(
                 trustedModels: [],
                 installedRecords: [],
@@ -588,8 +617,13 @@ struct ModelsSettingsPane: View {
                 transferState: nil,
                 query: catalogQuery
             )
+        let lifecyclePresentation =
+            ModelCatalogPaneLifecyclePresentation(
+                featureModel: featureModel,
+                coordinator: services.modelCatalogCoordinator
+            )
 
-        return SettingsPaneLayout(
+        return ModelCatalogSettingsPaneLayout(
             title: destination.title,
             subtitle: destination.subtitle,
             maxContentWidth: 1_360,
@@ -628,9 +662,9 @@ struct ModelsSettingsPane: View {
                     .foregroundStyle(.secondary)
             }
 
-            if !isInitialCatalogCheck {
+            if !lifecyclePresentation.showsInitialLoadingPlaceholder {
                 ModelCatalogToolbar(
-                    query: $discoveryQuery,
+                    query: $featureModel.discoveryQuery,
                     showsDownloads: $showsDownloads,
                     filterOptions: catalogExperience.filterOptions,
                     onReset: resetCatalogQuery,
@@ -650,15 +684,15 @@ struct ModelsSettingsPane: View {
                     isImportDisabled: hasPendingDownloads || isImporting
                 )
 
-                if !discoveryQuery.appliedFilterTokens.isEmpty {
+                if !featureModel.discoveryQuery.appliedFilterTokens.isEmpty {
                     ModelCatalogFilterTokens(
-                        tokens: discoveryQuery.appliedFilterTokens
+                        tokens: featureModel.discoveryQuery.appliedFilterTokens
                     ) { token in
-                        discoveryQuery.removeFilter(token)
+                        featureModel.discoveryQuery.removeFilter(token)
                     }
                 }
 
-                if discoveryQuery.scope == .installed {
+                if featureModel.discoveryQuery.scope == .installed {
                     ModelCatalogStorageSummaryView(
                         presentation: ModelCatalogStorageSummaryPresentation(
                             state: services.modelStorageInventory.state,
@@ -677,16 +711,17 @@ struct ModelsSettingsPane: View {
 
             catalogSurface(
                 catalogExperience,
-                isDerivationPending:
-                    derivationCoordinator.snapshot == nil
+                lifecyclePresentation: lifecyclePresentation
             )
         }
-        .inspector(isPresented: $showsInspector) {
+        .inspector(isPresented: $featureModel.showsInspector) {
             ScrollView {
                 ModelCatalogInspectorView(
-                    presentation: inspectorController.presentation,
-                    localDetailsState: inspectorController.localDetailsState,
-                    verificationState: inspectorController.verificationState,
+                    presentation: featureModel.inspectorController.presentation,
+                    localDetailsState:
+                        featureModel.inspectorController.localDetailsState,
+                    verificationState:
+                        featureModel.inspectorController.verificationState,
                     onVerify: verifySelectedArtifact
                 )
             }
@@ -696,100 +731,99 @@ struct ModelsSettingsPane: View {
         .popover(isPresented: $showsModelVariantsHelp) {
             ModelCatalogVariantsAboutView()
         }
+        .onAppear {
+            focusedCatalogRowID = featureModel.hierarchyState.focusedRowID
+        }
         .task {
-            _ = announcementTracker.update(
+            _ = featureModel.announcementTracker.update(
                 attempts: services.modelInstallCoordinator.attempts
             )
             services.refreshModelStorageInventory()
             _ = await services.dictation.refreshReadiness()
-            await services.modelCatalogCoordinator.refresh()
         }
         .onChange(of: derivationRequest, initial: true) { _, request in
-            derivationCoordinator.submit(request)
-        }
-        .onDisappear {
-            derivationCoordinator.cancel()
+            featureModel.submit(request)
         }
         .onChange(
-            of: derivationCoordinator.snapshot?.versions.queryResult,
+            of: featureModel.snapshot?.versions.queryResult,
             initial: true
         ) { _, _ in
             guard let updatedExperience =
-                    derivationCoordinator.snapshot?.experience
+                    featureModel.snapshot?.experience
             else {
                 return
             }
-            let recovery = hierarchyState.reconcile(
-                from: reconciledCatalogExperience,
+            let recovery = featureModel.hierarchyState.reconcile(
+                from: featureModel.reconciledCatalogExperience,
                 to: updatedExperience
             )
-            reconciledCatalogExperience = updatedExperience
+            featureModel.reconciledCatalogExperience = updatedExperience
             if recovery != nil,
-               hierarchyState.scrollAnchorID == nil {
-                hierarchyState.scroll(to: hierarchyState.focusedRowID)
+               featureModel.hierarchyState.scrollAnchorID == nil {
+                featureModel.hierarchyState.scroll(to: featureModel.hierarchyState.focusedRowID)
             }
-            if hierarchyState.scrollAnchorID != nil {
-                viewportRestorationGeneration &+= 1
+            if featureModel.hierarchyState.scrollAnchorID != nil {
+                featureModel.viewportRestorationGeneration &+= 1
             }
-            focusedCatalogRowID = hierarchyState.focusedRowID
-            inspectorController.select(
-                hierarchyState.selection,
+            focusedCatalogRowID = featureModel.hierarchyState.focusedRowID
+            featureModel.inspectorController.select(
+                featureModel.hierarchyState.selection,
                 in: updatedExperience
             )
-            if hierarchyState.selection == nil {
-                showsInspector = false
+            if featureModel.hierarchyState.selection == nil {
+                featureModel.showsInspector = false
             }
             if let recovery,
-               let rowID = hierarchyState.focusedRowID {
+               let rowID = featureModel.hierarchyState.focusedRowID {
                 accessibilityFocusedCatalogRowID = rowID
                 announce(recovery.announcement)
             }
-            for announcement in announcementTracker.update(
+            for announcement in featureModel.announcementTracker.update(
                 rows: updatedExperience.rows
             ) {
                 announce(announcement)
             }
         }
         .onChange(
-            of: derivationCoordinator.snapshot?.versions.localStateOverlay
+            of: featureModel.snapshot?.versions.localStateOverlay
         ) { _, _ in
-            guard showsInspector,
+            guard featureModel.showsInspector,
                   let updatedExperience =
-                    derivationCoordinator.snapshot?.experience
+                    featureModel.snapshot?.experience
             else {
                 return
             }
-            inspectorController.select(
-                hierarchyState.selection,
+            featureModel.inspectorController.select(
+                featureModel.hierarchyState.selection,
                 in: updatedExperience
             )
         }
         .onChange(of: focusedCatalogRowID) { _, rowID in
-            hierarchyState.focus(rowID)
+            featureModel.hierarchyState.focus(rowID)
         }
         .onChange(
             of: accessibilityFocusedCatalogRowID
         ) { _, rowID in
             if let rowID {
-                hierarchyState.focus(rowID)
+                featureModel.hierarchyState.focus(rowID)
             }
         }
         .onChange(
             of: services.modelInstallCoordinator.attempts
         ) { _, attempts in
-            for announcement in announcementTracker.update(
+            for announcement in featureModel.announcementTracker.update(
                 attempts: attempts
             ) {
                 announce(announcement)
             }
         }
-        .onChange(of: inspectorController.verificationState) { _, state in
+        .onChange(of: featureModel.inspectorController.verificationState) { _, state in
             switch state {
             case let .verified(artifactID):
                 let expectedRestorationIDs =
-                    verificationRestorationIDsByArtifact[artifactID]
+                    featureModel.verificationRestorationIDsByArtifact[artifactID]
                         ?? []
-                verificationRestorationIDsByArtifact[artifactID] = nil
+                featureModel.verificationRestorationIDsByArtifact[artifactID] = nil
                 Task {
                     await services.acknowledgeRestoredModelIntegrity(
                         artifactID,
@@ -799,7 +833,7 @@ struct ModelsSettingsPane: View {
                     services.refreshModelStorageInventory()
                 }
             case let .failed(artifactID):
-                verificationRestorationIDsByArtifact[artifactID] = nil
+                featureModel.verificationRestorationIDsByArtifact[artifactID] = nil
                 services.refreshModelStorageInventory()
             case .unavailable, .available, .verifying:
                 break
@@ -867,11 +901,6 @@ struct ModelsSettingsPane: View {
 
     private var hasPendingDownloads: Bool {
         services.modelInstallCoordinator.hasNonterminalAttempts
-    }
-
-    private var isInitialCatalogCheck: Bool {
-        services.modelCatalogCoordinator.manifest == nil
-            && services.modelCatalogCoordinator.status == .checking
     }
 
     @ViewBuilder
@@ -956,7 +985,7 @@ struct ModelsSettingsPane: View {
     }
 
     private var catalogQuery: ModelCatalogQuery {
-        var query = discoveryQuery
+        var query = featureModel.discoveryQuery
         query.purpose = destination.purpose
         if services.settingsRouter.modelReveal?.purpose == destination.purpose {
             query.revealedArtifactID = services.settingsRouter.modelReveal?.artifactID
@@ -965,15 +994,15 @@ struct ModelsSettingsPane: View {
     }
 
     private func resetCatalogQuery() {
-        discoveryQuery.resetDiscovery()
+        featureModel.discoveryQuery.resetDiscovery()
         services.settingsRouter.dismissModelReveal()
     }
 
     private var viewportRestoration:
         ModelCatalogViewportRestoration? {
-        hierarchyState.scrollAnchorID.map {
+        featureModel.hierarchyState.scrollAnchorID.map {
             ModelCatalogViewportRestoration(
-                generation: viewportRestorationGeneration,
+                generation: featureModel.viewportRestorationGeneration,
                 rowID: $0
             )
         }
@@ -989,57 +1018,58 @@ struct ModelsSettingsPane: View {
 
     private func verifySelectedArtifact() {
         guard case let .exactArtifact(artifact) =
-                inspectorController.presentation
+                featureModel.inspectorController.presentation
         else {
             return
         }
         let record = services.installedModelRecords.first {
             $0.model.id == artifact.id
         }
-        verificationRestorationIDsByArtifact[artifact.id] =
+        featureModel.verificationRestorationIDsByArtifact[artifact.id] =
             record.map {
                 services.pendingRestorationVerificationIDs(for: $0)
             } ?? []
-        inspectorController.verifySelectedArtifact()
+        featureModel.inspectorController.verifySelectedArtifact()
     }
 
     private func catalogSurface(
         _ catalogExperience: ModelCatalogExperience,
-        isDerivationPending: Bool
+        lifecyclePresentation: ModelCatalogPaneLifecyclePresentation
     ) -> some View {
         ModelCatalogSurface(
-            rows: isInitialCatalogCheck || isDerivationPending
-                ? []
-                : catalogExperience.rows,
+            rows: lifecyclePresentation.hasUsefulProjection
+                ? catalogExperience.rows
+                : [],
             sizeLabel: catalogExperience.sizeLabel,
-            hierarchyRows: isInitialCatalogCheck || isDerivationPending
-                ? []
-                : hierarchyState.visibleRows(in: catalogExperience),
-            accessibilityRows: isInitialCatalogCheck || isDerivationPending
-                ? []
-                : hierarchyState.accessibilityRows(in: catalogExperience),
-            selection: hierarchyState.selection,
+            hierarchyRows: lifecyclePresentation.hasUsefulProjection
+                ? featureModel.hierarchyState.visibleRows(in: catalogExperience)
+                : [],
+            accessibilityRows: lifecyclePresentation.hasUsefulProjection
+                ? featureModel.hierarchyState.accessibilityRows(in: catalogExperience)
+                : [],
+            selection: featureModel.hierarchyState.selection,
             focusedRowID: $focusedCatalogRowID,
             accessibilityFocusedRowID: $accessibilityFocusedCatalogRowID,
             onSelect: { selection in
-                hierarchyState.select(selection)
-                inspectorController.select(selection, in: catalogExperience)
-                showsInspector = true
+                featureModel.hierarchyState.select(selection)
+                featureModel.inspectorController.select(selection, in: catalogExperience)
+                featureModel.showsInspector = true
             },
             onToggleCheckpoint: { checkpoint in
                 let previousScrollAnchorID =
-                    hierarchyState.scrollAnchorID
-                hierarchyState.toggleExpansion(of: checkpoint)
+                    featureModel.hierarchyState.scrollAnchorID
+                featureModel.hierarchyState.toggleExpansion(of: checkpoint)
                 requestCatalogScrollIfChanged(
                     from: previousScrollAnchorID
                 )
-                inspectorController.select(
-                    hierarchyState.selection,
+                featureModel.inspectorController.select(
+                    featureModel.hierarchyState.selection,
                     in: catalogExperience
                 )
             },
             onReset: performEmptyStateAction,
-            emptyPresentation: isDerivationPending
+            emptyPresentation: lifecyclePresentation
+                .showsInitialLoadingPlaceholder
                 ? .checking
                 : emptyPresentation
         ) { row, context in
@@ -1049,12 +1079,12 @@ struct ModelsSettingsPane: View {
                 onInspect: context == nil ? {
                     let selection = ModelCatalogHierarchySelection
                         .exactArtifact(row.id)
-                    hierarchyState.select(selection)
-                    inspectorController.select(
+                    featureModel.hierarchyState.select(selection)
+                    featureModel.inspectorController.select(
                         selection,
                         in: catalogExperience
                     )
-                    showsInspector = true
+                    featureModel.showsInspector = true
                 } : nil
             )
         }
@@ -1102,22 +1132,22 @@ struct ModelsSettingsPane: View {
             return .ignored
         }
 
-        let previousScrollAnchorID = hierarchyState.scrollAnchorID
-        let action = hierarchyState.handleKeyboardCommand(
+        let previousScrollAnchorID = featureModel.hierarchyState.scrollAnchorID
+        let action = featureModel.hierarchyState.handleKeyboardCommand(
             command,
             in: catalogExperience
         )
         requestCatalogScrollIfChanged(from: previousScrollAnchorID)
-        focusedCatalogRowID = hierarchyState.focusedRowID
+        focusedCatalogRowID = featureModel.hierarchyState.focusedRowID
         switch action {
         case .none:
             break
         case let .selectionChanged(selection):
-            inspectorController.select(selection, in: catalogExperience)
-            showsInspector = true
+            featureModel.inspectorController.select(selection, in: catalogExperience)
+            featureModel.showsInspector = true
         case .disclosureChanged:
-            inspectorController.select(
-                hierarchyState.selection,
+            featureModel.inspectorController.select(
+                featureModel.hierarchyState.selection,
                 in: catalogExperience
             )
         case .requestDeletion:
@@ -1129,12 +1159,12 @@ struct ModelsSettingsPane: View {
     private func requestCatalogScrollIfChanged(
         from previousScrollAnchorID: ModelCatalogHierarchyRowID?
     ) {
-        guard hierarchyState.scrollAnchorID != nil,
-              hierarchyState.scrollAnchorID != previousScrollAnchorID
+        guard featureModel.hierarchyState.scrollAnchorID != nil,
+              featureModel.hierarchyState.scrollAnchorID != previousScrollAnchorID
         else {
             return
         }
-        viewportRestorationGeneration &+= 1
+        featureModel.viewportRestorationGeneration &+= 1
     }
 
     private func announce(_ message: String) {
@@ -1175,26 +1205,22 @@ struct ModelsSettingsPane: View {
         case let .query(state):
             switch state {
             case .installed:
-                discoveryQuery.scope = .all
-                if discoveryQuery.sort == .installedSize {
-                    discoveryQuery.sort = .catalog
+                featureModel.discoveryQuery.scope = .all
+                if featureModel.discoveryQuery.sort == .installedSize {
+                    featureModel.discoveryQuery.sort = .catalog
                 }
             case .search:
-                discoveryQuery.clearSearch()
+                featureModel.discoveryQuery.clearSearch()
             case .filters:
-                discoveryQuery.clearFilters()
+                featureModel.discoveryQuery.clearFilters()
             case .combined:
-                discoveryQuery.clearSearch()
-                discoveryQuery.clearFilters()
+                featureModel.discoveryQuery.clearSearch()
+                featureModel.discoveryQuery.clearFilters()
             case .validCatalog:
-                Task {
-                    await services.modelCatalogCoordinator.refresh()
-                }
+                break
             }
         case .purpose, .unavailable, .securityFailure:
-            Task {
-                await services.modelCatalogCoordinator.refresh()
-            }
+            break
         case .checking, .requiresNewerTextify:
             break
         }
@@ -1222,19 +1248,19 @@ struct ModelsSettingsPane: View {
                         isRecommended: checkpoint
                             .presentsRecommendation(artifact),
                         isFallback: checkpoint.presentsFallback(artifact),
-                        isSelected: hierarchyState.selection
+                        isSelected: featureModel.hierarchyState.selection
                             == .exactArtifact(artifact.id),
                         indentation: 0,
                         comparison: nil,
                         onSelect: {
                             let selection = ModelCatalogHierarchySelection
                                 .exactArtifact(artifact.id)
-                            hierarchyState.select(selection)
-                            inspectorController.select(
+                            featureModel.hierarchyState.select(selection)
+                            featureModel.inspectorController.select(
                                 selection,
                                 in: catalogExperience
                             )
-                            showsInspector = true
+                            featureModel.showsInspector = true
                         }
                     )
                 )
@@ -1250,12 +1276,12 @@ struct ModelsSettingsPane: View {
                     onInspect: {
                         let selection = ModelCatalogHierarchySelection
                             .exactArtifact(row.id)
-                        hierarchyState.select(selection)
-                        inspectorController.select(
+                        featureModel.hierarchyState.select(selection)
+                        featureModel.inspectorController.select(
                             selection,
                             in: catalogExperience
                         )
-                        showsInspector = true
+                        featureModel.showsInspector = true
                     }
                 )
             }
@@ -1389,7 +1415,7 @@ struct ModelsSettingsPane: View {
             beginSelectedRemoval()
         }
         let visibleActions = row.visibleActions(
-            for: hierarchyState.selection
+            for: featureModel.hierarchyState.selection
         )
 
         if let context, let comparison = context.comparison {
@@ -1447,7 +1473,7 @@ struct ModelsSettingsPane: View {
             query: catalogQuery
         )
         pendingRemoval = experience.removalConfirmation(
-            for: hierarchyState.selection
+            for: featureModel.hierarchyState.selection
         )
     }
 
@@ -2817,6 +2843,7 @@ private struct ModelCatalogSurface<Row: View>: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+    @State private var hasEmittedFirstUsefulRow = false
 
     init(
         rows: [ModelCatalogRowPresentation],
@@ -2851,6 +2878,12 @@ private struct ModelCatalogSurface<Row: View>: View {
     }
 
     var body: some View {
+        let accessibilityRowsByID = Dictionary(
+            uniqueKeysWithValues: accessibilityRows.map {
+                ($0.id, $0)
+            }
+        )
+
         VStack(spacing: 0) {
             ModelCatalogColumnHeader()
             Divider()
@@ -2859,8 +2892,15 @@ private struct ModelCatalogSurface<Row: View>: View {
                     presentation: emptyPresentation,
                     onAction: onReset
                 )
+                .onAppear {
+                    if case .checking = emptyPresentation {
+                        ModelCatalogPerformanceTrace.event(
+                            "placeholder-visible"
+                        )
+                    }
+                }
             } else {
-                VStack(spacing: 0) {
+                LazyVStack(spacing: 0) {
                     if hierarchyRows.isEmpty {
                         ForEach(rows) { catalogRow in
                             row(catalogRow, nil)
@@ -2869,6 +2909,7 @@ private struct ModelCatalogSurface<Row: View>: View {
                                     ModelCatalogPerformanceTrace.event(
                                         "row-visible"
                                     )
+                                    emitFirstUsefulRowIfNeeded()
                                 }
                                 .onDisappear {
                                     ModelCatalogPerformanceTrace.event(
@@ -2954,6 +2995,7 @@ private struct ModelCatalogSurface<Row: View>: View {
                                 ModelCatalogPerformanceTrace.event(
                                     "row-visible"
                                 )
+                                emitFirstUsefulRowIfNeeded()
                             }
                             .onDisappear {
                                 ModelCatalogPerformanceTrace.event(
@@ -2968,9 +3010,10 @@ private struct ModelCatalogSurface<Row: View>: View {
                             )
                             .modifier(
                                 ModelCatalogRowAccessibilityModifier(
-                                    presentation: accessibilityRows.first {
-                                        $0.id == hierarchyRow.id
-                                    }
+                                    presentation:
+                                        accessibilityRowsByID[
+                                            hierarchyRow.id
+                                        ]
                                 )
                             )
                         }
@@ -2990,6 +3033,14 @@ private struct ModelCatalogSurface<Row: View>: View {
                         colorSchemeContrast == .increased ? 2 : 1
                 )
         }
+    }
+
+    private func emitFirstUsefulRowIfNeeded() {
+        guard !hasEmittedFirstUsefulRow else {
+            return
+        }
+        hasEmittedFirstUsefulRow = true
+        ModelCatalogPerformanceTrace.event("first-useful-row")
     }
 }
 
@@ -5201,6 +5252,67 @@ extension MicrophonePermissionStatus {
             return .unknown
         case .denied, .restricted:
             return .denied
+        }
+    }
+}
+
+private struct ModelCatalogSettingsPaneLayout<Content: View>: View {
+    let title: String
+    let subtitle: String
+    let maxContentWidth: CGFloat
+    let catalogViewportRestoration: ModelCatalogViewportRestoration?
+    @ViewBuilder var content: Content
+
+    init(
+        title: String,
+        subtitle: String,
+        maxContentWidth: CGFloat,
+        catalogViewportRestoration:
+            ModelCatalogViewportRestoration?,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.maxContentWidth = maxContentWidth
+        self.catalogViewportRestoration =
+            catalogViewportRestoration
+        self.content = content()
+    }
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    TextifyPaneHeader(
+                        title: title,
+                        subtitle: subtitle
+                    )
+                    .padding(.bottom, 6)
+
+                    content
+                }
+                .frame(
+                    maxWidth: maxContentWidth,
+                    alignment: .leading
+                )
+                .padding(.horizontal, 24)
+                .padding(.top, 19)
+                .padding(.bottom, 28)
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .topLeading
+                )
+            }
+            .scrollContentBackground(.hidden)
+            .background(TextifyVisualIdentity.windowSurface)
+            .task(id: catalogViewportRestoration) {
+                guard let request = catalogViewportRestoration
+                else {
+                    return
+                }
+                await Task.yield()
+                proxy.scrollTo(request.rowID, anchor: .top)
+            }
         }
     }
 }

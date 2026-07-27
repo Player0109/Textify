@@ -159,6 +159,7 @@ final class TextifyMainWindowPresenter {
     static let shared = TextifyMainWindowPresenter()
 
     private var window: NSWindow?
+    private var windowDelegate: TextifyMainWindowSessionDelegate?
 
     private init() {}
 
@@ -203,9 +204,30 @@ final class TextifyMainWindowPresenter {
             rootView: SettingsRootView()
                 .environment(services)
         )
+        let windowDelegate = TextifyMainWindowSessionDelegate {
+            [weak self, weak services] in
+            services?.resetModelCatalogPresentationSession()
+            self?.window = nil
+            self?.windowDelegate = nil
+        }
+        window.delegate = windowDelegate
         window.center()
         window.makeKeyAndOrderFront(nil)
         NSApplication.shared.activate(ignoringOtherApps: true)
         self.window = window
+        self.windowDelegate = windowDelegate
+    }
+}
+
+@MainActor
+final class TextifyMainWindowSessionDelegate: NSObject, NSWindowDelegate {
+    private let sessionDidEnd: @MainActor () -> Void
+
+    init(sessionDidEnd: @escaping @MainActor () -> Void) {
+        self.sessionDidEnd = sessionDidEnd
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        sessionDidEnd()
     }
 }

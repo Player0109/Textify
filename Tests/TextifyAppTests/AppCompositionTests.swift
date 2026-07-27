@@ -33,6 +33,37 @@ final class AppCompositionTests: XCTestCase {
         XCTAssertEqual(AppReopenPolicy.action(isMainWindowVisible: true), .focusVisibleWindow)
     }
 
+    @MainActor
+    func testClosingMainWindowEndsCatalogPresentationSession() async throws {
+        let services = try Self.makeServices()
+        let feature = services.modelCatalogFeature(
+            for: .transcription
+        )
+        await feature.waitUntilSettled()
+        let retainedSnapshot = feature.snapshot
+        feature.discoveryQuery.searchText = "whisper"
+        feature.showsInspector = true
+        feature.hierarchyState.scroll(
+            to: .exactArtifact("retained-before-close")
+        )
+        let delegate = TextifyMainWindowSessionDelegate {
+            services.resetModelCatalogPresentationSession()
+        }
+
+        delegate.windowWillClose(
+            Notification(name: NSWindow.willCloseNotification)
+        )
+
+        let resetFeature = services.modelCatalogFeature(
+            for: .transcription
+        )
+        XCTAssertFalse(feature === resetFeature)
+        XCTAssertEqual(resetFeature.snapshot, retainedSnapshot)
+        XCTAssertEqual(resetFeature.discoveryQuery.searchText, "")
+        XCTAssertFalse(resetFeature.showsInspector)
+        XCTAssertNil(resetFeature.hierarchyState.scrollAnchorID)
+    }
+
     func testClosingLastWindowDoesNotTerminateTextify() {
         XCTAssertFalse(
             AppDelegate().applicationShouldTerminateAfterLastWindowClosed(NSApplication.shared)
@@ -971,7 +1002,12 @@ final class AppCompositionTests: XCTestCase {
             )
         )
 
-        ModelsSettingsPane(destination: .transcription)
+        ModelsSettingsPane(
+            destination: .transcription,
+            featureModel: services.modelCatalogFeature(
+                for: .transcription
+            )
+        )
             .resolveRemoval(confirmation, confirmed: false)
 
         XCTAssertEqual(services.preferences.activeModelID, model.id)
@@ -986,6 +1022,72 @@ final class AppCompositionTests: XCTestCase {
         let unloadCount = await transcriber.unloadCount()
         XCTAssertEqual(unloadCount, 0)
         XCTAssertNil(services.modelRemovalStatus)
+    }
+
+    @MainActor
+    func testWarmModelPaneNavigationRetainsUsefulProjection() async throws {
+        let services = try Self.makeServices()
+        let model = try Self.catalogModel(
+            id: ProductionModelPolicy.requiredModelID
+        )
+        let manifest = ModelManifest(
+            manifestVersion: 1,
+            generatedAt: "2026-07-27T00:00:00Z",
+            models: [model]
+        )
+        services.modelCatalogCoordinator = ModelCatalogCoordinator(
+            initialManifest: manifest,
+            loadOperation: { manifest }
+        )
+        let feature = services.modelCatalogFeature(
+            for: .transcription
+        )
+        await feature.waitUntilSettled()
+        let initialSnapshot = try XCTUnwrap(feature.snapshot)
+        let initialGeneration = feature.publishedGeneration
+        XCTAssertFalse(initialSnapshot.experience.rows.isEmpty)
+        let retainedRowID = ModelCatalogHierarchyRowID.exactArtifact(
+            try XCTUnwrap(initialSnapshot.experience.rows.first?.id)
+        )
+        feature.discoveryQuery.searchText = "whisper"
+        feature.hierarchyState.focus(retainedRowID)
+        feature.hierarchyState.scroll(to: retainedRowID)
+        feature.showsInspector = true
+        let initialPresentation =
+            ModelCatalogPaneLifecyclePresentation(
+                featureModel: feature,
+                coordinator: services.modelCatalogCoordinator
+            )
+
+        services.settingsRouter.selectedPane = .transcriptionModels
+        services.settingsRouter.selectedPane = .general
+        services.settingsRouter.selectedPane = .transcriptionModels
+        let reenteredFeature = services.modelCatalogFeature(
+            for: .transcription
+        )
+        let reenteredPresentation =
+            ModelCatalogPaneLifecyclePresentation(
+                featureModel: reenteredFeature,
+                coordinator: services.modelCatalogCoordinator
+            )
+
+        XCTAssertTrue(feature === reenteredFeature)
+        XCTAssertEqual(reenteredFeature.snapshot, initialSnapshot)
+        XCTAssertEqual(reenteredFeature.publishedGeneration, initialGeneration)
+        XCTAssertEqual(
+            reenteredFeature.discoveryQuery.searchText,
+            "whisper"
+        )
+        XCTAssertEqual(reenteredPresentation, initialPresentation)
+        XCTAssertTrue(reenteredPresentation.hasUsefulProjection)
+        XCTAssertFalse(
+            reenteredPresentation.showsInitialLoadingPlaceholder
+        )
+        XCTAssertTrue(reenteredPresentation.showsInspector)
+        XCTAssertEqual(
+            reenteredPresentation.scrollAnchorID,
+            retainedRowID
+        )
     }
 
     @MainActor

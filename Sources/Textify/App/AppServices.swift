@@ -22,6 +22,10 @@ final class AppServices {
     let launchAtLogin: any LaunchAtLoginManaging
     let launchAtLoginLocation: any LaunchAtLoginLocationChecking
     let modelCatalogCompatibilityResolver: ModelCatalogCompatibilityResolver
+    @ObservationIgnored private let modelCatalogDerivationEngine =
+        ModelCatalogDerivationEngine()
+    @ObservationIgnored private lazy var modelCatalogFeatures =
+        ModelCatalogFeatureStore(engine: modelCatalogDerivationEngine)
     let modelStorageInventory: ModelStorageInventoryCoordinator
     let startupIssue: AppStartupIssue?
     @ObservationIgnored private let modelTransferNetworkObserver:
@@ -239,6 +243,7 @@ final class AppServices {
         },
         lifecycleDidChange: { [weak self] in
             self?.refreshModelStorageInventory()
+            self?.refreshRetainedModelCatalogFeatures()
         }
     )
 
@@ -252,6 +257,7 @@ final class AppServices {
             attachModelRevocationEnforcement()
             reconcileInstalledModelsWithCatalog()
             observeModelCatalogManifest()
+            refreshRetainedModelCatalogFeatures()
         }
     }
 
@@ -378,6 +384,8 @@ final class AppServices {
         modelCatalogCoordinator = makeProductionModelCatalogCoordinator()
         reconcileInstalledModelsWithCatalog()
         observeModelCatalogManifest()
+        observeModelCatalogPresentationInputs()
+        refreshRetainedModelCatalogFeatures()
         modelTransferNetworkObserver?.start { [weak self] in
             Task { @MainActor [weak self] in
                 self?.modelInstallCoordinator.networkDidBecomeAvailable()
@@ -792,6 +800,32 @@ final class AppServices {
             installedSizeStatus: localState.installedSizeStatus,
             query: scopedQuery
         )
+    }
+
+    func modelCatalogFeature(
+        for purpose: ModelPurpose
+    ) -> ModelCatalogFeatureModel {
+        modelCatalogFeatures.feature(for: purpose)
+    }
+
+    func resetModelCatalogPresentationSession() {
+        modelCatalogFeatures = ModelCatalogFeatureStore(
+            engine: modelCatalogDerivationEngine,
+            initialSnapshots: modelCatalogFeatures.retainedSnapshots
+        )
+        refreshRetainedModelCatalogFeatures()
+    }
+
+    private func refreshRetainedModelCatalogFeatures() {
+        for purpose in [ModelPurpose.transcription, .voiceCleaning] {
+            let feature = modelCatalogFeatures.feature(for: purpose)
+            feature.submit(
+                modelCatalogDerivationRequest(
+                    for: purpose,
+                    query: feature.discoveryQuery
+                )
+            )
+        }
     }
 
     private func modelCatalogPresentationLocalState(
@@ -1458,7 +1492,26 @@ final class AppServices {
                     return
                 }
                 self.reconcileInstalledModelsWithCatalog()
+                self.refreshRetainedModelCatalogFeatures()
                 self.observeModelCatalogManifest()
+            }
+        }
+    }
+
+    private func observeModelCatalogPresentationInputs() {
+        withObservationTracking {
+            _ = preferences.activeModelID
+            _ = preferences.activeVoiceCleaningModelID
+            _ = installedModelsStore.records
+            _ = modelStorageInventory.state
+            _ = modelCatalogCoordinator.revocationOverlay
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else {
+                    return
+                }
+                self.refreshRetainedModelCatalogFeatures()
+                self.observeModelCatalogPresentationInputs()
             }
         }
     }
