@@ -11,6 +11,17 @@ public enum ModelArtifactAliasValidationError: Error, Equatable, Sendable {
     )
 }
 
+public enum ModelVariantSelectionCopyValidationError:
+    Error,
+    Equatable,
+    Sendable
+{
+    case duplicateAccuracyTradeoff
+    case accuracyTradeoffTooLong
+    case unsupportedAccuracySuperlative
+    case languageDifferenceNotDisclosed
+}
+
 public enum ProductionModelPolicyError: Error, Equatable {
     case unsupportedManifestVersion(Int)
     case expectedSingleModel(count: Int)
@@ -46,6 +57,10 @@ public enum ProductionModelPolicyError: Error, Equatable {
     case benchmarkArtifactMismatch(modelID: String)
     case invalidPresentationGraph(ModelCatalogGraphValidationError)
     case invalidArtifactAlias(ModelArtifactAliasValidationError)
+    case invalidVariantSelectionCopy(
+        checkpointID: String,
+        reason: ModelVariantSelectionCopyValidationError
+    )
 }
 
 public enum ProductionModelPolicy {
@@ -266,7 +281,163 @@ public enum ProductionModelPolicy {
                 throw ProductionModelPolicyError.invalidPresentationGraph(error)
             }
             try validateArtifactAliases(in: manifest)
+            try validateVariantSelectionCopy(
+                in: manifest,
+                graph: presentationGraph
+            )
         }
+    }
+
+    private static func validateVariantSelectionCopy(
+        in manifest: ModelManifest,
+        graph: ModelCatalogPresentationGraph
+    ) throws {
+        let modelsByID = Dictionary(
+            uniqueKeysWithValues: manifest.models.map { ($0.id, $0) }
+        )
+        for checkpoint in graph.checkpoints
+        where checkpoint.artifactIDs.count > 1 {
+            let models = checkpoint.artifactIDs.compactMap {
+                modelsByID[$0]
+            }
+            guard models.count == checkpoint.artifactIDs.count else {
+                continue
+            }
+            let tradeoffs = models.compactMap {
+                $0.presentation?.accuracyTradeoff
+                    .trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+            }
+            guard tradeoffs.count == models.count else {
+                continue
+            }
+            let normalized = tradeoffs.map {
+                $0.folding(
+                    options: [
+                        .caseInsensitive,
+                        .diacriticInsensitive,
+                        .widthInsensitive,
+                    ],
+                    locale: Locale(identifier: "en_US_POSIX")
+                )
+            }
+            guard Set(normalized).count == normalized.count else {
+                throw ProductionModelPolicyError
+                    .invalidVariantSelectionCopy(
+                        checkpointID: checkpoint.id,
+                        reason: .duplicateAccuracyTradeoff
+                    )
+            }
+            guard tradeoffs.allSatisfy({ $0.count <= 200 }) else {
+                throw ProductionModelPolicyError
+                    .invalidVariantSelectionCopy(
+                        checkpointID: checkpoint.id,
+                        reason: .accuracyTradeoffTooLong
+                    )
+            }
+
+            let bestQualityScore = models.compactMap {
+                $0.benchmark?.quality.score
+            }.max()
+            for (model, normalizedTradeoff) in zip(
+                models,
+                normalized
+            ) where containsAccuracySuperlative(normalizedTradeoff) {
+                if normalizedTradeoff.contains("english wer"),
+                   let claimedWER = englishWER(
+                       in: normalizedTradeoff
+                   ),
+                   claimedWER == normalized.compactMap(
+                       englishWER(in:)
+                   ).min() {
+                    continue
+                }
+                guard let qualityScore = model.benchmark?.quality.score,
+                      qualityScore == bestQualityScore
+                else {
+                    throw ProductionModelPolicyError
+                        .invalidVariantSelectionCopy(
+                            checkpointID: checkpoint.id,
+                            reason: .unsupportedAccuracySuperlative
+                        )
+                }
+            }
+
+            let languageSets = models.map {
+                Set($0.capabilities.languages.map {
+                    $0.lowercased()
+                })
+            }
+            guard Set(languageSets).count > 1 else {
+                continue
+            }
+            for (model, normalizedTradeoff) in zip(
+                models,
+                normalized
+            ) {
+                let disclosed = model.capabilities.languages
+                    .filter { $0 != "*" }
+                    .allSatisfy {
+                        normalizedTradeoff.contains(
+                            languageDisclosureName($0)
+                        )
+                    }
+                guard disclosed else {
+                    throw ProductionModelPolicyError
+                        .invalidVariantSelectionCopy(
+                            checkpointID: checkpoint.id,
+                            reason: .languageDifferenceNotDisclosed
+                        )
+                }
+            }
+        }
+    }
+
+    private static func containsAccuracySuperlative(
+        _ value: String
+    ) -> Bool {
+        value.contains("best measured")
+            || value.contains("most accurate")
+            || value.contains("highest measured accuracy")
+    }
+
+    private static func languageDisclosureName(_ code: String) -> String {
+        switch code.lowercased() {
+        case "en":
+            "english"
+        case "hi":
+            "hindi"
+        default:
+            code.lowercased()
+        }
+    }
+
+    private static func englishWER(in value: String) -> Double? {
+        let pattern =
+            #"([0-9]+(?:\.[0-9]+)?)%[^.]{0,40}english wer|english wer[^.]{0,40}?([0-9]+(?:\.[0-9]+)?)%"#
+        guard let expression = try? NSRegularExpression(
+            pattern: pattern
+        ) else {
+            return nil
+        }
+        let range = NSRange(value.startIndex..., in: value)
+        guard let match = expression.firstMatch(
+            in: value,
+            range: range
+        ) else {
+            return nil
+        }
+        for index in 1 ..< match.numberOfRanges {
+            let capture = match.range(at: index)
+            guard capture.location != NSNotFound,
+                  let range = Range(capture, in: value)
+            else {
+                continue
+            }
+            return Double(value[range])
+        }
+        return nil
     }
 
     private static func validateArtifactAliases(

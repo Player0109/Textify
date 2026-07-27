@@ -475,7 +475,7 @@
       },
       "presentation": {
         "expectedFinalization": "English 367 ms median/415 ms p95; Hindi 536.5 ms median/734 ms p95 on fixed M4 Max samples",
-        "accuracyTradeoff": "Higher-capacity English and Hindi specialist; 4.29% English WER and 22.05% Hindi WER on Textify's narrow fixed samples",
+        "accuracyTradeoff": "The only Turbo build with Hindi: 4.29% English and 22.05% Hindi WER on Textify's fixed samples, at about a third the download and under half the peak memory of the 1.62 GB English-only build.",
         "requirements": "Apple Silicon with Metal; about 574 MB disk and 700 MB peak memory"
       },
       "benchmark": {
@@ -864,7 +864,7 @@
       },
       "presentation": {
         "expectedFinalization": "Typically under 100 ms after release on M4-class Apple Silicon",
-        "accuracyTradeoff": "Best measured English accuracy plus 25-language European coverage",
+        "accuracyTradeoff": "Smallest download at about 483 MB and the only Neural Engine route, typically finalizing under 100 ms; its measured English accuracy is the lowest of the five variants.",
         "requirements": "Apple Silicon, macOS 14.4+, about 483 MB disk; first preparation may take several seconds"
       },
       "benchmark": {
@@ -1934,7 +1934,7 @@
       },
       "presentation": {
         "expectedFinalization": "321.5 ms median and 416 ms p95 release-to-final on the fixed M4 Max English sample",
-        "accuracyTradeoff": "3.33% English WER on Textify's fixed 210-word sample; larger download and memory use than the 5-bit whisper.cpp Turbo route",
+        "accuracyTradeoff": "English only, and more accurate on English: 3.33% WER against 4.29%. Costs about 1.62 GB disk and 1.75 GB memory versus 574 MB, and drops the Hindi support of the smaller build.",
         "requirements": "Apple Silicon with Metal and at least 8 GB memory; about 1.62 GB disk and 1.75 GB peak process memory"
       },
       "benchmark": {
@@ -4444,7 +4444,7 @@
       },
       "presentation": {
         "expectedFinalization": "67 ms median and 291 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
-        "accuracyTradeoff": "2.38% English WER; automatic selection across 25 declared European languages, with Textify corpus evidence currently limited to English",
+        "accuracyTradeoff": "Fastest typical finalization at 67 ms but the least consistent at 291 ms p95. Largest of the five at about 2.51 GB disk and 2.68 GB memory, for the same 2.38% English WER as the smaller builds.",
         "requirements": "Apple Silicon with Metal; about 2.51 GB disk, 2.68 GB measured peak process memory, and a 60-second recording limit"
       },
       "benchmark": {
@@ -4637,7 +4637,7 @@
       },
       "presentation": {
         "expectedFinalization": "137 ms median and 413 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
-        "accuracyTradeoff": "3.33% English WER; Textify exposes whole-recording batch dictation, not upstream streaming partials",
+        "accuracyTradeoff": "Same 1.28 GB download as the other full-precision build and slightly less memory at 1.44 GB, but the least consistent finalization here: 137 ms median against 413 ms p95.",
         "requirements": "Apple Silicon with Metal; about 1.28 GB disk, 1.44 GB measured peak process memory, and a 60-second recording limit"
       },
       "benchmark": {
@@ -5213,7 +5213,7 @@
       },
       "presentation": {
         "expectedFinalization": "99 ms median and 143 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
-        "accuracyTradeoff": "2.38% English WER; automatic selection across 25 declared European languages, with Textify corpus evidence currently limited to English",
+        "accuracyTradeoff": "Same 2.38% English WER as the other Metal builds at about 1.26 GB disk and 1.60 GB memory, roughly half the largest variant, finalizing at 99 ms median and 143 ms p95.",
         "requirements": "Apple Silicon with Metal; about 1.26 GB disk, 1.60 GB measured peak process memory, and a 60-second recording limit"
       },
       "benchmark": {
@@ -5375,7 +5375,7 @@
       },
       "presentation": {
         "expectedFinalization": "75 ms median and 98 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
-        "accuracyTradeoff": "2.38% English WER; automatic selection across 25 declared European languages, with Textify corpus evidence currently limited to English",
+        "accuracyTradeoff": "Most consistent of the Metal builds at 75 ms median and 98 ms p95, using about 0.74 GB disk and 1.07 GB memory, with the same 2.38% English WER as the larger ones.",
         "requirements": "Apple Silicon with Metal; about 0.74 GB disk, 1.07 GB measured peak process memory, and a 60-second recording limit"
       },
       "benchmark": {
@@ -5537,7 +5537,7 @@
       },
       "presentation": {
         "expectedFinalization": "98 ms median and 134 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
-        "accuracyTradeoff": "2.38% English WER; automatic selection across 25 declared European languages, with Textify corpus evidence currently limited to English",
+        "accuracyTradeoff": "Smallest Metal build at about 0.55 GB disk and 0.88 GB memory, finalizing at 98 ms median and 134 ms p95, with English accuracy a shade below the larger Metal builds.",
         "requirements": "Apple Silicon with Metal; about 0.55 GB disk, 0.88 GB measured peak process memory, and a 60-second recording limit"
       },
       "benchmark": {
@@ -5702,7 +5702,7 @@
       },
       "presentation": {
         "expectedFinalization": "129 ms median and 220 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
-        "accuracyTradeoff": "3.33% English WER; Textify exposes whole-recording batch dictation, not upstream streaming partials",
+        "accuracyTradeoff": "Steadier than the other 1.28 GB build at 129 ms median and 220 ms p95, in exchange for about 1.65 GB peak memory rather than 1.44 GB.",
         "requirements": "Apple Silicon with Metal; about 1.28 GB disk, 1.65 GB measured peak process memory, and a 60-second recording limit"
       },
       "benchmark": {
@@ -5867,7 +5867,7 @@
       },
       "presentation": {
         "expectedFinalization": "123 ms median and 230 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
-        "accuracyTradeoff": "3.33% English WER; Textify exposes whole-recording batch dictation, not upstream streaming partials",
+        "accuracyTradeoff": "Fastest typical finalization at 123 ms and a little over half the download at about 0.75 GB, with the same 3.33% English WER as the two 1.28 GB builds.",
         "requirements": "Apple Silicon with Metal; about 0.75 GB disk, 1.11 GB measured peak process memory, and a 60-second recording limit"
       },
       "benchmark": {
@@ -6032,7 +6032,7 @@
       },
       "presentation": {
         "expectedFinalization": "130 ms median and 306 ms p95 release-to-final on Textify's fixed M4 Max English corpus",
-        "accuracyTradeoff": "2.86% English WER; Textify exposes whole-recording batch dictation, not upstream streaming partials",
+        "accuracyTradeoff": "Smallest download at about 0.56 GB and the best measured English WER here at 2.86%, though finalization is less consistent at 306 ms p95 than the 0.75 GB build.",
         "requirements": "Apple Silicon with Metal; about 0.56 GB disk, 0.92 GB measured peak process memory, and a 60-second recording limit"
       },
       "benchmark": {

@@ -2047,6 +2047,139 @@ final class AppCompositionTests: XCTestCase {
         XCTAssertEqual(services.settingsStore.load().activeModelID, active.id)
     }
 
+    @MainActor
+    func testExplicitUseInstallsVerifiesThenActivatesTheChosenArtifact() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let active = try Self.catalogModel(
+            id: ProductionModelPolicy.requiredModelID
+        )
+        let candidate = try Self.catalogModel(
+            id: "whisper-large-v2-q5_0"
+        )
+        try Self.writeInstalledStore(models: [active], to: paths)
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = active.id
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths,
+            models: CandidateRuntimeModelResolver(models: [
+                Self.runtimeModel(active),
+                Self.runtimeModel(candidate),
+            ]),
+            transcriber: ActivationTranscriberSpy()
+        )
+        services.modelInstallCoordinator = ModelInstallCoordinator(
+            installOperation: { [weak services] _, onStateChange in
+                try Self.writeInstalledStore(
+                    models: [active, candidate],
+                    to: paths
+                )
+                guard let services else {
+                    throw ModelInstallCoordinatorError
+                        .modelPreparationFailed
+                }
+                try await services.completeModelInstall(
+                    candidate,
+                    onStateChange: onStateChange
+                )
+            },
+            lifecycleDidChange: { [weak services] in
+                services?.refreshModelStorageInventory()
+                services?.reconcilePendingModelUseIntents()
+            }
+        )
+
+        let request = await services.useModel(
+            candidate.id,
+            purpose: .transcription
+        )
+        for _ in 0..<10_000
+        where services.preferences.activeModelID != candidate.id {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(request, .installQueued)
+        XCTAssertEqual(services.preferences.activeModelID, candidate.id)
+        XCTAssertEqual(
+            services.settingsStore.load().activeModelID,
+            candidate.id
+        )
+        XCTAssertTrue(services.isModelInstalled(candidate.id))
+    }
+
+    @MainActor
+    func testChoosingSignedRecommendedVersionClearsManualOverride()
+        async throws
+    {
+        let services = try Self.makeServices()
+        await services.modelCatalogCoordinator.refresh()
+        let checkpointID =
+            "checkpoint.openai.whisper-large-v3-turbo"
+        let key = "transcription|\(checkpointID)"
+
+        services.setModelArtifactOverride(
+            checkpointID: checkpointID,
+            artifactID: "whisper-large-v3-turbo-mlx",
+            purpose: .transcription
+        )
+        XCTAssertEqual(
+            services.preferences
+                .modelArtifactOverridesByPurposeCheckpoint[key],
+            "whisper-large-v3-turbo-mlx"
+        )
+
+        services.setModelArtifactOverride(
+            checkpointID: checkpointID,
+            artifactID: "whisper-large-v3-turbo-q5_0",
+            purpose: .transcription,
+            followsSignedRecommendation: true
+        )
+        XCTAssertNil(
+            services.preferences
+                .modelArtifactOverridesByPurposeCheckpoint[key]
+        )
+    }
+
+    @MainActor
+    func testExplicitUseFailurePreservesThePreviousActiveModel() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let active = try Self.catalogModel(
+            id: ProductionModelPolicy.requiredModelID
+        )
+        try Self.writeInstalledStore(models: [active], to: paths)
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = active.id
+        let services = try Self.makeServices(
+            preferences: preferences,
+            paths: paths
+        )
+        services.modelInstallCoordinator = ModelInstallCoordinator(
+            installOperation: { _, _ in
+                throw ModelInstallCoordinatorError.modelPreparationFailed
+            },
+            lifecycleDidChange: { [weak services] in
+                services?.refreshModelStorageInventory()
+                services?.reconcilePendingModelUseIntents()
+            }
+        )
+
+        let request = await services.useModel(
+            "whisper-large-v2-q5_0",
+            purpose: .transcription
+        )
+        for _ in 0..<10_000
+        where services.modelInstallCoordinator.hasNonterminalAttempts {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(request, .installQueued)
+        XCTAssertEqual(services.preferences.activeModelID, active.id)
+        XCTAssertEqual(
+            services.settingsStore.load().activeModelID,
+            active.id
+        )
+    }
+
     func testAppPathsFactoryUsesTextifySupportLocationsWithoutUserLibrarySideEffects() throws {
         let root = Self.temporaryDirectory()
         let paths = try AppPaths.make(

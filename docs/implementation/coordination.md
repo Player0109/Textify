@@ -1520,3 +1520,26 @@ Task 1 must merge before parallel Wave 1 work begins.
   lazy-row implementation. The M1 Instruments, VoiceOver, Full Keyboard
   Access, variable-height scrolling, and trackpad-hitch gates decide whether
   the lazy stack ships or must move to a stronger system-virtualized control.
+
+## Checkpoint-First Models Presentation Handoff - 2026-07-27
+
+- Issue #27 owns the Models presentation projection, the shared responsive
+  layout policy, progressive Exact Artifact choice, purpose-specific Voice
+  Cleaning card, focused presentation tests, and the narrow signed catalog-copy
+  publication gates needed by the redesigned chooser.
+- The existing Family → Checkpoint → Exact Artifact domain graph, retained
+  window-session feature lifetime, semantic navigation state, signed evidence,
+  installation queue, integrity verification, revocation enforcement, and
+  purpose runtime boundaries remain authoritative.
+- This work may replace the permanently expanded artifact table and its
+  per-row responsive decisions. It must not reintroduce page-entry loading,
+  remote catalog access, inferred artifact identity, unsigned comparison
+  claims, or automatic replacement after deletion or revocation.
+- Changes outside the prior Settings UI ownership are limited to persisted
+  legal Exact Artifact overrides, explicit Use orchestration, production
+  presentation-copy validation, and the signed manifest copy reviewed in issue
+  #27.
+- The explicit Use handoff also owns focused application-composition coverage
+  proving that only Use may continue from verified installation into
+  activation; Install Only, reinstall, and failed transfers retain the prior
+  active identity.

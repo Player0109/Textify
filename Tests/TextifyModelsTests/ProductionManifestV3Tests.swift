@@ -46,15 +46,18 @@ final class ProductionManifestV3Tests: XCTestCase {
         XCTAssertEqual(whisperGGML.computeRoute, .gpuViaMetal)
     }
 
-    func testProductionV3PreservesV2OperationalRecordsExceptSignedPeakStorageBounds() throws {
+    func testProductionV3PreservesV2OperationalRecordsExceptSignedPeakStorageAndSelectionCopy() throws {
         let v2Data = try fixtureData("manifest_v2.production-migration.json")
         let v3Data = try Data(
             contentsOf: repositoryRoot.appendingPathComponent("models/manifest.json")
         )
-        let v2Models = try rawModels(in: v2Data)
+        var v2Models = try rawModels(in: v2Data)
         var v3Models = try rawModels(in: v3Data)
+        for index in v2Models.indices {
+            normalizeMutableManifestModel(&v2Models[index])
+        }
         for index in v3Models.indices {
-            v3Models[index].removeValue(forKey: "installationStorage")
+            normalizeMutableManifestModel(&v3Models[index])
         }
         XCTAssertEqual(
             try JSONSerialization.data(
@@ -73,8 +76,8 @@ final class ProductionManifestV3Tests: XCTestCase {
         XCTAssertEqual(v2.manifestVersion, 2)
         XCTAssertEqual(v2.models.count, 43)
         XCTAssertEqual(
-            v3.models.map(removingInstallationStorage),
-            v2.models
+            v3.models.map(normalizingV3PresentationCopy),
+            v2.models.map(normalizingV3PresentationCopy)
         )
         XCTAssertTrue(
             v3.models.allSatisfy {
@@ -119,8 +122,8 @@ final class ProductionManifestV3Tests: XCTestCase {
                 previousArtifact.files.first { $0.filename == record.filename }
             )
             XCTAssertEqual(
-                removingInstallationStorage(currentArtifact),
-                previousArtifact
+                normalizingV3PresentationCopy(currentArtifact),
+                normalizingV3PresentationCopy(previousArtifact)
             )
             XCTAssertEqual(
                 graph.artifacts.filter { $0.id == record.artifactID }.count,
@@ -196,7 +199,7 @@ final class ProductionManifestV3Tests: XCTestCase {
         return try XCTUnwrap(json["models"] as? [[String: Any]])
     }
 
-    private func removingInstallationStorage(
+    private func normalizingV3PresentationCopy(
         _ model: ModelEntry
     ) -> ModelEntry {
         ModelEntry(
@@ -213,11 +216,26 @@ final class ProductionManifestV3Tests: XCTestCase {
             minAppVersion: model.minAppVersion,
             runtime: model.runtime,
             capabilities: model.capabilities,
-            presentation: model.presentation,
+            presentation: model.presentation.map {
+                ModelUserPresentation(
+                    expectedFinalization: $0.expectedFinalization,
+                    accuracyTradeoff: "",
+                    requirements: $0.requirements
+                )
+            },
             purpose: model.purpose,
             installationStorage: nil,
             benchmark: model.benchmark
         )
+    }
+
+    private func normalizeMutableManifestModel(_ model: inout [String: Any]) {
+        model.removeValue(forKey: "installationStorage")
+        guard var presentation = model["presentation"] as? [String: Any] else {
+            return
+        }
+        presentation["accuracyTradeoff"] = ""
+        model["presentation"] = presentation
     }
 
     private var repositoryRoot: URL {

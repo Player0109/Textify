@@ -244,6 +244,7 @@ final class AppServices {
         lifecycleDidChange: { [weak self] in
             self?.refreshModelStorageInventory()
             self?.refreshRetainedModelCatalogFeatures()
+            self?.reconcilePendingModelUseIntents()
         }
     )
 
@@ -271,6 +272,7 @@ final class AppServices {
     private(set) var revokedActiveTranscriptionModelID: String?
     private(set) var revokedActiveVoiceCleaningModelID: String?
     private(set) var modelRemovalStatus: AppModelRemovalStatus?
+    private(set) var modelUseStatusMessage: String?
 
     @ObservationIgnored private var runtimeStarted = false
     @ObservationIgnored private var diagnosticsStarted = false
@@ -285,6 +287,9 @@ final class AppServices {
         false
     @ObservationIgnored private var modelRevocationEnforcementDeferred =
         false
+    @ObservationIgnored private var pendingModelUseArtifactIDs = Set<String>()
+    @ObservationIgnored private var pendingArtifactOverrideRemovalKeys =
+        Set<String>()
     @ObservationIgnored private var overlayUpdateGeneration = 0
     private var managedReadinessByModelID:
         [String: ModelCatalogManagedReadiness] = [:]
@@ -965,6 +970,196 @@ final class AppServices {
         savePreferences()
         Task { @MainActor [dictation] in
             _ = await dictation.prepareActiveModelIfAvailable()
+        }
+    }
+
+    func selectCatalogTranscriptionLanguage(
+        _ language: TranscriptionLanguage
+    ) {
+        preferences.transcriptionLanguage = language
+        savePreferences()
+        guard let activeModelID = preferences.activeModelID,
+              let activeModel = installedModel(activeModelID)?.model
+        else {
+            modelUseStatusMessage = nil
+            return
+        }
+        if availableTranscriptionLanguages(for: activeModel)
+            .contains(language) {
+            modelUseStatusMessage = nil
+            Task { @MainActor [dictation] in
+                _ = await dictation.prepareActiveModelIfAvailable()
+            }
+        } else {
+            modelUseStatusMessage = String(
+                localized:
+                    "The current model does not support \(language.rawValue.uppercased()). Choose a compatible model to use this dictation language."
+            )
+        }
+    }
+
+    func modelArtifactOverrides(
+        for purpose: ModelPurpose
+    ) -> [String: String] {
+        let prefix = "\(purpose.rawValue)|"
+        let persisted: [String: String] = Dictionary(
+            uniqueKeysWithValues:
+                preferences.modelArtifactOverridesByPurposeCheckpoint
+                .compactMap { key, artifactID in
+                    guard key.hasPrefix(prefix) else {
+                        return nil
+                    }
+                    return (
+                        String(key.dropFirst(prefix.count)),
+                        artifactID
+                    )
+                }
+        )
+        guard modelCatalogCoordinator.authoritativeManifest?
+            .presentationGraph != nil
+        else {
+            return persisted
+        }
+        let experience = modelCatalogExperience(
+            for: purpose,
+            query: ModelCatalogQuery(purpose: purpose)
+        )
+        let legalArtifactIDsByCheckpoint = Dictionary(
+            uniqueKeysWithValues: experience.families.flatMap(\.checkpoints)
+                .map { checkpoint in
+                    (
+                        checkpoint.id,
+                        Set(checkpoint.artifacts.compactMap {
+                            !$0.row.isRevoked
+                                && $0.row.compatibility
+                                    .allowsModelOperations
+                                ? $0.id
+                                : nil
+                        })
+                    )
+                }
+        )
+        let legal = persisted.filter { checkpointID, artifactID in
+            legalArtifactIDsByCheckpoint[checkpointID]?
+                .contains(artifactID) == true
+        }
+        if legal.count != persisted.count {
+            scheduleInvalidArtifactOverrideRemoval(
+                Dictionary(
+                    uniqueKeysWithValues: persisted.compactMap {
+                        checkpointID, artifactID in
+                        legal[checkpointID] == nil
+                            ? ("\(prefix)\(checkpointID)", artifactID)
+                            : nil
+                    }
+                )
+            )
+        }
+        return legal
+    }
+
+    private func scheduleInvalidArtifactOverrideRemoval(
+        _ invalidValuesByKey: [String: String]
+    ) {
+        let newKeys = Set(invalidValuesByKey.keys)
+            .subtracting(pendingArtifactOverrideRemovalKeys)
+        guard !newKeys.isEmpty else {
+            return
+        }
+        pendingArtifactOverrideRemovalKeys.formUnion(newKeys)
+        Task { @MainActor [weak self] in
+            await Task.yield()
+            guard let self else {
+                return
+            }
+            for key in newKeys
+            where self.preferences
+                .modelArtifactOverridesByPurposeCheckpoint[key]
+                    == invalidValuesByKey[key] {
+                self.preferences
+                    .modelArtifactOverridesByPurposeCheckpoint[key] = nil
+            }
+            self.pendingArtifactOverrideRemovalKeys
+                .subtract(newKeys)
+            self.savePreferences()
+        }
+    }
+
+    func setModelArtifactOverride(
+        checkpointID: String,
+        artifactID: String,
+        purpose: ModelPurpose,
+        followsSignedRecommendation: Bool = false
+    ) {
+        let key = "\(purpose.rawValue)|\(checkpointID)"
+        let signedRecommendation = modelCatalogCoordinator
+            .authoritativeManifest?.presentationGraph?.checkpoints
+            .first { $0.id == checkpointID }?
+            .recommendedArtifactID
+        preferences.modelArtifactOverridesByPurposeCheckpoint[key] =
+            followsSignedRecommendation
+                || signedRecommendation == artifactID
+                ? nil
+                : artifactID
+        savePreferences()
+    }
+
+    @discardableResult
+    func useModel(
+        _ modelID: String,
+        purpose: ModelPurpose
+    ) async -> AppModelUseRequestResult {
+        modelUseStatusMessage = nil
+        if installedModel(modelID) != nil {
+            return .activation(await activateInstalledModel(modelID))
+        }
+        pendingModelUseArtifactIDs.insert(modelID)
+        guard modelInstallCoordinator.start(
+            modelID: modelID,
+            purpose: purpose,
+            action: .install
+        ) != nil else {
+            pendingModelUseArtifactIDs.remove(modelID)
+            return .unavailable
+        }
+        modelUseStatusMessage = String(
+            localized:
+                "Downloading the selected version. Textify will verify it, then make it active."
+        )
+        return .installQueued
+    }
+
+    func reconcilePendingModelUseIntents() {
+        for modelID in Array(pendingModelUseArtifactIDs) {
+            if let record = installedModel(modelID) {
+                pendingModelUseArtifactIDs.remove(modelID)
+                Task { @MainActor [weak self] in
+                    guard let self else {
+                        return
+                    }
+                    let result = await self.activateInstalledModel(modelID)
+                    self.modelUseStatusMessage = result.message(
+                        for: ProductionModelPresentation(
+                            model: record.model
+                        )
+                    )
+                }
+                continue
+            }
+            if let state = modelInstallCoordinator.artifactStates[modelID],
+               state.phase.isTerminal {
+                pendingModelUseArtifactIDs.remove(modelID)
+                modelUseStatusMessage =
+                    state.phase == .revoked
+                        ? String(
+                            localized:
+                                "The selected version was revoked and was not activated."
+                        )
+                        : String(
+                            localized:
+                                "The selected version was not installed, so the current model is unchanged."
+                        )
+            }
         }
     }
 
@@ -1874,6 +2069,29 @@ enum AppModelActivationResult: Equatable {
             return "Textify kept the previous model because \(model.displayName) could not be prepared."
         case .persistenceFailed:
             return "Textify kept the previous model because the new selection could not be saved."
+        }
+    }
+}
+
+enum AppModelUseRequestResult: Equatable {
+    case activation(AppModelActivationResult)
+    case installQueued
+    case unavailable
+
+    func message(for model: ProductionModelPresentation) -> String {
+        switch self {
+        case let .activation(result):
+            result.message(for: model)
+        case .installQueued:
+            String(
+                localized:
+                    "Downloading \(model.displayName). Textify will verify it before activation."
+            )
+        case .unavailable:
+            String(
+                localized:
+                    "Textify could not start this download. Check Downloads and try again."
+            )
         }
     }
 }

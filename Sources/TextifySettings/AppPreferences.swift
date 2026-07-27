@@ -58,6 +58,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
     public var modelSelectionScope: ModelSelectionScope
     public var activeModelID: String?
     public var activeVoiceCleaningModelID: String?
+    public var modelArtifactOverridesByPurposeCheckpoint: [String: String]
     public var keepTextifyInDock: Bool
     public var automaticallyCheckForUpdates: Bool
     public var launchAtLoginEnabled: Bool
@@ -80,6 +81,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         modelSelectionScope: ModelSelectionScope = .curatedInstalledModels,
         activeModelID: String? = nil,
         activeVoiceCleaningModelID: String? = nil,
+        modelArtifactOverridesByPurposeCheckpoint: [String: String] = [:],
         keepTextifyInDock: Bool = true,
         automaticallyCheckForUpdates: Bool = true,
         launchAtLoginEnabled: Bool = true,
@@ -96,6 +98,8 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         self.modelSelectionScope = modelSelectionScope
         self.activeModelID = activeModelID
         self.activeVoiceCleaningModelID = activeVoiceCleaningModelID
+        self.modelArtifactOverridesByPurposeCheckpoint =
+            modelArtifactOverridesByPurposeCheckpoint
         self.keepTextifyInDock = keepTextifyInDock
         self.automaticallyCheckForUpdates = automaticallyCheckForUpdates
         self.launchAtLoginEnabled = launchAtLoginEnabled
@@ -130,6 +134,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         case modelSelectionScope
         case activeModelID
         case activeVoiceCleaningModelID
+        case modelArtifactOverridesByPurposeCheckpoint
         case keepTextifyInDock
         case legacyShowInDock = "showInDock"
         case automaticallyCheckForUpdates
@@ -168,6 +173,10 @@ public struct AppPreferences: Codable, Equatable, Sendable {
             modelSelectionScope: try container.decodeIfPresent(ModelSelectionScope.self, forKey: .modelSelectionScope) ?? defaults.modelSelectionScope,
             activeModelID: try container.decodeIfPresent(String.self, forKey: .activeModelID) ?? defaults.activeModelID,
             activeVoiceCleaningModelID: try container.decodeIfPresent(String.self, forKey: .activeVoiceCleaningModelID) ?? defaults.activeVoiceCleaningModelID,
+            modelArtifactOverridesByPurposeCheckpoint: try container.decodeIfPresent(
+                [String: String].self,
+                forKey: .modelArtifactOverridesByPurposeCheckpoint
+            ) ?? defaults.modelArtifactOverridesByPurposeCheckpoint,
             keepTextifyInDock: keepTextifyInDock,
             automaticallyCheckForUpdates: try container.decodeIfPresent(Bool.self, forKey: .automaticallyCheckForUpdates) ?? defaults.automaticallyCheckForUpdates,
             launchAtLoginEnabled: launchAtLogin,
@@ -188,6 +197,10 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         try container.encode(modelSelectionScope, forKey: .modelSelectionScope)
         try container.encodeIfPresent(activeModelID, forKey: .activeModelID)
         try container.encodeIfPresent(activeVoiceCleaningModelID, forKey: .activeVoiceCleaningModelID)
+        try container.encode(
+            modelArtifactOverridesByPurposeCheckpoint,
+            forKey: .modelArtifactOverridesByPurposeCheckpoint
+        )
         try container.encode(keepTextifyInDock, forKey: .keepTextifyInDock)
         try container.encode(automaticallyCheckForUpdates, forKey: .automaticallyCheckForUpdates)
         try container.encode(launchAtLoginEnabled, forKey: .launchAtLoginEnabled)

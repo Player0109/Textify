@@ -578,6 +578,23 @@ struct ModelCatalogPaneLifecyclePresentation: Equatable {
     }
 }
 
+private struct ModelCheckpointPendingLanguageUse: Equatable {
+    let row: ModelCheckpointRowPresentation
+    let artifact: ModelCatalogExactArtifactPresentation
+    let mismatch: ModelCheckpointLanguageMismatch
+}
+
+private struct ModelCheckpointOrderContext: Equatable {
+    let language: String?
+    let browsesAllLanguages: Bool
+    let searchText: String
+}
+
+private enum ModelCheckpointInspectorMode {
+    case trailing
+    case sheet
+}
+
 struct ModelsSettingsPane: View {
     @Environment(AppServices.self) private var services
     let destination: ModelCatalogPurposeDestination
@@ -592,6 +609,10 @@ struct ModelsSettingsPane: View {
         ModelRemovalConfirmationPresentation?
     @State private var showsModelVariantsHelp = false
     @State private var showsDownloads = false
+    @State private var pendingLanguageMismatchUse:
+        ModelCheckpointPendingLanguageUse?
+    @State private var checkpointInspectorMode:
+        ModelCheckpointInspectorMode = .sheet
     @FocusState private var focusedCatalogRowID: ModelCatalogHierarchyRowID?
     @AccessibilityFocusState private var accessibilityFocusedCatalogRowID:
         ModelCatalogHierarchyRowID?
@@ -622,6 +643,45 @@ struct ModelsSettingsPane: View {
                 featureModel: featureModel,
                 coordinator: services.modelCatalogCoordinator
             )
+        let liveCheckpointPresentation = ModelCheckpointListPresentation(
+            experience: catalogExperience,
+            purpose: destination.purpose,
+            selectedLanguage:
+                destination == .transcription
+                    ? services.preferences.transcriptionLanguage.rawValue
+                    : nil,
+            browseAllLanguages: featureModel.browseAllLanguages,
+            searchText: featureModel.discoveryQuery.searchText,
+            artifactOverrides: services.modelArtifactOverrides(
+                for: destination.purpose
+            )
+        )
+        let checkpointPresentation =
+            featureModel.checkpointOrderIDs.isEmpty
+                ? liveCheckpointPresentation
+                : ModelCheckpointListPresentation(
+                    experience: catalogExperience,
+                    purpose: destination.purpose,
+                    selectedLanguage:
+                        destination == .transcription
+                            ? services.preferences.transcriptionLanguage.rawValue
+                            : nil,
+                    browseAllLanguages: featureModel.browseAllLanguages,
+                    searchText: featureModel.discoveryQuery.searchText,
+                    artifactOverrides: services.modelArtifactOverrides(
+                        for: destination.purpose
+                    ),
+                    stableCheckpointOrder:
+                        featureModel.checkpointOrderIDs
+                )
+        let inspectedCheckpointRow = checkpointPresentation.rows.first {
+            featureModel.hierarchyState.selection
+                == .checkpoint($0.checkpointID)
+        }
+        let standaloneInstalledRows =
+            ModelCheckpointListPresentation.standaloneInstalledRows(
+                in: catalogExperience
+            )
 
         return ModelCatalogSettingsPaneLayout(
             title: destination.title,
@@ -631,108 +691,199 @@ struct ModelsSettingsPane: View {
         ) {
             catalogStatus(hasRows: !catalogExperience.rows.isEmpty)
 
-            if services.settingsRouter.modelReplacementPurpose
-                == destination.purpose {
-                Label(
-                    "The previous selection was revoked. Choose and explicitly activate a replacement.",
-                    systemImage: "exclamationmark.shield"
+            if services.modelCatalogCoordinator.securityIssue != nil {
+                ModelCatalogEmptyState(
+                    presentation: .securityFailure(destination),
+                    onAction: {}
                 )
-                .font(.callout)
-                .foregroundStyle(.orange)
-            }
+                .onAppear {
+                    featureModel.showsInspector = false
+                }
+            } else {
+                if services.settingsRouter.modelReplacementPurpose
+                    == destination.purpose
+                {
+                    Label(
+                        "The previous selection was revoked. Choose and explicitly activate a replacement.",
+                        systemImage: "exclamationmark.shield"
+                    )
+                    .font(.callout)
+                    .foregroundStyle(.orange)
+                }
 
-            if let removalStatus = services.modelRemovalStatus {
-                Label(
-                    removalStatus.phase == .finishingCurrentDictation
-                        ? "Finishing Current Dictation before removing this Exact Artifact."
-                        : "Removing the selected Exact Artifact…",
-                    systemImage: "hourglass"
-                )
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            } else if let modelMessage {
-                Text(modelMessage)
+                if let removalStatus = services.modelRemovalStatus {
+                    Label(
+                        removalStatus.phase == .finishingCurrentDictation
+                            ? "Finishing Current Dictation before removing this Exact Artifact."
+                            : "Removing the selected Exact Artifact…",
+                        systemImage: "hourglass"
+                    )
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else if ProductionModelInstallConfiguration.current == nil,
-                      services.modelCatalogCoordinator.manifest == nil {
-                Text("Signed catalog unavailable in this build")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
+                } else if let modelMessage {
+                    Text(modelMessage)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if let modelUseStatusMessage =
+                    services.modelUseStatusMessage
+                {
+                    Text(modelUseStatusMessage)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if ProductionModelInstallConfiguration.current == nil,
+                    services.modelCatalogCoordinator.manifest == nil
+                {
+                    Text("Signed catalog unavailable in this build")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
 
-            if !lifecyclePresentation.showsInitialLoadingPlaceholder {
-                ModelCatalogToolbar(
-                    query: $featureModel.discoveryQuery,
-                    showsDownloads: $showsDownloads,
-                    filterOptions: catalogExperience.filterOptions,
-                    onReset: resetCatalogQuery,
-                    onVerify: verifyInstalledModels,
-                    onImport: destination == .transcription
-                        ? chooseCustomWhisperModel
-                        : nil,
-                    onShowVariantHelp: {
-                        showsModelVariantsHelp = true
-                    },
-                    downloadCount: services.modelInstallCoordinator
-                        .hasNonterminalAttempts
-                        ? ModelDownloadsPresentation(
-                            attempts: services.modelInstallCoordinator.attempts
-                        ).nonterminalCount
-                        : 0,
-                    isImportDisabled: hasPendingDownloads || isImporting
-                )
+                if !lifecyclePresentation.showsInitialLoadingPlaceholder {
+                    if destination == .transcription {
+                        ModelCheckpointToolbar(
+                            searchText:
+                                $featureModel.discoveryQuery.searchText,
+                            browseAllLanguages:
+                                $featureModel.browseAllLanguages,
+                            language:
+                                services.preferences.transcriptionLanguage,
+                            downloadCount:
+                                ModelDownloadsPresentation(
+                                    attempts:
+                                        services.modelInstallCoordinator
+                                        .attempts
+                                ).nonterminalCount,
+                            onSelectLanguage: {
+                                services.selectCatalogTranscriptionLanguage($0)
+                            },
+                            onShowDownloads: {
+                                showsDownloads = true
+                            },
+                            onVerify: verifyInstalledModels,
+                            onImport: chooseCustomWhisperModel
+                        )
+                    } else {
+                        HStack {
+                            Spacer()
+                            Button {
+                                showsDownloads = true
+                            } label: {
+                                Label(
+                                    "Downloads",
+                                    systemImage: "arrow.down.circle"
+                                )
+                            }
+                            .controlSize(.small)
+                        }
+                    }
 
-                if !featureModel.discoveryQuery.appliedFilterTokens.isEmpty {
-                    ModelCatalogFilterTokens(
-                        tokens: featureModel.discoveryQuery.appliedFilterTokens
-                    ) { token in
-                        featureModel.discoveryQuery.removeFilter(token)
+                    if let pinnedReveal = catalogExperience.pinnedReveal {
+                        pinnedRevealView(
+                            pinnedReveal,
+                            in: catalogExperience
+                        )
                     }
                 }
 
-                if featureModel.discoveryQuery.scope == .installed {
-                    ModelCatalogStorageSummaryView(
-                        presentation: ModelCatalogStorageSummaryPresentation(
-                            state: services.modelStorageInventory.state,
-                            installedCount: services.installedModelRecords.count
+                if lifecyclePresentation.showsInitialLoadingPlaceholder {
+                    ModelCatalogEmptyState(
+                        presentation: .checking,
+                        onAction: {}
+                    )
+                } else if destination == .voiceCleaning {
+                VoiceCleaningFeatureCard(
+                    row: checkpointPresentation.rows.first,
+                    isBusy: modelTransactionsAreBusy,
+                    disabledReason: modelTransactionDisabledReason,
+                    onUse: useCheckpointArtifact,
+                        onDisable: disableVoiceCleaning,
+                        onChooseVersion: chooseCheckpointArtifact,
+                        onInspect: inspectCheckpoint
+                    )
+                } else if checkpointPresentation.rows.isEmpty
+                    && standaloneInstalledRows.isEmpty
+                {
+                    ModelCatalogEmptyState(
+                        presentation: emptyPresentation,
+                        onAction: performEmptyStateAction
+                    )
+                } else {
+                    if !checkpointPresentation.rows.isEmpty {
+                        ModelCheckpointCatalogSurface(
+                        presentation: checkpointPresentation,
+                        isBusy: modelTransactionsAreBusy,
+                        disabledReason: modelTransactionDisabledReason,
+                            onInspect: inspectCheckpoint,
+                            onUse: useCheckpointArtifact,
+                            onInstallOnly: installCheckpointArtifactOnly,
+                            onCancel: cancelCheckpointInstall,
+                            onRetry: retryCheckpointInstall,
+                            onChooseVersion: chooseCheckpointArtifact,
+                            onVerify: verifyCheckpointArtifact,
+                            onReveal: revealCheckpointArtifact,
+                            onDelete: beginCheckpointRemoval,
+                            focusedRowID: $focusedCatalogRowID,
+                            accessibilityFocusedRowID:
+                                $accessibilityFocusedCatalogRowID
                         )
-                    )
-                }
-
-                if let pinnedReveal = catalogExperience.pinnedReveal {
-                    pinnedRevealView(
-                        pinnedReveal,
-                        in: catalogExperience
-                    )
+                    }
+                    if !standaloneInstalledRows.isEmpty {
+                        standaloneInstalledSurface(
+                            standaloneInstalledRows,
+                            in: catalogExperience
+                        )
+                    }
                 }
             }
-
-            catalogSurface(
-                catalogExperience,
-                lifecyclePresentation: lifecyclePresentation
-            )
         }
-        .inspector(isPresented: $featureModel.showsInspector) {
+        .inspector(isPresented: trailingInspectorBinding) {
             ScrollView {
-                ModelCatalogInspectorView(
-                    presentation: featureModel.inspectorController.presentation,
-                    localDetailsState:
-                        featureModel.inspectorController.localDetailsState,
-                    verificationState:
-                        featureModel.inspectorController.verificationState,
-                    onVerify: verifySelectedArtifact
-                )
+                modelInspectorContent(inspectedCheckpointRow)
             }
             .scrollContentBackground(.hidden)
             .inspectorColumnWidth(min: 280, ideal: 320, max: 360)
+        }
+        .sheet(isPresented: sheetInspectorBinding) {
+            ScrollView {
+                modelInspectorContent(inspectedCheckpointRow)
+            }
+            .scrollContentBackground(.hidden)
+            .frame(minWidth: 560, minHeight: 560)
+            .background(TextifyVisualIdentity.windowSurface)
         }
         .popover(isPresented: $showsModelVariantsHelp) {
             ModelCatalogVariantsAboutView()
         }
         .onAppear {
-            focusedCatalogRowID = featureModel.hierarchyState.focusedRowID
+            let resetsAfterActivation =
+                featureModel.refreshCheckpointOrderOnNextEntry
+            if featureModel.checkpointOrderIDs.isEmpty
+                || resetsAfterActivation {
+                featureModel.checkpointOrderIDs =
+                    liveCheckpointPresentation.rows.map(\.id)
+                featureModel.refreshCheckpointOrderOnNextEntry = false
+            }
+            if resetsAfterActivation,
+               let activeCheckpointID =
+                   liveCheckpointPresentation.rows.first?.id {
+                let rowID = ModelCatalogHierarchyRowID.checkpoint(
+                    activeCheckpointID
+                )
+                let selection = ModelCatalogHierarchySelection.checkpoint(
+                    activeCheckpointID
+                )
+                focusedCatalogRowID = rowID
+                accessibilityFocusedCatalogRowID = rowID
+                featureModel.hierarchyState.focus(rowID)
+                featureModel.hierarchyState.select(selection)
+                featureModel.hierarchyState.scroll(to: rowID)
+                featureModel.viewportRestorationGeneration &+= 1
+            } else {
+                focusedCatalogRowID =
+                    featureModel.hierarchyState.focusedRowID
+            }
         }
         .task {
             _ = featureModel.announcementTracker.update(
@@ -743,6 +894,20 @@ struct ModelsSettingsPane: View {
         }
         .onChange(of: derivationRequest, initial: true) { _, request in
             featureModel.submit(request)
+        }
+        .onChange(of: featureModel.showsInspector) { _, showsInspector in
+            if showsInspector {
+                checkpointInspectorMode = preferredInspectorMode
+            }
+        }
+        .onChange(of: checkpointOrderContext) { _, _ in
+            featureModel.checkpointOrderIDs =
+                liveCheckpointPresentation.rows.map(\.id)
+        }
+        .onChange(of: activeArtifactIDForDestination) { previous, current in
+            if current != nil, current != previous {
+                featureModel.refreshCheckpointOrderOnNextEntry = true
+            }
         }
         .onChange(
             of: featureModel.snapshot?.versions.queryResult,
@@ -848,15 +1013,14 @@ struct ModelsSettingsPane: View {
                 .home,
                 .end,
                 .return,
-                .leftArrow,
-                .rightArrow,
                 .delete,
             ],
             phases: .down
         ) { keyPress in
-            handleCatalogKeyPress(
+            handleModelsKeyPress(
                 keyPress,
-                in: catalogExperience
+                checkpointPresentation: checkpointPresentation,
+                catalogExperience: catalogExperience
             )
         }
         .alert("Import local Whisper model?", isPresented: $showsImportConfirmation) {
@@ -868,6 +1032,33 @@ struct ModelsSettingsPane: View {
             }
         } message: {
             Text("Textify validates the file and loads it locally with Whisper.cpp. Only continue if you trust the file and its license permits your use. Textify cannot verify third-party model licenses.")
+        }
+        .alert(
+            "Change Dictation Language?",
+            isPresented: pendingLanguageMismatchAlertBinding,
+            presenting: pendingLanguageMismatchUse
+        ) { pending in
+            Button("Cancel", role: .cancel) {
+                pendingLanguageMismatchUse = nil
+            }
+            Button("Use \(pending.mismatch.supportedLanguageName)") {
+                guard let language = TranscriptionLanguage(
+                    rawValue: pending.mismatch.supportedLanguageCode
+                ) else {
+                    pendingLanguageMismatchUse = nil
+                    return
+                }
+                services.selectCatalogTranscriptionLanguage(language)
+                pendingLanguageMismatchUse = nil
+                performCheckpointUse(
+                    pending.row,
+                    pending.artifact
+                )
+            }
+        } message: { pending in
+            Text(
+                "\(pending.artifact.metadata.presentation.displayName) does not support \(pending.mismatch.requestedLanguageName). Change Dictation Language to \(pending.mismatch.supportedLanguageName) and continue?"
+            )
         }
         .alert(
             pendingRemoval.map {
@@ -901,6 +1092,318 @@ struct ModelsSettingsPane: View {
 
     private var hasPendingDownloads: Bool {
         services.modelInstallCoordinator.hasNonterminalAttempts
+    }
+
+    private var preferredInspectorMode: ModelCheckpointInspectorMode {
+        let windowWidth = NSApp.keyWindow?.frame.width ?? 0
+        return ModelCheckpointInspectorLayoutPolicy()
+            .usesTrailingInspector(windowWidth: windowWidth)
+            ? .trailing
+            : .sheet
+    }
+
+    private var pendingLanguageMismatchAlertBinding: Binding<Bool> {
+        Binding(
+            get: { pendingLanguageMismatchUse != nil },
+            set: {
+                if !$0 {
+                    pendingLanguageMismatchUse = nil
+                }
+            }
+        )
+    }
+
+    private var trailingInspectorBinding: Binding<Bool> {
+        Binding(
+            get: {
+                featureModel.showsInspector
+                    && checkpointInspectorMode == .trailing
+            },
+            set: {
+                if !$0 {
+                    featureModel.showsInspector = false
+                }
+            }
+        )
+    }
+
+    private var sheetInspectorBinding: Binding<Bool> {
+        Binding(
+            get: {
+                featureModel.showsInspector
+                    && checkpointInspectorMode == .sheet
+            },
+            set: {
+                if !$0 {
+                    featureModel.showsInspector = false
+                }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private func modelInspectorContent(
+        _ inspectedCheckpointRow: ModelCheckpointRowPresentation?
+    ) -> some View {
+        if let inspectedCheckpointRow {
+            ModelCheckpointInspectorSurface(
+                row: inspectedCheckpointRow,
+                isBusy: modelTransactionsAreBusy,
+                disabledReason: modelTransactionDisabledReason,
+                onVerify: verifyCheckpointArtifact,
+                onReinstall: reinstallCheckpointArtifact,
+                onReveal: revealCheckpointArtifact,
+                onRemove: removeCheckpointArtifact
+            )
+        } else {
+            ModelCatalogInspectorView(
+                presentation:
+                    featureModel.inspectorController.presentation,
+                localDetailsState:
+                    featureModel.inspectorController.localDetailsState,
+                verificationState:
+                    featureModel.inspectorController.verificationState,
+                onVerify: verifySelectedArtifact
+            )
+        }
+    }
+
+    private func standaloneInstalledSurface(
+        _ rows: [ModelCatalogRowPresentation],
+        in experience: ModelCatalogExperience
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Installed Models")
+                .font(.headline)
+            ForEach(rows) { row in
+                catalogRow(
+                    row,
+                    context: nil,
+                    onInspect: {
+                        let selection =
+                            ModelCatalogHierarchySelection
+                            .exactArtifact(row.id)
+                        featureModel.hierarchyState.select(selection)
+                        featureModel.inspectorController.select(
+                            selection,
+                            in: experience
+                        )
+                        featureModel.showsInspector = true
+                    }
+                )
+            }
+        }
+    }
+
+    private var modelTransactionsAreBusy: Bool {
+        activatingModelID != nil
+            || isImporting
+            || !services.dictation.allowsModelTransactions
+    }
+
+    private var modelTransactionDisabledReason: String? {
+        guard !services.dictation.allowsModelTransactions else {
+            return nil
+        }
+        return String(
+            localized: "Finish Current Dictation before changing models."
+        )
+    }
+
+    private func inspectCheckpoint(
+        _ row: ModelCheckpointRowPresentation
+    ) {
+        let selection = ModelCatalogHierarchySelection
+            .checkpoint(row.checkpointID)
+        featureModel.hierarchyState.select(selection)
+        featureModel.inspectorController.select(
+            selection,
+            in: featureModel.snapshot?.experience
+                ?? services.modelCatalogExperience(
+                    for: destination.purpose,
+                    query: catalogQuery
+                )
+        )
+        checkpointInspectorMode = preferredInspectorMode
+        featureModel.showsInspector = true
+    }
+
+    private func chooseCheckpointArtifact(
+        _ row: ModelCheckpointRowPresentation,
+        _ artifact: ModelCatalogExactArtifactPresentation
+    ) {
+        services.setModelArtifactOverride(
+            checkpointID: row.checkpointID,
+            artifactID: artifact.id,
+            purpose: destination.purpose,
+            followsSignedRecommendation:
+                row.checkpoint.metadata.recommendedArtifactID
+                    == artifact.id
+        )
+    }
+
+    private func useCheckpointArtifact(
+        _ row: ModelCheckpointRowPresentation,
+        _ artifact: ModelCatalogExactArtifactPresentation
+    ) {
+        if destination == .transcription,
+           let mismatch = row.languageMismatch(for: artifact) {
+            pendingLanguageMismatchUse = ModelCheckpointPendingLanguageUse(
+                row: row,
+                artifact: artifact,
+                mismatch: mismatch
+            )
+            return
+        }
+        performCheckpointUse(row, artifact)
+    }
+
+    private func performCheckpointUse(
+        _ row: ModelCheckpointRowPresentation,
+        _ artifact: ModelCatalogExactArtifactPresentation
+    ) {
+        chooseCheckpointArtifact(row, artifact)
+        activatingModelID = artifact.id
+        Task {
+            let result = await services.useModel(
+                artifact.id,
+                purpose: destination.purpose
+            )
+            let message = result.message(for: artifact.row.model)
+            if result == .installQueued {
+                modelMessage = nil
+            } else {
+                modelMessage = message
+            }
+            activatingModelID = nil
+            announce(message)
+        }
+    }
+
+    private var checkpointOrderContext: ModelCheckpointOrderContext {
+        ModelCheckpointOrderContext(
+            language:
+                destination == .transcription
+                    ? services.preferences.transcriptionLanguage.rawValue
+                    : nil,
+            browsesAllLanguages: featureModel.browseAllLanguages,
+            searchText: featureModel.discoveryQuery.searchText
+        )
+    }
+
+    private var activeArtifactIDForDestination: String? {
+        switch destination {
+        case .transcription:
+            services.preferences.activeModelID
+        case .voiceCleaning:
+            services.preferences.activeVoiceCleaningModelID
+        }
+    }
+
+    private func installCheckpointArtifactOnly(
+        _ row: ModelCheckpointRowPresentation,
+        _ artifact: ModelCatalogExactArtifactPresentation
+    ) {
+        chooseCheckpointArtifact(row, artifact)
+        services.modelInstallCoordinator.start(
+            modelID: artifact.id,
+            purpose: destination.purpose,
+            action: artifact.row.isInstalled ? .reinstall : .install
+        )
+    }
+
+    private func cancelCheckpointInstall(
+        _ row: ModelCheckpointRowPresentation
+    ) {
+        guard let attemptID = row.selectedArtifact.row.install?
+            .state.attemptID else {
+            return
+        }
+        services.modelInstallCoordinator.cancel(attemptID: attemptID)
+    }
+
+    private func retryCheckpointInstall(
+        _ row: ModelCheckpointRowPresentation
+    ) {
+        guard let attemptID = row.selectedArtifact.row.install?
+            .state.attemptID else {
+            return
+        }
+        services.modelInstallCoordinator.retry(attemptID: attemptID)
+    }
+
+    private func beginCheckpointRemoval(
+        _ row: ModelCheckpointRowPresentation
+    ) {
+        let selection = ModelCatalogHierarchySelection
+            .exactArtifact(row.selectedArtifactID)
+        featureModel.hierarchyState.select(selection)
+        beginSelectedRemoval()
+    }
+
+    private func verifyCheckpointArtifact(
+        _ artifact: ModelCatalogExactArtifactPresentation
+    ) {
+        selectExactArtifactForInspector(artifact.id)
+        verifySelectedArtifact()
+    }
+
+    private func reinstallCheckpointArtifact(
+        _ artifact: ModelCatalogExactArtifactPresentation
+    ) {
+        services.modelInstallCoordinator.start(
+            modelID: artifact.id,
+            purpose: destination.purpose,
+            action: .reinstall
+        )
+    }
+
+    private func revealCheckpointArtifact(
+        _ artifact: ModelCatalogExactArtifactPresentation
+    ) {
+        guard let path = artifact.row.installedRecord?
+            .localFilesByManifestFilename.values.sorted().first
+        else {
+            return
+        }
+        NSWorkspace.shared.activateFileViewerSelecting([
+            URL(fileURLWithPath: path),
+        ])
+    }
+
+    private func removeCheckpointArtifact(
+        _ artifact: ModelCatalogExactArtifactPresentation
+    ) {
+        selectExactArtifactForInspector(artifact.id)
+        beginSelectedRemoval()
+    }
+
+    private func selectExactArtifactForInspector(_ artifactID: String) {
+        let selection = ModelCatalogHierarchySelection
+            .exactArtifact(artifactID)
+        featureModel.hierarchyState.select(selection)
+        featureModel.inspectorController.select(
+            selection,
+            in: featureModel.snapshot?.experience
+                ?? services.modelCatalogExperience(
+                    for: destination.purpose,
+                    query: catalogQuery
+                )
+        )
+    }
+
+    private func disableVoiceCleaning() {
+        Task {
+            let disabled = await services.disableVoiceCleaning()
+            let message = disabled
+                ? String(localized: "Voice cleaning is off.")
+                : String(
+                    localized:
+                        "Wait for the current dictation to finish, then try again."
+                )
+            modelMessage = message
+            announce(message)
+        }
     }
 
     @ViewBuilder
@@ -937,12 +1440,6 @@ struct ModelsSettingsPane: View {
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 12)
-                Button("Check Again") {
-                    Task {
-                        await coordinator.refresh()
-                    }
                 }
             }
             .padding(12)
@@ -1088,6 +1585,107 @@ struct ModelsSettingsPane: View {
                 } : nil
             )
         }
+    }
+
+    private func handleCheckpointKeyPress(
+        _ keyPress: KeyPress,
+        in presentation: ModelCheckpointListPresentation,
+        catalogExperience: ModelCatalogExperience
+    ) -> KeyPress.Result {
+        let command: ModelCatalogKeyboardCommand?
+        switch keyPress.key {
+        case .upArrow:
+            command = .moveUp
+        case .downArrow:
+            command = .moveDown
+        case .pageUp:
+            command = .pageUp
+        case .pageDown:
+            command = .pageDown
+        case .home:
+            command = .home
+        case .end:
+            command = .end
+        case .return:
+            command = .activate
+        case .delete where keyPress.modifiers.contains(.command):
+            command = .deleteSelection
+        default:
+            command = nil
+        }
+        guard let command else {
+            return .ignored
+        }
+        let disallowedModifiers: EventModifiers = [
+            .command,
+            .control,
+            .option,
+        ]
+        if command != .deleteSelection,
+           !keyPress.modifiers.intersection(disallowedModifiers).isEmpty {
+            return .ignored
+        }
+
+        let focusedCheckpointID: String?
+        if case let .checkpoint(id) = focusedCatalogRowID {
+            focusedCheckpointID = id
+        } else {
+            focusedCheckpointID = nil
+        }
+        let result = ModelCheckpointKeyboardNavigation.result(
+            for: command,
+            focusedCheckpointID: focusedCheckpointID,
+            checkpointIDs: presentation.rows.map(\.id)
+        )
+        switch result {
+        case .ignored:
+            return .ignored
+        case let .focus(id):
+            let rowID = ModelCatalogHierarchyRowID.checkpoint(id)
+            focusedCatalogRowID = rowID
+            featureModel.hierarchyState.focus(rowID)
+            featureModel.hierarchyState.scroll(to: rowID)
+            featureModel.viewportRestorationGeneration &+= 1
+            let selection = ModelCatalogHierarchySelection.checkpoint(id)
+            featureModel.hierarchyState.select(selection)
+            featureModel.inspectorController.select(
+                selection,
+                in: catalogExperience
+            )
+        case let .inspect(id):
+            guard let row = presentation.rows.first(where: {
+                $0.id == id
+            }) else {
+                return .ignored
+            }
+            inspectCheckpoint(row)
+        case let .delete(id):
+            guard let row = presentation.rows.first(where: {
+                $0.id == id
+            }) else {
+                return .ignored
+            }
+            beginCheckpointRemoval(row)
+        }
+        return .handled
+    }
+
+    private func handleModelsKeyPress(
+        _ keyPress: KeyPress,
+        checkpointPresentation: ModelCheckpointListPresentation,
+        catalogExperience: ModelCatalogExperience
+    ) -> KeyPress.Result {
+        if destination == .transcription {
+            return handleCheckpointKeyPress(
+                keyPress,
+                in: checkpointPresentation,
+                catalogExperience: catalogExperience
+            )
+        }
+        return handleCatalogKeyPress(
+            keyPress,
+            in: catalogExperience
+        )
     }
 
     private func handleCatalogKeyPress(
@@ -1412,6 +2010,7 @@ struct ModelsSettingsPane: View {
             services.modelInstallCoordinator.retry(attemptID: attemptID)
         }
         let onDelete: () -> Void = {
+            featureModel.hierarchyState.select(.exactArtifact(row.id))
             beginSelectedRemoval()
         }
         let visibleActions = row.visibleActions(
@@ -3162,7 +3761,10 @@ enum ModelCatalogEmptyPresentation {
         case let .unavailable(destination):
             return destination.unavailableDetail
         case .securityFailure:
-            return "Textify rejected the candidate catalog and did not replace trusted data."
+            return String(
+                localized:
+                    "Textify could not verify the model list included with this app. Reinstall or update Textify. Existing local dictation may continue with an already loaded model; no catalog actions are available."
+            )
         case let .requiresNewerTextify(manifestVersion):
             return "This signed catalog uses schema version \(manifestVersion), which this version of Textify cannot present."
         }
@@ -3170,13 +3772,12 @@ enum ModelCatalogEmptyPresentation {
 
     var actionTitle: String? {
         switch self {
-        case .checking, .requiresNewerTextify:
+        case .checking, .requiresNewerTextify, .securityFailure:
             return nil
         case let .query(state):
             return state.actionTitle
         case let .purpose(destination),
-             let .unavailable(destination),
-             let .securityFailure(destination):
+             let .unavailable(destination):
             return destination.unavailableActionTitle
         }
     }

@@ -439,6 +439,9 @@ final class ModelCatalogDerivationCoordinator {
 final class ModelCatalogFeatureModel {
     let purpose: ModelPurpose
     var discoveryQuery: ModelCatalogQuery
+    var browseAllLanguages = false
+    var checkpointOrderIDs: [String] = []
+    var refreshCheckpointOrderOnNextEntry = false
     var hierarchyState = ModelCatalogHierarchyState()
     var reconciledCatalogExperience: ModelCatalogExperience?
     var viewportRestorationGeneration: UInt64 = 0
