@@ -74,6 +74,7 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CURRENT_PROJECT_VERSION: "1"
         MARKETING_VERSION: "1.1.0"
+        TEXTIFY_SOURCE_COMMIT: local-development-not-for-release
       configs:
         Debug:
           CODE_SIGN_ENTITLEMENTS: Textify.Local.entitlements
@@ -90,6 +91,15 @@ targets:
           /bin/cp "$SRCROOT/models/manifest.json.sig" "$CATALOG_DIRECTORY/manifest.json.sig"
           /bin/cp "$SRCROOT/models/revocations.json" "$CATALOG_DIRECTORY/revocations.json"
           /bin/cp "$SRCROOT/models/revocations.json.sig" "$CATALOG_DIRECTORY/revocations.json.sig"
+          SOURCE_COMMIT="${TEXTIFY_SOURCE_COMMIT:-local-development-not-for-release}"
+          if ! printf '%s\n' "$SOURCE_COMMIT" \
+            | /usr/bin/grep -Eq '^(local-development-not-for-release|[0-9a-f]{40})$'; then
+            echo "Invalid Textify source commit identity: $SOURCE_COMMIT" >&2
+            exit 1
+          fi
+          /usr/libexec/PlistBuddy \
+            -c "Set :TextifySourceCommit $SOURCE_COMMIT" \
+            "$TARGET_BUILD_DIR/$INFOPLIST_PATH"
         inputFiles:
           - $(SRCROOT)/models/manifest.json
           - $(SRCROOT)/models/manifest.json.sig

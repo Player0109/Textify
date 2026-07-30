@@ -6,23 +6,14 @@ set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-require_clean_source_tree() {
-  local source_status
-  source_status="$(git -C "$REPO_ROOT" status --porcelain=v1 --untracked-files=all)"
-  if [[ -n "$source_status" ]]; then
-    echo "Release archives require a clean tracked and untracked source tree." >&2
-    printf '%s\n' "$source_status" >&2
-    exit 1
-  fi
-}
-
 rm -f "$ARCHIVE_COMMIT_PATH"
+require_clean_source_tree
 ensure_xcode_project
 mkdir -p "$BUILD_DIR"
 rm -rf "$ARCHIVE_PATH"
 
-require_clean_source_tree
 SOURCE_COMMIT="$(git -C "$REPO_ROOT" rev-parse --verify HEAD)"
+require_clean_head_at_commit "$SOURCE_COMMIT"
 
 xcodebuild archive \
   -project "$REPO_ROOT/Textify.xcodeproj" \
@@ -34,9 +25,14 @@ xcodebuild archive \
   CODE_SIGN_IDENTITY="$TEXTIFY_SIGNING_IDENTITY" \
   CODE_SIGN_STYLE=Manual \
   ARCHS=arm64 \
-  ONLY_ACTIVE_ARCH=NO
+  ONLY_ACTIVE_ARCH=NO \
+  TEXTIFY_SOURCE_COMMIT="$SOURCE_COMMIT"
 
 [[ -d "$ARCHIVE_PATH" ]]
-[[ "$(git -C "$REPO_ROOT" rev-parse --verify HEAD)" == "$SOURCE_COMMIT" ]]
-require_clean_source_tree
+[[ -d "$ARCHIVED_APP_PATH" ]]
+require_clean_head_at_commit "$SOURCE_COMMIT"
+"$REPO_ROOT/script/release/verify_artifact_source_commit.sh" \
+  "$ARCHIVED_APP_PATH" \
+  "$SOURCE_COMMIT"
+require_clean_head_at_commit "$SOURCE_COMMIT"
 printf '%s\n' "$SOURCE_COMMIT" > "$ARCHIVE_COMMIT_PATH"

@@ -341,6 +341,12 @@ rules, additive state ownership, and the designated rollback contract are in
 
 ## Public Docs And Manual QA Gate
 
+Resolve every item under “Known Specification-Conformance Blockers” in
+`docs/MANUAL_QA.md` before assembling final evidence. Source publication may
+proceed while those product decisions remain open, but a production app tag,
+draft, or release may not. Do not make the checklist appear complete by
+checking an item that the candidate cannot perform.
+
 The committed app-release candidate must describe an available release rather
 than a future one. Before the final validation used for archive creation or
 evidence collection:

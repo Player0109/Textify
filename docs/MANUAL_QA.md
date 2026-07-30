@@ -94,6 +94,47 @@ release-blocking.
   withdrawal with the designated rollback bridge. Revoked active content stays
   blocked, active identities do not change, and Installation Receipts, Queue
   Attempts, placements, and all attributed bytes remain owned afterward.
+- [ ] 42. In Settings -> Dictation, select a non-default microphone, confirm
+  the exact CoreAudio device identity persists across relaunch, verify a
+  disconnected selection is shown as unavailable without silent fallback, and
+  then return to System Default.
+- [ ] 43. Onboarding and Settings -> Dictation show a live input level meter
+  only while that UI is visible. With Microphone permission denied, the
+  permission action replaces the meter. No recording, waveform history, or
+  audio from the meter is retained.
+- [ ] 44. The transcription catalog exposes Family, Checkpoint, and Exact
+  Artifact hierarchy semantics to keyboard and assistive-technology users.
+  Left/Right collapse or expand a Checkpoint, Return inspects the focused
+  artifact, and Command-Delete is available only for one explicitly selected
+  installed Exact Artifact. A multi-variant Checkpoint is never a deletion
+  target.
+- [ ] 45. The normal curated-model inspector provides working source and
+  bundled-license affordances for the selected Exact Artifact, not provenance
+  and license names as display-only text.
+- [ ] 46. With Increase Contrast or Differentiate Without Color enabled, the
+  checkpoint catalog adds stronger selection and control boundaries. Complete
+  the corresponding Reduce Transparency visual pass before approval.
+
+## Known Specification-Conformance Blockers
+
+- BLOCKED: checks 42 and 43 cannot pass in the current implementation. Textify
+  resets microphone selection to System Default and does not ship the live
+  input meters required by `docs/SPEC.md`. Production app publication requires
+  either the specified implementation or an explicit product decision that
+  narrows the authoritative specification; checking the boxes alone is not a
+  substitute.
+- BLOCKED: `docs/SPEC.md` still says V1 has no language selector, while the
+  shipping Settings UI exposes one and the public documentation describes it.
+  The product owner must explicitly choose and document the production
+  behavior before evidence is assembled against the specification.
+- BLOCKED: checks 44 through 46 cannot pass on the current checkpoint-first
+  catalog surface. Independent review confirmed ambiguous Checkpoint-level
+  destructive keyboard routing, missing source/license affordances in the
+  normal inspector, and missing contrast/differentiate-without-color
+  adaptation. These require implementation and accessibility evidence, not
+  checklist-only approval.
+- Source publication is allowed while these items remain open. A `v1.1.0` tag,
+  draft app release, or production DMG publication is not.
 
 ## Supporting Commands
 

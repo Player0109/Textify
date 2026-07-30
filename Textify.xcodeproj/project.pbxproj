@@ -517,7 +517,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "CATALOG_DIRECTORY=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/ModelCatalog\"\nmkdir -p \"$CATALOG_DIRECTORY\"\n/bin/cp \"$SRCROOT/models/manifest.json\" \"$CATALOG_DIRECTORY/manifest.json\"\n/bin/cp \"$SRCROOT/models/manifest.json.sig\" \"$CATALOG_DIRECTORY/manifest.json.sig\"\n/bin/cp \"$SRCROOT/models/revocations.json\" \"$CATALOG_DIRECTORY/revocations.json\"\n/bin/cp \"$SRCROOT/models/revocations.json.sig\" \"$CATALOG_DIRECTORY/revocations.json.sig\"\n";
+			shellScript = "CATALOG_DIRECTORY=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/ModelCatalog\"\nmkdir -p \"$CATALOG_DIRECTORY\"\n/bin/cp \"$SRCROOT/models/manifest.json\" \"$CATALOG_DIRECTORY/manifest.json\"\n/bin/cp \"$SRCROOT/models/manifest.json.sig\" \"$CATALOG_DIRECTORY/manifest.json.sig\"\n/bin/cp \"$SRCROOT/models/revocations.json\" \"$CATALOG_DIRECTORY/revocations.json\"\n/bin/cp \"$SRCROOT/models/revocations.json.sig\" \"$CATALOG_DIRECTORY/revocations.json.sig\"\nSOURCE_COMMIT=\"${TEXTIFY_SOURCE_COMMIT:-local-development-not-for-release}\"\nif ! printf '%s\\n' \"$SOURCE_COMMIT\" \\\n  | /usr/bin/grep -Eq '^(local-development-not-for-release|[0-9a-f]{40})$'; then\n  echo \"Invalid Textify source commit identity: $SOURCE_COMMIT\" >&2\n  exit 1\nfi\n/usr/libexec/PlistBuddy \\\n  -c \"Set :TextifySourceCommit $SOURCE_COMMIT\" \\\n  \"$TARGET_BUILD_DIR/$INFOPLIST_PATH\"\n";
 		};
 		621E56C67CB1EB1DA5AA6D03 /* Thin and Sign LiteRT-LM Runtime */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -670,6 +670,7 @@
 				SDKROOT = macosx;
 				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_VERSION = 5.9;
+				TEXTIFY_SOURCE_COMMIT = "local-development-not-for-release";
 			};
 			name = Debug;
 		};
@@ -822,6 +823,7 @@
 				SDKROOT = macosx;
 				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_VERSION = 5.9;
+				TEXTIFY_SOURCE_COMMIT = "local-development-not-for-release";
 			};
 			name = Release;
 		};

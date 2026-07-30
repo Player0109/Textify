@@ -1857,3 +1857,50 @@ Task 1 must merge before parallel Wave 1 work begins.
 - Preserve all unrelated feature claims, release-blocking wording, and the
   distinction between Textify's own model-download requests and browser
   navigation initiated by the user.
+
+## Signed Artifact Source-Provenance Handoff - 2026-07-31
+
+- The production release review remediation owns the narrow build metadata and
+  release-script changes required to carry the archive's original clean commit
+  into the signed app and prove the same identity through export, DMG creation,
+  evidence binding, draft creation, notarization, and publication.
+- This slice may update `Resources/Info.plist`, `project.yml`, the generated
+  Xcode project, release helpers, focused release validation, and matching
+  release documentation/tests. Every long-running transformation must compare
+  the captured commit with a clean `HEAD` both before and after it runs.
+- The commit identity must live inside the signed app so a stale DMG cannot be
+  rebound to a later declaration whose executable happens to be unchanged.
+  Evidence, draft, and publish helpers must verify that signed identity against
+  the declaration/tag commit.
+- The artifact verifier may also close the reviewed generic Mach-O gap by
+  requiring every packaged Mach-O file—not only the known libraries—to be
+  exactly arm64 while preserving the macOS 14 compatibility checks.
+
+## Authoritative Spec Drift Release Gate Handoff - 2026-07-31
+
+- The production open-source release audit owns narrow release-documentation
+  gates for the independently reviewed mismatch between `docs/SPEC.md` and the
+  shipping microphone UI/runtime.
+- Do not rewrite the authoritative product decision or implement the missing
+  feature in this release-setup slice. Instead, add explicit unchecked manual
+  gates for non-default microphone selection and the visibility-scoped live
+  input meters, and record that app publication remains blocked until the
+  feature ships or the product owner formally narrows the specification.
+- Also preserve the review finding that the specification's old “No language
+  selector” statement conflicts with the shipping language control. Resolving
+  either product decision requires explicit scope authority; source
+  publication may proceed while production app publication remains blocked.
+
+## Catalog Interaction Spec Blocker Handoff - 2026-07-31
+
+- The production open-source release audit owns narrow release-documentation
+  gates for the independently confirmed catalog interaction defects. Do not
+  redesign the catalog UI in this release-setup slice.
+- Production app publication must remain blocked while a multi-variant
+  Checkpoint-level Command-Delete can resolve implicitly to one selected Exact
+  Artifact, the normal curated inspector lacks the required source and license
+  affordances, or the checkpoint surface lacks stronger boundaries for
+  Increase Contrast and Differentiate Without Color.
+- Preserve the existing destructive-action confirmations and accessibility
+  evidence requirements. Source publication may proceed with explicit,
+  unchecked gates and public issue tracking for the implementation work.

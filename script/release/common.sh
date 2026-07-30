@@ -8,6 +8,63 @@ EXPORT_PATH="$BUILD_DIR/export"
 APP_PATH="$EXPORT_PATH/Textify.app"
 ARCHIVE_COMMIT_PATH="$ARCHIVE_PATH/.textify-source-commit"
 EXPORT_COMMIT_PATH="$EXPORT_PATH/.textify-source-commit"
+ARCHIVED_APP_PATH="$ARCHIVE_PATH/Products/Applications/Textify.app"
+SOURCE_COMMIT_PLIST_KEY="TextifySourceCommit"
+
+require_release_commit() {
+  local source_commit="${1:-}"
+  if [[ ! "$source_commit" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "Expected a lowercase 40-character source commit, got: $source_commit" >&2
+    return 1
+  fi
+}
+
+require_clean_source_tree() {
+  local source_status
+  source_status="$(
+    git -C "$REPO_ROOT" status --porcelain=v1 --untracked-files=all
+  )"
+  if [[ -n "$source_status" ]]; then
+    echo "Release operations require a clean tracked and untracked source tree." >&2
+    printf '%s\n' "$source_status" >&2
+    return 1
+  fi
+}
+
+require_clean_head_at_commit() {
+  local expected_commit="$1"
+  local current_commit
+  require_release_commit "$expected_commit"
+  current_commit="$(git -C "$REPO_ROOT" rev-parse --verify HEAD)"
+  if [[ "$current_commit" != "$expected_commit" ]]; then
+    echo "Current HEAD $current_commit does not match release source $expected_commit." >&2
+    return 1
+  fi
+  require_clean_source_tree
+}
+
+embedded_source_commit() {
+  local app_path="$1"
+  local info_plist="$app_path/Contents/Info.plist"
+  [[ -d "$app_path" && ! -L "$app_path" ]]
+  [[ -f "$info_plist" && ! -L "$info_plist" ]]
+  /usr/libexec/PlistBuddy \
+    -c "Print :$SOURCE_COMMIT_PLIST_KEY" \
+    "$info_plist"
+}
+
+require_embedded_source_commit() {
+  local app_path="$1"
+  local expected_commit="$2"
+  local actual_commit
+  require_release_commit "$expected_commit"
+  actual_commit="$(embedded_source_commit "$app_path")"
+  require_release_commit "$actual_commit"
+  if [[ "$actual_commit" != "$expected_commit" ]]; then
+    echo "Signed app source $actual_commit does not match expected commit $expected_commit." >&2
+    return 1
+  fi
+}
 
 ensure_xcode_project() {
   cd "$REPO_ROOT"

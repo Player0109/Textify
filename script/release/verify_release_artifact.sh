@@ -4,11 +4,11 @@ set -euo pipefail
 : "${TEXTIFY_DEVELOPMENT_TEAM:?Set TEXTIFY_DEVELOPMENT_TEAM}"
 : "${TEXTIFY_SIGNING_IDENTITY:?Set TEXTIFY_SIGNING_IDENTITY}"
 
+SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIRECTORY/common.sh"
 APP_PATH="${1:?Usage: verify_release_artifact.sh path/to/Textify.app expected-version [--gatekeeper]}"
 EXPECTED_VERSION="${2:?Usage: verify_release_artifact.sh path/to/Textify.app expected-version [--gatekeeper]}"
 GATEKEEPER_MODE="${3:-}"
-SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIRECTORY/../.." && pwd)"
 MODEL_CATALOG_DIRECTORY="$APP_PATH/Contents/Resources/ModelCatalog"
 MODEL_CATALOG_KEY_ID="textify-model-manifest-2026-huggingface"
 MODEL_CATALOG_PUBLIC_KEY_BASE64="eg6XVGVQ4Kqh1dtN3B8JcFTtK0RSxkxd79W5tfIlfos="
@@ -65,6 +65,13 @@ assert_macos_14_compatible_macho() {
 [[ "$(plist_value CFBundleIconName)" == "AppIcon" ]]
 [[ "$(plist_value LSUIElement)" == "true" ]]
 [[ -n "$(plist_value NSMicrophoneUsageDescription)" ]]
+EMBEDDED_SOURCE_COMMIT="$(plist_value "$SOURCE_COMMIT_PLIST_KEY")"
+require_release_commit "$EMBEDDED_SOURCE_COMMIT"
+if [[ -n "${TEXTIFY_EXPECTED_SOURCE_COMMIT:-}" ]]; then
+  require_embedded_source_commit \
+    "$APP_PATH" \
+    "$TEXTIFY_EXPECTED_SOURCE_COMMIT"
+fi
 [[ -s "$APP_PATH/Contents/Resources/AppIcon.icns" ]]
 [[ -s "$APP_PATH/Contents/Resources/LICENSE" ]]
 [[ -s "$APP_PATH/Contents/Resources/ACKNOWLEDGMENTS.md" ]]
@@ -216,6 +223,11 @@ EXECUTABLE_MINOS="$(
 
 while IFS= read -r -d '' packaged_file; do
   [[ "$(file -b "$packaged_file")" == *Mach-O* ]] || continue
+  PACKAGED_ARCHITECTURES="$(lipo -archs "$packaged_file")"
+  if [[ "$PACKAGED_ARCHITECTURES" != "arm64" ]]; then
+    echo "$packaged_file contains unexpected architectures: $PACKAGED_ARCHITECTURES" >&2
+    exit 1
+  fi
   assert_macos_14_compatible_macho "$packaged_file"
 done < <(find "$APP_PATH/Contents" -type f -print0)
 

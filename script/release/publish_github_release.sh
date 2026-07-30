@@ -24,7 +24,7 @@ REPOSITORY="Player0109/Textify"
 [[ -f "$DECLARATION_PATH" ]]
 [[ -d "$EVIDENCE_ROOT" ]]
 [[ -f "$LOCAL_DMG_PATH" && -f "$LOCAL_CHECKSUM_PATH" ]]
-[[ -z "$(git -C "$REPO_ROOT" status --porcelain)" ]]
+require_clean_source_tree
 
 TEMPORARY_DIRECTORY="$(mktemp -d)"
 MOUNT_DIRECTORY="$TEMPORARY_DIRECTORY/mount"
@@ -44,6 +44,11 @@ trap cleanup EXIT
   "$TEMPORARY_DIRECTORY/release-evidence-bundle.json"
 
 RELEASE_COMMIT="$(jq -er '.releaseCommitSHA' "$DECLARATION_PATH")"
+require_clean_head_at_commit "$RELEASE_COMMIT"
+"$REPO_ROOT/script/release/verify_artifact_source_commit.sh" \
+  "$LOCAL_DMG_PATH" \
+  "$RELEASE_COMMIT"
+require_clean_head_at_commit "$RELEASE_COMMIT"
 LOCAL_DMG_SHA256="$(
   shasum -a 256 "$LOCAL_DMG_PATH" | awk '{print $1}'
 )"
@@ -85,7 +90,7 @@ EVIDENCE_EXECUTABLE_SHA256="$(
 )"
 
 git -C "$REPO_ROOT" fetch origin master --tags
-[[ "$(git -C "$REPO_ROOT" rev-parse HEAD)" == "$RELEASE_COMMIT" ]]
+require_clean_head_at_commit "$RELEASE_COMMIT"
 [[ "$(git -C "$REPO_ROOT" rev-parse origin/master)" == "$RELEASE_COMMIT" ]]
 [[ "$(git -C "$REPO_ROOT" cat-file -t "$TAG")" == "tag" ]]
 [[ "$(git -C "$REPO_ROOT" rev-list -n 1 "$TAG")" == "$RELEASE_COMMIT" ]]
@@ -116,6 +121,9 @@ spctl --assess \
   --context context:primary-signature \
   --verbose \
   "$DOWNLOADED_DMG_PATH"
+"$REPO_ROOT/script/release/verify_artifact_source_commit.sh" \
+  "$DOWNLOADED_DMG_PATH" \
+  "$RELEASE_COMMIT"
 
 hdiutil attach \
   "$DOWNLOADED_DMG_PATH" \
@@ -124,10 +132,11 @@ hdiutil attach \
   -mountpoint "$MOUNT_DIRECTORY" \
   -quiet
 MOUNTED=true
-"$REPO_ROOT/script/release/verify_release_artifact.sh" \
-  "$MOUNT_DIRECTORY/Textify.app" \
-  "$VERSION" \
-  --gatekeeper
+TEXTIFY_EXPECTED_SOURCE_COMMIT="$RELEASE_COMMIT" \
+  "$REPO_ROOT/script/release/verify_release_artifact.sh" \
+    "$MOUNT_DIRECTORY/Textify.app" \
+    "$VERSION" \
+    --gatekeeper
 [[ "$(
   shasum -a 256 \
     "$MOUNT_DIRECTORY/Textify.app/Contents/MacOS/Textify" \
@@ -136,6 +145,8 @@ MOUNTED=true
 hdiutil detach "$MOUNT_DIRECTORY" -quiet
 MOUNTED=false
 
+require_clean_head_at_commit "$RELEASE_COMMIT"
+[[ "$(git -C "$REPO_ROOT" rev-list -n 1 "$TAG")" == "$RELEASE_COMMIT" ]]
 gh release edit "$TAG" \
   --repo "$REPOSITORY" \
   --draft=false \
@@ -146,6 +157,7 @@ gh release edit "$TAG" \
 [[ "$(
   gh api "repos/$REPOSITORY/releases/latest" --jq '.tag_name'
 )" == "$TAG" ]]
+require_clean_head_at_commit "$RELEASE_COMMIT"
 
 trap - EXIT
 rm -rf "$TEMPORARY_DIRECTORY"

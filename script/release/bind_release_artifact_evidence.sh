@@ -38,10 +38,11 @@ if [[ ! "$ARTIFACT_NAME" =~ ^Textify-[0-9]+\.[0-9]+\.[0-9]+-arm64\.dmg$ ]]; then
 fi
 
 RELEASE_COMMIT="$(jq -er '.releaseCommitSHA' "$DECLARATION_PATH")"
-if [[ "$(git -C "$REPO_ROOT" rev-parse HEAD)" != "$RELEASE_COMMIT" ]]; then
-  echo "evidence releaseCommitSHA does not match the current commit" >&2
-  exit 1
-fi
+require_clean_head_at_commit "$RELEASE_COMMIT"
+"$REPO_ROOT/script/release/verify_artifact_source_commit.sh" \
+  "$ARTIFACT_PATH" \
+  "$RELEASE_COMMIT"
+require_clean_head_at_commit "$RELEASE_COMMIT"
 
 ARTIFACT_SHA256="$(shasum -a 256 "$ARTIFACT_PATH" | awk '{print $1}')"
 ARTIFACT_DIRECTORY="$EVIDENCE_ROOT/artifacts"
@@ -91,6 +92,7 @@ jq \
   ' \
   "$DECLARATION_PATH" > "$TEMPORARY_DECLARATION"
 jq -e 'type == "object"' "$TEMPORARY_DECLARATION" >/dev/null
+require_clean_head_at_commit "$RELEASE_COMMIT"
 mv "$TEMPORARY_DECLARATION" "$DECLARATION_PATH"
 
 trap - EXIT

@@ -28,5 +28,7 @@
   <string>Textify uses your microphone to transcribe speech while you're actively dictating. Audio is processed on-device and never leaves your Mac.</string>
   <key>NSPrincipalClass</key>
   <string>NSApplication</string>
+  <key>TextifySourceCommit</key>
+  <string>local-development-not-for-release</string>
 </dict>
 </plist>

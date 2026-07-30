@@ -8,7 +8,11 @@ source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 rm -rf "$EXPORT_PATH"
 [[ -d "$ARCHIVE_PATH" ]]
 [[ -f "$ARCHIVE_COMMIT_PATH" ]]
-[[ "$(<"$ARCHIVE_COMMIT_PATH")" == "$(git -C "$REPO_ROOT" rev-parse HEAD)" ]]
+SOURCE_COMMIT="$(<"$ARCHIVE_COMMIT_PATH")"
+require_clean_head_at_commit "$SOURCE_COMMIT"
+"$REPO_ROOT/script/release/verify_artifact_source_commit.sh" \
+  "$ARCHIVED_APP_PATH" \
+  "$SOURCE_COMMIT"
 mkdir -p "$EXPORT_PATH"
 
 xcodebuild -exportArchive \
@@ -44,6 +48,10 @@ codesign \
   --entitlements "$REPO_ROOT/Textify.entitlements" \
   "$APP_PATH"
 codesign --verify --deep --strict --verbose=2 "$APP_PATH"
-git -C "$REPO_ROOT" rev-parse HEAD > "$EXPORT_COMMIT_PATH"
+"$REPO_ROOT/script/release/verify_artifact_source_commit.sh" \
+  "$APP_PATH" \
+  "$SOURCE_COMMIT"
+require_clean_head_at_commit "$SOURCE_COMMIT"
+printf '%s\n' "$SOURCE_COMMIT" > "$EXPORT_COMMIT_PATH"
 trap - EXIT
 rm -rf "$TEMPORARY_DIRECTORY"

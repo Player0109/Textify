@@ -8,6 +8,7 @@ set -euo pipefail
 DMG_PATH="${1:?Usage: notarize_dmg.sh path/to/Textify.dmg}"
 CHECKSUM_PATH="$DMG_PATH.sha256"
 SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIRECTORY/common.sh"
 DMG_FILENAME="$(basename "$DMG_PATH")"
 DMG_DIRECTORY="$(cd "$(dirname "$DMG_PATH")" && pwd)"
 if [[ "$DMG_FILENAME" =~ ^Textify-(.+)-arm64\.dmg$ ]]; then
@@ -18,6 +19,12 @@ else
 fi
 
 rm -f "$CHECKSUM_PATH"
+SOURCE_COMMIT="$(git -C "$REPO_ROOT" rev-parse --verify HEAD)"
+require_clean_head_at_commit "$SOURCE_COMMIT"
+"$SCRIPT_DIRECTORY/verify_artifact_source_commit.sh" \
+  "$DMG_PATH" \
+  "$SOURCE_COMMIT" \
+  --allow-unsigned-dmg
 
 codesign --force \
   --sign "$TEXTIFY_SIGNING_IDENTITY" \
@@ -42,15 +49,21 @@ cleanup_mount() {
 }
 trap cleanup_mount EXIT
 hdiutil attach "$DMG_PATH" -nobrowse -readonly -mountpoint "$MOUNT_DIRECTORY" -quiet
-"$SCRIPT_DIRECTORY/verify_release_artifact.sh" \
-  "$MOUNT_DIRECTORY/Textify.app" \
-  "$EXPECTED_VERSION" \
-  --gatekeeper
+TEXTIFY_EXPECTED_SOURCE_COMMIT="$SOURCE_COMMIT" \
+  "$SCRIPT_DIRECTORY/verify_release_artifact.sh" \
+    "$MOUNT_DIRECTORY/Textify.app" \
+    "$EXPECTED_VERSION" \
+    --gatekeeper
 cleanup_mount
 trap - EXIT
 
+"$SCRIPT_DIRECTORY/verify_artifact_source_commit.sh" \
+  "$DMG_PATH" \
+  "$SOURCE_COMMIT"
+require_clean_head_at_commit "$SOURCE_COMMIT"
 (
   cd "$DMG_DIRECTORY"
   shasum -a 256 "$DMG_FILENAME" > "$DMG_FILENAME.sha256"
   shasum -a 256 -c "$DMG_FILENAME.sha256"
 )
+require_clean_head_at_commit "$SOURCE_COMMIT"

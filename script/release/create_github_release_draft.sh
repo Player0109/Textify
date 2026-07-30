@@ -23,7 +23,8 @@ REPOSITORY="Player0109/Textify"
 [[ -d "$EVIDENCE_ROOT" ]]
 [[ -f "$DMG_PATH" && -f "$CHECKSUM_PATH" ]]
 [[ -f "$NOTES_PATH" ]]
-[[ -z "$(git -C "$REPO_ROOT" status --porcelain)" ]]
+[[ -f "$REPO_ROOT/docs/MANUAL_QA.md" ]]
+require_clean_source_tree
 ! grep -Fq \
   "The Textify $VERSION production app has not been published yet." \
   "$REPO_ROOT/README.md"
@@ -34,6 +35,16 @@ CHANGELOG_RELEASE_DATE="$(
     "$REPO_ROOT/CHANGELOG.md"
 )"
 [[ "$CHANGELOG_RELEASE_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]
+UNCHECKED_QA_ITEMS="$(
+  grep -nE '^[[:space:]]*- \[ \]' \
+    "$REPO_ROOT/docs/MANUAL_QA.md" \
+    || true
+)"
+if [[ -n "$UNCHECKED_QA_ITEMS" ]]; then
+  echo "Every release-blocking MANUAL_QA item must be checked before creating a draft." >&2
+  printf '%s\n' "$UNCHECKED_QA_ITEMS" >&2
+  exit 1
+fi
 
 TEMPORARY_DIRECTORY="$(mktemp -d)"
 cleanup() {
@@ -47,6 +58,11 @@ trap cleanup EXIT
   "$TEMPORARY_DIRECTORY/release-evidence-bundle.json"
 
 RELEASE_COMMIT="$(jq -er '.releaseCommitSHA' "$DECLARATION_PATH")"
+require_clean_head_at_commit "$RELEASE_COMMIT"
+"$REPO_ROOT/script/release/verify_artifact_source_commit.sh" \
+  "$DMG_PATH" \
+  "$RELEASE_COMMIT"
+require_clean_head_at_commit "$RELEASE_COMMIT"
 DMG_SHA256="$(shasum -a 256 "$DMG_PATH" | awk '{print $1}')"
 EVIDENCE_DMG_SHA256="$(
   jq -er \
@@ -66,7 +82,7 @@ EVIDENCE_DMG_SHA256="$(
 )
 
 git -C "$REPO_ROOT" fetch origin master --tags
-[[ "$(git -C "$REPO_ROOT" rev-parse HEAD)" == "$RELEASE_COMMIT" ]]
+require_clean_head_at_commit "$RELEASE_COMMIT"
 [[ "$(git -C "$REPO_ROOT" rev-parse origin/master)" == "$RELEASE_COMMIT" ]]
 
 if git -C "$REPO_ROOT" rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
@@ -76,6 +92,8 @@ else
   git -C "$REPO_ROOT" tag -a "$TAG" -m "Textify $VERSION" "$RELEASE_COMMIT"
 fi
 
+[[ "$(git -C "$REPO_ROOT" rev-list -n 1 "$TAG")" == "$RELEASE_COMMIT" ]]
+require_clean_head_at_commit "$RELEASE_COMMIT"
 git -C "$REPO_ROOT" push origin "refs/tags/$TAG"
 if gh release view "$TAG" --repo "$REPOSITORY" >/dev/null 2>&1; then
   echo "GitHub Release already exists for $TAG" >&2
