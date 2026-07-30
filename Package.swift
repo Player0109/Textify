@@ -112,7 +112,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/ml-explore/mlx-swift.git",
-            exact: "0.31.3"
+            exact: "0.31.6"
         ),
         .package(
             url: "https://github.com/Blaizzy/mlx-audio-swift.git",
