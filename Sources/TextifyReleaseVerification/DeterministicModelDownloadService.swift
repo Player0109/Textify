@@ -28,6 +28,7 @@ public final class DeterministicModelDownloadService: @unchecked Sendable {
     private var listener: NWListener?
     private var servicePort: UInt16?
     private var flakyRequestCount = 0
+    private var slowResponseConnection: NWConnection?
 
     public init(payload: Data) {
         self.payload = payload
@@ -72,6 +73,7 @@ public final class DeterministicModelDownloadService: @unchecked Sendable {
             listener = nil
             servicePort = nil
         }
+        cancelSlowResponse()
     }
 
     public func exercise() async throws -> DeterministicModelDownloadReport {
@@ -304,26 +306,35 @@ public final class DeterministicModelDownloadService: @unchecked Sendable {
         transport: URLSessionDownloadTransport
     ) async throws -> Bool {
         let partialURL = root.appendingPathComponent("cancel.partial")
+        let cancellation = PartialDownloadCancellation()
         let task = Task {
             try await transport.downloadFile(
                 URLRequest(url: baseURL.appendingPathComponent("slow")),
-                to: partialURL
+                to: partialURL,
+                progress: { progress in
+                    cancellation.observe(progress)
+                }
             )
         }
-        for _ in 0..<200 {
-            if (try? partialURL.resourceValues(
-                forKeys: [.fileSizeKey]
-            ).fileSize) ?? 0 > 0 {
-                break
-            }
-            try await Task.sleep(nanoseconds: 2_000_000)
+        cancellation.bind { task.cancel() }
+        let watchdog = Task {
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard !Task.isCancelled else { return }
+            cancellation.failIfProgressMissing()
         }
-        task.cancel()
+        defer {
+            watchdog.cancel()
+            cancelSlowResponse()
+        }
+
         do {
             _ = try await task.value
             return false
+        } catch is CancellationError {
+            return cancellation.observedPartialPayload
+                && !FileManager.default.fileExists(atPath: partialURL.path)
         } catch {
-            return !FileManager.default.fileExists(atPath: partialURL.path)
+            return false
         }
     }
 
@@ -522,6 +533,7 @@ public final class DeterministicModelDownloadService: @unchecked Sendable {
     }
 
     private func sendSlowResponse(on connection: NWConnection) {
+        guard retainSlowResponse(connection) else { return }
         let header = Data(
             "HTTP/1.1 200 OK\r\nContent-Length: \(payload.count)\r\nETag: \"v1\"\r\nConnection: close\r\n\r\n"
                 .utf8
@@ -530,20 +542,42 @@ public final class DeterministicModelDownloadService: @unchecked Sendable {
         connection.send(
             content: header + payload.prefix(split),
             completion: .contentProcessed { [weak self] error in
-                guard error == nil, let self else {
-                    connection.cancel()
-                    return
-                }
-                self.queue.asyncAfter(deadline: .now() + 1) {
-                    connection.send(
-                        content: self.payload.dropFirst(split),
-                        completion: .contentProcessed {
-                            _ in connection.cancel()
-                        }
-                    )
+                if error != nil {
+                    self?.cancelSlowResponse(connection)
                 }
             }
         )
+    }
+
+    private func retainSlowResponse(_ connection: NWConnection) -> Bool {
+        var replacedConnection: NWConnection?
+        let retained = lock.withLock {
+            guard listener != nil else { return false }
+            replacedConnection = slowResponseConnection
+            slowResponseConnection = connection
+            return true
+        }
+        replacedConnection?.cancel()
+        if !retained {
+            connection.cancel()
+        }
+        return retained
+    }
+
+    private func cancelSlowResponse(
+        _ expectedConnection: NWConnection? = nil
+    ) {
+        let connection = lock.withLock {
+            guard let expectedConnection else {
+                defer { slowResponseConnection = nil }
+                return slowResponseConnection
+            }
+            if slowResponseConnection === expectedConnection {
+                slowResponseConnection = nil
+            }
+            return expectedConnection
+        }
+        connection?.cancel()
     }
 
     private func send(
@@ -565,6 +599,65 @@ public final class DeterministicModelDownloadService: @unchecked Sendable {
             content: header + body,
             completion: .contentProcessed { _ in connection.cancel() }
         )
+    }
+}
+
+private final class PartialDownloadCancellation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancellation: (@Sendable () -> Void)?
+    private var cancellationPending = false
+    private var didObservePartialPayload = false
+    private var didFailForMissingProgress = false
+
+    var observedPartialPayload: Bool {
+        lock.withLock {
+            didObservePartialPayload && !didFailForMissingProgress
+        }
+    }
+
+    func bind(_ cancellation: @escaping @Sendable () -> Void) {
+        let shouldCancel = lock.withLock {
+            if cancellationPending {
+                return true
+            }
+            self.cancellation = cancellation
+            return false
+        }
+        if shouldCancel {
+            cancellation()
+        }
+    }
+
+    func observe(_ progress: DownloadFileProgress) {
+        guard progress.bytesDownloaded > 0,
+              progress.bytesDownloaded < progress.totalBytes else {
+            return
+        }
+        let cancellation = lock.withLock {
+            guard !didObservePartialPayload,
+                  !didFailForMissingProgress else {
+                return nil as (@Sendable () -> Void)?
+            }
+            didObservePartialPayload = true
+            cancellationPending = true
+            defer { self.cancellation = nil }
+            return self.cancellation
+        }
+        cancellation?()
+    }
+
+    func failIfProgressMissing() {
+        let cancellation = lock.withLock {
+            guard !didObservePartialPayload,
+                  !didFailForMissingProgress else {
+                return nil as (@Sendable () -> Void)?
+            }
+            didFailForMissingProgress = true
+            cancellationPending = true
+            defer { self.cancellation = nil }
+            return self.cancellation
+        }
+        cancellation?()
     }
 }
 

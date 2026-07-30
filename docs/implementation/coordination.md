@@ -1904,3 +1904,15 @@ Task 1 must merge before parallel Wave 1 work begins.
 - Preserve the existing destructive-action confirmations and accessibility
   evidence requirements. Source publication may proceed with explicit,
   unchecked gates and public issue tracking for the implementation work.
+
+## Hosted CI Download Cancellation Verification Handoff - 2026-07-31
+
+- The production open-source release audit owns the narrow deterministic-test
+  remediation in `DeterministicModelDownloadService.swift` and its focused
+  release-verification test after the macOS 26 hosted runner completed the
+  artificial slow response before the cancellation task resumed.
+- Replace wall-clock ordering with explicit synchronization that proves a
+  partial payload was received before cancellation and that cancellation
+  removes the partial file. Preserve the production download transport,
+  redirect/range/validator/disconnect/retry coverage, and all unrelated model
+  workflow behavior.
