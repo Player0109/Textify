@@ -1844,3 +1844,16 @@ Task 1 must merge before parallel Wave 1 work begins.
   integrated release gate finishes.
 - Preserve every manual checkbox, human-approval requirement, credentialed
   signing/notarization blocker, and real-device evidence requirement.
+
+## Public Documentation Truthfulness Handoff - 2026-07-31
+
+- The production open-source release audit owns narrow corrections to
+  `README.md`, `docs/release/v1.1.0.md`, and `PRIVACY.md` identified by the
+  final documentation review.
+- Public feature copy must not claim that Textify 1.1 can select a microphone;
+  the shipping setting is System Default. The privacy statement must also
+  disclose user-opened model, source, and license links that leave Textify for
+  third-party pages in the default browser.
+- Preserve all unrelated feature claims, release-blocking wording, and the
+  distinction between Textify's own model-download requests and browser
+  navigation initiated by the user.

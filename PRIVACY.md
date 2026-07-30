@@ -43,18 +43,23 @@ The signed model catalog and its signature are bundled with Textify. The app
 does not fetch catalog or revocation metadata when it launches, when onboarding
 opens, or when Settings opens.
 
-Network access occurs only for:
+Textify itself makes network requests only for a model download that you
+explicitly start, from an immutable Textify GitHub Release asset or an exact
+commit-pinned public Hugging Face file.
 
-- a model download that you explicitly start, from an immutable Textify GitHub
-  Release asset or an exact commit-pinned public Hugging Face file; and
-- manual app downloads from GitHub Releases that you initiate outside Textify.
-
-GitHub and Hugging Face receive the requested immutable URL, including its
+GitHub or Hugging Face receives the requested immutable URL, including its
 repository path and model filename, and ordinary request metadata such as IP
 address, user agent, and request time. The provider can therefore infer which
 model file was requested. Textify does not send a separate installed-model
 inventory, local storage paths, analytics, system profiles, or dictated content
-with those requests.
+with that request.
+
+Actions you explicitly initiate outside Textify can create separate browser
+requests. These include downloading the app manually from GitHub Releases and
+opening model, source, or license links from Settings. Those links may visit
+GitHub, Hugging Face, ModelScope, or a license publisher. Your default browser
+then sends the requested URL and ordinary request metadata to that provider
+under the browser's and provider's privacy practices.
 
 Automatic updates are deferred in Textify 1.1, so the app does not make update
 checks or send Sparkle system-profile data.
