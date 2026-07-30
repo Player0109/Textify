@@ -1,5 +1,5 @@
 name: Model Suggestion
-description: Suggest a redistributable Whisper-compatible ggml model for curation.
+description: Suggest an on-device speech model for Textify's signed catalog.
 title: "[Model]: "
 labels:
   - model-suggestion
@@ -9,7 +9,16 @@ body:
       value: |
         Model suggestions are reviewed by maintainers and added at their discretion based on license compatibility, quality, and fit. Filing this issue does not guarantee inclusion or a timeline.
 
-        Do not attach or submit model binaries. Textify maintainers obtain eligible artifacts directly from their upstream source.
+        Textify supports multiple local runtimes and currently curates 42 exact artifacts: 39 transcription models and 3 voice-cleaning models. Do not attach or submit model binaries. Textify maintainers obtain eligible artifacts directly from their authoritative upstream source.
+  - type: dropdown
+    id: purpose
+    attributes:
+      label: Intended purpose
+      options:
+        - Transcription
+        - Voice cleaning
+    validations:
+      required: true
   - type: input
     id: model_name
     attributes:
@@ -22,6 +31,14 @@ body:
       label: Source URL
       description: Link to the authoritative upstream model page or repository.
       placeholder: "https://..."
+    validations:
+      required: true
+  - type: input
+    id: source_revision
+    attributes:
+      label: Source revision
+      description: Provide an immutable release, tag, or full commit SHA when known.
+      placeholder: "Release, tag, or full commit SHA"
     validations:
       required: true
   - type: input
@@ -39,21 +56,35 @@ body:
       placeholder: "500 MB"
     validations:
       required: true
+  - type: input
+    id: languages
+    attributes:
+      label: Supported languages
+      placeholder: "English"
+    validations:
+      required: true
   - type: textarea
     id: rationale
     attributes:
       label: Why should Textify consider it?
-      description: Explain its quality, performance, and fit for short English dictation.
+      description: Explain its quality, latency, hardware requirements, and fit for short dictation or voice cleaning.
+    validations:
+      required: true
+  - type: textarea
+    id: runtime_compatibility
+    attributes:
+      label: Runtime compatibility
+      description: Name the Textify-supported local runtime that can execute the exact artifact, or explain what new runtime work would be required.
+      placeholder: "Runtime, artifact format, and required integration"
     validations:
       required: true
   - type: dropdown
-    id: tested_with_whisper_cpp
+    id: tested_on_apple_silicon
     attributes:
-      label: Tested with whisper.cpp?
+      label: Tested locally on Apple Silicon?
       options:
         - "Yes"
         - "No"
         - Not sure
     validations:
       required: true
-

@@ -218,11 +218,11 @@ enum ModelCatalogQueryEmptyState: Equatable {
         case .combined:
             "Clear the search and filters to return to the full catalog."
         case .validCatalog:
-            "Refresh the trusted catalog to check for newly curated models."
+            "This version of Textify does not include models for this selection."
         }
     }
 
-    var actionTitle: String {
+    var actionTitle: String? {
         switch self {
         case .installed:
             "Show All Models"
@@ -233,7 +233,7 @@ enum ModelCatalogQueryEmptyState: Equatable {
         case .combined:
             "Clear Search and Filters"
         case .validCatalog:
-            "Refresh Catalog"
+            nil
         }
     }
 }
@@ -683,9 +683,9 @@ enum ModelCatalogPurposeDestination: Equatable {
     var emptyDetail: String {
         switch self {
         case .transcription:
-            return "Refresh the signed catalog or update Textify to find a compatible transcription model."
+            return "Update Textify to install a version with a compatible transcription model."
         case .voiceCleaning:
-            return "Voice cleaning is optional. Refresh the signed catalog or continue dictating with raw audio."
+            return "Voice cleaning is optional. Update Textify for a newer bundled model list, or continue dictating with raw audio."
         }
     }
 
@@ -701,14 +701,14 @@ enum ModelCatalogPurposeDestination: Equatable {
     var unavailableDetail: String {
         switch self {
         case .transcription:
-            return "Textify could not load the trusted catalog. Installed transcription models remain available offline."
+            return "Textify could not verify the model list included with this app. Reinstall or update Textify. Installed transcription models remain available."
         case .voiceCleaning:
-            return "Textify could not load the trusted catalog. Voice cleaning is optional, and installed cleaners remain available offline."
+            return "Textify could not verify the model list included with this app. Reinstall or update Textify. Voice cleaning remains optional."
         }
     }
 
-    var unavailableActionTitle: String {
-        "Refresh Catalog"
+    var unavailableActionTitle: String? {
+        nil
     }
 }
 
@@ -2993,6 +2993,7 @@ struct ModelCatalogExperience: Equatable {
             provenance: provenance,
             license: license,
             sourceURL: row.model.sourceURL,
+            sourceAndLicense: model.map(ModelSourceLicensePresentation.init),
             canVerify: row.isInstalled,
             localDetails: row.storageInventory.map {
                 ModelCatalogArtifactLocalDetails(inventory: $0)

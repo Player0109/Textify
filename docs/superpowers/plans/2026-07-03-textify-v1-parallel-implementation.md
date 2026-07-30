@@ -199,7 +199,8 @@ Run:
 git rev-parse --is-inside-work-tree || git init
 ```
 
-Expected: either `true` or a new repository initialized at `/Users/amrendrasingh/Desktop/Amrendra/Textify`.
+Expected: either `true` or a new repository initialized at
+`/Users/textify/Textify`.
 
 - [ ] **Step 2: Create `Package.swift`**
 

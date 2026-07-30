@@ -12,7 +12,7 @@ verify_source() {
   printf '%s  %s\n' \
     'b9dce3ad05294742b57627d86e7815be497a2f426e954476cdc31fea22197318' \
     "$SHERPA_LIBRARY" \
-    '3b76ed91e19443f04b79d53bf415d5fe66dd81211e3b7787ba48009e49e2d04d' \
+    '872533f130f1839a5bc01788ddb4f75c83a189763441ba1178788ed965449289' \
     "$ONNX_RUNTIME_LIBRARY" \
     | shasum -a 256 -c - >/dev/null
   [[ "$(lipo -archs "$SHERPA_LIBRARY")" == "arm64" ]]

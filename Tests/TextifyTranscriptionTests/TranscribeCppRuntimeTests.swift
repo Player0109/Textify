@@ -295,17 +295,13 @@ final class TranscribeCppRuntimeTests: XCTestCase {
             ),
             "auto"
         )
-        XCTAssertThrowsError(
+        XCTAssertEqual(
             try TranscribeCppRuntime.requireSupportedLanguage(
                 "en",
                 variant: .qwen3ASR0_6B
-            )
-        ) { error in
-            XCTAssertEqual(
-                error as? TranscribeCppRuntimeError,
-                .automaticLanguageDetectionRequired
-            )
-        }
+            ),
+            "en"
+        )
         XCTAssertEqual(
             try TranscribeCppRuntime.requireSupportedLanguage(
                 "EN-US",
@@ -328,7 +324,7 @@ final class TranscribeCppRuntimeTests: XCTestCase {
         }
     }
 
-    func testQwen3ASRUsesAutomaticLanguageForWarmupAndInference() async throws {
+    func testQwen3ASRUsesConfiguredLanguageForWarmupAndInference() async throws {
         let runtimeDirectory = try Self.makeTemporaryDirectory()
         let modelURL = try Self.makeTemporaryModelFile()
         defer {
@@ -340,23 +336,25 @@ final class TranscribeCppRuntimeTests: XCTestCase {
             TranscribeCppModelVariant.qwen3ASR0_6B,
             TranscribeCppModelVariant.qwen3ASR1_7B,
         ] {
-            let session = FakeTranscribeCppSession()
-            let runtime = TranscribeCppRuntime(
-                runtimeDirectory: runtimeDirectory.path,
-                backend: TranscribeCppRuntimeBackend { _, _, _, _ in session }
-            )
-            try await runtime.load(
-                modelID: variant.rawValue,
-                modelPath: modelURL.path,
-                variant: variant,
-                languageCode: "auto"
-            )
-            _ = try await runtime.transcribe(
-                TranscriptionAudioBuffer(samples: Array(repeating: 0.1, count: 16000))
-            )
+            for languageCode in ["auto", "en"] {
+                let session = FakeTranscribeCppSession()
+                let runtime = TranscribeCppRuntime(
+                    runtimeDirectory: runtimeDirectory.path,
+                    backend: TranscribeCppRuntimeBackend { _, _, _, _ in session }
+                )
+                try await runtime.load(
+                    modelID: variant.rawValue,
+                    modelPath: modelURL.path,
+                    variant: variant,
+                    languageCode: languageCode
+                )
+                _ = try await runtime.transcribe(
+                    TranscriptionAudioBuffer(samples: Array(repeating: 0.1, count: 16000))
+                )
 
-            let calls = await session.callsSnapshot()
-            XCTAssertEqual(calls.map(\.languageCode), ["auto", "auto"])
+                let calls = await session.callsSnapshot()
+                XCTAssertEqual(calls.map(\.languageCode), [languageCode, languageCode])
+            }
         }
     }
 

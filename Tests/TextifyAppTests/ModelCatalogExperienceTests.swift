@@ -1234,15 +1234,17 @@ final class ModelCatalogExperienceTests: XCTestCase {
             .combined
         )
         XCTAssertEqual(ModelCatalogQuery().emptyState, .validCatalog)
+        XCTAssertNil(
+            ModelCatalogQueryEmptyState.validCatalog.actionTitle
+        )
         XCTAssertEqual(
             Set([
                 ModelCatalogQueryEmptyState.installed.actionTitle,
                 ModelCatalogQueryEmptyState.search.actionTitle,
                 ModelCatalogQueryEmptyState.filters.actionTitle,
                 ModelCatalogQueryEmptyState.combined.actionTitle,
-                ModelCatalogQueryEmptyState.validCatalog.actionTitle,
-            ]).count,
-            5
+            ].compactMap { $0 }).count,
+            4
         )
     }
 
@@ -2583,6 +2585,32 @@ final class ModelCatalogExperienceTests: XCTestCase {
             "Fixture • Whisper Small • revision 1234567890ab • model.bin"
         )
         XCTAssertEqual(artifact.license, "MIT — MIT License (model)")
+        let sourceAndLicense = try XCTUnwrap(artifact.sourceAndLicense)
+        XCTAssertEqual(sourceAndLicense.sourceName, "Fixture")
+        XCTAssertEqual(sourceAndLicense.originalModelName, "Whisper Small")
+        XCTAssertEqual(sourceAndLicense.sourceRevision, "1234567890abcdef1234567890abcdef12345678")
+        XCTAssertEqual(
+            sourceAndLicense.files,
+            [
+                ModelSourceLicensePresentation.SignedFile(
+                    filename: "model.bin",
+                    relativePath: nil,
+                    sha256: "66bd26882020db56790522008135dfc28268bac4ed7ebce49086c7179bd2f868",
+                    sizeBytes: 33
+                ),
+            ]
+        )
+        XCTAssertEqual(
+            sourceAndLicense.licenses,
+            [
+                ModelSourceLicensePresentation.License(
+                    scope: "model",
+                    spdxID: "MIT",
+                    name: "MIT License",
+                    licenseTextURL: "https://example.com/licenses/whisper-small-q5_1.txt"
+                ),
+            ]
+        )
         XCTAssertTrue(artifact.canVerify)
         XCTAssertEqual(artifact.localDetails?.allocatedBytes, 4_096)
         XCTAssertEqual(artifact.localDetails?.unexpectedFileCount, 1)

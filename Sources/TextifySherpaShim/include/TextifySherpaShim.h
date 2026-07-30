@@ -40,15 +40,6 @@ TextifySherpaContext *TextifySherpaCreateQwen3ASR(
     char *error_message,
     int32_t error_message_capacity);
 
-TextifySherpaContext *TextifySherpaCreateOmnilingualASR(
-    const char *runtime_directory,
-    const char *model_path,
-    const char *tokens_path,
-    const char *provider,
-    int32_t thread_count,
-    char *error_message,
-    int32_t error_message_capacity);
-
 TextifySherpaContext *TextifySherpaCreateDolphin(
     const char *runtime_directory,
     const char *model_path,

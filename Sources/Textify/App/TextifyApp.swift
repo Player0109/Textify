@@ -34,9 +34,12 @@ struct TextifyApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("Textify", systemImage: "text.bubble") {
+        MenuBarExtra {
             MenuBarRoot()
                 .environment(services)
+        } label: {
+            Label("Textify", systemImage: "waveform")
+                .accessibilityLabel("Textify")
         }
         .commands {
             CommandGroup(replacing: .appSettings) {
@@ -132,12 +135,7 @@ final class TextifyOnboardingWindowPresenter {
         window.title = "Welcome to Textify"
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
-        window.backgroundColor = NSColor(
-            calibratedRed: 0.110,
-            green: 0.110,
-            blue: 0.118,
-            alpha: 1
-        )
+        window.backgroundColor = NSColor(TextifyVisualIdentity.windowSurface)
         window.appearance = NSAppearance(named: .darkAqua)
         window.isReleasedWhenClosed = false
         window.contentViewController = NSHostingController(
@@ -188,12 +186,7 @@ final class TextifyMainWindowPresenter {
         window.title = "Textify"
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
-        window.backgroundColor = NSColor(
-            calibratedRed: 0.110,
-            green: 0.110,
-            blue: 0.118,
-            alpha: 1
-        )
+        window.backgroundColor = NSColor(TextifyVisualIdentity.windowSurface)
         window.appearance = NSAppearance(named: .darkAqua)
         window.contentMinSize = NSSize(
             width: TextifyWindowMetrics.mainMinimumWidth,

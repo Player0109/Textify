@@ -6,6 +6,8 @@ BUILD_DIR="$REPO_ROOT/build/release"
 ARCHIVE_PATH="$BUILD_DIR/Textify.xcarchive"
 EXPORT_PATH="$BUILD_DIR/export"
 APP_PATH="$EXPORT_PATH/Textify.app"
+ARCHIVE_COMMIT_PATH="$ARCHIVE_PATH/.textify-source-commit"
+EXPORT_COMMIT_PATH="$EXPORT_PATH/.textify-source-commit"
 
 ensure_xcode_project() {
   cd "$REPO_ROOT"

@@ -86,9 +86,10 @@ release-blocking.
   confirming Disable Purpose and Delete. The previous active identity remains
   selected after switch failure; deletion stops before filesystem mutation,
   and relaunch never restores an active identity whose bytes were removed.
-- [ ] 40. Run the staged HTTPS catalog endpoint smoke and retain evidence that
-  binds the exact catalog revision/signer, revocation revision/signer, and
-  candidate app build identity. Confirm the smoke does not fetch model bytes.
+- [ ] 40. Disable network access, launch the staged app, and open onboarding
+  plus both Models destinations. Retain evidence binding the embedded catalog
+  revision/signer to the candidate app build identity. Confirm all bundled
+  rows appear and an installed model remains usable without a catalog request.
 - [ ] 41. On a copy of populated v3 Application Support, rehearse application
   withdrawal with the designated rollback bridge. Revoked active content stays
   blocked, active identities do not change, and Installation Receipts, Queue
@@ -352,9 +353,9 @@ This verification includes the then-current nine-model catalog.
   `Contents/Resources/ModelCatalog/`. Strict deep ad-hoc signature verification
   passes. The copied FunASR model license and SenseVoice attribution are also
   present in `Contents/Resources`.
-- PASS: catalog selection tests prove that the bundled baseline survives remote
-  failure and cannot be replaced by an older valid remote catalog. Sources are
-  selected wholesale; entries are never merged.
+- PASS: bundled-catalog tests prove that the signed pair embedded in the app is
+  the only production catalog source. Opening onboarding or Models performs no
+  catalog request, and legacy cached catalog state is ignored for presentation.
 - REMAINS MANUAL: checklist items 26-30 must still be performed interactively
   against the final Developer ID signed, notarized, stapled artifact. The local
   clean-install/runtime proof does not certify Gatekeeper, user permissions,
@@ -606,21 +607,49 @@ with the release evidence; do not commit machine-specific `.trace` data.
   a revoked active artifact remains blocked. Evidence retains state and
   owned-file SHA-256 values plus byte count; exact state and model bytes are
   unchanged after rehearsal.
-- PASS: `bash script/release/validate_release.sh` completed 766 tests with 12
-  expected opt-in skips and zero failures, verified the tracked signed
-  43-model v3 catalog, built the arm64 Release executable, and passed release
-  metadata, native dependency, and shell-syntax checks.
-- PARTIAL live endpoint evidence: anonymous HTTPS fetched the current public
+- HISTORICAL PASS: `bash script/release/validate_release.sh` completed 766 tests
+  with 12 expected opt-in skips and zero failures, verified the then-current
+  tracked signed 43-model v3 catalog, built the arm64 Release executable, and
+  passed release metadata, native dependency, and shell-syntax checks.
+- HISTORICAL live endpoint evidence: anonymous HTTPS fetched the then-current public
   catalog and detached signature without fetching model bytes. The signature
   names `textify-model-manifest-2026-huggingface`, but the public body is the
   older schema-v2 revision `2026-07-23T12:30:59Z`; the new publication gate
   correctly rejects it because it lacks v3 installation bounds.
-- BLOCKED external publication gate: the public `revocations.json` and
-  `revocations.json.sig` endpoints currently return HTTP 404. A credentialed
+- HISTORICAL BLOCKED external publication gate: the public `revocations.json` and
+  `revocations.json.sig` endpoints returned HTTP 404. A credentialed
   maintainer must publish the reviewed signed revocation baseline and staged
   v3 catalog, then run
   `script/models/smoke_model_catalog_endpoint.sh` and retain its evidence
   before checking release item 40.
+- SUPERSEDED: the current bundled-only release profile does not fetch catalog or
+  revocation endpoints at runtime. Current item 40 requires offline staged-app
+  proof instead. The signed revocation baseline and publication evidence remain
+  required release inputs, but they ship through the app release rather than
+  updating installed builds from an endpoint.
+
+## Production Candidate Automated Verification - 2026-07-31
+
+- PASS: `bash script/release/validate_release.sh` completed 862 tests with 11
+  expected opt-in native/hardware skips and zero failures, verified the tracked
+  signed 42-entry v3 catalog and empty signed v2 revocation baseline, built the
+  arm64 Release executable, and passed release metadata, exact production
+  entitlement, native dependency, deployment-target, legal notice, provenance,
+  and shell-syntax checks.
+- PASS: the local CI-equivalent path verified the signed catalog, ran
+  the same 862-test suite, built the arm64 Release executable, and confirmed
+  its architecture.
+- PASS: `bash script/build_and_run.sh --stage-full-release` built and staged the
+  Xcode Release app, verified the exact signed catalog and revocation pairs,
+  checked all required legal resources, the first-party macOS 14 ONNX runtime,
+  and arm64 native libraries, passed strict deep local signature validation,
+  and survived the launch smoke.
+- BLOCKED: this machine has no valid Developer ID Application identity or
+  configured `notarytool` Keychain profile, so no signed, notarized, stapled DMG
+  exists.
+- REMAINS MANUAL: every unchecked release-blocking and final-evidence item
+  below, including genuine accessibility passes, oldest-supported M1 evidence,
+  independent reviews, and two distinct human approvals.
 
 ## Final Release Evidence Sign-Off
 

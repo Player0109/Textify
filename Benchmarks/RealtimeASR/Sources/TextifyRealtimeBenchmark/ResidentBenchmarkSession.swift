@@ -30,8 +30,8 @@ enum ResidentBenchmarkSessionFactory {
                 modelsRootURL: options.fluidCacheURL,
                 feedMode: options.feedMode
             )
-        case .reazonSpeechK2V2, .qwen3ASR0_6B, .omnilingualASR300M,
-             .dolphinSmall, .senseVoiceSmall:
+        case .reazonSpeechK2V2, .qwen3ASR0_6B, .dolphinSmall,
+             .senseVoiceSmall:
             return try SherpaOnnxBenchmark.makeSession(
                 engine: options.engine,
                 runtimeDirectoryURL: options.sherpaRuntimeURL!,

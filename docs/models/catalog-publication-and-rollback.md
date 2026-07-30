@@ -1,8 +1,9 @@
-# Catalog Publication And V3 Rollback
+# Catalog App Release And V3 Rollback
 
-This is the release contract for publishing a model catalog after manifest v3
-state has shipped. It supplements `docs/RELEASING.md`; it does not authorize an
-unsigned catalog, a lower revision, or an arbitrary application downgrade.
+This is the release contract for shipping a bundled model catalog after
+manifest v3 state has shipped. It supplements `docs/RELEASING.md`; it does not
+authorize an unsigned catalog, a lower revision, a runtime catalog feed, or an
+arbitrary application downgrade.
 
 ## Signing Identities
 
@@ -33,13 +34,13 @@ CI.
   records remain sticky even if a later body omits them.
 - A restoration uses a higher revocation revision and the exact restoration
   rules in `docs/SPEC.md`; it does not reactivate an artifact.
-- Never publish a lower revision as rollback or recovery.
+- Never ship a lower revision as rollback or recovery.
 
 Keep each successful evidence JSON with the release records. It binds catalog
 revision/hash/signer, revocation revision/hash/signer, exact app build identity,
-artifact count, endpoint, and verification time.
+artifact count, an optional legacy source endpoint, and verification time.
 
-## Prepublication Gate
+## Prerelease Gate
 
 Build and sign the exact candidate application first. The gate requires its
 code signature to pass strict verification, requires the production bundle
@@ -57,9 +58,9 @@ script/models/prepublish_model_catalog.sh \
   previous/catalog-publication-evidence.json
 ```
 
-Normal publication requires the immediately prior retained evidence, so
+Normal release validation requires the immediately prior retained evidence, so
 anti-rollback and sticky-revocation checks cannot be skipped accidentally. For
-the one-time first v3 publication only, replace the final previous-evidence
+the one-time first v3 authority baseline only, replace the final previous-evidence
 argument with an explicit leading `--bootstrap`; the resulting evidence marks
 that it establishes the authority baseline and must be retained permanently.
 
@@ -69,20 +70,12 @@ typed SHA-256, exact leaf and aggregate sizes, bounded peak installation space,
 nonempty HTTPS-backed license metadata, pinned provenance, supported Runtime
 and Compute Route, and one signed presentation owner.
 
-Before making the endpoint live, run the same check against its staging URL:
-
-```bash
-script/models/smoke_model_catalog_endpoint.sh \
-  'https://staging.example.invalid/Textify/models' \
-  build/release/Textify.app \
-  build/release/catalog-endpoint-evidence.json \
-  previous/catalog-publication-evidence.json
-```
-
-The smoke fetches and verifies only the catalog, catalog signature, revocation
-body, and revocation signature. It deliberately does not download model
-artifacts and is not an ordinary CI dependency. Final artifact-byte smokes stay
-in the credentialed release checklist.
+The legacy `smoke_model_catalog_endpoint.sh` remains available for archival
+endpoint checks, but it is not a release gate and current Textify builds do not
+consume its results. Release verification instead compares the tracked signed
+pair byte-for-byte with `Contents/Resources/ModelCatalog/` and exercises the
+staged app with network access disabled. Final artifact-byte smokes stay in the
+credentialed release checklist.
 
 ## Additive Migration Contract
 
@@ -99,9 +92,9 @@ through decode-compatible fields:
   history; catalog withdrawal does not turn Curated content into Custom or
   Legacy.
 - Transcription and Voice Cleaning active Exact Artifact IDs stay distinct.
-- The trusted catalog archive retains the highest accepted revision and exact
-  signed bytes. The revocation archive retains exact signed snapshots and alias
-  evidence.
+- Older builds may retain a trusted catalog archive for migration and rollback
+  evidence, but current presentation ignores it in favor of the bundled pair.
+  The revocation archive retains exact signed snapshots and alias evidence.
 
 Migration must not delete, rename, or reinterpret managed bytes merely because
 a new app or catalog no longer presents them. Copy the complete Textify
@@ -117,8 +110,8 @@ settings, receipt, Queue Attempt, trusted-catalog archive, and sticky-revocation
 archive using the embedded production trust table. It strictly verifies the
 bridge app's code signature and requires its derived identity to match the
 publication evidence before recording state-file and owned-byte SHA-256
-evidence. The rehearsal represents an unavailable/withdrawn remote catalog
-while continuing to use retained signed authority. It must prove:
+evidence. The rehearsal covers legacy persisted remote-catalog state while
+continuing to use retained signed authority. It must prove:
 
 - every receipt and storage identity remains owned;
 - every Queue Attempt remains attributable;

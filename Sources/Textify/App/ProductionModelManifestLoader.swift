@@ -1,68 +1,33 @@
 import Foundation
 import TextifyModels
 
+enum ProductionModelManifestLoaderError: Error, Equatable {
+    case bundledCatalogMissing
+    case bundledRevocationMissing
+    case bundledRevocationIncomplete
+}
+
+struct ProductionBundledModelTrust {
+    let catalogSnapshot: TrustedCatalogSnapshot
+    let revocationState: TrustedModelRevocationState
+}
+
 struct ProductionModelManifestLoader {
     static let bundledDirectoryName = "ModelCatalog"
     static let bundledManifestName = "manifest.json"
     static let bundledSignatureName = "manifest.json.sig"
+    static let bundledRevocationName = "revocations.json"
+    static let bundledRevocationSignatureName = "revocations.json.sig"
 
     let configuration: ProductionModelInstallConfiguration
     let resourceDirectory: URL?
-    let transport: any DownloadTransport
 
     init(
         configuration: ProductionModelInstallConfiguration,
-        resourceDirectory: URL? = Bundle.main.resourceURL,
-        transport: any DownloadTransport = URLSessionDownloadTransport()
+        resourceDirectory: URL? = Bundle.main.resourceURL
     ) {
         self.configuration = configuration
         self.resourceDirectory = resourceDirectory
-        self.transport = transport
-    }
-
-    func load() async throws -> ModelManifest {
-        let bundled = try loadBundledSnapshot()?.manifest
-
-        do {
-            let remote = try await downloadRemoteSnapshot().manifest
-            guard let bundled else {
-                return remote
-            }
-            return try Self.newest(bundled: bundled, remote: remote)
-        } catch {
-            guard let bundled else {
-                throw error
-            }
-            return bundled
-        }
-    }
-
-    func downloadRemoteSnapshot() async throws -> TrustedCatalogSnapshot {
-        try await ModelDownloader(
-            transport: transport,
-            manifestVerifier: verifier
-        ).downloadManifestSnapshot(
-            manifestURL: configuration.manifestURL,
-            signatureURL: configuration.signatureURL
-        )
-    }
-
-    func downloadRemoteRevocationSnapshot() async throws
-        -> TrustedModelRevocationSnapshot {
-        guard let revocationURL = configuration.revocationURL,
-              let signatureURL = configuration.revocationSignatureURL
-        else {
-            throw ModelCatalogRefreshError.unavailable
-        }
-        return try await ModelRevocationDownloader(
-            transport: transport,
-            verifier: ModelRevocationVerifier(
-                trustedKeys: configuration.trustedKeys
-            )
-        ).downloadSnapshot(
-            revocationURL: revocationURL,
-            signatureURL: signatureURL
-        )
     }
 
     func loadBundledSnapshot() throws -> TrustedCatalogSnapshot? {
@@ -91,24 +56,78 @@ struct ProductionModelManifestLoader {
         )
     }
 
-    static func newest(
-        bundled: ModelManifest,
-        remote: ModelManifest
-    ) throws -> ModelManifest {
-        let formatter = ISO8601DateFormatter()
-        guard let bundledDate = formatter.date(from: bundled.generatedAt) else {
-            throw ProductionModelPolicyError.invalidGeneratedAt(bundled.generatedAt)
+    func loadBundledRevocationSnapshot() throws
+        -> TrustedModelRevocationSnapshot {
+        guard let resourceDirectory else {
+            throw ProductionModelManifestLoaderError
+                .bundledRevocationMissing
         }
-        guard let remoteDate = formatter.date(from: remote.generatedAt) else {
-            throw ProductionModelPolicyError.invalidGeneratedAt(remote.generatedAt)
+        let catalogDirectory = resourceDirectory.appendingPathComponent(
+            Self.bundledDirectoryName,
+            isDirectory: true
+        )
+        let revocationURL = catalogDirectory.appendingPathComponent(
+            Self.bundledRevocationName
+        )
+        let signatureURL = catalogDirectory.appendingPathComponent(
+            Self.bundledRevocationSignatureName
+        )
+        let revocationExists = FileManager.default.fileExists(
+            atPath: revocationURL.path
+        )
+        let signatureExists = FileManager.default.fileExists(
+            atPath: signatureURL.path
+        )
+
+        guard revocationExists || signatureExists else {
+            throw ProductionModelManifestLoaderError
+                .bundledRevocationMissing
         }
-        return remoteDate >= bundledDate ? remote : bundled
+        guard revocationExists, signatureExists else {
+            throw ProductionModelManifestLoaderError
+                .bundledRevocationIncomplete
+        }
+        return try TrustedModelRevocationSnapshot(
+            revocationData: Data(contentsOf: revocationURL),
+            signatureData: Data(contentsOf: signatureURL),
+            verifier: revocationVerifier
+        )
+    }
+
+    func loadBundledTrust(
+        persistedRevocationState: TrustedModelRevocationState,
+        saveRevocationState:
+            (TrustedModelRevocationState) throws -> Void
+    ) throws -> ProductionBundledModelTrust {
+        let revocationSnapshot = try loadBundledRevocationSnapshot()
+        var revocationState = try persistedRevocationState.accepting(
+            revocationSnapshot
+        )
+        guard let catalogSnapshot = try loadBundledSnapshot() else {
+            throw ProductionModelManifestLoaderError.bundledCatalogMissing
+        }
+        revocationState = revocationState.retainingAliases(
+            from: catalogSnapshot
+        )
+        if revocationState != persistedRevocationState {
+            try saveRevocationState(revocationState)
+        }
+        return ProductionBundledModelTrust(
+            catalogSnapshot: catalogSnapshot,
+            revocationState: revocationState
+        )
     }
 
     private var verifier: ManifestVerifier {
         ManifestVerifier(
             trustedKeys: configuration.trustedKeys,
             legacyPolicy: .publishedV1_1
+        )
+    }
+
+    private var revocationVerifier: ModelRevocationVerifier {
+        ModelRevocationVerifier(
+            trustedKeys: configuration.trustedKeys
         )
     }
 }

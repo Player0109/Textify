@@ -171,7 +171,16 @@ struct ModelCheckpointCatalogSurface: View, Equatable {
             }
             .id(layoutMode)
         }
-        .background(TextifyVisualIdentity.cardSurface)
+        .background {
+            LinearGradient(
+                colors: [
+                    TextifyVisualIdentity.cardSurfaceTop,
+                    TextifyVisualIdentity.cardSurfaceBottom,
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
         .clipShape(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
         )
@@ -180,8 +189,23 @@ struct ModelCheckpointCatalogSurface: View, Equatable {
                 cornerRadius: 12,
                 style: .continuous
             )
-            .stroke(TextifyVisualIdentity.separator, lineWidth: 1)
+            .stroke(
+                LinearGradient(
+                    colors: [
+                        TextifyVisualIdentity.panelHighlight,
+                        TextifyVisualIdentity.separator.opacity(0.72),
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 0.8
+            )
         }
+        .shadow(
+            color: TextifyVisualIdentity.panelShadow,
+            radius: 7,
+            y: 3
+        )
         .background {
             GeometryReader { proxy in
                 Color.clear
@@ -412,11 +436,27 @@ private struct ModelCheckpointCatalogRow: View {
         .contextMenu {
             secondaryActions
         }
-        .background(
-            row.isActive
-                ? TextifyVisualIdentity.voiceViolet.opacity(0.075)
-                : Color.clear
-        )
+        .background {
+            if row.isActive {
+                LinearGradient(
+                    colors: [
+                        TextifyVisualIdentity.consoleSelection.opacity(0.9),
+                        TextifyVisualIdentity.voiceViolet.opacity(0.055),
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            }
+        }
+        .overlay(alignment: .leading) {
+            if row.isActive {
+                Capsule(style: .continuous)
+                    .fill(TextifyVisualIdentity.voiceViolet)
+                    .frame(width: 3)
+                    .padding(.vertical, 11)
+                    .accessibilityHidden(true)
+            }
+        }
         .overlay(alignment: .bottom) {
             Divider()
                 .padding(.leading, 42)
@@ -470,32 +510,31 @@ private struct ModelCheckpointCatalogRow: View {
             )
 
             VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 7) {
-                    Text(row.title)
-                        .font(.body.weight(.semibold))
-                        .fixedSize(horizontal: false, vertical: true)
-                    if let annotation = row.annotation.title {
-                        TextifyStatusBadge(
-                            title: annotation.uppercased(),
-                            tone:
-                                row.annotation == .inUse
-                                ? .success
-                                : .accent
+                Text(row.title)
+                    .font(.body.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                if let annotation = row.annotation.title {
+                    TextifyStatusBadge(
+                        title: annotation.uppercased(),
+                        tone:
+                            row.annotation == .inUse
+                            ? .success
+                            : .accent
+                    )
+                    .fixedSize(horizontal: true, vertical: true)
+                }
+                ModelCheckpointVersionControl(
+                    row: row,
+                    isBusy: isBusy,
+                    onUse: {
+                        onCommand(
+                            .use(
+                                checkpointID: row.checkpointID,
+                                artifactID: $0
+                            )
                         )
                     }
-                    ModelCheckpointVersionControl(
-                        row: row,
-                        isBusy: isBusy,
-                        onUse: {
-                            onCommand(
-                                .use(
-                                    checkpointID: row.checkpointID,
-                                    artifactID: $0
-                                )
-                            )
-                        }
-                    )
-                }
+                )
                 Text(row.description)
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -825,6 +864,8 @@ private struct ModelCheckpointVersionControl: View {
                 .buttonStyle(.plain)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(TextifyVisualIdentity.voiceViolet)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: true)
                 .popover(isPresented: $showsPopover) {
                     ModelVersionChoiceView(
                         row: row,
@@ -839,6 +880,8 @@ private struct ModelCheckpointVersionControl: View {
                 .buttonStyle(.plain)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(TextifyVisualIdentity.voiceViolet)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: true)
                 .sheet(isPresented: $showsComparison) {
                     ModelVersionComparisonSheet(
                         row: row,
@@ -895,12 +938,16 @@ private struct ModelVersionChoiceView: View {
                                 Text(option.displayName)
                                     .font(.callout.weight(.semibold))
                                 if option.isRecommended {
-                                    Text("Recommended")
-                                        .font(.caption2.bold().monospaced())
-                                        .textCase(.uppercase)
-                                        .foregroundStyle(
-                                            TextifyVisualIdentity.voiceViolet
-                                        )
+                                    TextifyStatusBadge(
+                                        title: String(
+                                            localized: "Recommended"
+                                        ).uppercased(),
+                                        tone: .accent
+                                    )
+                                    .fixedSize(
+                                        horizontal: true,
+                                        vertical: true
+                                    )
                                 }
                             }
                             Text(
@@ -908,6 +955,7 @@ private struct ModelVersionChoiceView: View {
                             )
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                             Text(option.accuracyTradeoff)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -1241,14 +1289,44 @@ struct VoiceCleaningFeatureCard: View {
             }
         }
         .padding(18)
-        .background(
-            TextifyVisualIdentity.cardSurface,
-            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-        )
+        .background {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            row?.isActive == true
+                                ? TextifyVisualIdentity.consoleSelection
+                                : TextifyVisualIdentity.cardSurfaceTop,
+                            TextifyVisualIdentity.cardSurfaceBottom,
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        }
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(TextifyVisualIdentity.separator, lineWidth: 1)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            row?.isActive == true
+                                ? TextifyVisualIdentity.voiceViolet.opacity(
+                                    0.46
+                                )
+                                : TextifyVisualIdentity.panelHighlight,
+                            TextifyVisualIdentity.separator.opacity(0.72),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: row?.isActive == true ? 1 : 0.8
+                )
         }
+        .shadow(
+            color: TextifyVisualIdentity.panelShadow,
+            radius: 7,
+            y: 3
+        )
         .help(disabledReason ?? "")
     }
 }

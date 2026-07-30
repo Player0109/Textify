@@ -43,6 +43,7 @@ struct ModelCatalogExactArtifactInspectorPresentation: Equatable {
     let provenance: String
     let license: String
     let sourceURL: URL?
+    let sourceAndLicense: ModelSourceLicensePresentation?
     let canVerify: Bool
     let localDetails: ModelCatalogArtifactLocalDetails?
     let localDetailsStatus: ModelCatalogInstalledSizeStatus

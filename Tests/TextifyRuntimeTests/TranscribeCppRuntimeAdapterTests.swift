@@ -73,6 +73,24 @@ final class TranscribeCppRuntimeAdapterTests: XCTestCase {
         }
     }
 
+    func testAdapterPreparesExplicitLanguageForMultilingualQwen() async throws {
+        let runtime = FakeTranscribeCppRuntime()
+        let adapter = TranscribeCppRuntimeTranscribingAdapter(runtime: runtime)
+
+        try await adapter.prepare(
+            model: Self.activeModel(
+                id: "qwen3-asr-1.7b-q8-0",
+                modelPath: "/tmp/Qwen3-ASR-1.7B-Q8_0.gguf",
+                variant: .qwen3ASR1_7B,
+                language: "en",
+                detectLanguage: false
+            )
+        )
+
+        let load = await runtime.loadSnapshot()
+        XCTAssertEqual(load?.languageCode, "en")
+    }
+
     func testAdapterPreparesParakeetTDTAndNemotronVariants() async throws {
         let candidates: [(String, TranscribeCppModelVariant, String, Bool)] = [
             ("parakeet-tdt-0.6b-v2-q8-0", .parakeetTDT0_6BV2, "en", false),

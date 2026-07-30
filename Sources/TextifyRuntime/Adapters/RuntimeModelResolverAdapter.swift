@@ -61,29 +61,34 @@ public actor RuntimeModelResolverAdapter: RuntimeModelResolving {
         }
 
         let selectedLanguage = preferences.transcriptionLanguage.rawValue
-        let supportsSelectedLanguage = selectedLanguage == "auto"
-            || record.model.capabilities.languages.contains(selectedLanguage)
-            || record.model.capabilities.languages.contains("*")
+        let supportedLanguages = record.model.capabilities.languages
+        let supportsSelectedLanguage = supportedLanguages.contains(selectedLanguage)
+            || supportedLanguages.contains("*")
+        guard selectedLanguage == "auto" || supportsSelectedLanguage else {
+            return nil
+        }
+
         let baseParameters = record.model.runtimeParameters
-        let requiresAutomaticLanguage = baseParameters.detectLanguage
-            && baseParameters.language.lowercased() == "auto"
-        let runtimeParameters = requiresAutomaticLanguage
-            ? baseParameters
-            : supportsSelectedLanguage
-            ? RuntimeParameters(
-                language: selectedLanguage == "auto" ? baseParameters.language : selectedLanguage,
-                detectLanguage: selectedLanguage == "auto",
-                translate: baseParameters.translate,
-                strategy: baseParameters.strategy,
-                beamSize: baseParameters.beamSize,
-                bestOf: baseParameters.bestOf,
-                temperature: baseParameters.temperature,
-                temperatureFallback: baseParameters.temperatureFallback,
-                noContext: baseParameters.noContext,
-                tokenTimestamps: baseParameters.tokenTimestamps,
-                maxAudioSeconds: baseParameters.maxAudioSeconds
-            )
-            : baseParameters
+        let supportsAutomaticLanguage = baseParameters.detectLanguage
+            || supportedLanguages.contains("*")
+            || supportedLanguages.count > 1
+        let detectLanguage = selectedLanguage == "auto" && supportsAutomaticLanguage
+        let language = selectedLanguage == "auto"
+            ? detectLanguage ? "auto" : baseParameters.language
+            : selectedLanguage
+        let runtimeParameters = RuntimeParameters(
+            language: language,
+            detectLanguage: detectLanguage,
+            translate: baseParameters.translate,
+            strategy: baseParameters.strategy,
+            beamSize: baseParameters.beamSize,
+            bestOf: baseParameters.bestOf,
+            temperature: baseParameters.temperature,
+            temperatureFallback: baseParameters.temperatureFallback,
+            noContext: baseParameters.noContext,
+            tokenTimestamps: baseParameters.tokenTimestamps,
+            maxAudioSeconds: baseParameters.maxAudioSeconds
+        )
 
         return RuntimeActiveModel(
             id: record.model.id,

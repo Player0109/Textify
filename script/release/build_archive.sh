@@ -7,6 +7,7 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 ensure_xcode_project
 mkdir -p "$BUILD_DIR"
+rm -rf "$ARCHIVE_PATH"
 
 xcodebuild archive \
   -project "$REPO_ROOT/Textify.xcodeproj" \
@@ -19,3 +20,6 @@ xcodebuild archive \
   CODE_SIGN_STYLE=Manual \
   ARCHS=arm64 \
   ONLY_ACTIVE_ARCH=NO
+
+[[ -d "$ARCHIVE_PATH" ]]
+git -C "$REPO_ROOT" rev-parse HEAD > "$ARCHIVE_COMMIT_PATH"

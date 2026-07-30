@@ -331,38 +331,6 @@ TextifySherpaContext *TextifySherpaCreateQwen3ASR(
       runtime_directory, &config, error_message, error_message_capacity);
 }
 
-TextifySherpaContext *TextifySherpaCreateOmnilingualASR(
-    const char *runtime_directory,
-    const char *model_path,
-    const char *tokens_path,
-    const char *provider,
-    int32_t thread_count,
-    char *error_message,
-    int32_t error_message_capacity) {
-  if (model_path == NULL || tokens_path == NULL || provider == NULL ||
-      thread_count <= 0 ||
-      (strcmp(provider, "cpu") != 0 && strcmp(provider, "coreml") != 0)) {
-    TextifySherpaSetError(
-        error_message,
-        error_message_capacity,
-        "The sherpa-onnx Omnilingual ASR configuration is invalid.");
-    return NULL;
-  }
-
-  SherpaOnnxOfflineRecognizerConfig config;
-  memset(&config, 0, sizeof(config));
-  config.feat_config.sample_rate = 16000;
-  config.feat_config.feature_dim = 80;
-  config.model_config.omnilingual.model = model_path;
-  config.model_config.tokens = tokens_path;
-  config.model_config.num_threads = thread_count;
-  config.model_config.provider = provider;
-  config.model_config.model_type = "omnilingual";
-  config.decoding_method = "greedy_search";
-  return TextifySherpaCreateRecognizer(
-      runtime_directory, &config, error_message, error_message_capacity);
-}
-
 TextifySherpaContext *TextifySherpaCreateDolphin(
     const char *runtime_directory,
     const char *model_path,

@@ -1,6 +1,6 @@
 {
   "manifestVersion": 3,
-  "generatedAt": "2026-07-24T11:02:38Z",
+  "generatedAt": "2026-07-28T15:40:53Z",
   "models": [
     {
       "id": "ggml-small.en-q5_1",
@@ -572,7 +572,7 @@
           "scope": "transcribe.cpp runtime and conversion tooling",
           "spdxId": "MIT",
           "name": "MIT License",
-          "licenseTextUrl": "https://raw.githubusercontent.com/antirez/transcribe.cpp/5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+          "licenseTextUrl": "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
         }
       ],
       "provenance": {
@@ -6441,100 +6441,6 @@
       }
     },
     {
-      "id": "omnilingual-asr-300m-ctc-int8",
-      "displayName": "Experimental - Omnilingual ASR 300M",
-      "tier": "experimental",
-      "description": "Exact INT8 Omnilingual ASR 300M CTC export for offline automatic transcription across more than 1,600 languages through sherpa-onnx.",
-      "sizeBytes": 365438543,
-      "files": [
-        {
-          "filename": "model.int8.onnx",
-          "relativePath": "model.int8.onnx",
-          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12/resolve/6abf1ece20cd2308bdb7d13cd78ec1c44fa4c094/model.int8.onnx",
-          "sha256": "e7c4e54ee4c4c47829cc6667d5d00ed8ea7bef1dcfeef0fce766f77752a2726c",
-          "sizeBytes": 365352120
-        },
-        {
-          "filename": "tokens.txt",
-          "relativePath": "tokens.txt",
-          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12/resolve/6abf1ece20cd2308bdb7d13cd78ec1c44fa4c094/tokens.txt",
-          "sha256": "a7a044c52cb29cbe8b0dc1953e92cefd4ca16b0ed968177b6beab21f9a7d0b31",
-          "sizeBytes": 86423
-        }
-      ],
-      "licenses": [
-        {
-          "scope": "Meta Omnilingual ASR weights and ONNX conversion",
-          "spdxId": "Apache-2.0",
-          "name": "Apache License 2.0",
-          "licenseTextUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt"
-        },
-        {
-          "scope": "sherpa-onnx runtime and ONNX conversion",
-          "spdxId": "Apache-2.0",
-          "name": "Apache License 2.0",
-          "licenseTextUrl": "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/13d0ae6c539d2809d32f5eaa3ef1db0c459d0b24/LICENSE"
-        },
-        {
-          "scope": "ONNX Runtime",
-          "spdxId": "MIT",
-          "name": "MIT License",
-          "licenseTextUrl": "https://raw.githubusercontent.com/microsoft/onnxruntime/v1.24.4/LICENSE"
-        }
-      ],
-      "provenance": {
-        "sourceName": "csukuangfj/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12",
-        "sourceUrl": "https://huggingface.co/csukuangfj/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12",
-        "sourceRevision": "6abf1ece20cd2308bdb7d13cd78ec1c44fa4c094",
-        "sourceFile": "Official INT8 ONNX model and token table",
-        "originalModelName": "Meta Omnilingual ASR CTC 300M",
-        "originalModelUrl": "https://huggingface.co/facebook/omniASR-CTC-300M",
-        "mirroredBy": "csukuangfj",
-        "mirroredAt": "2025-11-14"
-      },
-      "runtimeParameters": {
-        "language": "auto",
-        "detectLanguage": true,
-        "translate": false,
-        "strategy": "greedy",
-        "beamSize": 1,
-        "bestOf": 1,
-        "temperature": 0,
-        "temperatureFallback": [],
-        "noContext": true,
-        "tokenTimestamps": false,
-        "maxAudioSeconds": 40
-      },
-      "hallucinationThresholds": {
-        "noSpeechProbabilityMax": 0.6,
-        "avgLogProbabilityMin": -1,
-        "compressionRatioMax": 2.4
-      },
-      "minAppVersion": "1.1.0",
-      "runtime": {
-        "engine": "sherpa_onnx",
-        "variant": "omnilingual-asr-300m-ctc-int8",
-        "accelerator": "cpu",
-        "artifactLayout": "model_directory"
-      },
-      "capabilities": {
-        "languages": [
-          "*"
-        ],
-        "supportsTranslation": false,
-        "supportsCustomVocabulary": false
-      },
-      "presentation": {
-        "expectedFinalization": "Unrated in Textify; runs locally through the pinned sherpa-onnx CPU runtime",
-        "accuracyTradeoff": "Broadest language coverage in the catalog via a compact CTC model; accuracy varies substantially by language",
-        "requirements": "Apple Silicon CPU; about 365 MB disk, automatic language-agnostic decoding, and a 40-second recording limit"
-      },
-      "installationStorage": {
-        "finalArtifactBytes": 365438543,
-        "peakInstallationBytes": 365438543
-      }
-    },
-    {
       "id": "mossformer2-se-fp32",
       "displayName": "Accurate - MossFormer2 SE FP32",
       "tier": "accurate",
@@ -6988,22 +6894,6 @@
         }
       },
       {
-        "id": "family.meta.omnilingual-asr",
-        "purpose": "transcription",
-        "checkpointIDs": [
-          "checkpoint.meta.omnilingual-asr-300m-ctc"
-        ],
-        "presentation": {
-          "displayName": "Omnilingual ASR",
-          "description": "Meta massively multilingual speech recognition checkpoints.",
-          "provider": {
-            "id": "meta",
-            "displayName": "Meta"
-          },
-          "curatedRank": 120
-        }
-      },
-      {
         "id": "family.alibaba.mossformer2-se",
         "purpose": "voice_cleaning",
         "checkpointIDs": [
@@ -7354,20 +7244,6 @@
         "presentation": {
           "displayName": "MOSS Transcribe-Diarize 0.9B",
           "description": "English and Chinese transcription checkpoint with inline speaker labels.",
-          "curatedRank": 0
-        }
-      },
-      {
-        "id": "checkpoint.meta.omnilingual-asr-300m-ctc",
-        "purpose": "transcription",
-        "artifactIDs": [
-          "omnilingual-asr-300m-ctc-int8"
-        ],
-        "recommendedArtifactID": "omnilingual-asr-300m-ctc-int8",
-        "fallbackArtifactIDs": [],
-        "presentation": {
-          "displayName": "Omnilingual ASR 300M CTC",
-          "description": "Compact language-agnostic Omnilingual ASR checkpoint.",
           "curatedRank": 0
         }
       },
@@ -8163,25 +8039,6 @@
         },
         "presentation": {
           "displayName": "GGUF Q5_K_M",
-          "curatedRank": 0
-        }
-      },
-      {
-        "id": "omnilingual-asr-300m-ctc-int8",
-        "purpose": "transcription",
-        "artifactFormat": "onnx",
-        "numericFormat": "INT8",
-        "runtime": "sherpa_onnx",
-        "computeRoute": "cpu_only",
-        "compatibility": {
-          "minimumAppVersion": "1.1.0",
-          "minimumMacOSVersion": "14.0.0",
-          "supportedArchitectures": [
-            "arm64"
-          ]
-        },
-        "presentation": {
-          "displayName": "ONNX INT8",
           "curatedRank": 0
         }
       },

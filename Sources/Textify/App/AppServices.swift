@@ -525,10 +525,6 @@ final class AppServices {
             trustedKeys: configuration.trustedKeys,
             legacyPolicy: .publishedV1_1
         )
-        let store = TrustedCatalogStore(
-            fileURL: paths.rollbackStateLayout.catalogStateFileURL,
-            verifier: verifier
-        )
         let revocationStore = TrustedModelRevocationStore(
             fileURL: paths.rollbackStateLayout.revocationStateFileURL,
             verifier: ModelRevocationVerifier(
@@ -540,58 +536,63 @@ final class AppServices {
         let loader = ProductionModelManifestLoader(
             configuration: configuration
         )
-        var storedState: TrustedCatalogStoredState
         var bootstrapIssue: TrustedCatalogSecurityIssue?
-        do {
-            storedState = try store.load()
-        } catch {
-            bootstrapIssue = TrustedCatalogSecurityIssue(
-                reason: .cacheCorruption
-            )
-            storedState = TrustedCatalogStoredState(
-                securityIssue: bootstrapIssue
-            )
-        }
-        let revocationState: TrustedModelRevocationState
+        var revocationState = TrustedModelRevocationState()
         do {
             revocationState = try revocationStore.load()
         } catch {
             let issue = TrustedCatalogSecurityIssue(
                 reason: .cacheCorruption
             )
-            logCatalogSecurityIssue(issue)
-            revocationState = TrustedModelRevocationState()
+            bootstrapIssue = issue
         }
 
-        let bundledSnapshot: TrustedCatalogSnapshot?
-        do {
-            bundledSnapshot = try loader.loadBundledSnapshot()
-        } catch {
-            let issue = TrustedCatalogSecurityIssue(
-                reason: .bundledCatalogInvalid,
-                highestAcceptedRevision: storedState.highestAcceptedRevision
-            )
-            bootstrapIssue = issue
-            storedState.securityIssue = issue
-            bundledSnapshot = nil
+        var bundledSnapshot: TrustedCatalogSnapshot?
+        if bootstrapIssue == nil {
+            do {
+                let bundledTrust = try loader.loadBundledTrust(
+                    persistedRevocationState: revocationState
+                ) { state in
+                    try revocationStore.save(state)
+                }
+                revocationState = bundledTrust.revocationState
+                bundledSnapshot = bundledTrust.catalogSnapshot
+            } catch {
+                bootstrapIssue = TrustedCatalogSecurityIssue(
+                    reason: .bundledCatalogInvalid
+                )
+            }
         }
 
         if let bootstrapIssue {
             logCatalogSecurityIssue(bootstrapIssue)
         }
+        let storedState = TrustedCatalogStoredState(
+            highestAcceptedRevision: bundledSnapshot?.revision,
+            presentedSnapshot: bundledSnapshot,
+            securityIssue: bootstrapIssue,
+            lastSuccessfulCatalogIntegrityCheckAt:
+                bundledSnapshot == nil ? nil : Date()
+        )
+        let acceptedBundledRevocationState = revocationState
         return ModelCatalogCoordinator(
             storedState: storedState,
             bundledSnapshot: bundledSnapshot,
             snapshotLoadOperation: {
-                try await loader.downloadRemoteSnapshot()
+                let bundledTrust = try loader.loadBundledTrust(
+                    persistedRevocationState: try revocationStore.load()
+                ) { state in
+                    try revocationStore.save(state)
+                }
+                guard bundledTrust.revocationState
+                        == acceptedBundledRevocationState
+                else {
+                    throw ModelCatalogRefreshError.unavailable
+                }
+                return bundledTrust.catalogSnapshot
             },
-            saveOperation: { state in
-                try store.save(state)
-            },
+            saveOperation: { _ in },
             revocationState: revocationState,
-            revocationSnapshotLoadOperation: {
-                try await loader.downloadRemoteRevocationSnapshot()
-            },
             revocationSaveOperation: { state in
                 try revocationStore.save(state)
             },
@@ -651,7 +652,20 @@ final class AppServices {
 
     private func presentOverlay(_ state: RecordingOverlayState) {
         overlayState = state
-        overlayPresenter.present(state)
+        overlayPresenter.present(
+            state,
+            preferences: preferences.recordingOverlay
+        )
+    }
+
+    func setRecordingOverlayPreferences(
+        _ preferences: RecordingOverlayPreferences
+    ) {
+        self.preferences.recordingOverlay = preferences.normalized()
+        savePreferences()
+        if overlayState != .hidden {
+            presentOverlay(overlayState)
+        }
     }
 
     private func scheduleTerminalStatusDismissal(for status: DictationRuntimeStatus) {
@@ -1820,6 +1834,11 @@ final class AppServices {
         let settingsStore = SettingsStore(storage: .file(paths.settingsFileURL), fileManager: fileManager)
         let diagnosticsLogger = DiagnosticsLogger(directory: paths.logsDirectory)
         let modelLayout = ModelStorageLayout(rootDirectory: paths.modelsDirectory)
+        try? RetiredManagedModelCleanup.omnilingualASR300M.run(
+            settingsStore: settingsStore,
+            layout: modelLayout,
+            fileManager: fileManager
+        )
         let whisperRuntime = WhisperRuntime()
         let parakeetRuntime = ParakeetRuntime()
         let paraformerRuntime = ParaformerRuntime()
@@ -1897,6 +1916,120 @@ final class AppServices {
         case .controlSpace:
             return .controlSpace
         }
+    }
+}
+
+enum RetiredManagedModelCleanupError: Error, Equatable {
+    case preferencesUnavailable
+    case preferencePersistenceFailed
+}
+
+struct RetiredManagedModelCleanup {
+    static let omnilingualASR300M = RetiredManagedModelCleanup(
+        artifactID: "omnilingual-asr-300m-ctc-int8",
+        expectedFilenames: [
+            "model.int8.onnx",
+            "tokens.txt",
+        ]
+    )
+
+    let artifactID: String
+    let expectedFilenames: [String]
+
+    func run(
+        settingsStore: SettingsStore,
+        layout: ModelStorageLayout,
+        fileManager: FileManager = .default
+    ) throws {
+        var preferences = settingsStore.load()
+        guard settingsStore.lastError == nil else {
+            throw RetiredManagedModelCleanupError.preferencesUnavailable
+        }
+
+        let retainedOverrides = preferences
+            .modelArtifactOverridesByPurposeCheckpoint
+            .filter { $0.value != artifactID }
+        if preferences.activeModelID == artifactID
+            || retainedOverrides
+                != preferences.modelArtifactOverridesByPurposeCheckpoint {
+            if preferences.activeModelID == artifactID {
+                preferences.activeModelID = nil
+            }
+            preferences.modelArtifactOverridesByPurposeCheckpoint =
+                retainedOverrides
+            settingsStore.save(preferences)
+            guard settingsStore.lastError == nil else {
+                throw RetiredManagedModelCleanupError
+                    .preferencePersistenceFailed
+            }
+        }
+
+        let queueStore = ModelInstallQueueStore(
+            fileURL: layout.installQueueURL
+        )
+        var queue = try queueStore.loadForRelaunch()
+        let removedAttempts = queue.removeAttempts(
+            forArtifactID: artifactID
+        )
+        if !removedAttempts.isEmpty {
+            try queueStore.save(queue)
+        }
+
+        let filenames = Array(
+            Set(
+                expectedFilenames
+                    + removedAttempts.flatMap {
+                        $0.authorizedArtifactIdentity?
+                            .expectedFiles.map(\.filename) ?? []
+                    }
+                    + removedAttempts.flatMap {
+                        $0.resumableData?.filenames ?? []
+                    }
+            )
+        ).sorted()
+        try ModelInstallRetainedDataRemover(
+            layout: layout,
+            fileManager: fileManager
+        ).remove(
+            modelID: artifactID,
+            filenames: filenames
+        )
+
+        let installedPersistence = InstalledModelsStorePersistence(
+            fileURL: layout.installedStoreURL,
+            fileManager: fileManager
+        )
+        if try installedPersistence.load().record(
+            forModelID: artifactID
+        ) != nil {
+            _ = try InstalledModelManager(
+                layout: layout,
+                fileManager: fileManager
+            ).remove(modelID: artifactID)
+        }
+
+        try removeOrphanIfPresent(
+            at: layout.installedModelDirectory(
+                modelID: artifactID
+            ),
+            fileManager: fileManager
+        )
+        try removeOrphanIfPresent(
+            at: layout.pendingRemovalDirectory(
+                modelID: artifactID
+            ),
+            fileManager: fileManager
+        )
+    }
+
+    private func removeOrphanIfPresent(
+        at url: URL,
+        fileManager: FileManager
+    ) throws {
+        guard fileManager.fileExists(atPath: url.path) else {
+            return
+        }
+        try fileManager.removeItem(at: url)
     }
 }
 
@@ -2990,13 +3123,13 @@ final class ModelCatalogCoordinator {
         case .checking, .checkingForUpdates, .trusted, .updateAvailable:
             return nil
         case .offline:
-            return "Using the last trusted catalog while Textify is offline."
+            return "Textify could not reverify the bundled model list."
         case let .securityFailure(reason):
-            return "Textify rejected an untrusted catalog update (\(reason.displayName)). The last trusted catalog remains available."
+            return "Textify rejected invalid model-list data (\(reason.displayName))."
         case let .requiresNewerTextify(manifestVersion):
             return "Catalog version \(manifestVersion) requires a newer version of Textify."
         case .unavailable:
-            return "The signed model catalog is unavailable. Installed models still work offline."
+            return "The bundled model list is unavailable. Installed models still work."
         }
     }
 

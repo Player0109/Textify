@@ -1,44 +1,58 @@
-# Textify V1.1 Privacy
+# Textify Privacy
 
-Textify is a local dictation utility. V1.1 has no accounts, analytics service,
-crash reporter, transcript history, or automatic upload path for dictated
-content.
+This statement applies to Textify 1.1.x. Textify is a local dictation utility
+with no accounts, analytics service, crash reporter, transcript history, or
+automatic upload path for dictated content.
 
-## Audio And Transcription
+## Audio and dictated text
 
 - Audio is captured only while you actively dictate.
-- Transcription runs locally on your Mac through whisper.cpp.
-- Raw audio is processed for the active dictation and is not retained after that
-  dictation finishes.
-- Textify does not keep transcript history.
+- Audio and optional voice cleaning are processed locally through the installed
+  on-device runtime.
+- Raw audio is processed in memory and is not saved by default. It is released
+  after the active dictation finishes.
+- Dictated text is inserted locally. Textify does not keep transcript history.
+- Textify does not send audio, transcripts, vocabulary, custom words, or
+  replacement pairs to a Textify server or cloud speech service.
 
-## Clipboard Use
+## Clipboard use
 
 Textify uses the system clipboard only as an insertion transport. Before paste,
-it snapshots the current clipboard, writes the dictated text, posts paste, and
-then restores the snapshot when the expected marker remains. If another app or
-the user changes the clipboard during insertion, Textify does not overwrite that
-new clipboard content.
+it snapshots the current clipboard, writes the dictated text, marks that item
+transient and concealed on a best-effort basis, posts paste, and restores the
+snapshot only while Textify's expected clipboard marker remains.
 
-## Diagnostics
+If another app or the user changes the clipboard during insertion, Textify does
+not overwrite that newer content. Transient and concealed pasteboard markers
+are conventions, not guarantees; third-party clipboard managers may still
+observe or retain the temporary dictated text.
 
-Diagnostics export is explicit. Diagnostics are redacted and must not contain
-transcripts, clipboard content, or raw audio. They are intended for technical
-state such as permissions, model status, timing, and error categories.
+## Local settings and diagnostics
 
-## Network
+Settings, model receipts, vocabulary, custom words, replacement pairs, and
+excluded-app records remain local.
 
-Textify V1.1 does not automatically upload audio, transcripts, clipboard
-content, diagnostics, or settings. Network access is used for the signed model
-manifest, model-revocation records, and their signatures from GitHub Pages, the
-curated model download from Textify GitHub Release assets, and manual app
-downloads from GitHub Releases. Revocation matching happens locally. Those
-requests do not include installed model IDs, Custom model hashes, local
-filenames, storage inventory, or match results.
+Diagnostics export is explicit. Exported diagnostics are redacted and must not
+contain transcripts, clipboard contents, vocabulary, custom words, replacement
+text, or raw audio. They are limited to technical state such as permissions,
+model status, timings, and error categories.
 
-GitHub Pages and GitHub Releases may receive ordinary request metadata for those
-downloads, such as IP address, user agent, and request time. Textify does not add
-analytics payloads or dictated content to those requests.
+## Network access
 
-Sparkle is deferred in V1.1, so Textify does not send Sparkle update requests or
-Sparkle system profile data.
+The signed model catalog and its signature are bundled with Textify. The app
+does not fetch catalog or revocation metadata when it launches, when onboarding
+opens, or when Settings opens.
+
+Network access occurs only for:
+
+- a model download that you explicitly start, from an immutable Textify GitHub
+  Release asset or an exact commit-pinned public Hugging Face file; and
+- manual app downloads from GitHub Releases that you initiate outside Textify.
+
+GitHub and Hugging Face may receive ordinary request metadata for those
+downloads, such as IP address, user agent, and request time. Textify does not
+add installed model identifiers, local filenames, storage inventory, analytics,
+system profiles, or dictated content to those requests.
+
+Automatic updates are deferred in Textify 1.1, so the app does not make update
+checks or send Sparkle system-profile data.

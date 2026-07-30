@@ -26,6 +26,8 @@ targets:
       - path: Resources/Assets.xcassets
       - path: Resources/Localizable.xcstrings
         buildPhase: resources
+      - path: LICENSE
+        buildPhase: resources
       - path: ACKNOWLEDGMENTS.md
         buildPhase: resources
       - path: THIRD_PARTY_NOTICES.md
@@ -86,12 +88,18 @@ targets:
           mkdir -p "$CATALOG_DIRECTORY"
           /bin/cp "$SRCROOT/models/manifest.json" "$CATALOG_DIRECTORY/manifest.json"
           /bin/cp "$SRCROOT/models/manifest.json.sig" "$CATALOG_DIRECTORY/manifest.json.sig"
+          /bin/cp "$SRCROOT/models/revocations.json" "$CATALOG_DIRECTORY/revocations.json"
+          /bin/cp "$SRCROOT/models/revocations.json.sig" "$CATALOG_DIRECTORY/revocations.json.sig"
         inputFiles:
           - $(SRCROOT)/models/manifest.json
           - $(SRCROOT)/models/manifest.json.sig
+          - $(SRCROOT)/models/revocations.json
+          - $(SRCROOT)/models/revocations.json.sig
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ModelCatalog/manifest.json
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ModelCatalog/manifest.json.sig
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ModelCatalog/revocations.json
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ModelCatalog/revocations.json.sig
       - name: Compile Whisper Metal Library
         script: |
           "$SRCROOT/script/build_whisper_metallib.sh" \

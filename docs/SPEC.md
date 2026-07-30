@@ -1,11 +1,11 @@
 # Textify V1 Spec
 
-Snapshot date: 2026-07-03
+Snapshot date: 2026-07-30
 
 This document captures the Textify V1 product and technical decisions from the
-grill session through Q350. It is a current-state decision snapshot, not a public
-roadmap. Items listed as out of scope are boundaries for V1, not commitments for
-future versions.
+original product-discovery sequence through Q350. It is a current-state
+decision snapshot, not a public roadmap. Items listed as out of scope are
+boundaries for V1, not commitments for future versions.
 
 ### Current V1.1 release profile
 
@@ -13,23 +13,20 @@ The shipping target began with the narrower V1.1 implementation plan in
 `docs/superpowers/plans/2026-07-03-textify-v1-parallel-implementation.md`.
 The production hardening and multi-model workstream recorded in
 `docs/implementation/coordination.md` now supersedes that plan's single-model,
-Whisper-only, and no-Core-ML boundaries. Textify remains arm64-only, uses the
-system-default microphone, and is distributed as a manually updated GitHub
-Release DMG. It now supports a signed multi-model catalog, multiple installed
-models, safe switching/deletion, verified custom Whisper import, Whisper on
-Metal, released FluidAudio batch engines on Core ML/Apple Neural Engine, and
-optional MossFormer2 speech enhancement before ASR.
-It still omits Sparkle, history, vocabulary/custom words, per-app profiles,
-cloud ASR, and live partial transcription. The trigger is user-selectable from
-the four curated choices, with Right Command as the default. A runtime is not a
-public model promise until its exact artifacts and metadata are published in
-the signed catalog.
-
-Last external grill respondent:
-
-- Claude session used through Q329: `02de4aa5-d168-4f20-a2dc-e9ffd8afa33c`
-- Codex session used from Q330 onward: `019f25f5-3ff3-7571-9137-d5ecfbfaaba4`
-- Last completed grill question: Q350
+Whisper-only, and no-Core-ML boundaries. Textify remains arm64-only, supports
+the system-default or an explicitly selected microphone, and is distributed as
+a manually updated GitHub Release DMG. It now supports a signed multi-model
+catalog, multiple installed models, safe switching/deletion, verified custom
+Whisper import, several local Apple Silicon runtimes, multilingual model
+routing, vocabulary and replacement pairs, and optional MossFormer2 speech
+enhancement before ASR.
+It still omits Sparkle, transcript history, per-app profiles, cloud ASR, and
+live partial transcription. The trigger is user-selectable from the four
+curated choices, with Right Command as the default. A runtime is not a public
+model promise until its exact artifacts and metadata are published in the
+signed catalog. The original product-discovery sequence concluded at Q350;
+private tool/session identifiers are intentionally not part of the public
+specification.
 
 ## 1. Product Summary
 
@@ -139,12 +136,9 @@ Release artifact naming should include architecture, for example:
 V1 hosting uses GitHub-owned project infrastructure only:
 
 - Signed/notarized DMG releases:
-  `https://github.com/Player0109/Textify/releases/download/v1.0.0/Textify-1.0.0-arm64.dmg`
-- Sparkle appcast:
-  `https://player0109.github.io/Textify/appcast.xml`
-- Signed remote model manifest:
-  `https://player0109.github.io/Textify/models/manifest.json`
-  and `https://player0109.github.io/Textify/models/manifest.json.sig`
+  `https://github.com/Player0109/Textify/releases/download/v1.1.0/Textify-1.1.0-arm64.dmg`
+- The signed model manifest and detached signature are bundled inside each
+  Textify app release. Textify does not fetch catalog metadata at runtime.
 - Model files:
   immutable Textify GitHub Release assets, for example
   `https://github.com/Player0109/Textify/releases/download/models-v1/ggml-small.en-q5_1.bin`
@@ -169,8 +163,8 @@ Hardened Runtime:
 - Enabled for distribution with `codesign --options runtime`.
 - Do not add Hardened Runtime exception entitlements unless a verified build
   failure proves they are required.
-- Do not disable library validation for Sparkle. Re-sign embedded Sparkle code
-  correctly in the release build.
+- Do not disable library validation in distribution. Sign every embedded native
+  library correctly in the release build.
 
 Info.plist requirements:
 
@@ -197,10 +191,6 @@ Release key management:
 
 - Developer ID certificate private keys and notary credentials stay in the
   maintainer's local Keychain/account only.
-- Sparkle update signing uses its own Ed25519 keypair.
-- The Sparkle private key stays in local encrypted/offline storage only.
-- `SUPublicEDKey` is public and is stored in the app `Info.plist`, repo, and
-  release docs.
 - Model manifest signing uses a separate Ed25519 keypair.
 - Model manifest private keys stay in local encrypted/offline storage only.
 - Model manifest public keys and `keyId` values are public and are stored in
@@ -211,23 +201,18 @@ Never commit:
 - Apple `.p12` files or private certs
 - certificate passwords
 - notary credentials or API keys
-- Sparkle private key exports
 - model-manifest private keys
 - recovery keys
 - signing environment files
 
 GitHub Actions may build and test unsigned artifacts in V1.
 
-Final release signing, notarization, Sparkle appcast signing, and model-manifest
-signing are manual maintainer-machine operations in V1. GitHub hosts public
-outputs but does not hold V1 signing authority.
+Final release signing, notarization, and model-manifest signing are manual
+maintainer-machine operations in V1. GitHub hosts public outputs but does not
+hold V1 signing authority.
 
 Minimum rotation story:
 
-- Sparkle key rotation happens through a Developer ID-signed DMG update that
-  embeds the new Sparkle public key.
-- Do not rotate Developer ID and Sparkle signing material in the same update
-  unless unavoidable.
 - Model manifest signatures include a `keyId`.
 - V1 app supports a small embedded trusted public-key set, normally active key
   plus one reserve key.
@@ -240,32 +225,26 @@ Minimum rotation story:
 
 ## 6. App Update Policy
 
-V1 uses Sparkle for direct-distributed app updates.
+V1.1 uses manual GitHub Release DMG updates. Sparkle and automatic update checks
+are deferred.
 
 Policy:
 
-- Signed Sparkle appcast.
-- Automatic update checks.
-- Manual "Check for Updates..." action.
-- Installation always requires explicit user approval.
+- Each release is Developer ID signed, notarized, stapled, and accompanied by a
+  SHA-256 checksum.
+- The app performs no automatic update check and sends no system profile.
+- Users explicitly download the next release and replace the installed app.
 - No silent app replacement.
-- Sparkle optional system profile sending must be disabled to match privacy claims.
 
-General settings update controls:
-
-- Automatically check for updates
-- Check for Updates Now
-- App version display
-
-Sparkle signing keys are not stored in GitHub Actions for V1.
+General Settings shows the app version but no updater controls.
 
 ## 7. Build Strategy
 
 The project is SwiftPM-first for source structure and ordinary logic tests.
 
 However, V1 also includes a thin Xcode project for real `.app` bundling,
-assets, entitlements, Sparkle embedding, signing, archiving, notarization, and
-release.
+assets, entitlements, native runtime embedding, signing, archiving,
+notarization, and release.
 
 SwiftPM package:
 
@@ -317,7 +296,8 @@ README language should be factual:
 
 - Do not compare against competitors.
 - Do not use roadmap language.
-- State English-only and Apple-Silicon-only constraints clearly.
+- State the Apple-Silicon-only constraint and exact catalog language support
+  clearly.
 - Use verifiable claims instead of marketing adjectives.
 
 README model wording:
@@ -344,8 +324,9 @@ Also state:
 - No crash reporting.
 - No accounts.
 - No servers that see dictated content.
-- Network is used for app update checks and curated model downloads.
-- Model/update hosts may see ordinary request metadata such as IP address.
+- Network is used for explicit curated model downloads and user-initiated app
+  downloads.
+- Model/app hosts may see ordinary request metadata such as IP address.
 - Textify does not send extra analytics or system profiles with those requests.
 - Clipboard insertion briefly writes dictated text to the system clipboard, marks
   it transient/concealed on a best-effort basis, and restores the previous
@@ -362,7 +343,8 @@ Also state:
 - Acknowledge reports within about 5 business days.
 - No fixed remediation SLA.
 - In scope: Accessibility/keyboard-monitoring paths, insertion, model downloads,
-  manifest verification, Sparkle, signing/notarization, vendored dependencies.
+  manifest verification, release integrity, signing/notarization, vendored
+  dependencies.
 - Out of scope: documented punctuation command collisions and best-effort
   clipboard transient marking.
 
@@ -555,7 +537,6 @@ Menu dropdown:
 ```text
 [Open Textify…]
 [optional status lines]
-Check for Updates...
 About Textify
 Quit Textify
 ```
@@ -647,8 +628,6 @@ Controls:
 
 - Launch at Login
 - Keep Textify in the Dock
-- Automatically check for updates
-- Check for Updates Now
 - App version
 
 Excluded:
@@ -670,6 +649,9 @@ Controls:
 - Dictation Trigger
 - Microphone
 - Test Trigger
+- Floating Icon X Offset
+- Floating Icon Y Offset
+- Floating Icon Scale
 
 Microphone control:
 
@@ -691,11 +673,18 @@ No language selector in V1.
 
 No insertion method selector.
 
-No overlay customization.
+Floating Icon controls:
+
+- Apply to the recording/processing overlay for every configured trigger.
+- X and Y are point offsets from the default center-bottom position.
+- Scale ranges from 50% to 200%.
+- Defaults are X `0`, Y `0`, and scale `100%`.
+- Reset Position & Scale restores those defaults.
+- Clamp the final overlay window frame to the selected screen's visible frame.
 
 ### 13.3 Models
 
-Models pane shows curated entries from the active manifest source.
+Models pane shows curated entries from the bundled signed manifest.
 
 Rows show:
 
@@ -737,11 +726,13 @@ If no model is installed, show a banner:
 
 > No model installed. Download one to start dictating.
 
-Manifest refresh:
+Catalog availability:
 
-- Fetch silently when Models pane opens.
-- Manual Refresh button.
-- Fetch failure falls back to cached/built-in manifest.
+- Load and verify the signed manifest bundled with the app.
+- Opening Models or onboarding performs no catalog network request.
+- Model-list changes ship only through a new Textify app release.
+- A missing or invalid bundled manifest is a release-integrity failure, not an
+  offline state.
 
 Support tiers are curator labels, not measurements. The Models pane must never
 derive quality or speed bars from `tier`. Quality and speed sorting uses
@@ -1106,7 +1097,8 @@ Busy behavior:
 
 Overlay:
 
-- Small center-bottom recording indicator.
+- Small recording indicator at center-bottom by default.
+- User-configurable X offset, Y offset, and scale from Settings -> Dictation.
 - Compact waveform/level pulse.
 - Optional elapsed seconds after a few seconds.
 - No transcript preview.
@@ -1414,7 +1406,7 @@ Model catalog interaction and accessibility:
   the first/last logical row; Return selects and inspects the focused artifact;
   Left/Right collapse or expand checkpoints; and Command-Delete requests
   deletion only for the selected installed Exact Artifact.
-- Query, catalog refresh, revocation, install, and deletion updates preserve a
+- Query, catalog, revocation, install, and deletion updates preserve a
   surviving focused identity. If the selected row disappears, focus moves to
   the nearest surviving selectable row and Textify announces that result once.
 - Download progress exposes its current phase, bytes, and percentage as a
@@ -1483,9 +1475,6 @@ Model storage:
 │   ├── .downloading/
 │   ├── <model-id>/
 │   │   └── <model-file>
-├── ManifestCache/
-│   ├── manifest.json
-│   └── manifest.json.sig
 └── Diagnostics/
     └── log-YYYY-MM-DD.jsonl
 ```
@@ -1621,7 +1610,7 @@ Backup policy:
 - Include user settings, vocabulary, custom words, excluded apps, installed metadata.
 - Exclude model binaries.
 - Exclude download temp files.
-- Exclude manifest cache.
+- Exclude the legacy manifest cache left by older Textify versions.
 - Exclude diagnostics.
 
 On launch:
@@ -1632,48 +1621,35 @@ On launch:
 - Do not auto-promote another installed model if active model is invalid.
 - Self-heal `installed.json`.
 - Preload active valid model in background.
-- Do not wait on network manifest refresh to use an already-installed model.
+- Do not perform a network catalog refresh before using an already-installed
+  model.
 
 ## 22. Model Manifest
 
-Built-in manifest:
+Bundled manifest:
 
-- Bundled in app resources.
-- Lists curated model options.
-- No model binaries bundled.
+- `manifest.json` and `manifest.json.sig` are bundled in app resources.
+- The bundled pair is the only runtime catalog source.
+- It lists curated model options but does not contain model binaries.
+- Textify verifies the complete pair locally with strict JSON schema validation,
+  the embedded Ed25519 public-key table, and production catalog policy.
+- Invalid, unsigned, or incomplete bundled data is a release-integrity failure.
+  There is no remote or cached fallback.
+- Opening onboarding or Models never fetches manifest, signature, or revocation
+  metadata.
+- Catalog membership, presentation, benchmark, and revocation-policy changes
+  require a newly signed Textify app release.
+- A legacy remote catalog cache is ignored for presentation. Previously
+  accepted sticky revocation state remains locally enforced.
 
-Remote manifest:
-
-- HTTPS only.
-- Strict JSON schema validation.
-- Signed with EdDSA.
-- Public verification key embedded in app.
-- Invalid or unsigned manifest is rejected.
-- No degraded trust mode.
-
-Remote manifest hosting:
-
-- `manifest.json` and `manifest.json.sig` live on GitHub Pages.
-- Model file URLs inside the manifest point either to immutable Textify GitHub
-  Release assets or exact Hugging Face
-  `resolve/<40-character-lowercase-commit>/<path>` files.
-- Reject mutable refs, credentials, ports, queries, fragments, percent-encoded
-  or traversing paths, and every unapproved host or URL shape.
-- The manifest includes upstream source/provenance/license metadata for each
-  model.
-- New model bytes require a new immutable URL or commit, new size/checksum, and
-  newly signed manifest.
-
-Fallback precedence:
-
-1. Verify the complete bundled manifest/signature pair and the fetched remote
-   manifest/signature pair independently.
-2. If both are valid, select the one with the newer signed `generatedAt`
-   timestamp; an equal timestamp may select remote.
-3. If remote fetch or verification fails, use the valid bundled manifest.
-4. An incomplete or invalid bundled pair is a release-integrity failure.
-
-Select one manifest source wholesale. Do not merge sources.
+Model file URLs inside the bundled manifest point either to immutable Textify
+GitHub Release assets or exact Hugging Face
+`resolve/<40-character-lowercase-commit>/<path>` files. Reject mutable refs,
+credentials, ports, queries, fragments, percent-encoded or traversing paths,
+and every unapproved host or URL shape. The manifest includes upstream
+source/provenance/license metadata for each model. New model bytes require a
+new immutable URL or commit, new size/checksum, newly signed manifest, and a
+new Textify release.
 
 Already installed models keep working even if removed from current manifest.
 
@@ -1915,9 +1891,10 @@ Before adding or updating a curated model:
 - Use either an immutable Textify GitHub Release asset or an exact commit-pinned
   Hugging Face file. If Textify mirrors the bytes, publish the applicable
   license and provenance sidecars with the release asset.
-- Update built-in/remote manifest with URL, size, SHA-256, licenses,
+- Update the bundled manifest with URL, size, SHA-256, licenses,
   provenance, runtime preset, and min app version.
-- Sign the manifest and verify a clean install download path.
+- Sign the manifest, embed the exact verified pair in the app, and verify a
+  clean install download path.
 
 If license provenance is unclear, the model is not eligible for V1 curation.
 
@@ -1959,7 +1936,7 @@ contentSHA256=<lowercase-hex-sha256-of-exact-manifest-json-bytes>
 
 Verification order:
 
-1. Download `manifest.json` and `manifest.json.sig` over HTTPS.
+1. Read the bundled `manifest.json` and `manifest.json.sig` bytes.
 2. Parse `.sig` with a strict schema; reject unknown or missing fields.
 3. Require `signatureVersion == 1`.
 4. Require `algorithm == "Ed25519"` exactly.
@@ -1978,11 +1955,11 @@ path.
 
 ### 22.3 Signed Model Revocation Overlay
 
-Model security revocations are an independently versioned, independently
-signed input at `revocations.json` and `revocations.json.sig`. Textify fetches
-and authenticates this pair before attempting to decode a fetched catalog for
-presentation. A valid revocation update therefore still applies when the
-catalog uses a presentation schema that this app version does not support.
+Model security revocations use an independently versioned, independently
+signed `revocations.json` and `revocations.json.sig` format. The bundled-only
+release profile does not acquire new revocation envelopes at runtime. It loads,
+re-verifies, and enforces previously accepted sticky revocation state for
+migration safety. New revocations or restorations require a Textify app release.
 
 The revocation body is strict JSON:
 
@@ -2050,12 +2027,11 @@ later catalog canonicalization.
 Accepted revocations are sticky. A later signed envelope may add records but
 cannot mutate an existing `recordID`, roll back the accepted timestamp, or
 remove the effect of a prior record by omission. The app persists the exact
-signed envelopes and re-verifies them when loading the cache. Network failure,
-catalog refresh failure, unsupported catalog presentation, and rollback retain
-the previously accepted overlay. When an accepted signed catalog supplies an
-artifact alias, Textify also persists that exact signed catalog evidence and
-re-verifies it on load so a later catalog omission cannot break the identity
-relationship.
+signed envelopes and re-verifies them when loading the cache. Relaunch,
+unsupported catalog presentation, and rollback retain the previously accepted
+overlay. When an accepted signed catalog supplies an artifact alias, Textify
+also persists that exact signed catalog evidence and re-verifies it on load so
+a later catalog omission cannot break the identity relationship.
 
 A restoration is valid only in a higher signed revision. It has an immutable
 `restorationID`, references a revocation record from an already accepted prior
@@ -2108,8 +2084,7 @@ is nonterminal, Textify neither authorizes a duplicate attempt nor offers or
 executes retained-data removal. Activation remains gated by successful
 integrity verification.
 
-Matching is local. Revocation fetches are anonymous HTTPS GETs for only the two
-configured files. Textify never sends installed Artifact IDs, Custom content
+Matching is local. Textify never sends installed Artifact IDs, Custom content
 digests, local filenames, storage inventory, or match results to the publisher.
 
 ## 23. Post-Processing Pipeline
@@ -2410,7 +2385,7 @@ Allowed as counts/enums/metrics:
 - machine model/chip class
 - active model ID/tier
 - installed model IDs/tiers
-- manifest source
+- bundled manifest revision
 - vocabulary entry count
 - custom words count
 - excluded apps count
@@ -2520,7 +2495,7 @@ Build flag ownership:
 - The thin Xcode project consumes the SwiftPM package.
 - Do not duplicate vendored file membership in Xcode.
 - Xcode project does not own whisper.cpp build flags.
-- Remote model manifest never controls compile flags, thread count, Metal, or
+- The bundled model manifest never controls compile flags, thread count, Metal, or
   GPU behavior.
 - Release builds target macOS 14+ arm64 only.
 - Enable the Metal path for Apple Silicon builds.
@@ -2568,8 +2543,6 @@ Dependency policy:
 - First-party native frameworks for hotkeys, menu bar, settings, downloads.
 - No SQLite in V1.
 - Use JSON/UserDefaults/JSONL.
-- Sparkle is an accepted third-party exception because Apple has no equivalent
-  direct-distributed update system.
 - whisper.cpp is the accepted native ASR dependency.
 
 Concurrency:
@@ -2600,7 +2573,8 @@ Release-blocking smoke test:
 4. Secure field protection.
 5. Excluded apps.
 6. Clean DMG install and Gatekeeper behavior.
-7. Sparkle update success and tampered update rejection.
+7. Manual update replacement install, checksum verification, and confirmation
+   that no automatic updater/appcast is embedded.
 8. Model download and SHA-256 verification.
 9. Diagnostics export contains no dictated text.
 10. Launch at Login, including `.requiresApproval` if triggered.
@@ -2609,6 +2583,7 @@ Periodic regression checks:
 
 - each fallback trigger
 - overlay timing threshold
+- floating-icon X/Y/scale persistence, reset, and visible-screen clamping
 - Keep Textify in the Dock migration, opt-out, and relaunch behavior
 - main-window close, Dock reopen, and menu-bar Open Textify behavior
 - Reset Onboarding
@@ -2633,7 +2608,7 @@ Day-one automated tests:
 - manifest signature verification
 - SHA-256 verification
 - installed model reconciliation
-- manifest precedence
+- bundled manifest verification without catalog network requests
 - TextifyAudio pure VAD/resampling fixtures
 - TextifyDiagnostics schema and no-content invariants
 - TextifySettings persistence round-trips
@@ -2647,7 +2622,7 @@ Manual-only:
 - real cross-app insertion
 - secure field behavior
 - real Metal/whisper accuracy
-- Sparkle update installation
+- manual update replacement installation
 - notarization/Gatekeeper
 - UI snapshot testing
 
@@ -2694,8 +2669,9 @@ The V1 product decisions are sufficient to start implementation.
 
 No product decision blocks coding.
 
-Start with a mock-first vertical path. Do not start with whisper.cpp, Sparkle,
-notarization, or real global keyboard monitoring.
+The implementation sequence below is retained as historical delivery context.
+It began with a mock-first vertical path before native runtimes, notarization,
+or real global keyboard monitoring.
 
 ### 31.1 Milestone Sequence
 
@@ -2758,8 +2734,8 @@ notarization, or real global keyboard monitoring.
    - Proof: state tests with fakes plus manual full-app TCC test.
 
 10. Model Downloads
-    - Implement GitHub-hosted manifest fetch, one-at-a-time downloads, staging,
-      resume, cancel, verify, and install.
+    - Implement one-at-a-time artifact downloads authorized by the bundled
+      manifest, staging, resume, cancel, verify, and install.
     - Proof: local test server or fixture download; checksum mismatch deletes
       partial; active model remains usable during another download.
 
@@ -2770,7 +2746,7 @@ notarization, or real global keyboard monitoring.
       local smoke with one curated model.
 
 12. Thin Xcode And Distribution
-    - Add Xcode project for app bundle, entitlements, Sparkle embedding,
+    - Add Xcode project for app bundle, entitlements, native runtime embedding,
       signing, notarization, and DMG.
     - Proof: `xcodebuild` archive, ad-hoc local run, then signed/notarized
       release candidate.
@@ -2779,7 +2755,6 @@ notarization, or real global keyboard monitoring.
 
 - Exact whisper.cpp upstream commit: defer until Milestone 11.
 - Final model SHA-256 values and release URLs: defer until Milestone 10.
-- Sparkle private key material and notarization credentials: defer until
-  Milestone 12.
+- Notarization credentials: defer until Milestone 12.
 - Threshold tuning beyond current defaults: defer until audio/runtime QA.
 - App icon/final visual polish: defer until UI milestone.

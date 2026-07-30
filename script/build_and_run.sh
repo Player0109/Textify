@@ -24,6 +24,8 @@ LITERT_LM_LIBRARY="$APP_FRAMEWORKS/libCLiteRTLM_mac.dylib"
 MODEL_CATALOG_DIRECTORY="$APP_RESOURCES/ModelCatalog"
 MODEL_CATALOG_MANIFEST="$MODEL_CATALOG_DIRECTORY/manifest.json"
 MODEL_CATALOG_SIGNATURE="$MODEL_CATALOG_DIRECTORY/manifest.json.sig"
+MODEL_REVOCATION_MANIFEST="$MODEL_CATALOG_DIRECTORY/revocations.json"
+MODEL_REVOCATION_SIGNATURE="$MODEL_CATALOG_DIRECTORY/revocations.json.sig"
 MODEL_CATALOG_KEY_ID="textify-model-manifest-2026-huggingface"
 MODEL_CATALOG_PUBLIC_KEY_BASE64="eg6XVGVQ4Kqh1dtN3B8JcFTtK0RSxkxd79W5tfIlfos="
 DERIVED_DATA_DIR="$DIST_DIR/DerivedData"
@@ -77,8 +79,27 @@ stage_fast_app() {
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/MLXAudioSwift.txt" "$APP_RESOURCES/MLXAudioSwift.txt"
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/MLXSwift.txt" "$APP_RESOURCES/MLXSwift.txt"
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/LiteRT-LM.txt" "$APP_RESOURCES/LiteRT-LM.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/CC-BY-4.0.txt" "$APP_RESOURCES/CC-BY-4.0.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/OpenAI-Whisper.txt" "$APP_RESOURCES/OpenAI-Whisper.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/ggml-small.en-q5_1.LICENSES.txt" "$APP_RESOURCES/ggml-small.en-q5_1.LICENSES.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/NVIDIA_Open_Model_License.txt" "$APP_RESOURCES/NVIDIA_Open_Model_License.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/OpenMDW-1.1.txt" "$APP_RESOURCES/OpenMDW-1.1.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/SwiftNIO-NOTICE.txt" "$APP_RESOURCES/SwiftNIO-NOTICE.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/SwiftCrypto-NOTICE.txt" "$APP_RESOURCES/SwiftCrypto-NOTICE.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/FluidAudio-fastcluster.txt" "$APP_RESOURCES/FluidAudio-fastcluster.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/FluidAudio-VBx.txt" "$APP_RESOURCES/FluidAudio-VBx.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/MLXSwift-fmt.txt" "$APP_RESOURCES/MLXSwift-fmt.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/MLXSwift-nlohmann-json.txt" "$APP_RESOURCES/MLXSwift-nlohmann-json.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/MLXSwift-metal-cpp.txt" "$APP_RESOURCES/MLXSwift-metal-cpp.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/MLXSwift-MLX-Core.txt" "$APP_RESOURCES/MLXSwift-MLX-Core.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/transcribe.cpp-ggml.txt" "$APP_RESOURCES/transcribe.cpp-ggml.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/transcribe.cpp-miniz.txt" "$APP_RESOURCES/transcribe.cpp-miniz.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/ONNX_Runtime_ThirdPartyNotices.txt" "$APP_RESOURCES/ONNX_Runtime_ThirdPartyNotices.txt"
+  cp "$ROOT_DIR/LICENSE" "$APP_RESOURCES/LICENSE"
   cp "$ROOT_DIR/models/manifest.json" "$MODEL_CATALOG_MANIFEST"
   cp "$ROOT_DIR/models/manifest.json.sig" "$MODEL_CATALOG_SIGNATURE"
+  cp "$ROOT_DIR/models/revocations.json" "$MODEL_REVOCATION_MANIFEST"
+  cp "$ROOT_DIR/models/revocations.json.sig" "$MODEL_REVOCATION_SIGNATURE"
   /usr/bin/ditto "$BUILD_RESOURCE_BUNDLE" "$APP_RESOURCES/$WHISPER_RESOURCE_BUNDLE_NAME"
   "$ROOT_DIR/script/build_whisper_metallib.sh" "$METAL_LIBRARY"
   "$ROOT_DIR/script/runtime/embed_mlx_metallib.sh" "$MLX_METAL_LIBRARY" -
@@ -119,6 +140,23 @@ verify_staged_app() {
   [[ -s "$APP_RESOURCES/MLXAudioSwift.txt" ]]
   [[ -s "$APP_RESOURCES/MLXSwift.txt" ]]
   [[ -s "$APP_RESOURCES/LiteRT-LM.txt" ]]
+  [[ -s "$APP_RESOURCES/CC-BY-4.0.txt" ]]
+  [[ -s "$APP_RESOURCES/OpenAI-Whisper.txt" ]]
+  [[ -s "$APP_RESOURCES/ggml-small.en-q5_1.LICENSES.txt" ]]
+  [[ -s "$APP_RESOURCES/NVIDIA_Open_Model_License.txt" ]]
+  [[ -s "$APP_RESOURCES/OpenMDW-1.1.txt" ]]
+  [[ -s "$APP_RESOURCES/SwiftNIO-NOTICE.txt" ]]
+  [[ -s "$APP_RESOURCES/SwiftCrypto-NOTICE.txt" ]]
+  [[ -s "$APP_RESOURCES/FluidAudio-fastcluster.txt" ]]
+  [[ -s "$APP_RESOURCES/FluidAudio-VBx.txt" ]]
+  [[ -s "$APP_RESOURCES/MLXSwift-fmt.txt" ]]
+  [[ -s "$APP_RESOURCES/MLXSwift-nlohmann-json.txt" ]]
+  [[ -s "$APP_RESOURCES/MLXSwift-metal-cpp.txt" ]]
+  [[ -s "$APP_RESOURCES/MLXSwift-MLX-Core.txt" ]]
+  [[ -s "$APP_RESOURCES/transcribe.cpp-ggml.txt" ]]
+  [[ -s "$APP_RESOURCES/transcribe.cpp-miniz.txt" ]]
+  [[ -s "$APP_RESOURCES/ONNX_Runtime_ThirdPartyNotices.txt" ]]
+  [[ -s "$APP_RESOURCES/LICENSE" ]]
   [[ "$(lipo -archs "$APP_FRAMEWORKS/libsherpa-onnx-c-api.dylib")" == "arm64" ]]
   [[ "$(lipo -archs "$APP_FRAMEWORKS/libonnxruntime.1.24.4.dylib")" == "arm64" ]]
   [[ "$(lipo -archs "$APP_FRAMEWORKS/libtextify-transcribe.0.1.3.dylib")" == "arm64" ]]
@@ -132,6 +170,10 @@ verify_staged_app() {
     "$ROOT_DIR/script/models/verify_model_manifest.sh" \
       "$MODEL_CATALOG_MANIFEST" \
       "$MODEL_CATALOG_SIGNATURE"
+  TEXTIFY_MODEL_REVOCATION_KEY_ID="$MODEL_CATALOG_KEY_ID" \
+    "$ROOT_DIR/script/models/verify_model_revocations.sh" \
+      "$MODEL_REVOCATION_MANIFEST" \
+      "$MODEL_REVOCATION_SIGNATURE"
 }
 
 verify_staged_app_launch() {

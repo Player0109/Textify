@@ -49,7 +49,7 @@ final class ProductionUITests: XCTestCase {
         )
         XCTAssertEqual(
             ModelCatalogPurposeDestination.transcription.unavailableActionTitle,
-            "Refresh Catalog"
+            nil
         )
         XCTAssertTrue(
             ModelCatalogPurposeDestination.voiceCleaning.unavailableDetail
@@ -186,6 +186,147 @@ final class ProductionUITests: XCTestCase {
 
         XCTAssertEqual(state, .granted)
         XCTAssertEqual(probeCount, 3)
+    }
+
+    func testGuidedPermissionSetupChoosesTheNextRecoverableAction() {
+        let fresh = PermissionSetupPresentation(
+            permissions: RuntimePermissionSnapshot(
+                microphone: .unknown,
+                accessibility: .denied,
+                inputMonitoring: .granted
+            )
+        )
+        XCTAssertEqual(
+            fresh.primaryAction,
+            .requestMicrophoneThenAccessibility
+        )
+        XCTAssertEqual(fresh.actionTitle, "Allow Permissions")
+        XCTAssertEqual(fresh.completedCount, 0)
+
+        let microphoneDenied = PermissionSetupPresentation(
+            permissions: RuntimePermissionSnapshot(
+                microphone: .denied,
+                accessibility: .granted,
+                inputMonitoring: .granted
+            )
+        )
+        XCTAssertEqual(
+            microphoneDenied.primaryAction,
+            .openMicrophoneSettings
+        )
+        XCTAssertEqual(
+            microphoneDenied.actionTitle,
+            "Open Microphone Settings"
+        )
+
+        let accessibilityMissing = PermissionSetupPresentation(
+            permissions: RuntimePermissionSnapshot(
+                microphone: .granted,
+                accessibility: .denied,
+                inputMonitoring: .granted
+            )
+        )
+        XCTAssertEqual(
+            accessibilityMissing.primaryAction,
+            .requestAccessibility
+        )
+        XCTAssertEqual(
+            accessibilityMissing.actionTitle,
+            "Allow Accessibility"
+        )
+        XCTAssertEqual(accessibilityMissing.completedCount, 1)
+
+        let complete = PermissionSetupPresentation(
+            permissions: RuntimePermissionSnapshot(
+                microphone: .granted,
+                accessibility: .granted,
+                inputMonitoring: .denied
+            )
+        )
+        XCTAssertEqual(complete.primaryAction, .complete)
+        XCTAssertNil(complete.actionTitle)
+        XCTAssertEqual(complete.completedCount, 2)
+    }
+
+    func testSetupStatusRoutesStraightToTheMissingRequirement() {
+        let permissionsMissing = RuntimePermissionSnapshot(
+            microphone: .granted,
+            accessibility: .denied,
+            inputMonitoring: .granted
+        )
+        let missingPermissionReadiness = ReadinessSnapshot(
+            permissions: permissionsMissing,
+            model: .noActiveModel
+        )
+        XCTAssertEqual(
+            SettingsSetupNavigation.destination(
+                for: missingPermissionReadiness
+            ),
+            .privacy
+        )
+        XCTAssertEqual(
+            SettingsSetupNavigation.detail(for: missingPermissionReadiness),
+            "Grant required permissions"
+        )
+
+        let permissionsReady = RuntimePermissionSnapshot(
+            microphone: .granted,
+            accessibility: .granted,
+            inputMonitoring: .denied
+        )
+        let noModelReadiness = ReadinessSnapshot(
+            permissions: permissionsReady,
+            model: .noActiveModel
+        )
+        XCTAssertEqual(
+            SettingsSetupNavigation.destination(for: noModelReadiness),
+            .transcriptionModels
+        )
+        XCTAssertEqual(
+            SettingsSetupNavigation.detail(for: noModelReadiness),
+            "Choose a transcription model"
+        )
+
+        let loadingModelReadiness = ReadinessSnapshot(
+            permissions: permissionsReady,
+            model: .loading(modelID: "active-model")
+        )
+        XCTAssertEqual(
+            SettingsSetupNavigation.detail(for: loadingModelReadiness),
+            "Model setup is in progress"
+        )
+
+        let failedModelReadiness = ReadinessSnapshot(
+            permissions: permissionsReady,
+            model: .failed(
+                modelID: "active-model",
+                reason: .loadFailed
+            )
+        )
+        XCTAssertEqual(
+            SettingsSetupNavigation.detail(for: failedModelReadiness),
+            "Repair the active model"
+        )
+
+        let revokedModelReadiness = ReadinessSnapshot(
+            permissions: permissionsReady,
+            model: .revoked(modelID: "active-model")
+        )
+        XCTAssertEqual(
+            SettingsSetupNavigation.detail(for: revokedModelReadiness),
+            "Replace the active model"
+        )
+    }
+
+    func testSystemPrivacySettingsDestinationsOpenTheExpectedPanes() {
+        XCTAssertEqual(
+            SystemPrivacySettingsDestination.microphone.url.absoluteString,
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
+        )
+        XCTAssertEqual(
+            SystemPrivacySettingsDestination.accessibility.url.absoluteString,
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        )
     }
 
     func testModelCatalogDoesNotInferRatingsFromSupportTier() {
@@ -422,6 +563,44 @@ final class ProductionUITests: XCTestCase {
         XCTAssertEqual(DictationOverlayPresentation.state(for: .idle), .hidden)
     }
 
+    func testRecordingOverlayGeometryAppliesOffsetsAndScale() {
+        let visibleFrame = CGRect(x: 0, y: 0, width: 1_440, height: 900)
+        let preferences = RecordingOverlayPreferences(
+            xOffset: 100,
+            yOffset: 200,
+            scale: 1.5
+        )
+
+        let frame = RecordingOverlayGeometry.frame(
+            visibleFrame: visibleFrame,
+            preferences: preferences
+        )
+
+        XCTAssertEqual(frame.width, 516)
+        XCTAssertEqual(frame.height, 132)
+        XCTAssertEqual(frame.origin.x, 562)
+        XCTAssertEqual(frame.origin.y, 222)
+    }
+
+    func testRecordingOverlayGeometryKeepsWindowInsideVisibleScreen() {
+        let visibleFrame = CGRect(x: 40, y: 30, width: 800, height: 600)
+        let preferences = RecordingOverlayPreferences(
+            xOffset: 800,
+            yOffset: 800,
+            scale: 2
+        )
+
+        let frame = RecordingOverlayGeometry.frame(
+            visibleFrame: visibleFrame,
+            preferences: preferences
+        )
+
+        XCTAssertEqual(frame.maxX, visibleFrame.maxX)
+        XCTAssertEqual(frame.maxY, visibleFrame.maxY)
+        XCTAssertGreaterThanOrEqual(frame.minX, visibleFrame.minX)
+        XCTAssertGreaterThanOrEqual(frame.minY, visibleFrame.minY)
+    }
+
     func testOnboardingFlowAndDonePreferenceMutation() {
         XCTAssertEqual(
             OnboardingStep.productionFlow,
@@ -438,27 +617,9 @@ final class ProductionUITests: XCTestCase {
         XCTAssertTrue(preferences.onboardingCompleted)
     }
 
-    func testProductionModelPresentationShowsOnlyRequiredModel() {
+    func testProductionModelConfigurationEmbedsTrustedKeys() {
         XCTAssertEqual(ProductionModelPresentation.visibleCatalog.map(\.id), [ProductionModelPolicy.requiredModelID])
         XCTAssertEqual(ProductionModelPresentation.v1_1.displayName, "Balanced - Whisper small.en q5_1")
-        XCTAssertEqual(
-            ProductionModelInstallConfiguration.current?.manifestURL.absoluteString,
-            "https://player0109.github.io/Textify/models/manifest.json"
-        )
-        XCTAssertEqual(
-            ProductionModelInstallConfiguration.current?.signatureURL.absoluteString,
-            "https://player0109.github.io/Textify/models/manifest.json.sig"
-        )
-        XCTAssertEqual(
-            ProductionModelInstallConfiguration.current?
-                .revocationURL?.absoluteString,
-            "https://player0109.github.io/Textify/models/revocations.json"
-        )
-        XCTAssertEqual(
-            ProductionModelInstallConfiguration.current?
-                .revocationSignatureURL?.absoluteString,
-            "https://player0109.github.io/Textify/models/revocations.json.sig"
-        )
         XCTAssertEqual(
             ProductionModelInstallConfiguration.current?.trustedKeys.first?.keyId,
             "textify-model-manifest-2026-primary"
@@ -471,43 +632,7 @@ final class ProductionUITests: XCTestCase {
         )
     }
 
-    func testBundledModelCatalogWinsWhenRemoteCatalogIsOlder() throws {
-        let bundled = ModelManifest(
-            manifestVersion: 1,
-            generatedAt: "2026-07-19T09:43:39Z",
-            models: []
-        )
-        let remote = ModelManifest(
-            manifestVersion: 1,
-            generatedAt: "2026-07-03T00:00:00Z",
-            models: []
-        )
-
-        XCTAssertEqual(
-            try ProductionModelManifestLoader.newest(bundled: bundled, remote: remote),
-            bundled
-        )
-    }
-
-    func testRemoteModelCatalogWinsWhenItIsAtLeastAsNewAsBundledCatalog() throws {
-        let bundled = ModelManifest(
-            manifestVersion: 1,
-            generatedAt: "2026-07-19T09:43:39Z",
-            models: []
-        )
-        let remote = ModelManifest(
-            manifestVersion: 1,
-            generatedAt: "2026-07-20T00:00:00Z",
-            models: []
-        )
-
-        XCTAssertEqual(
-            try ProductionModelManifestLoader.newest(bundled: bundled, remote: remote),
-            remote
-        )
-    }
-
-    func testBundledSignedCatalogLoadsWhenRemoteCatalogIsUnavailable() async throws {
+    func testBundledSignedCatalogLoadsAsTheOnlyCatalogSource() throws {
         let temporaryResources = FileManager.default.temporaryDirectory
             .appendingPathComponent("TextifyModelCatalog-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: temporaryResources) }
@@ -531,9 +656,7 @@ final class ProductionUITests: XCTestCase {
             at: repositoryRoot.appendingPathComponent("models/manifest.json.sig"),
             to: bundledDirectory.appendingPathComponent("manifest.json.sig")
         )
-        let configuration = try ProductionModelInstallConfiguration(
-            manifestURL: XCTUnwrap(URL(string: "http://invalid.example/manifest.json")),
-            signatureURL: XCTUnwrap(URL(string: "http://invalid.example/manifest.json.sig")),
+        let configuration = ProductionModelInstallConfiguration(
             trustedKeys: [
                 TrustedModelManifestKey(
                     keyId: "textify-model-manifest-2026-huggingface",
@@ -542,10 +665,11 @@ final class ProductionUITests: XCTestCase {
             ]
         )
 
-        let manifest = try await ProductionModelManifestLoader(
+        let snapshot = try XCTUnwrap(ProductionModelManifestLoader(
             configuration: configuration,
             resourceDirectory: temporaryResources
-        ).load()
+        ).loadBundledSnapshot())
+        let manifest = snapshot.manifest
 
         XCTAssertEqual(manifest.manifestVersion, 3)
         XCTAssertNotNil(manifest.presentationGraph)
@@ -591,7 +715,6 @@ final class ProductionUITests: XCTestCase {
                 "granite-speech-4.1-2b-nar-q5-k-m",
                 "voxtral-mini-4b-realtime-2602-q4-k-m",
                 "moss-transcribe-diarize-0.9b-q5-k-m",
-                "omnilingual-asr-300m-ctc-int8",
                 "mossformer2-se-fp32",
                 "mossformer2-se-fp16",
                 "mossformer2-se-int8",

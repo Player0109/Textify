@@ -456,16 +456,18 @@ public actor TranscribeCppRuntime: TranscriptionProvider {
             .first
             .map(String.init)
             ?? ""
-        if variant.supportsAutomaticLanguageDetection {
-            guard normalized == "auto" else {
-                throw TranscribeCppRuntimeError.automaticLanguageDetectionRequired
+        guard !normalized.isEmpty else {
+            throw TranscribeCppRuntimeError.unsupportedLanguage(languageCode)
+        }
+        if normalized == "auto" {
+            guard variant.supportsAutomaticLanguageDetection else {
+                throw TranscribeCppRuntimeError.automaticLanguageDetectionUnsupported
             }
             return normalized
         }
-        guard normalized != "auto" else {
-            throw TranscribeCppRuntimeError.automaticLanguageDetectionUnsupported
-        }
-        guard variant.supportedLanguageCodes.contains(normalized) else {
+        guard variant.supportedLanguageCodes.isEmpty
+                || variant.supportedLanguageCodes.contains(normalized)
+        else {
             throw TranscribeCppRuntimeError.unsupportedLanguage(languageCode)
         }
         return normalized

@@ -34,8 +34,8 @@ The current candidates are:
 - `reazonspeech-k2-v2` and `sensevoice-small-int8`: the two promoted
   sherpa-onnx CPU paths. SenseVoice supports automatic English, Mandarin,
   Cantonese, Japanese, and Korean recognition.
-- `qwen3-asr-0.6b`, `omnilingual-asr-300m-ctc-int8`, and
-  `dolphin-small-ctc-multi-lang-int8`: exact-artifact evaluation-only paths;
+- `qwen3-asr-0.6b` and `dolphin-small-ctc-multi-lang-int8`: exact-artifact
+  evaluation-only paths;
   their measured support decisions are recorded in the benchmark report.
 - `mlx-parakeet-rnnt-1.1b`, `mlx-cohere-transcribe-03-2026`, and
   `mlx-whisper-large-v3-turbo`: exact local MLX Audio model-directory routes

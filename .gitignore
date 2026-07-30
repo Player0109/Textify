@@ -10,3 +10,30 @@ Textify.app/
 dist/
 build/release/
 .worktrees/
+
+# Local release artifacts
+*.app/
+*.dmg
+*.pkg
+*.xcarchive/
+*.dSYM/
+*.xcresult/
+*.trace
+*.tracev3
+*.xip
+
+# Signing, notarization, and local secret material
+.env
+.env.*
+*.env
+!.env.example
+!*.env.example
+*.p12
+*.p8
+*.pfx
+*.cer
+*.key
+*.mobileprovision
+*.provisionprofile
+*.private-key
+*.private.pem

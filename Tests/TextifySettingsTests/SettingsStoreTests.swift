@@ -14,6 +14,70 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(preferences.automaticallyCheckForUpdates)
         XCTAssertTrue(preferences.launchAtLoginEnabled)
         XCTAssertTrue(preferences.excludedApps.isEmpty)
+        XCTAssertEqual(preferences.recordingOverlay, .defaults)
+    }
+
+    func testLegacyPreferencesUseDefaultRecordingOverlayPlacement() throws {
+        let json = """
+        {
+          "trigger": "rightOption",
+          "onboardingCompleted": true
+        }
+        """
+
+        let preferences = try JSONDecoder().decode(
+            AppPreferences.self,
+            from: Data(json.utf8)
+        )
+
+        XCTAssertEqual(preferences.recordingOverlay, .defaults)
+    }
+
+    func testRecordingOverlayPreferencesRoundTrip() {
+        let store = SettingsStore(storage: .memory)
+        var preferences = AppPreferences.defaults
+        preferences.recordingOverlay = RecordingOverlayPreferences(
+            xOffset: 125,
+            yOffset: 240,
+            scale: 1.35
+        )
+
+        store.save(preferences)
+
+        XCTAssertEqual(
+            store.load().recordingOverlay,
+            RecordingOverlayPreferences(
+                xOffset: 125,
+                yOffset: 240,
+                scale: 1.35
+            )
+        )
+    }
+
+    func testRecordingOverlayPreferencesClampUnsafeStoredValues() throws {
+        let json = """
+        {
+          "recordingOverlay": {
+            "xOffset": 10000,
+            "yOffset": -10000,
+            "scale": 8
+          }
+        }
+        """
+
+        let preferences = try JSONDecoder().decode(
+            AppPreferences.self,
+            from: Data(json.utf8)
+        )
+
+        XCTAssertEqual(
+            preferences.recordingOverlay,
+            RecordingOverlayPreferences(
+                xOffset: RecordingOverlayPreferences.xOffsetRange.upperBound,
+                yOffset: RecordingOverlayPreferences.yOffsetRange.lowerBound,
+                scale: RecordingOverlayPreferences.scaleRange.upperBound
+            )
+        )
     }
 
     func testLegacyShowInDockPreferenceMigratesToHybridDockDefault() throws {

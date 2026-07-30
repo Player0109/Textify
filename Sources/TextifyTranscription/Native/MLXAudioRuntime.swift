@@ -130,7 +130,10 @@ struct MLXAudioSessionResult: Equatable {
 
 protocol MLXAudioRuntimeSession: Sendable {
     var backendName: String { get async }
-    func transcribe(samples: [Float]) async throws -> MLXAudioSessionResult
+    func transcribe(
+        samples: [Float],
+        languageCode: String
+    ) async throws -> MLXAudioSessionResult
     func unload() async
 }
 
@@ -190,7 +193,10 @@ private actor NativeNemotronASRSession: MLXAudioRuntimeSession {
         Device.defaultDevice().deviceType == .gpu ? "mlx-metal" : ""
     }
 
-    func transcribe(samples: [Float]) throws -> MLXAudioSessionResult {
+    func transcribe(
+        samples: [Float],
+        languageCode: String
+    ) throws -> MLXAudioSessionResult {
         guard let model else {
             throw MLXAudioRuntimeError.notLoaded
         }
@@ -201,7 +207,7 @@ private actor NativeNemotronASRSession: MLXAudioRuntimeSession {
                     maxTokens: model.defaultGenerationParameters.maxTokens,
                     temperature: 0,
                     topP: 1,
-                    language: "auto",
+                    language: languageCode,
                     chunkDuration: 60,
                     minChunkDuration: 0.1
                 )
@@ -227,12 +233,25 @@ private actor NativeParakeetRNNTSession: MLXAudioRuntimeSession {
         Device.defaultDevice().deviceType == .gpu ? "mlx-metal" : ""
     }
 
-    func transcribe(samples: [Float]) throws -> MLXAudioSessionResult {
+    func transcribe(
+        samples: [Float],
+        languageCode: String
+    ) throws -> MLXAudioSessionResult {
         guard let model else {
             throw MLXAudioRuntimeError.notLoaded
         }
         let output = Device.withDefaultDevice(.gpu) {
-            model.generate(audio: MLXArray(samples))
+            model.generate(
+                audio: MLXArray(samples),
+                generationParameters: STTGenerateParameters(
+                    maxTokens: model.defaultGenerationParameters.maxTokens,
+                    temperature: 0,
+                    topP: 1,
+                    language: languageCode,
+                    chunkDuration: 60,
+                    minChunkDuration: 0.1
+                )
+            )
         }
         return MLXAudioSessionResult(text: output.text)
     }
@@ -254,7 +273,10 @@ private actor NativeCohereTranscribeSession: MLXAudioRuntimeSession {
         Device.defaultDevice().deviceType == .gpu ? "mlx-metal" : ""
     }
 
-    func transcribe(samples: [Float]) throws -> MLXAudioSessionResult {
+    func transcribe(
+        samples: [Float],
+        languageCode: String
+    ) throws -> MLXAudioSessionResult {
         guard let model else {
             throw MLXAudioRuntimeError.notLoaded
         }
@@ -265,7 +287,7 @@ private actor NativeCohereTranscribeSession: MLXAudioRuntimeSession {
                     maxTokens: model.defaultGenerationParameters.maxTokens,
                     temperature: 0,
                     topP: 1,
-                    language: "en",
+                    language: languageCode,
                     chunkDuration: 30
                 )
             )
@@ -290,7 +312,10 @@ private actor NativeWhisperSession: MLXAudioRuntimeSession {
         Device.defaultDevice().deviceType == .gpu ? "mlx-metal" : ""
     }
 
-    func transcribe(samples: [Float]) throws -> MLXAudioSessionResult {
+    func transcribe(
+        samples: [Float],
+        languageCode: String
+    ) throws -> MLXAudioSessionResult {
         guard let model else {
             throw MLXAudioRuntimeError.notLoaded
         }
@@ -301,7 +326,7 @@ private actor NativeWhisperSession: MLXAudioRuntimeSession {
                     maxTokens: model.defaultGenerationParameters.maxTokens,
                     temperature: 0,
                     topP: 1,
-                    language: "en",
+                    language: languageCode,
                     chunkDuration: 30,
                     minChunkDuration: 0.1
                 )
@@ -327,16 +352,22 @@ private actor NativeQwen3ASRSession: MLXAudioRuntimeSession {
         Device.defaultDevice().deviceType == .gpu ? "mlx-metal" : ""
     }
 
-    func transcribe(samples: [Float]) throws -> MLXAudioSessionResult {
+    func transcribe(
+        samples: [Float],
+        languageCode: String
+    ) throws -> MLXAudioSessionResult {
         guard let model else {
             throw MLXAudioRuntimeError.notLoaded
         }
+        let language = languageCode == "auto"
+            ? nil
+            : Self.languageNamesByCode[languageCode] ?? languageCode
         let output = Device.withDefaultDevice(.gpu) {
             model.generate(
                 audio: MLXArray(samples),
                 maxTokens: 8192,
                 temperature: 0,
-                language: nil,
+                language: language,
                 chunkDuration: 60,
                 minChunkDuration: 0.1
             )
@@ -348,6 +379,39 @@ private actor NativeQwen3ASRSession: MLXAudioRuntimeSession {
         model = nil
         Memory.clearCache()
     }
+
+    private static let languageNamesByCode: [String: String] = [
+        "ar": "Arabic",
+        "cs": "Czech",
+        "da": "Danish",
+        "de": "German",
+        "el": "Greek",
+        "en": "English",
+        "es": "Spanish",
+        "fa": "Persian",
+        "fi": "Finnish",
+        "fil": "Filipino",
+        "fr": "French",
+        "hi": "Hindi",
+        "hu": "Hungarian",
+        "id": "Indonesian",
+        "it": "Italian",
+        "ja": "Japanese",
+        "ko": "Korean",
+        "mk": "Macedonian",
+        "ms": "Malay",
+        "nl": "Dutch",
+        "pl": "Polish",
+        "pt": "Portuguese",
+        "ro": "Romanian",
+        "ru": "Russian",
+        "sv": "Swedish",
+        "th": "Thai",
+        "tr": "Turkish",
+        "vi": "Vietnamese",
+        "yue": "Cantonese",
+        "zh": "Chinese",
+    ]
 }
 
 public actor MLXAudioRuntime: TranscriptionProvider {
@@ -438,7 +502,8 @@ public actor MLXAudioRuntime: TranscriptionProvider {
         if warmup {
             do {
                 _ = try await loadedSession.transcribe(
-                    samples: Array(repeating: 0.01, count: 16000)
+                    samples: Array(repeating: 0.01, count: 16000),
+                    languageCode: languageCode
                 )
             } catch {
                 await releaseSession()
@@ -472,7 +537,7 @@ public actor MLXAudioRuntime: TranscriptionProvider {
                 actualSamples: audio.samples.count
             )
         }
-        guard let session else {
+        guard let session, let loadedConfiguration else {
             throw MLXAudioRuntimeError.notLoaded
         }
 
@@ -494,7 +559,10 @@ public actor MLXAudioRuntime: TranscriptionProvider {
 
         let start = DispatchTime.now().uptimeNanoseconds
         do {
-            let result = try await session.transcribe(samples: audio.samples)
+            let result = try await session.transcribe(
+                samples: audio.samples,
+                languageCode: loadedConfiguration.languageCode
+            )
             let inferenceDurationMs = Int(
                 (DispatchTime.now().uptimeNanoseconds - start + 999_999) / 1_000_000
             )
@@ -529,16 +597,16 @@ public actor MLXAudioRuntime: TranscriptionProvider {
             .first
             .map(String.init)
             ?? ""
-        if variant.supportsAutomaticLanguageDetection {
-            guard normalized == "auto" else {
-                throw MLXAudioRuntimeError.automaticLanguageDetectionRequired
+        guard !normalized.isEmpty else {
+            throw MLXAudioRuntimeError.unsupportedLanguage(languageCode)
+        }
+        if normalized == "auto" {
+            guard variant.supportsAutomaticLanguageDetection else {
+                throw MLXAudioRuntimeError.automaticLanguageDetectionUnsupported
             }
             return normalized
         }
-        guard normalized != "auto" else {
-            throw MLXAudioRuntimeError.automaticLanguageDetectionUnsupported
-        }
-        guard normalized == "en" else {
+        guard variant.supportsAutomaticLanguageDetection || normalized == "en" else {
             throw MLXAudioRuntimeError.unsupportedLanguage(languageCode)
         }
         return normalized

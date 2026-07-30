@@ -28,7 +28,6 @@ final class BenchmarkModelCatalogTests: XCTestCase {
                 "granite-speech-4.1-2b-nar-q5-k-m",
                 "voxtral-mini-4b-realtime-2602-q4-k-m",
                 "moss-transcribe-diarize-0.9b-q5-k-m",
-                "omnilingual-asr-300m-ctc-int8",
             ]
         )
 
@@ -216,35 +215,9 @@ final class BenchmarkModelCatalogTests: XCTestCase {
             XCTAssertNil(model.benchmark)
         }
 
-        let omnilingual = try XCTUnwrap(
-            manifest.models.first { $0.id == "omnilingual-asr-300m-ctc-int8" }
+        XCTAssertFalse(
+            manifest.models.contains { $0.id == "omnilingual-asr-300m-ctc-int8" }
         )
-        XCTAssertEqual(omnilingual.runtime.engine, .sherpaOnnx)
-        XCTAssertEqual(
-            omnilingual.runtime.variant,
-            SherpaOnnxModelVariant.omnilingualASR300M.rawValue
-        )
-        XCTAssertEqual(omnilingual.runtime.accelerator, .cpu)
-        XCTAssertEqual(omnilingual.runtime.artifactLayout, .modelDirectory)
-        XCTAssertEqual(omnilingual.runtimeParameters.language, "auto")
-        XCTAssertTrue(omnilingual.runtimeParameters.detectLanguage)
-        XCTAssertEqual(omnilingual.runtimeParameters.maxAudioSeconds, 40)
-        XCTAssertEqual(omnilingual.files.count, 2)
-        XCTAssertEqual(omnilingual.sizeBytes, 365_438_543)
-        let weights = try XCTUnwrap(
-            omnilingual.files.first { $0.filename == "model.int8.onnx" }
-        )
-        XCTAssertEqual(weights.sizeBytes, 365_352_120)
-        XCTAssertEqual(
-            weights.sha256,
-            "e7c4e54ee4c4c47829cc6667d5d00ed8ea7bef1dcfeef0fce766f77752a2726c"
-        )
-        XCTAssertTrue(
-            omnilingual.files.allSatisfy {
-                $0.url.contains("/resolve/6abf1ece20cd2308bdb7d13cd78ec1c44fa4c094/")
-            }
-        )
-        XCTAssertNil(omnilingual.benchmark)
     }
 
     func testCohereTranscribeUsesPinnedLocalMLXMetalArtifacts() throws {

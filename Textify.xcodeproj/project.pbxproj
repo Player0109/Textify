@@ -10,16 +10,21 @@
 		00C40789CFF04783D96839AD /* whisper.cpp.txt in Resources */ = {isa = PBXBuildFile; fileRef = B5E142BEBD39AA35B2C2A16F /* whisper.cpp.txt */; };
 		11FD7F8316A64487858A9CEF /* SwiftNIO.txt in Resources */ = {isa = PBXBuildFile; fileRef = 1CF14F373C1BB3AFACD0BD5B /* SwiftNIO.txt */; };
 		1245A89E25B6AC062D7A70D1 /* transcribe.cpp.txt in Resources */ = {isa = PBXBuildFile; fileRef = 3567D5257D3C4693797A76CC /* transcribe.cpp.txt */; };
+		1283CD9A22A045046747AB2E /* OpenAI-Whisper.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2BCB01FBE6D8E7354FACB47F /* OpenAI-Whisper.txt */; };
 		1B7EAFF9974199AFC617F1FA /* ACKNOWLEDGMENTS.md in Resources */ = {isa = PBXBuildFile; fileRef = 1CB78709709A243F50FFFCF0 /* ACKNOWLEDGMENTS.md */; };
 		1D4C90A954214718ED04E602 /* ModelCatalogArtifactInspection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58F5611F5BE94FA64F4648CB /* ModelCatalogArtifactInspection.swift */; };
 		20CC47763A7B676444BE009F /* ModelCatalogVariantComparison.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5FCFD81E2C513F4D4C26431 /* ModelCatalogVariantComparison.swift */; };
 		214BD35622CF9B9C7D5AB31C /* ONNX_Runtime.txt in Resources */ = {isa = PBXBuildFile; fileRef = 261F5703526A4920FC4DFF9D /* ONNX_Runtime.txt */; };
 		225D483CCD7F74E4320FCAA1 /* TextifyInsertion in Frameworks */ = {isa = PBXBuildFile; productRef = 07F283ACA2766E166455A5EF /* TextifyInsertion */; };
 		22631822F1C68FA854A8A32B /* ModelCatalogDerivation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0F79371515ABA39DCF665F7 /* ModelCatalogDerivation.swift */; };
+		243BE1D7F33E10299969D934 /* transcribe.cpp-miniz.txt in Resources */ = {isa = PBXBuildFile; fileRef = AD47911650AB842C53EA01C1 /* transcribe.cpp-miniz.txt */; };
 		24B9C8C0EB665F386AC9A049 /* TextifyTranscription in Frameworks */ = {isa = PBXBuildFile; productRef = 5A754B4772812D6F6B03E1B5 /* TextifyTranscription */; };
 		2669C055AEE16289EA593996 /* ModelCatalogExperience.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B1C934AC2E7D23F6CF6020 /* ModelCatalogExperience.swift */; };
 		2BA724319382989A1C583610 /* MLXSwiftLM.txt in Resources */ = {isa = PBXBuildFile; fileRef = 626CE18A6793738D87F81A13 /* MLXSwiftLM.txt */; };
+		2EE2FBEA2042E79B3C06B97F /* ggml-small.en-q5_1.LICENSES.txt in Resources */ = {isa = PBXBuildFile; fileRef = 44A2437E8C283C7FFFC1F49E /* ggml-small.en-q5_1.LICENSES.txt */; };
+		312B50E93A4C289DD9F9F859 /* MLXSwift-MLX-Core.txt in Resources */ = {isa = PBXBuildFile; fileRef = 17FA64FDC24578B0861D3EB0 /* MLXSwift-MLX-Core.txt */; };
 		352499832F959F080E70F038 /* TextifyModels in Frameworks */ = {isa = PBXBuildFile; productRef = 55B2B6B8EA96A06F9F2110FC /* TextifyModels */; };
+		3757DA444F6CEE81C1583E81 /* SwiftNIO-NOTICE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 8B5D8432F1D949AAB6A3D8B5 /* SwiftNIO-NOTICE.txt */; };
 		393F62F18EE6C7EAAFDFE1F3 /* SwiftTransformers.txt in Resources */ = {isa = PBXBuildFile; fileRef = 23EF947B0D979C0131808D9F /* SwiftTransformers.txt */; };
 		3B0FD05953AE11637273FC75 /* TextifyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F80B1907E994ACF795B14A1 /* TextifyApp.swift */; };
 		4035112A36E706A5E546260E /* SwiftHuggingFace.txt in Resources */ = {isa = PBXBuildFile; fileRef = 8BE1E7363BFCFA5AB888ECA0 /* SwiftHuggingFace.txt */; };
@@ -39,23 +44,39 @@
 		6CAA4DB722FE9720BAFDCD09 /* ProductionModelManifestLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70DF2341D0286566EE14C37A /* ProductionModelManifestLoader.swift */; };
 		6D63DC47C566F31B048CD477 /* EventSource.txt in Resources */ = {isa = PBXBuildFile; fileRef = FCA476E0930186FF787D9C63 /* EventSource.txt */; };
 		6DEA13BA30DC7587CC42280E /* sherpa-onnx.txt in Resources */ = {isa = PBXBuildFile; fileRef = 8AD879F0D8719F8540E69AAA /* sherpa-onnx.txt */; };
+		714103EEB527618B39DA750A /* CC-BY-4.0.txt in Resources */ = {isa = PBXBuildFile; fileRef = 19F3C9112A8FB9B7B23EDB20 /* CC-BY-4.0.txt */; };
+		72FD9128A25D1E3C01AF3FF5 /* ModelLegalDocumentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 707BEFBEFCA00386B2567370 /* ModelLegalDocumentView.swift */; };
+		7751FD6B4139F3331CB51F41 /* ModelCatalogScreenProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4617EAD880DB908A8E34931E /* ModelCatalogScreenProjection.swift */; };
 		7BD8D1C22BB1F0EE2536BB3D /* TextifyHotkeys in Frameworks */ = {isa = PBXBuildFile; productRef = 48F8807F9DA4FFCFE56FACA7 /* TextifyHotkeys */; };
+		7DD12040C37A565BEE2ADB73 /* SwiftCrypto-NOTICE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 5EA2849A31F900036E40E7D2 /* SwiftCrypto-NOTICE.txt */; };
 		7E307B0C0E5791635E601B45 /* SwiftSyntax.txt in Resources */ = {isa = PBXBuildFile; fileRef = B96F34B62CE298F0736DC70F /* SwiftSyntax.txt */; };
+		83BF6DB438092B5B83E10025 /* FluidAudio-VBx.txt in Resources */ = {isa = PBXBuildFile; fileRef = D15B56AA140711CE36EF8A57 /* FluidAudio-VBx.txt */; };
+		8961D4E7473A908220CBEA43 /* MLXSwift-nlohmann-json.txt in Resources */ = {isa = PBXBuildFile; fileRef = 4E1697A13E6E303303D73C0E /* MLXSwift-nlohmann-json.txt */; };
+		9394496A8BD635594185E7E0 /* NVIDIA_Open_Model_License.txt in Resources */ = {isa = PBXBuildFile; fileRef = 1670F14D9661CA50ADD326AA /* NVIDIA_Open_Model_License.txt */; };
+		974C5B469280C3A603C879A1 /* FluidAudio-fastcluster.txt in Resources */ = {isa = PBXBuildFile; fileRef = B47D38C787CDEBF70A5ABDDF /* FluidAudio-fastcluster.txt */; };
 		9B4DF1DED0EE9DA1B7C5CE5C /* TextifySettings in Frameworks */ = {isa = PBXBuildFile; productRef = 9430CD33F9E9B82564632D30 /* TextifySettings */; };
 		A144C92E74AAF7D61126BDC4 /* LaunchAtLoginController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77EBF4271CB3FC9AE19B1DE5 /* LaunchAtLoginController.swift */; };
 		AA52799E88857371AD78CBAC /* TextifyVisualSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 521E635A02FA359283D0D319 /* TextifyVisualSystem.swift */; };
+		AF26FA2FF47E93F304B25BA2 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = BBEB3CE60F7CE1D7196F5ED7 /* LICENSE */; };
 		B3D0D133AA19D87D88A454EE /* MLXSwift.txt in Resources */ = {isa = PBXBuildFile; fileRef = 9951D35B4B5345C255BC7FCF /* MLXSwift.txt */; };
 		B8A079B1778C11DC35E50AED /* TextifyAudio in Frameworks */ = {isa = PBXBuildFile; productRef = B1677768EEB0E11CB0915BF3 /* TextifyAudio */; };
 		BAA39168D933BC34A5957FFD /* ModelInstallProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01131FE96D27558A2041D9B4 /* ModelInstallProgressView.swift */; };
+		BD0036BA21EEB86DC8A5E187 /* MLXSwift-metal-cpp.txt in Resources */ = {isa = PBXBuildFile; fileRef = 1CB5C7E0FACBD19A12792772 /* MLXSwift-metal-cpp.txt */; };
 		C68A87C74F49D77057553A11 /* ModelCatalogVariantComparisonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0468CB0F07A06511893A98E0 /* ModelCatalogVariantComparisonView.swift */; };
 		C87B35194E13C6B8347A9AA8 /* LiteRT-LM.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2C6154B49DBC9110E0F6A6C5 /* LiteRT-LM.txt */; };
+		C9718CC256C7A8E964304045 /* ONNX_Runtime_ThirdPartyNotices.txt in Resources */ = {isa = PBXBuildFile; fileRef = D1160F40D4A863F202979D3E /* ONNX_Runtime_ThirdPartyNotices.txt */; };
+		CBA00E3F8C259C30BCE570A3 /* ModelCatalogCheckpointView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FD552518721CF85A8919DDB /* ModelCatalogCheckpointView.swift */; };
+		CFB05107C105217D7C4AA5E7 /* transcribe.cpp-ggml.txt in Resources */ = {isa = PBXBuildFile; fileRef = 454633D11B2E3F3686B0B7B4 /* transcribe.cpp-ggml.txt */; };
 		D68C511E485467C12023BA63 /* SwiftASN1.txt in Resources */ = {isa = PBXBuildFile; fileRef = 9510A25BCF86D6827E535C91 /* SwiftASN1.txt */; };
 		D8D18BF5FDF50911E7580A66 /* TextifyDiagnostics in Frameworks */ = {isa = PBXBuildFile; productRef = 95C59065380C81191E03CD94 /* TextifyDiagnostics */; };
 		DEDA5C75CEC9F016E1620904 /* THIRD_PARTY_NOTICES.md in Resources */ = {isa = PBXBuildFile; fileRef = 50EFA53917D5428EA5F8CFDD /* THIRD_PARTY_NOTICES.md */; };
+		E3BE834A64E6312DA6C8A3D7 /* MLXSwift-fmt.txt in Resources */ = {isa = PBXBuildFile; fileRef = 8722D474B0A7ED49B5C23B37 /* MLXSwift-fmt.txt */; };
 		E412A5C9120B41D1B543D9F7 /* ModelCatalogInspectorPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CC623827B3C6D9A378CDFB3 /* ModelCatalogInspectorPresentation.swift */; };
 		E4C0244160BA9CEE6A7445AD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F7E292AC1DD24E083692F969 /* Assets.xcassets */; };
+		E5EB96C5D1DFC2A3BA781E8B /* ModelCatalogCheckpointExperience.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EFF83803008DFB05952BB47 /* ModelCatalogCheckpointExperience.swift */; };
 		E7D38CE2027D09A3B73C8AF6 /* SettingsRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC943A14D084BC8D112A71EB /* SettingsRootView.swift */; };
 		F088E249B21EAB13FB7FA38E /* FluidAudio.txt in Resources */ = {isa = PBXBuildFile; fileRef = 7CE755CBD32543074B8433D8 /* FluidAudio.txt */; };
+		F2E6A300B5D6E3F839E84C8E /* OpenMDW-1.1.txt in Resources */ = {isa = PBXBuildFile; fileRef = 0346CCD4BD9BF273E6EFE3EF /* OpenMDW-1.1.txt */; };
 		F328A0C3A3107E02586111FA /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35A0D6F1EF4A7DB14D99D2D6 /* AppDelegate.swift */; };
 		F5A00884B700CBB2ADE2DA16 /* SwiftAtomics.txt in Resources */ = {isa = PBXBuildFile; fileRef = AEFEFF555251FEBD7FDD9B9A /* SwiftAtomics.txt */; };
 		F846FDC25A332B69852DEA3A /* OnboardingRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44C5780DE99C8DD3D79B7EFC /* OnboardingRootView.swift */; };
@@ -67,46 +88,67 @@
 
 /* Begin PBXFileReference section */
 		01131FE96D27558A2041D9B4 /* ModelInstallProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelInstallProgressView.swift; sourceTree = "<group>"; };
+		0346CCD4BD9BF273E6EFE3EF /* OpenMDW-1.1.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OpenMDW-1.1.txt"; sourceTree = "<group>"; };
 		0468CB0F07A06511893A98E0 /* ModelCatalogVariantComparisonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogVariantComparisonView.swift; sourceTree = "<group>"; };
 		047F02C7C6B402C590F2375D /* Textify */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Textify; path = .; sourceTree = SOURCE_ROOT; };
 		0DE762BA89473A6795A5D976 /* AppServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServices.swift; sourceTree = "<group>"; };
 		0EFB7B3B702120578207D4FB /* yyjson.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = yyjson.txt; sourceTree = "<group>"; };
+		1670F14D9661CA50ADD326AA /* NVIDIA_Open_Model_License.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = NVIDIA_Open_Model_License.txt; sourceTree = "<group>"; };
+		17FA64FDC24578B0861D3EB0 /* MLXSwift-MLX-Core.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "MLXSwift-MLX-Core.txt"; sourceTree = "<group>"; };
 		18B1C934AC2E7D23F6CF6020 /* ModelCatalogExperience.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogExperience.swift; sourceTree = "<group>"; };
+		19F3C9112A8FB9B7B23EDB20 /* CC-BY-4.0.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "CC-BY-4.0.txt"; sourceTree = "<group>"; };
+		1CB5C7E0FACBD19A12792772 /* MLXSwift-metal-cpp.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "MLXSwift-metal-cpp.txt"; sourceTree = "<group>"; };
 		1CB78709709A243F50FFFCF0 /* ACKNOWLEDGMENTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ACKNOWLEDGMENTS.md; sourceTree = "<group>"; };
 		1CF14F373C1BB3AFACD0BD5B /* SwiftNIO.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftNIO.txt; sourceTree = "<group>"; };
 		22DFC5ADE2174CBEA8D692D7 /* RecordingOverlayWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingOverlayWindow.swift; sourceTree = "<group>"; };
 		23EF947B0D979C0131808D9F /* SwiftTransformers.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftTransformers.txt; sourceTree = "<group>"; };
 		261F5703526A4920FC4DFF9D /* ONNX_Runtime.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = ONNX_Runtime.txt; sourceTree = "<group>"; };
+		2BCB01FBE6D8E7354FACB47F /* OpenAI-Whisper.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OpenAI-Whisper.txt"; sourceTree = "<group>"; };
 		2C6154B49DBC9110E0F6A6C5 /* LiteRT-LM.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "LiteRT-LM.txt"; sourceTree = "<group>"; };
+		2EFF83803008DFB05952BB47 /* ModelCatalogCheckpointExperience.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogCheckpointExperience.swift; sourceTree = "<group>"; };
 		32299B3438710241007D7BA9 /* SwiftSystem.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftSystem.txt; sourceTree = "<group>"; };
 		3567D5257D3C4693797A76CC /* transcribe.cpp.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = transcribe.cpp.txt; sourceTree = "<group>"; };
 		35A0D6F1EF4A7DB14D99D2D6 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		39F5933A65048AFC4CEC13C2 /* FunASR_Model_License_1.1.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = FunASR_Model_License_1.1.txt; sourceTree = "<group>"; };
+		44A2437E8C283C7FFFC1F49E /* ggml-small.en-q5_1.LICENSES.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "ggml-small.en-q5_1.LICENSES.txt"; sourceTree = "<group>"; };
 		44C5780DE99C8DD3D79B7EFC /* OnboardingRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingRootView.swift; sourceTree = "<group>"; };
+		454633D11B2E3F3686B0B7B4 /* transcribe.cpp-ggml.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "transcribe.cpp-ggml.txt"; sourceTree = "<group>"; };
+		4617EAD880DB908A8E34931E /* ModelCatalogScreenProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogScreenProjection.swift; sourceTree = "<group>"; };
 		4CC623827B3C6D9A378CDFB3 /* ModelCatalogInspectorPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogInspectorPresentation.swift; sourceTree = "<group>"; };
+		4E1697A13E6E303303D73C0E /* MLXSwift-nlohmann-json.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "MLXSwift-nlohmann-json.txt"; sourceTree = "<group>"; };
 		50EFA53917D5428EA5F8CFDD /* THIRD_PARTY_NOTICES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = THIRD_PARTY_NOTICES.md; sourceTree = "<group>"; };
 		521E635A02FA359283D0D319 /* TextifyVisualSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextifyVisualSystem.swift; sourceTree = "<group>"; };
 		5328DF9E826A6D401E0FDC4B /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		571CC5300AD3FA1F34564F0C /* SwiftCollections.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftCollections.txt; sourceTree = "<group>"; };
 		58F5611F5BE94FA64F4648CB /* ModelCatalogArtifactInspection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogArtifactInspection.swift; sourceTree = "<group>"; };
 		5B64C10E76B28DCB342D30DE /* ModelCatalogInspectorController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogInspectorController.swift; sourceTree = "<group>"; };
+		5EA2849A31F900036E40E7D2 /* SwiftCrypto-NOTICE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "SwiftCrypto-NOTICE.txt"; sourceTree = "<group>"; };
 		5F80B1907E994ACF795B14A1 /* TextifyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextifyApp.swift; sourceTree = "<group>"; };
 		626CE18A6793738D87F81A13 /* MLXSwiftLM.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = MLXSwiftLM.txt; sourceTree = "<group>"; };
 		6CF0AB1D69531402DCE40D70 /* AppPaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPaths.swift; sourceTree = "<group>"; };
+		707BEFBEFCA00386B2567370 /* ModelLegalDocumentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelLegalDocumentView.swift; sourceTree = "<group>"; };
 		70DF2341D0286566EE14C37A /* ProductionModelManifestLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionModelManifestLoader.swift; sourceTree = "<group>"; };
 		77EBF4271CB3FC9AE19B1DE5 /* LaunchAtLoginController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginController.swift; sourceTree = "<group>"; };
 		7CE755CBD32543074B8433D8 /* FluidAudio.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = FluidAudio.txt; sourceTree = "<group>"; };
+		7FD552518721CF85A8919DDB /* ModelCatalogCheckpointView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogCheckpointView.swift; sourceTree = "<group>"; };
+		8722D474B0A7ED49B5C23B37 /* MLXSwift-fmt.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "MLXSwift-fmt.txt"; sourceTree = "<group>"; };
 		8AD879F0D8719F8540E69AAA /* sherpa-onnx.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "sherpa-onnx.txt"; sourceTree = "<group>"; };
+		8B5D8432F1D949AAB6A3D8B5 /* SwiftNIO-NOTICE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "SwiftNIO-NOTICE.txt"; sourceTree = "<group>"; };
 		8BE1E7363BFCFA5AB888ECA0 /* SwiftHuggingFace.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftHuggingFace.txt; sourceTree = "<group>"; };
 		9510A25BCF86D6827E535C91 /* SwiftASN1.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftASN1.txt; sourceTree = "<group>"; };
 		9951D35B4B5345C255BC7FCF /* MLXSwift.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = MLXSwift.txt; sourceTree = "<group>"; };
 		A832DFCDACE99CAE41017E5F /* SwiftNumerics.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftNumerics.txt; sourceTree = "<group>"; };
 		AC943A14D084BC8D112A71EB /* SettingsRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRootView.swift; sourceTree = "<group>"; };
+		AD47911650AB842C53EA01C1 /* transcribe.cpp-miniz.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "transcribe.cpp-miniz.txt"; sourceTree = "<group>"; };
 		AEFEFF555251FEBD7FDD9B9A /* SwiftAtomics.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftAtomics.txt; sourceTree = "<group>"; };
 		B0F79371515ABA39DCF665F7 /* ModelCatalogDerivation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogDerivation.swift; sourceTree = "<group>"; };
+		B47D38C787CDEBF70A5ABDDF /* FluidAudio-fastcluster.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "FluidAudio-fastcluster.txt"; sourceTree = "<group>"; };
 		B5E142BEBD39AA35B2C2A16F /* whisper.cpp.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = whisper.cpp.txt; sourceTree = "<group>"; };
 		B96F34B62CE298F0736DC70F /* SwiftSyntax.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftSyntax.txt; sourceTree = "<group>"; };
+		BBEB3CE60F7CE1D7196F5ED7 /* LICENSE */ = {isa = PBXFileReference; path = LICENSE; sourceTree = "<group>"; };
 		C32C98F05AD92486666F9717 /* MenuBarRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarRoot.swift; sourceTree = "<group>"; };
+		D1160F40D4A863F202979D3E /* ONNX_Runtime_ThirdPartyNotices.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = ONNX_Runtime_ThirdPartyNotices.txt; sourceTree = "<group>"; };
+		D15B56AA140711CE36EF8A57 /* FluidAudio-VBx.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "FluidAudio-VBx.txt"; sourceTree = "<group>"; };
 		E5FCFD81E2C513F4D4C26431 /* ModelCatalogVariantComparison.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogVariantComparison.swift; sourceTree = "<group>"; };
 		E63D1ED9495AC2C1A95E866B /* MLXAudioSwift.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = MLXAudioSwift.txt; sourceTree = "<group>"; };
 		F0C61DAF2351DEC5C3365040 /* Textify.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Textify.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -166,12 +208,16 @@
 			isa = PBXGroup;
 			children = (
 				58F5611F5BE94FA64F4648CB /* ModelCatalogArtifactInspection.swift */,
+				2EFF83803008DFB05952BB47 /* ModelCatalogCheckpointExperience.swift */,
+				7FD552518721CF85A8919DDB /* ModelCatalogCheckpointView.swift */,
 				B0F79371515ABA39DCF665F7 /* ModelCatalogDerivation.swift */,
 				18B1C934AC2E7D23F6CF6020 /* ModelCatalogExperience.swift */,
 				5B64C10E76B28DCB342D30DE /* ModelCatalogInspectorController.swift */,
 				4CC623827B3C6D9A378CDFB3 /* ModelCatalogInspectorPresentation.swift */,
+				4617EAD880DB908A8E34931E /* ModelCatalogScreenProjection.swift */,
 				E5FCFD81E2C513F4D4C26431 /* ModelCatalogVariantComparison.swift */,
 				0468CB0F07A06511893A98E0 /* ModelCatalogVariantComparisonView.swift */,
+				707BEFBEFCA00386B2567370 /* ModelLegalDocumentView.swift */,
 				AC943A14D084BC8D112A71EB /* SettingsRootView.swift */,
 			);
 			path = SettingsUI;
@@ -241,6 +287,7 @@
 			isa = PBXGroup;
 			children = (
 				1CB78709709A243F50FFFCF0 /* ACKNOWLEDGMENTS.md */,
+				BBEB3CE60F7CE1D7196F5ED7 /* LICENSE */,
 				50EFA53917D5428EA5F8CFDD /* THIRD_PARTY_NOTICES.md */,
 				88237D86D1E7014C985840AD /* Packages */,
 				05829B0147AB6C0767AA11DD /* Resources */,
@@ -253,26 +300,42 @@
 		FD4044AC38DB32795D3285FA /* THIRD_PARTY_LICENSES */ = {
 			isa = PBXGroup;
 			children = (
+				19F3C9112A8FB9B7B23EDB20 /* CC-BY-4.0.txt */,
 				FCA476E0930186FF787D9C63 /* EventSource.txt */,
+				B47D38C787CDEBF70A5ABDDF /* FluidAudio-fastcluster.txt */,
+				D15B56AA140711CE36EF8A57 /* FluidAudio-VBx.txt */,
 				7CE755CBD32543074B8433D8 /* FluidAudio.txt */,
 				39F5933A65048AFC4CEC13C2 /* FunASR_Model_License_1.1.txt */,
+				44A2437E8C283C7FFFC1F49E /* ggml-small.en-q5_1.LICENSES.txt */,
 				2C6154B49DBC9110E0F6A6C5 /* LiteRT-LM.txt */,
 				E63D1ED9495AC2C1A95E866B /* MLXAudioSwift.txt */,
+				8722D474B0A7ED49B5C23B37 /* MLXSwift-fmt.txt */,
+				1CB5C7E0FACBD19A12792772 /* MLXSwift-metal-cpp.txt */,
+				17FA64FDC24578B0861D3EB0 /* MLXSwift-MLX-Core.txt */,
+				4E1697A13E6E303303D73C0E /* MLXSwift-nlohmann-json.txt */,
 				9951D35B4B5345C255BC7FCF /* MLXSwift.txt */,
 				626CE18A6793738D87F81A13 /* MLXSwiftLM.txt */,
+				1670F14D9661CA50ADD326AA /* NVIDIA_Open_Model_License.txt */,
+				D1160F40D4A863F202979D3E /* ONNX_Runtime_ThirdPartyNotices.txt */,
 				261F5703526A4920FC4DFF9D /* ONNX_Runtime.txt */,
+				2BCB01FBE6D8E7354FACB47F /* OpenAI-Whisper.txt */,
+				0346CCD4BD9BF273E6EFE3EF /* OpenMDW-1.1.txt */,
 				8AD879F0D8719F8540E69AAA /* sherpa-onnx.txt */,
 				9510A25BCF86D6827E535C91 /* SwiftASN1.txt */,
 				AEFEFF555251FEBD7FDD9B9A /* SwiftAtomics.txt */,
 				571CC5300AD3FA1F34564F0C /* SwiftCollections.txt */,
+				5EA2849A31F900036E40E7D2 /* SwiftCrypto-NOTICE.txt */,
 				FB0EFFE778B8D9895B709876 /* SwiftCrypto.txt */,
 				8BE1E7363BFCFA5AB888ECA0 /* SwiftHuggingFace.txt */,
 				FA70F155E156CF0333DDB847 /* SwiftJinja.txt */,
+				8B5D8432F1D949AAB6A3D8B5 /* SwiftNIO-NOTICE.txt */,
 				1CF14F373C1BB3AFACD0BD5B /* SwiftNIO.txt */,
 				A832DFCDACE99CAE41017E5F /* SwiftNumerics.txt */,
 				B96F34B62CE298F0736DC70F /* SwiftSyntax.txt */,
 				32299B3438710241007D7BA9 /* SwiftSystem.txt */,
 				23EF947B0D979C0131808D9F /* SwiftTransformers.txt */,
+				454633D11B2E3F3686B0B7B4 /* transcribe.cpp-ggml.txt */,
+				AD47911650AB842C53EA01C1 /* transcribe.cpp-miniz.txt */,
 				3567D5257D3C4693797A76CC /* transcribe.cpp.txt */,
 				B5E142BEBD39AA35B2C2A16F /* whisper.cpp.txt */,
 				0EFB7B3B702120578207D4FB /* yyjson.txt */,
@@ -361,28 +424,45 @@
 			files = (
 				1B7EAFF9974199AFC617F1FA /* ACKNOWLEDGMENTS.md in Resources */,
 				E4C0244160BA9CEE6A7445AD /* Assets.xcassets in Resources */,
+				714103EEB527618B39DA750A /* CC-BY-4.0.txt in Resources */,
 				6D63DC47C566F31B048CD477 /* EventSource.txt in Resources */,
+				83BF6DB438092B5B83E10025 /* FluidAudio-VBx.txt in Resources */,
+				974C5B469280C3A603C879A1 /* FluidAudio-fastcluster.txt in Resources */,
 				F088E249B21EAB13FB7FA38E /* FluidAudio.txt in Resources */,
 				6A51BA26C3D3B66F0B321F3B /* FunASR_Model_License_1.1.txt in Resources */,
+				AF26FA2FF47E93F304B25BA2 /* LICENSE in Resources */,
 				C87B35194E13C6B8347A9AA8 /* LiteRT-LM.txt in Resources */,
 				FA4A729A01A787D41F0A0605 /* Localizable.xcstrings in Resources */,
 				6A364A441FCF57DA734D6D57 /* MLXAudioSwift.txt in Resources */,
+				312B50E93A4C289DD9F9F859 /* MLXSwift-MLX-Core.txt in Resources */,
+				E3BE834A64E6312DA6C8A3D7 /* MLXSwift-fmt.txt in Resources */,
+				BD0036BA21EEB86DC8A5E187 /* MLXSwift-metal-cpp.txt in Resources */,
+				8961D4E7473A908220CBEA43 /* MLXSwift-nlohmann-json.txt in Resources */,
 				B3D0D133AA19D87D88A454EE /* MLXSwift.txt in Resources */,
 				2BA724319382989A1C583610 /* MLXSwiftLM.txt in Resources */,
+				9394496A8BD635594185E7E0 /* NVIDIA_Open_Model_License.txt in Resources */,
 				214BD35622CF9B9C7D5AB31C /* ONNX_Runtime.txt in Resources */,
+				C9718CC256C7A8E964304045 /* ONNX_Runtime_ThirdPartyNotices.txt in Resources */,
+				1283CD9A22A045046747AB2E /* OpenAI-Whisper.txt in Resources */,
+				F2E6A300B5D6E3F839E84C8E /* OpenMDW-1.1.txt in Resources */,
 				D68C511E485467C12023BA63 /* SwiftASN1.txt in Resources */,
 				F5A00884B700CBB2ADE2DA16 /* SwiftAtomics.txt in Resources */,
 				5CBAAFC507E7F0CFBFD14254 /* SwiftCollections.txt in Resources */,
+				7DD12040C37A565BEE2ADB73 /* SwiftCrypto-NOTICE.txt in Resources */,
 				51BB395291A1261B7259452D /* SwiftCrypto.txt in Resources */,
 				4035112A36E706A5E546260E /* SwiftHuggingFace.txt in Resources */,
 				64BAF0B9382B64D43EF14710 /* SwiftJinja.txt in Resources */,
+				3757DA444F6CEE81C1583E81 /* SwiftNIO-NOTICE.txt in Resources */,
 				11FD7F8316A64487858A9CEF /* SwiftNIO.txt in Resources */,
 				4E83A89278A0C79CBF5AEA5E /* SwiftNumerics.txt in Resources */,
 				7E307B0C0E5791635E601B45 /* SwiftSyntax.txt in Resources */,
 				596E0360F338A0F644669E47 /* SwiftSystem.txt in Resources */,
 				393F62F18EE6C7EAAFDFE1F3 /* SwiftTransformers.txt in Resources */,
 				DEDA5C75CEC9F016E1620904 /* THIRD_PARTY_NOTICES.md in Resources */,
+				2EE2FBEA2042E79B3C06B97F /* ggml-small.en-q5_1.LICENSES.txt in Resources */,
 				6DEA13BA30DC7587CC42280E /* sherpa-onnx.txt in Resources */,
+				CFB05107C105217D7C4AA5E7 /* transcribe.cpp-ggml.txt in Resources */,
+				243BE1D7F33E10299969D934 /* transcribe.cpp-miniz.txt in Resources */,
 				1245A89E25B6AC062D7A70D1 /* transcribe.cpp.txt in Resources */,
 				00C40789CFF04783D96839AD /* whisper.cpp.txt in Resources */,
 				F8839E7DC406FE2BCF8E199D /* yyjson.txt in Resources */,
@@ -423,6 +503,8 @@
 			inputPaths = (
 				"$(SRCROOT)/models/manifest.json",
 				"$(SRCROOT)/models/manifest.json.sig",
+				"$(SRCROOT)/models/revocations.json",
+				"$(SRCROOT)/models/revocations.json.sig",
 			);
 			name = "Embed Signed Model Catalog";
 			outputFileListPaths = (
@@ -430,10 +512,12 @@
 			outputPaths = (
 				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ModelCatalog/manifest.json",
 				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ModelCatalog/manifest.json.sig",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ModelCatalog/revocations.json",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ModelCatalog/revocations.json.sig",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "CATALOG_DIRECTORY=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/ModelCatalog\"\nmkdir -p \"$CATALOG_DIRECTORY\"\n/bin/cp \"$SRCROOT/models/manifest.json\" \"$CATALOG_DIRECTORY/manifest.json\"\n/bin/cp \"$SRCROOT/models/manifest.json.sig\" \"$CATALOG_DIRECTORY/manifest.json.sig\"\n";
+			shellScript = "CATALOG_DIRECTORY=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/ModelCatalog\"\nmkdir -p \"$CATALOG_DIRECTORY\"\n/bin/cp \"$SRCROOT/models/manifest.json\" \"$CATALOG_DIRECTORY/manifest.json\"\n/bin/cp \"$SRCROOT/models/manifest.json.sig\" \"$CATALOG_DIRECTORY/manifest.json.sig\"\n/bin/cp \"$SRCROOT/models/revocations.json\" \"$CATALOG_DIRECTORY/revocations.json\"\n/bin/cp \"$SRCROOT/models/revocations.json.sig\" \"$CATALOG_DIRECTORY/revocations.json.sig\"\n";
 		};
 		621E56C67CB1EB1DA5AA6D03 /* Thin and Sign LiteRT-LM Runtime */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -536,13 +620,17 @@
 				A144C92E74AAF7D61126BDC4 /* LaunchAtLoginController.swift in Sources */,
 				503BE9FCFD1D80B2DF7C9BA3 /* MenuBarRoot.swift in Sources */,
 				1D4C90A954214718ED04E602 /* ModelCatalogArtifactInspection.swift in Sources */,
+				E5EB96C5D1DFC2A3BA781E8B /* ModelCatalogCheckpointExperience.swift in Sources */,
+				CBA00E3F8C259C30BCE570A3 /* ModelCatalogCheckpointView.swift in Sources */,
 				22631822F1C68FA854A8A32B /* ModelCatalogDerivation.swift in Sources */,
 				2669C055AEE16289EA593996 /* ModelCatalogExperience.swift in Sources */,
 				4FA01A6BE22246F5969661A2 /* ModelCatalogInspectorController.swift in Sources */,
 				E412A5C9120B41D1B543D9F7 /* ModelCatalogInspectorPresentation.swift in Sources */,
+				7751FD6B4139F3331CB51F41 /* ModelCatalogScreenProjection.swift in Sources */,
 				20CC47763A7B676444BE009F /* ModelCatalogVariantComparison.swift in Sources */,
 				C68A87C74F49D77057553A11 /* ModelCatalogVariantComparisonView.swift in Sources */,
 				BAA39168D933BC34A5957FFD /* ModelInstallProgressView.swift in Sources */,
+				72FD9128A25D1E3C01AF3FF5 /* ModelLegalDocumentView.swift in Sources */,
 				FB6FC34E77EF31AA5495DAB1 /* ModelStorageInventoryCoordinator.swift in Sources */,
 				F846FDC25A332B69852DEA3A /* OnboardingRootView.swift in Sources */,
 				6CAA4DB722FE9720BAFDCD09 /* ProductionModelManifestLoader.swift in Sources */,

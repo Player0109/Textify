@@ -121,6 +121,23 @@ final class MLXAudioRuntimeAdapterTests: XCTestCase {
         }
     }
 
+    func testAdapterPreparesExplicitLanguageForMultilingualQwen() async throws {
+        let runtime = FakeAdapterMLXAudioRuntime()
+        let adapter = MLXAudioRuntimeTranscribingAdapter(runtime: runtime)
+
+        try await adapter.prepare(
+            model: Self.activeModel(
+                id: "qwen3-asr-1.7b-mlx-8bit",
+                variant: .qwen3ASR1_7B8Bit,
+                language: "en",
+                detectLanguage: false
+            )
+        )
+
+        let load = await runtime.loadSnapshot()
+        XCTAssertEqual(load?.languageCode, "en")
+    }
+
     func testAdapterPreparesParakeetTDTAndNemotronVariants() async throws {
         let candidates: [(String, MLXAudioModelVariant, String, Bool)] = [
             ("parakeet-tdt-0.6b-v2-mlx", .parakeetTDT0_6BV2, "en", false),

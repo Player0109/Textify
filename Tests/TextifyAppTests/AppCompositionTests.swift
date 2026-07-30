@@ -118,6 +118,231 @@ final class AppCompositionTests: XCTestCase {
         XCTAssertEqual(services.dictation.status, DictationRuntimeStatus.idle)
     }
 
+    func testRetiredOmnilingualCleanupPurgesManagedStateAndIsIdempotent() throws {
+        let paths = try Self.makeTemporaryPaths()
+        let layout = ModelStorageLayout(
+            rootDirectory: paths.modelsDirectory
+        )
+        let retired = try Self.retiredOmnilingualModel()
+        let retained = try Self.catalogModel(
+            id: "ggml-small.en-q5_1"
+        )
+        _ = try Self.writeInstalledArtifacts(
+            [retired, retained],
+            to: paths
+        )
+
+        let settingsStore = SettingsStore(
+            storage: .file(paths.settingsFileURL)
+        )
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = retired.id
+        preferences.modelArtifactOverridesByPurposeCheckpoint = [
+            "transcription|retired": retired.id,
+            "transcription|retained": retained.id,
+        ]
+        settingsStore.save(preferences)
+
+        var queue = ModelInstallQueue(
+            attempts: [
+                ModelInstallQueueAttempt(
+                    id: "retired-attempt",
+                    artifactID: retired.id,
+                    authorizedArtifactIdentity:
+                        ModelInstallArtifactIdentity(model: retired),
+                    purpose: .transcription,
+                    action: .install,
+                    createdAt: "2026-07-28T00:00:00Z",
+                    state: DownloadState(
+                        modelID: retired.id,
+                        phase: .downloading,
+                        bytesDownloaded: 4,
+                        totalBytes: retired.sizeBytes
+                    ),
+                    resumableData: ModelInstallResumableData(
+                        sourceAttemptID: "retired-attempt",
+                        associatedAttemptID: "retired-attempt",
+                        validatedBytes: 4,
+                        fileCount: 1,
+                        filenames: retired.files.map(\.filename)
+                    )
+                ),
+                ModelInstallQueueAttempt(
+                    id: "retained-attempt",
+                    artifactID: retained.id,
+                    purpose: .transcription,
+                    action: .install,
+                    createdAt: "2026-07-28T00:01:00Z",
+                    state: DownloadState(
+                        modelID: retained.id,
+                        phase: .cancelled
+                    )
+                ),
+            ]
+        )
+        try ModelInstallQueueStore(
+            fileURL: layout.installQueueURL
+        ).save(queue)
+        queue = try ModelInstallQueueStore(
+            fileURL: layout.installQueueURL
+        ).load()
+        XCTAssertEqual(queue.attempts.count, 2)
+
+        try FileManager.default.createDirectory(
+            at: layout.downloadsDirectory,
+            withIntermediateDirectories: true
+        )
+        for file in retired.files {
+            try Data("partial".utf8).write(
+                to: layout.temporaryDownloadURL(
+                    modelID: retired.id,
+                    filename: file.filename
+                )
+            )
+            try Data("resume".utf8).write(
+                to: layout.downloadResumeMetadataURL(
+                    modelID: retired.id,
+                    filename: file.filename
+                )
+            )
+        }
+        let stagingDirectory = layout.downloadsDirectory
+            .appendingPathComponent(
+                ".\(retired.id).installing-test",
+                isDirectory: true
+            )
+        let retainedDirectory = layout.downloadsDirectory
+            .appendingPathComponent(
+                ".\(retired.id).retained-test",
+                isDirectory: true
+            )
+        try FileManager.default.createDirectory(
+            at: stagingDirectory,
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: retainedDirectory,
+            withIntermediateDirectories: true
+        )
+
+        try RetiredManagedModelCleanup.omnilingualASR300M.run(
+            settingsStore: settingsStore,
+            layout: layout
+        )
+        try RetiredManagedModelCleanup.omnilingualASR300M.run(
+            settingsStore: settingsStore,
+            layout: layout
+        )
+
+        let reloadedPreferences = settingsStore.load()
+        XCTAssertNil(reloadedPreferences.activeModelID)
+        XCTAssertEqual(
+            reloadedPreferences
+                .modelArtifactOverridesByPurposeCheckpoint,
+            ["transcription|retained": retained.id]
+        )
+        let reloadedQueue = try ModelInstallQueueStore(
+            fileURL: layout.installQueueURL
+        ).load()
+        XCTAssertEqual(
+            reloadedQueue.attempts.map(\.id),
+            ["retained-attempt"]
+        )
+        let installed = try InstalledModelsStorePersistence(
+            fileURL: layout.installedStoreURL
+        ).load()
+        XCTAssertNil(installed.record(forModelID: retired.id))
+        XCTAssertNotNil(installed.record(forModelID: retained.id))
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: try layout.installedModelDirectory(
+                    modelID: retired.id
+                ).path
+            )
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: try layout.installedModelDirectory(
+                    modelID: retained.id
+                ).path
+            )
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: stagingDirectory.path
+            )
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: retainedDirectory.path
+            )
+        )
+        for file in retired.files {
+            XCTAssertFalse(
+                FileManager.default.fileExists(
+                    atPath: try layout.temporaryDownloadURL(
+                        modelID: retired.id,
+                        filename: file.filename
+                    ).path
+                )
+            )
+            XCTAssertFalse(
+                FileManager.default.fileExists(
+                    atPath: try layout.downloadResumeMetadataURL(
+                        modelID: retired.id,
+                        filename: file.filename
+                    ).path
+                )
+            )
+        }
+    }
+
+    func testRetiredOmnilingualCleanupKeepsDataWhenActivePreferenceCannotPersist() throws {
+        let paths = try Self.makeTemporaryPaths()
+        let retired = try Self.retiredOmnilingualModel()
+        let directories = try Self.writeInstalledArtifacts(
+            [retired],
+            to: paths
+        )
+        let writableStore = SettingsStore(
+            storage: .file(paths.settingsFileURL)
+        )
+        var preferences = AppPreferences.defaults
+        preferences.activeModelID = retired.id
+        writableStore.save(preferences)
+        let failingFileManager = FailingSettingsSaveFileManager()
+        let failingStore = SettingsStore(
+            storage: .file(paths.settingsFileURL),
+            fileManager: failingFileManager
+        )
+
+        XCTAssertThrowsError(
+            try RetiredManagedModelCleanup.omnilingualASR300M.run(
+                settingsStore: failingStore,
+                layout: ModelStorageLayout(
+                    rootDirectory: paths.modelsDirectory
+                ),
+                fileManager: failingFileManager
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? RetiredManagedModelCleanupError,
+                .preferencePersistenceFailed
+            )
+        }
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: try XCTUnwrap(directories[retired.id]).path
+            )
+        )
+        let installed = try InstalledModelsStorePersistence(
+            fileURL: ModelStorageLayout(
+                rootDirectory: paths.modelsDirectory
+            ).installedStoreURL
+        ).load()
+        XCTAssertNotNil(installed.record(forModelID: retired.id))
+    }
+
     @MainActor
     func testApplicationCompositionProvidesOnePurposeScopedCatalogExperience() async throws {
         let manifestURL = URL(fileURLWithPath: #filePath)
@@ -2574,6 +2799,27 @@ final class AppCompositionTests: XCTestCase {
     }
 
     @MainActor
+    func testRecordingOverlayPreferencesPersistAndReachPresenter() throws {
+        let overlay = OverlayPresenterSpy()
+        let services = try Self.makeServices(overlayPresenter: overlay)
+        let preferences = RecordingOverlayPreferences(
+            xOffset: 120,
+            yOffset: 180,
+            scale: 1.25
+        )
+
+        services.setRecordingOverlayPreferences(preferences)
+        services.updateOverlay(for: .recording(speechDetected: false))
+
+        XCTAssertEqual(services.preferences.recordingOverlay, preferences)
+        XCTAssertEqual(
+            services.settingsStore.load().recordingOverlay,
+            preferences
+        )
+        XCTAssertEqual(overlay.preferences.last, preferences)
+    }
+
+    @MainActor
     func testProcessingIndicatorAppearsOnlyAfterDelayAndHidesWhenProcessingEnds() async throws {
         let overlay = OverlayPresenterSpy()
         let delay = OverlayDelayGate()
@@ -3131,6 +3377,26 @@ final class AppCompositionTests: XCTestCase {
         return try XCTUnwrap(manifest.models.first { $0.id == id })
     }
 
+    private static func retiredOmnilingualModel() throws -> ModelEntry {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let manifest = try ModelManifest.decode(
+            Data(
+                contentsOf: repositoryRoot.appendingPathComponent(
+                    "Tests/TextifyModelsTests/Fixtures/Models/manifest_v2.production-migration.json"
+                )
+            )
+        )
+        return try XCTUnwrap(
+            manifest.models.first {
+                $0.id == RetiredManagedModelCleanup
+                    .omnilingualASR300M.artifactID
+            }
+        )
+    }
+
     private static func makeTemporaryPaths() throws -> AppPaths {
         let root = temporaryDirectory()
         return try AppPaths.make(
@@ -3418,9 +3684,14 @@ private actor ActivationVoiceCleanerSpy: RuntimeVoiceCleaning {
 @MainActor
 private final class OverlayPresenterSpy: RecordingOverlayPresenting {
     private(set) var states: [RecordingOverlayState] = []
+    private(set) var preferences: [RecordingOverlayPreferences] = []
 
-    func present(_ state: RecordingOverlayState) {
+    func present(
+        _ state: RecordingOverlayState,
+        preferences: RecordingOverlayPreferences
+    ) {
         states.append(state)
+        self.preferences.append(preferences)
     }
 }
 

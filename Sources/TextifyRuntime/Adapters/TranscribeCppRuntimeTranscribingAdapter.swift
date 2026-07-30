@@ -61,11 +61,8 @@ public actor TranscribeCppRuntimeTranscribingAdapter: RuntimeEngineTranscribing 
         guard let variant = TranscribeCppModelVariant(rawValue: model.variant) else {
             throw TranscribeCppRuntimeError.unsupportedVariant(model.variant)
         }
-        if variant.supportsAutomaticLanguageDetection {
-            guard model.runtimeParameters.detectLanguage else {
-                throw TranscribeCppRuntimeError.automaticLanguageDetectionRequired
-            }
-        } else if model.runtimeParameters.detectLanguage {
+        if model.runtimeParameters.detectLanguage,
+           !variant.supportsAutomaticLanguageDetection {
             throw TranscribeCppRuntimeError.automaticLanguageDetectionUnsupported
         }
         let languageCode = try TranscribeCppRuntime.requireSupportedLanguage(

@@ -453,6 +453,27 @@ final class ModelInstallQueueTests: XCTestCase {
         XCTAssertNil(queue.latestStatesByArtifactID["artifact-c"])
     }
 
+    func testRemovingAttemptsForRetiredArtifactPreservesOtherQueueHistory() throws {
+        var queue = try twoAttemptQueue()
+        try queue.authorize(
+            artifactID: "artifact-a",
+            purpose: .transcription,
+            action: .reinstall,
+            attemptID: "attempt-3",
+            createdAt: "2026-07-28T00:00:00Z"
+        )
+
+        let removed = queue.removeAttempts(
+            forArtifactID: "artifact-a"
+        )
+
+        XCTAssertEqual(
+            removed.map(\.id),
+            ["attempt-1", "attempt-3"]
+        )
+        XCTAssertEqual(queue.attempts.map(\.id), ["attempt-2"])
+    }
+
     func testActiveAttemptWinsArtifactProjectionOverLaterRetry() throws {
         var queue = ModelInstallQueue(
             attempts: [

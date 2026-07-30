@@ -59,6 +59,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
     public var activeModelID: String?
     public var activeVoiceCleaningModelID: String?
     public var modelArtifactOverridesByPurposeCheckpoint: [String: String]
+    public var recordingOverlay: RecordingOverlayPreferences
     public var keepTextifyInDock: Bool
     public var automaticallyCheckForUpdates: Bool
     public var launchAtLoginEnabled: Bool
@@ -82,6 +83,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         activeModelID: String? = nil,
         activeVoiceCleaningModelID: String? = nil,
         modelArtifactOverridesByPurposeCheckpoint: [String: String] = [:],
+        recordingOverlay: RecordingOverlayPreferences = .defaults,
         keepTextifyInDock: Bool = true,
         automaticallyCheckForUpdates: Bool = true,
         launchAtLoginEnabled: Bool = true,
@@ -100,6 +102,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         self.activeVoiceCleaningModelID = activeVoiceCleaningModelID
         self.modelArtifactOverridesByPurposeCheckpoint =
             modelArtifactOverridesByPurposeCheckpoint
+        self.recordingOverlay = recordingOverlay.normalized()
         self.keepTextifyInDock = keepTextifyInDock
         self.automaticallyCheckForUpdates = automaticallyCheckForUpdates
         self.launchAtLoginEnabled = launchAtLoginEnabled
@@ -135,6 +138,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         case activeModelID
         case activeVoiceCleaningModelID
         case modelArtifactOverridesByPurposeCheckpoint
+        case recordingOverlay
         case keepTextifyInDock
         case legacyShowInDock = "showInDock"
         case automaticallyCheckForUpdates
@@ -177,6 +181,10 @@ public struct AppPreferences: Codable, Equatable, Sendable {
                 [String: String].self,
                 forKey: .modelArtifactOverridesByPurposeCheckpoint
             ) ?? defaults.modelArtifactOverridesByPurposeCheckpoint,
+            recordingOverlay: try container.decodeIfPresent(
+                RecordingOverlayPreferences.self,
+                forKey: .recordingOverlay
+            ) ?? defaults.recordingOverlay,
             keepTextifyInDock: keepTextifyInDock,
             automaticallyCheckForUpdates: try container.decodeIfPresent(Bool.self, forKey: .automaticallyCheckForUpdates) ?? defaults.automaticallyCheckForUpdates,
             launchAtLoginEnabled: launchAtLogin,
@@ -200,6 +208,10 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         try container.encode(
             modelArtifactOverridesByPurposeCheckpoint,
             forKey: .modelArtifactOverridesByPurposeCheckpoint
+        )
+        try container.encode(
+            recordingOverlay.normalized(),
+            forKey: .recordingOverlay
         )
         try container.encode(keepTextifyInDock, forKey: .keepTextifyInDock)
         try container.encode(automaticallyCheckForUpdates, forKey: .automaticallyCheckForUpdates)

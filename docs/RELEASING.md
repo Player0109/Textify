@@ -1,10 +1,11 @@
-# Releasing Textify V1.1
+# Releasing Textify 1.1
 
-This document covers the V1.1 local release workflow. It does not add Sparkle,
+This document covers the Textify 1.1 local release workflow. It does not add Sparkle,
 notarization secrets, DMG upload automation, appcast hosting, or bundled model
-weights. The small signed catalog is bundled as a trusted baseline. Sparkle
-remains deferred, so users update manually by downloading the next GitHub
-Release DMG.
+weights. The signed 42-entry catalog is bundled as the only runtime model list,
+alongside the signed sticky-revocation baseline that governs its artifacts.
+Sparkle remains deferred, so users update manually by downloading the next
+GitHub Release DMG.
 
 ## Model workflow fault evidence
 
@@ -45,7 +46,12 @@ attachments, or fewer than two distinct human approvals. See
   package declares Swift tools 6.2 while Textify continues to deploy to macOS 14.
 - XcodeGen installed locally: `brew install xcodegen`.
 - `jq` installed locally for strict release-evidence JSON validation.
+- GitHub CLI authenticated as a maintainer with repository release access.
 - A clean worktree except for intentional release files.
+- A committed release candidate whose commit is the exact source used for the
+  archive and release-evidence declaration.
+- A valid Developer ID Application identity, development team, and `notarytool`
+  Keychain profile on the maintainer machine.
 - The production model-manifest public key and `keyId` are embedded in the app.
 - The model-manifest private key is available only from the maintainer's macOS
   Keychain or other encrypted/offline maintainer storage.
@@ -67,7 +73,7 @@ bash script/release/validate_release.sh
 This regenerates the Xcode project, runs the Swift test suite, builds the arm64
 release executable, checks the release plist and hardened-runtime audio-input
 entitlement, confirms Sparkle/mock release strings are absent, validates every
-release shell script, verifies the tracked signed 35-model catalog, and
+release shell script, verifies the tracked signed 42-entry catalog, and
 verifies the SwiftPM release binary is arm64 only. A
 staged or archived app must also contain a valid compiled
 `Contents/Resources/default.metallib`; the artifact verifier rejects a bundle
@@ -89,6 +95,8 @@ maintainer can review and commit the generated project before rerunning it.
 ## Developer ID Archive, DMG, And Notarization
 
 ```bash
+export TEXTIFY_RELEASE_VERSION="1.1.0"
+
 TEXTIFY_DEVELOPMENT_TEAM="<TEAM_ID>" \
 TEXTIFY_SIGNING_IDENTITY="Developer ID Application: <NAME> (<TEAM_ID>)" \
 bash script/release/build_archive.sh
@@ -99,24 +107,47 @@ bash script/release/export_developer_id.sh
 
 TEXTIFY_DEVELOPMENT_TEAM="<TEAM_ID>" \
 TEXTIFY_SIGNING_IDENTITY="Developer ID Application: <NAME> (<TEAM_ID>)" \
-bash script/release/make_dmg.sh 1.1.0
+bash script/release/make_dmg.sh "$TEXTIFY_RELEASE_VERSION"
 
 TEXTIFY_NOTARY_PROFILE="TextifyNotary" \
 TEXTIFY_DEVELOPMENT_TEAM="<TEAM_ID>" \
 TEXTIFY_SIGNING_IDENTITY="Developer ID Application: <NAME> (<TEAM_ID>)" \
-bash script/release/notarize_dmg.sh build/release/Textify-1.1.0-arm64.dmg
+bash script/release/notarize_dmg.sh \
+  "build/release/Textify-$TEXTIFY_RELEASE_VERSION-arm64.dmg"
 ```
 
 Release artifacts are written under `build/release/`. Do not commit generated
-release artifacts. The expected upload artifacts are `Textify-1.1.0-arm64.dmg`
-and `Textify-1.1.0-arm64.dmg.sha256`. The checksum is deliberately created only
-after notarization and stapling, because stapling mutates the DMG. If
+release artifacts. For version `1.1.0`, the expected upload artifacts are
+`Textify-1.1.0-arm64.dmg` and `Textify-1.1.0-arm64.dmg.sha256`. The checksum
+contains the DMG basename so it can be verified in a normal download directory.
+It is deliberately created only after notarization and stapling, because
+stapling mutates the DMG. If
 notarization or validation fails, the notarization script removes any stale
 checksum and does not produce a replacement. The workflow verifies the exact
-exported app and mounted DMG copy for version/build metadata, arm64-only code,
+Developer ID signature on the DMG and verifies the exact exported app and
+mounted DMG copy for version/build metadata, arm64-only code,
 Developer ID identity and team, hardened runtime, audio-input entitlement,
 strict code-signature validity, designated requirement, and (after
 notarization) Gatekeeper acceptance.
+
+After notarization and stapling, retain the final DMG bytes inside the evidence
+root and bind their independently computed digest to both the declaration's
+attachment list and build-artifact list:
+
+```bash
+script/release/bind_release_artifact_evidence.sh \
+  dist/release-evidence/declaration.json \
+  dist/release-evidence \
+  "build/release/Textify-$TEXTIFY_RELEASE_VERSION-arm64.dmg"
+
+script/release/assemble_release_evidence.sh \
+  dist/release-evidence/declaration.json \
+  dist/release-evidence \
+  dist/release-evidence/release-evidence-bundle.json
+```
+
+The final evidence assembly must succeed after this binding. A checksum file
+uploaded beside the DMG is not independent evidence for its own payload.
 
 ## Model Publishing
 
@@ -223,7 +254,7 @@ Textify GitHub Release assets or exact commit-pinned Hugging Face URLs.
    ```
 
 9. Verify the detached signature and production manifest policy with the public
-   key before publishing.
+   key before embedding the pair in the release.
 
    ```bash
    export TEXTIFY_MODEL_MANIFEST_PUBLIC_KEY_BASE64='<raw public key base64>'
@@ -231,8 +262,8 @@ Textify GitHub Release assets or exact commit-pinned Hugging Face URLs.
    script/models/verify_model_manifest.sh path/to/manifest.json path/to/manifest.json.sig
    ```
 
-   For manifest v3 publication, also run the complete catalog/revocation
-   publication gate and retain its JSON evidence. The gate binds both signer
+   For a manifest v3 app release, also run the complete catalog/revocation
+   release gate and retain its JSON evidence. The gate binds both signer
    identities, both monotonic revisions, and the exact app build identity:
 
    ```bash
@@ -241,7 +272,7 @@ Textify GitHub Release assets or exact commit-pinned Hugging Face URLs.
      path/to/manifest.json.sig \
      path/to/revocations.json \
      path/to/revocations.json.sig \
-     build/release/Textify.app \
+     build/release/export/Textify.app \
      build/release/catalog-publication-evidence.json \
      path/to/previous-catalog-publication-evidence.json
    ```
@@ -250,22 +281,19 @@ Textify GitHub Release assets or exact commit-pinned Hugging Face URLs.
    the audited first v3 authority baseline may use a leading `--bootstrap` and
    omit it; retain that baseline evidence permanently.
 
-10. Replace the tracked `models/manifest.json` and `.sig`, build the app, and
-   verify the exact same bytes are embedded under
-   `Contents/Resources/ModelCatalog/`. A valid remote catalog older than this
-   bundled baseline cannot downgrade it.
+10. Replace the tracked catalog and revocation pairs, build the app, and verify
+    the exact same `models/manifest.json(.sig)` and
+    `models/revocations.json(.sig)` bytes are embedded under
+    `Contents/Resources/ModelCatalog/`. The bundled catalog pair is the
+    release's only runtime model list; the bundled revocation pair is merged
+    into the app's sticky retained revocation state before that list becomes
+    available.
 
-11. Publish both manifest files to GitHub Pages when updating the remote
-   catalog for installed builds:
+11. Ship catalog changes only in a newly signed, notarized Textify app release.
+    Do not use the legacy GitHub Pages endpoint to update installed builds.
 
-   - `https://player0109.github.io/Textify/models/manifest.json`
-   - `https://player0109.github.io/Textify/models/manifest.json.sig`
-
-12. Review the independently signed model revocation pair before publishing
-   catalog changes:
-
-   - `https://player0109.github.io/Textify/models/revocations.json`
-   - `https://player0109.github.io/Textify/models/revocations.json.sig`
+12. Review the independently signed model revocation evidence before shipping
+    catalog changes.
 
    Every record must have an immutable stable `recordID` and target an Exact
    Artifact ID, a lowercase SHA-256 with one explicit supported digest scope,
@@ -277,31 +305,24 @@ Textify GitHub Release assets or exact commit-pinned Hugging Face URLs.
    revision, a new immutable `restorationID`, the exact prior `recordID`, and
    one or both prior targets repeated byte-for-byte. Never use a restoration to
    clear another overlapping record or to name a compatible replacement.
-   Verify the detached Ed25519 signature over the exact JSON bytes and publish
-   the JSON/signature pair before or atomically with a catalog update that
-   changes how an affected artifact is presented.
+   Verify the detached Ed25519 signature over the exact JSON bytes. Current
+   Textify builds do not fetch revocation envelopes at runtime; a new
+   revocation or restoration therefore requires an app release and matching
+   implementation/release evidence.
 
-   Revocation lookup is private and local. Do not add query parameters,
-   request bodies, per-install endpoints, telemetry, or any publication flow
-   that receives installed Artifact IDs, Custom hashes, local filenames, or
-   storage inventory.
+   Revocation lookup is private and local. Do not add telemetry or any release
+   flow that receives installed Artifact IDs, Custom hashes, local filenames,
+   or storage inventory.
 
 13. On a clean machine, install and dictate once with every catalog backend
    from the final signed arm64 app. Confirm diagnostics prove Metal, Neural
    Engine, or the explicitly declared CPU provider and that offline dictation
    still works after network access is disabled.
 
-14. Before changing the live GitHub Pages files, run the real endpoint smoke
-    against the staged HTTPS endpoint. This verifies both exact signed pairs
-    and writes endpoint evidence without downloading model artifacts:
-
-    ```bash
-    script/models/smoke_model_catalog_endpoint.sh \
-      'https://<staging-host>/Textify/models' \
-      build/release/Textify.app \
-      build/release/catalog-endpoint-evidence.json \
-      path/to/previous-catalog-publication-evidence.json
-    ```
+14. Launch the staged app with network access disabled. Open onboarding and
+    both Models destinations, verify the complete bundled list is visible, and
+    confirm an already-installed model can dictate. Record this offline proof
+    with the release evidence.
 
 15. Rehearse withdrawal with the designated v3 rollback bridge and retain its
     log. Never present an arbitrary pre-v3 application downgrade as recovery.
@@ -310,10 +331,8 @@ Textify GitHub Release assets or exact commit-pinned Hugging Face URLs.
     protocol and never silently reactivates a model.
 
 A catalog entry is not release-ready until every immutable URL returns the
-signed size/hash and a clean signed-app test passes for that backend. Remote
-catalog publication is optional for a new app whose newer bundled catalog is
-authoritative, but it remains required when updating already-installed builds
-without shipping an app update.
+signed size/hash and a clean signed-app test passes for that backend. Updating
+the model list always requires shipping an app update.
 
 More detail lives in `docs/models/curated-models.md` and
 `docs/models/model-manifest-signing.md`. Publication identities, revision
@@ -336,8 +355,62 @@ must pass fresh install, Gatekeeper, notarization/stapling, arm64-only binary,
 permissions, Right Command dictation, insertion, clipboard, diagnostics, Launch
 at Login, and Sparkle-absence checks before the release is published.
 
-Re-run the automated release validation script before final upload if any
-release files changed after the archive was created.
+If any tracked source, catalog/revocation input, legal resource, entitlement,
+packaging script, or release metadata changes after the archive was created,
+discard the archive, export, DMG, checksum, and prior DMG evidence attachment.
+Then repeat validation, archive, export, packaging, DMG signing, notarization,
+stapling, artifact-evidence binding, and evidence assembly from the committed
+candidate. Re-running source validation alone does not refresh old binaries.
+
+## Git tag and GitHub Release
+
+Do not create the public tag or release until the complete manual QA and
+release-evidence gates above pass. The tag, evidence declaration, archive, DMG,
+and release must all identify the same commit.
+
+The repository source commit must already be pushed to `origin/master`, its
+required CI/security checks must be green, and the worktree must be clean.
+Create the annotated tag and a draft release through the fail-closed helper:
+
+```bash
+export TEXTIFY_RELEASE_VERSION="1.1.0"
+
+script/release/create_github_release_draft.sh \
+  "$TEXTIFY_RELEASE_VERSION" \
+  dist/release-evidence/declaration.json \
+  dist/release-evidence
+```
+
+The helper runs with `set -euo pipefail`; it validates the complete retained
+evidence, requires the evidence commit to equal both local `HEAD` and
+`origin/master`, requires the final local DMG to equal the independently
+retained evidence digest, creates or verifies an annotated tag at that exact
+commit, pushes only that tag, uploads the DMG and checksum, and verifies the
+result is still a draft. It never publishes a release.
+
+After the final clean-install check on the oldest supported M1-class Mac,
+publish through the separate fail-closed helper:
+
+```bash
+TEXTIFY_DEVELOPMENT_TEAM="<TEAM_ID>" \
+TEXTIFY_SIGNING_IDENTITY="Developer ID Application: <NAME> (<TEAM_ID>)" \
+script/release/publish_github_release.sh \
+  "$TEXTIFY_RELEASE_VERSION" \
+  dist/release-evidence/declaration.json \
+  dist/release-evidence
+```
+
+That helper revalidates the complete evidence bundle and all commit/tag/draft
+preconditions, downloads the draft assets into a fresh temporary directory,
+compares the DMG to the evidence-bound digest, validates its checksum, staple,
+Gatekeeper result, app signature, tracked catalog/revocation bytes, legal
+resources, native runtimes, and production entitlements, then compares the
+mounted executable with the catalog-publication evidence's executable digest.
+Only after every check succeeds does it run `gh release edit --draft=false`.
+
+Finally, test the public installation link in `README.md` from a logged-out
+browser. Retain the downloaded-asset checksum, Gatekeeper output, and release
+API result with the final evidence bundle.
 
 ## Signing Boundary
 

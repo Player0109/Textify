@@ -13,7 +13,6 @@ enum BenchmarkEngine: String, Codable {
     case paraformerLargeZhInt8 = "paraformer-large-zh-int8"
     case reazonSpeechK2V2 = "reazonspeech-k2-v2"
     case qwen3ASR0_6B = "qwen3-asr-0.6b"
-    case omnilingualASR300M = "omnilingual-asr-300m-ctc-int8"
     case dolphinSmall = "dolphin-small-ctc-multi-lang-int8"
     case senseVoiceSmall = "sensevoice-small-int8"
     case mlxParakeetRNNT1_1B = "mlx-parakeet-rnnt-1.1b"
@@ -172,8 +171,7 @@ struct BenchmarkOptions {
             URL(fileURLWithPath: $0).standardizedFileURL
         }
         if engine == .reazonSpeechK2V2 || engine == .qwen3ASR0_6B
-            || engine == .omnilingualASR300M || engine == .dolphinSmall
-            || engine == .senseVoiceSmall,
+            || engine == .dolphinSmall || engine == .senseVoiceSmall,
             sherpaRuntimeURL == nil || sherpaModelURL == nil
         {
             throw BenchmarkCLIError.invalidArguments(

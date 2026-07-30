@@ -8,6 +8,8 @@ body:
     attributes:
       value: |
         Thanks for reporting a problem. Do not paste dictated text, clipboard contents, window titles, document names, URLs, diagnostics secrets, or other private content.
+
+        Textify's current signed catalog contains 42 exact artifacts: 39 transcription models across multiple local runtimes and 3 optional voice-cleaning models. Please copy model names or Exact Artifact IDs from Textify when possible.
   - type: input
     id: textify_version
     attributes:
@@ -29,15 +31,20 @@ body:
       placeholder: "MacBook Air, Apple M2"
     validations:
       required: true
-  - type: dropdown
-    id: model_tier
+  - type: input
+    id: transcription_model
     attributes:
-      label: Model tier
-      options:
-        - Fast
-        - Balanced
-        - Accurate
-        - Not sure
+      label: Transcription model
+      description: Copy the model name or Exact Artifact ID from Settings > Models. Enter "Not sure" if unavailable.
+      placeholder: "Model name or Exact Artifact ID"
+    validations:
+      required: true
+  - type: input
+    id: voice_cleaning_model
+    attributes:
+      label: Voice-cleaning model
+      description: Enter "Disabled", the model name or Exact Artifact ID, or "Not sure".
+      placeholder: "Disabled"
     validations:
       required: true
   - type: dropdown
@@ -128,4 +135,3 @@ body:
       options:
         - label: I did not include dictated text, clipboard contents, window titles, document names, URLs, or credentials.
           required: true
-

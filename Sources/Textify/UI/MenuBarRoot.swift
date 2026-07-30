@@ -7,8 +7,13 @@ struct MenuBarRoot: View {
     @Environment(AppServices.self) private var services
 
     var body: some View {
-        Button(MenuBarPresentation.openTextifyTitle) {
+        Button {
             openSettingsPane(.general)
+        } label: {
+            Label(
+                MenuBarPresentation.openTextifyTitle,
+                systemImage: "macwindow"
+            )
         }
         .keyboardShortcut(",", modifiers: [.command])
 
@@ -19,7 +24,7 @@ struct MenuBarRoot: View {
                 .foregroundStyle(.secondary)
 
             if let blockerTitle {
-                Text(blockerTitle)
+                Label(blockerTitle, systemImage: "arrow.turn.down.right")
                     .foregroundStyle(.secondary)
             }
 
@@ -27,31 +32,44 @@ struct MenuBarRoot: View {
         }
 
         if shouldShowFinishSetup {
-            Button("Finish Setup…") {
+            Button {
                 TextifyOnboardingWindowPresenter.shared.show(services: services)
+            } label: {
+                Label("Finish Setup…", systemImage: "checklist")
             }
         }
 
         if services.revokedActiveTranscriptionModelID != nil {
-            Button("Choose Dictation Replacement…") {
+            Button {
                 openReplacementPicker(for: .transcription)
+            } label: {
+                Label("Replace Dictation Model…", systemImage: "waveform")
             }
         }
 
         if services.revokedActiveVoiceCleaningModelID != nil {
-            Button("Choose Voice Cleaning Replacement…") {
+            Button {
                 openReplacementPicker(for: .voiceCleaning)
+            } label: {
+                Label(
+                    "Replace Voice Cleaner…",
+                    systemImage: "waveform.path.ecg"
+                )
             }
         }
 
-        Button("About Textify") {
+        Button {
             showAboutPanel()
+        } label: {
+            Label("About Textify", systemImage: "info.circle")
         }
 
         Divider()
 
-        Button("Quit Textify") {
+        Button {
             NSApplication.shared.terminate(nil)
+        } label: {
+            Label("Quit Textify", systemImage: "power")
         }
         .keyboardShortcut("q", modifiers: [.command])
     }
@@ -73,7 +91,7 @@ struct MenuBarRoot: View {
 
     private var blockerTitle: String? {
         if let runtimeIssue = services.runtimeIssue {
-            return runtimeIssue.userMessage
+            return runtimeIssue.menuBlockerSummary
         }
         return services.dictation.readiness.blockers.first?.menuBlockerSummary
     }
@@ -124,6 +142,17 @@ struct MenuBarRoot: View {
 
 enum MenuBarPresentation {
     static let openTextifyTitle = "Open Textify…"
+}
+
+extension AppRuntimeIssue {
+    var menuBlockerSummary: String {
+        switch self {
+        case .persistentStorageUnavailable:
+            return "Check storage permissions"
+        case .hotkeyMonitorUnavailable:
+            return "Retry the trigger in Textify"
+        }
+    }
 }
 
 extension DictationRuntimeStatus {

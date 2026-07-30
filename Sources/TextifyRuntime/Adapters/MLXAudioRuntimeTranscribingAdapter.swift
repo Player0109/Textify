@@ -60,11 +60,8 @@ public actor MLXAudioRuntimeTranscribingAdapter: RuntimeEngineTranscribing {
         guard let variant = MLXAudioModelVariant(rawValue: model.variant) else {
             throw MLXAudioRuntimeError.unsupportedVariant(model.variant)
         }
-        if variant.supportsAutomaticLanguageDetection {
-            guard model.runtimeParameters.detectLanguage else {
-                throw MLXAudioRuntimeError.automaticLanguageDetectionRequired
-            }
-        } else if model.runtimeParameters.detectLanguage {
+        if model.runtimeParameters.detectLanguage,
+           !variant.supportsAutomaticLanguageDetection {
             throw MLXAudioRuntimeError.automaticLanguageDetectionUnsupported
         }
         let languageCode = try MLXAudioRuntime.requireSupportedLanguage(

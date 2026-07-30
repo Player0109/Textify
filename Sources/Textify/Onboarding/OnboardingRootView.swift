@@ -18,6 +18,8 @@ struct OnboardingRootView: View {
     @State private var launchAtLoginCompletionStatus: LaunchAtLoginStatus?
     @State private var didCompleteOnboarding = false
     @State private var triggerTest = OnboardingTriggerTestController()
+    @State private var microphonePermissionTask: Task<Void, Never>?
+    @State private var microphonePermissionRequestID: UUID?
 
     init(closeWindow: (@MainActor () -> Void)? = nil) {
         self.closeWindow = closeWindow
@@ -32,20 +34,31 @@ struct OnboardingRootView: View {
             Divider()
 
             VStack(alignment: .leading, spacing: 0) {
-                VStack(alignment: .leading, spacing: 7) {
-                    Text(services.onboardingStep.progressTitle.uppercased())
-                        .font(.caption2.bold().monospaced())
-                        .foregroundStyle(TextifyVisualIdentity.voiceViolet)
-                    Text(currentStepTitle)
-                        .font(.title2.weight(.semibold))
-                        .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 15) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(services.onboardingStep.progressTitle.uppercased())
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .tracking(0.65)
+                            .foregroundStyle(TextifyVisualIdentity.voiceViolet)
+
+                        Text(currentStepTitle)
+                            .font(.system(size: 25, weight: .semibold, design: .rounded))
+                            .tracking(-0.25)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    OnboardingProgressRail(
+                        titles: OnboardingStep.productionFlow.map { $0.title },
+                        completed: OnboardingStep.productionFlow.map { isComplete($0) },
+                        currentIndex: currentStepIndex
+                    )
                 }
                 .padding(.horizontal, 34)
-                .padding(.top, 32)
+                .padding(.top, 27)
                 .padding(.bottom, 18)
 
                 ScrollView {
-                    TextifyCard(padding: 22) {
+                    TextifyCard(padding: 24) {
                         onboardingContent
                     }
                     .padding(.horizontal, 34)
@@ -53,12 +66,13 @@ struct OnboardingRootView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
-                Divider()
-
                 HStack(spacing: 12) {
                     Button("Back") {
                         moveBack()
                     }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .frame(minWidth: 82)
                     .disabled(currentStepIndex == 0)
 
                     Spacer()
@@ -66,23 +80,34 @@ struct OnboardingRootView: View {
                     if services.onboardingStep == .completion {
                         Toggle("Launch at Login", isOn: $launchAtLogin)
                             .toggleStyle(.checkbox)
+                            .font(.callout)
                     }
 
                     Button(primaryButtonTitle) {
                         primaryAction()
                     }
                     .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .frame(minWidth: 104)
                     .keyboardShortcut(.defaultAction)
                     .disabled(primaryButtonDisabled)
                 }
                 .padding(.horizontal, 34)
-                .padding(.vertical, 14)
-                .frame(minHeight: 68)
+                .padding(.vertical, 13)
+                .frame(minHeight: 66)
+                .background(TextifyVisualIdentity.sidebarSurface.opacity(0.55))
+                .overlay(alignment: .top) {
+                    Rectangle()
+                        .fill(TextifyVisualIdentity.separator)
+                        .frame(height: 1)
+                }
             }
         }
         .tint(TextifyVisualIdentity.voiceViolet)
         .preferredColorScheme(.dark)
-        .background(TextifyVisualIdentity.windowSurface)
+        .background {
+            TextifyAcousticBackdrop()
+        }
         .ignoresSafeArea(.container, edges: .top)
         .frame(width: TextifyWindowMetrics.onboardingWidth, height: TextifyWindowMetrics.onboardingHeight)
         .disabled(services.startupIssue != nil)
@@ -100,13 +125,31 @@ struct OnboardingRootView: View {
         }
         .task {
             _ = await services.dictation.refreshReadiness()
-            await services.modelCatalogCoordinator.refresh()
             reconcileOnboardingModelSelection()
         }
+        .task(id: services.onboardingStep) {
+            guard services.onboardingStep == .accessibility else {
+                return
+            }
+            await monitorOnboardingAccessibilityPermission()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: NSApplication.didBecomeActiveNotification
+            )
+        ) { _ in
+            Task {
+                _ = await services.dictation.refreshReadiness()
+            }
+        }
         .onDisappear {
+            cancelMicrophonePermissionRequest()
             triggerTest.stop()
         }
         .onChange(of: services.onboardingStep) { _, newStep in
+            if newStep != .microphone {
+                cancelMicrophonePermissionRequest()
+            }
             if newStep != .triggerTest {
                 triggerTest.stop()
             }
@@ -124,22 +167,33 @@ struct OnboardingRootView: View {
 
     private var onboardingSidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 11) {
-                TextifyVoiceMark(state: .processing, height: 22)
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(TextifyVisualIdentity.voiceViolet.opacity(0.12))
 
-                VStack(alignment: .leading, spacing: 1) {
+                    TextifyVoiceMark(state: .processing, height: 20)
+                }
+                .frame(width: 38, height: 38)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(TextifyVisualIdentity.voiceViolet.opacity(0.24), lineWidth: 0.75)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
                     Text("Textify")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .tracking(-0.15)
                     Text("First-time setup")
-                        .font(.system(size: 11))
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 45)
-            .padding(.bottom, 22)
+            .padding(.horizontal, 22)
+            .padding(.top, 34)
+            .padding(.bottom, 20)
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 ForEach(Array(OnboardingStep.productionFlow.enumerated()), id: \.element) { index, step in
                     StepRow(
                         number: index + 1,
@@ -150,14 +204,26 @@ struct OnboardingRootView: View {
                     )
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 13)
 
             Spacer(minLength: 20)
 
             Label("On-device by design", systemImage: "lock.shield")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .padding(20)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    TextifyVisualIdentity.cardSurface.opacity(0.56),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(TextifyVisualIdentity.separator, lineWidth: 0.75)
+                }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 18)
         }
         .frame(width: TextifyWindowMetrics.sidebarWidth)
         .background(TextifyVisualIdentity.sidebarSurface)
@@ -168,12 +234,7 @@ struct OnboardingRootView: View {
         switch services.onboardingStep {
         case .welcome:
             VStack(alignment: .leading, spacing: 18) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(TextifyVisualIdentity.voiceViolet.opacity(0.12))
-                    TextifyVoiceMark(state: .processing, height: 54)
-                }
-                .frame(height: 128)
+                WelcomeVoiceHero()
 
                 VStack(alignment: .leading, spacing: 7) {
                     Text("Speak here. Type anywhere.")
@@ -206,10 +267,6 @@ struct OnboardingRootView: View {
                                 ? ModelCatalogPurposeDestination.transcription.unavailableDetail
                                 : ModelCatalogPurposeDestination.transcription.emptyDetail
                         )
-                    } actions: {
-                        Button("Refresh Catalog") {
-                            refreshOnboardingCatalog()
-                        }
                     }
                 } else {
                     Picker(
@@ -242,6 +299,13 @@ struct OnboardingRootView: View {
                             )
                             .font(.caption)
                             .foregroundStyle(.tertiary)
+                        }
+
+                        if let model = selectedModel.operationalModel {
+                            ModelSourceLicenseButton(
+                                presentation:
+                                    ModelSourceLicensePresentation(model: model)
+                            )
                         }
 
                         if let notice = onboardingModelCatalog.selectionNotice {
@@ -287,10 +351,48 @@ struct OnboardingRootView: View {
                 name: "Microphone",
                 status: services.dictation.readiness.permissions.microphone.settingsStatusLabel,
                 details: "Required to capture speech only while the trigger is held.",
-                actionTitle: "Request Microphone Access"
+                actionTitle:
+                    services.dictation.readiness.permissions.microphone
+                        == .granted
+                        ? nil
+                        : services.dictation.readiness.permissions.microphone
+                            == .denied
+                            ? "Open Microphone Settings"
+                            : "Request Microphone Access",
+                isDisabled: microphonePermissionRequestID != nil
             ) {
-                Task {
+                if services.dictation.readiness.permissions.microphone
+                    == .denied {
+                    if SystemPrivacySettingsOpener.open(.microphone) {
+                        permissionMessage =
+                            "Turn on Microphone for Textify in System Settings, then return here."
+                    } else {
+                        permissionMessage =
+                            "Open System Settings → Privacy & Security → Microphone, then turn on Textify."
+                    }
+                    return
+                }
+
+                guard microphonePermissionRequestID == nil else {
+                    return
+                }
+
+                let requestID = UUID()
+                microphonePermissionRequestID = requestID
+                microphonePermissionTask = Task {
+                    defer {
+                        if microphonePermissionRequestID == requestID {
+                            microphonePermissionRequestID = nil
+                            microphonePermissionTask = nil
+                        }
+                    }
+
                     let state = await ProductionPermissionRequester.requestMicrophone()
+                    guard !Task.isCancelled,
+                          microphonePermissionRequestID == requestID else {
+                        return
+                    }
+
                     permissionMessage = state.permissionRequestMessage(for: "Microphone")
                     _ = await services.dictation.refreshReadiness()
                 }
@@ -305,15 +407,27 @@ struct OnboardingRootView: View {
                 name: "Accessibility",
                 status: services.dictation.readiness.permissions.accessibility.settingsStatusLabel,
                 details: "Required so Textify can type into the active app.",
-                actionTitle: "Open Accessibility Prompt"
+                actionTitle:
+                    services.dictation.readiness.permissions.accessibility
+                        == .granted
+                        ? nil
+                        : "Allow Accessibility",
+                isDisabled: false
             ) {
                 ProductionPermissionRequester.requestAccessibilityPrompt()
+                permissionMessage =
+                    "Turn on Textify under Accessibility in System Settings."
                 Task {
                     _ = await services.dictation.refreshReadiness()
-                    permissionMessage = services.dictation.readiness.permissions.accessibility
-                        .permissionRequestMessage(for: "Accessibility")
                 }
             }
+
+            if services.dictation.readiness.permissions.accessibility
+                != .granted {
+                Divider()
+                AccessibilityAppDragSource()
+            }
+
             if let permissionMessage {
                 Text(permissionMessage)
                     .foregroundStyle(.secondary)
@@ -528,13 +642,6 @@ struct OnboardingRootView: View {
         }
     }
 
-    private func refreshOnboardingCatalog() {
-        Task {
-            await services.modelCatalogCoordinator.refresh()
-            reconcileOnboardingModelSelection()
-        }
-    }
-
     private func reconcileOnboardingModelSelection() {
         selectedOnboardingModelID = onboardingModelCatalog.selectedModelID
     }
@@ -553,6 +660,33 @@ struct OnboardingRootView: View {
             return
         }
         services.onboardingStep = OnboardingStep.productionFlow[previousIndex]
+    }
+
+    private func monitorOnboardingAccessibilityPermission() async {
+        var displayedState =
+            services.dictation.readiness.permissions.accessibility
+
+        while !Task.isCancelled {
+            do {
+                _ = try await AccessibilityPermissionMonitor.live.nextChange(
+                    from: displayedState
+                )
+            } catch {
+                return
+            }
+
+            let snapshot = await services.dictation.refreshReadiness()
+            displayedState = snapshot.permissions.accessibility
+            permissionMessage = displayedState.permissionRequestMessage(
+                for: "Accessibility"
+            )
+        }
+    }
+
+    private func cancelMicrophonePermissionRequest() {
+        microphonePermissionTask?.cancel()
+        microphonePermissionTask = nil
+        microphonePermissionRequestID = nil
     }
 
     private func isComplete(_ step: OnboardingStep) -> Bool {
@@ -817,10 +951,14 @@ private struct StepRow: View {
     let isPast: Bool
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 11) {
             ZStack {
                 Circle()
-                    .fill(stepColor.opacity(isSelected || isComplete ? 0.16 : 0.07))
+                    .fill(stepColor.opacity(isSelected || isComplete ? 0.17 : 0.08))
+
+                Circle()
+                    .stroke(stepColor.opacity(isSelected || isComplete ? 0.48 : 0.20), lineWidth: 0.75)
+
                 if isComplete {
                     Image(systemName: "checkmark")
                         .font(.system(size: 9, weight: .bold))
@@ -833,22 +971,46 @@ private struct StepRow: View {
                 }
             }
             .foregroundStyle(stepColor)
-            .frame(width: 24, height: 24)
+            .frame(width: 26, height: 26)
 
             Text(title)
-                .font(.system(.callout, design: .rounded, weight: isSelected ? .semibold : .regular))
+                .font(.system(size: 13, weight: isSelected ? .semibold : .regular, design: .rounded))
                 .foregroundStyle(isSelected ? .primary : .secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Spacer(minLength: 0)
+
+            if isSelected {
+                Circle()
+                    .fill(TextifyVisualIdentity.voiceViolet)
+                    .frame(width: 5, height: 5)
+                    .shadow(color: TextifyVisualIdentity.voiceViolet.opacity(0.55), radius: 2)
+            }
         }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 7)
-        .frame(minHeight: 38)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 8)
+        .frame(minHeight: 42)
         .background(
-            isSelected ? TextifyVisualIdentity.voiceViolet.opacity(0.10) : Color.clear,
-            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+            isSelected ? TextifyVisualIdentity.consoleSelection : Color.clear,
+            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
         )
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(
+                    isSelected
+                        ? TextifyVisualIdentity.voiceViolet.opacity(0.25)
+                        : Color.clear,
+                    lineWidth: 0.75
+                )
+        }
+        .overlay(alignment: .leading) {
+            if isSelected {
+                Capsule(style: .continuous)
+                    .fill(TextifyVisualIdentity.voiceViolet)
+                    .frame(width: 3, height: 22)
+                    .padding(.leading, 1)
+            }
+        }
         .accessibilityElement(children: .combine)
         .accessibilityValue(
             isComplete ? "Complete" : isPast ? "Needs attention" : isSelected ? "Current step" : "Not started"
@@ -866,6 +1028,160 @@ private struct StepRow: View {
             return TextifyVisualIdentity.warmWarning
         }
         return TextifyVisualIdentity.slate
+    }
+}
+
+private struct OnboardingProgressRail: View {
+    let titles: [String]
+    let completed: [Bool]
+    let currentIndex: Int
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(titles.indices, id: \.self) { index in
+                if index > 0 {
+                    Capsule(style: .continuous)
+                        .fill(connectorColor(before: index))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 2)
+                        .accessibilityHidden(true)
+                }
+
+                ZStack {
+                    Circle()
+                        .fill(nodeColor(at: index).opacity(nodeOpacity(at: index)))
+
+                    Circle()
+                        .stroke(nodeColor(at: index).opacity(strokeOpacity(at: index)), lineWidth: 1)
+
+                    if isComplete(at: index) {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 7, weight: .bold))
+                    } else if index < currentIndex {
+                        Image(systemName: "exclamationmark")
+                            .font(.system(size: 7, weight: .bold))
+                    } else {
+                        Circle()
+                            .fill(nodeColor(at: index))
+                            .frame(width: index == currentIndex ? 5 : 3, height: index == currentIndex ? 5 : 3)
+                    }
+                }
+                .foregroundStyle(nodeColor(at: index))
+                .frame(width: 17, height: 17)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(titles[index])
+                .accessibilityValue(accessibilityStatus(at: index))
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func isComplete(at index: Int) -> Bool {
+        completed.indices.contains(index) && completed[index]
+    }
+
+    private func connectorColor(before index: Int) -> Color {
+        index <= currentIndex
+            ? TextifyVisualIdentity.voiceViolet.opacity(0.72)
+            : TextifyVisualIdentity.separator
+    }
+
+    private func nodeColor(at index: Int) -> Color {
+        if isComplete(at: index) {
+            return TextifyVisualIdentity.readyMint
+        }
+        if index == currentIndex {
+            return TextifyVisualIdentity.voiceViolet
+        }
+        if index < currentIndex {
+            return TextifyVisualIdentity.warmWarning
+        }
+        return TextifyVisualIdentity.slate
+    }
+
+    private func nodeOpacity(at index: Int) -> Double {
+        index == currentIndex || isComplete(at: index) ? 0.18 : 0.08
+    }
+
+    private func strokeOpacity(at index: Int) -> Double {
+        index == currentIndex || isComplete(at: index) ? 0.70 : 0.26
+    }
+
+    private func accessibilityStatus(at index: Int) -> String {
+        if isComplete(at: index) {
+            return "Complete"
+        }
+        if index == currentIndex {
+            return "Current step"
+        }
+        if index < currentIndex {
+            return "Needs attention"
+        }
+        return "Not started"
+    }
+}
+
+private struct WelcomeVoiceHero: View {
+    private let signalHeights: [CGFloat] = [
+        12, 18, 27, 17, 36, 24, 42, 20, 31, 16, 26, 13, 20, 10, 15,
+        11, 18, 29, 16, 36, 22, 43, 25, 34, 18, 27, 15, 21, 12
+    ]
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            TextifyVisualIdentity.raisedSurface.opacity(0.72),
+                            TextifyVisualIdentity.cardSurface
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            VStack(spacing: 25) {
+                ForEach(0..<3, id: \.self) { _ in
+                    Rectangle()
+                        .fill(TextifyVisualIdentity.separator.opacity(0.46))
+                        .frame(height: 1)
+                }
+            }
+            .padding(.horizontal, 18)
+            .accessibilityHidden(true)
+
+            HStack(alignment: .center, spacing: 5) {
+                ForEach(signalHeights.indices, id: \.self) { index in
+                    Capsule(style: .continuous)
+                        .fill(
+                            index.isMultiple(of: 4)
+                                ? TextifyVisualIdentity.voiceViolet.opacity(0.30)
+                                : TextifyVisualIdentity.slate.opacity(0.20)
+                        )
+                        .frame(width: 3, height: signalHeights[index])
+                }
+            }
+            .accessibilityHidden(true)
+
+            ZStack {
+                Circle()
+                    .fill(TextifyVisualIdentity.windowSurface.opacity(0.94))
+                    .shadow(color: TextifyVisualIdentity.voiceViolet.opacity(0.22), radius: 18)
+
+                Circle()
+                    .stroke(TextifyVisualIdentity.voiceViolet.opacity(0.30), lineWidth: 1)
+
+                TextifyVoiceMark(state: .processing, height: 54, animated: true)
+            }
+            .frame(width: 92, height: 92)
+        }
+        .frame(height: 134)
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(TextifyVisualIdentity.separator, lineWidth: 0.8)
+        }
+        .accessibilityHidden(true)
     }
 }
 
@@ -906,7 +1222,8 @@ private struct PermissionStepView: View {
     let name: String
     let status: String
     let details: String
-    let actionTitle: String
+    let actionTitle: String?
+    let isDisabled: Bool
     let action: () -> Void
 
     var body: some View {
@@ -937,8 +1254,11 @@ private struct PermissionStepView: View {
                 )
             }
 
-            Button(actionTitle, action: action)
-                .buttonStyle(.borderedProminent)
+            if let actionTitle {
+                Button(actionTitle, action: action)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isDisabled)
+            }
         }
     }
 }

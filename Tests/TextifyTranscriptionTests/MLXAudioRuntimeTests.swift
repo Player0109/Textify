@@ -30,6 +30,8 @@ final class MLXAudioRuntimeTests: XCTestCase {
         XCTAssertEqual(load?.variant, .parakeetRNNT1_1B)
         let warmupSampleCounts = await session.sampleCounts()
         XCTAssertEqual(warmupSampleCounts, [16000])
+        let warmupLanguageCodes = await session.languageCodes()
+        XCTAssertEqual(warmupLanguageCodes, ["en"])
 
         let result = try await runtime.transcribe(
             TranscriptionAudioBuffer(samples: Array(repeating: 0.1, count: 16000))
@@ -42,6 +44,8 @@ final class MLXAudioRuntimeTests: XCTestCase {
         XCTAssertNotNil(result.timing?.inferenceDurationMs)
         let sampleCounts = await session.sampleCounts()
         XCTAssertEqual(sampleCounts, [16000, 16000])
+        let languageCodes = await session.languageCodes()
+        XCTAssertEqual(languageCodes, ["en", "en"])
     }
 
     func testLoadRejectsNonMetalBackend() async throws {
@@ -248,6 +252,28 @@ final class MLXAudioRuntimeTests: XCTestCase {
         }
     }
 
+    func testQwen3ASRForwardsExplicitLanguageToInference() async throws {
+        let modelDirectory = try Self.makeQwen3ASRModelDirectory(includeMerges: true)
+        defer { try? FileManager.default.removeItem(at: modelDirectory) }
+        let session = FakeMLXAudioSession()
+        let runtime = MLXAudioRuntime(
+            backend: MLXAudioRuntimeBackend { _, _ in session }
+        )
+
+        try await runtime.load(
+            modelID: "qwen3-asr-1.7b-mlx-8bit",
+            modelDirectory: modelDirectory.path,
+            variant: .qwen3ASR1_7B8Bit,
+            languageCode: "en"
+        )
+        _ = try await runtime.transcribe(
+            TranscriptionAudioBuffer(samples: Array(repeating: 0.1, count: 16000))
+        )
+
+        let languageCodes = await session.languageCodes()
+        XCTAssertEqual(languageCodes, ["en", "en"])
+    }
+
     func testParakeetTDTAndNemotronDeclareCompleteLocalAssetsAndLanguagePolicies() throws {
         XCTAssertEqual(
             MLXAudioModelVariant.parakeetTDT0_6BV2.requiredFilenames,
@@ -303,6 +329,13 @@ final class MLXAudioRuntimeTests: XCTestCase {
                 variant: .qwen3ASR1_7B8Bit
             ),
             "auto"
+        )
+        XCTAssertEqual(
+            try MLXAudioRuntime.requireSupportedLanguage(
+                "en",
+                variant: .qwen3ASR1_7B8Bit
+            ),
+            "en"
         )
     }
 
@@ -411,6 +444,7 @@ private actor FakeMLXAudioSession: MLXAudioRuntimeSession {
     let backendName: String
     private let resultText: String
     private var recordedSampleCounts: [Int] = []
+    private var recordedLanguageCodes: [String] = []
     private var unloads = 0
 
     init(
@@ -421,8 +455,9 @@ private actor FakeMLXAudioSession: MLXAudioRuntimeSession {
         self.resultText = resultText
     }
 
-    func transcribe(samples: [Float]) -> MLXAudioSessionResult {
+    func transcribe(samples: [Float], languageCode: String) -> MLXAudioSessionResult {
         recordedSampleCounts.append(samples.count)
+        recordedLanguageCodes.append(languageCode)
         return MLXAudioSessionResult(text: resultText)
     }
 
@@ -432,6 +467,10 @@ private actor FakeMLXAudioSession: MLXAudioRuntimeSession {
 
     func sampleCounts() -> [Int] {
         recordedSampleCounts
+    }
+
+    func languageCodes() -> [String] {
+        recordedLanguageCodes
     }
 
     func unloadCallCount() -> Int {

@@ -3,6 +3,13 @@ import TextifyModels
 import XCTest
 
 final class ProductionManifestV3Tests: XCTestCase {
+    private static let retiredCanaryLicenseURL =
+        "https://raw.githubusercontent.com/antirez/transcribe.cpp/"
+        + "5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+    private static let currentCanaryLicenseURL =
+        "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/"
+        + "5a5a49664a8ea1f0e5b3be1dfc544730d1b62561/LICENSE"
+
     func testSignedProductionCatalogIsCompleteV3PresentationGraph() throws {
         let manifest = try verifiedProductionManifest()
         let graph = try XCTUnwrap(manifest.presentationGraph)
@@ -47,11 +54,14 @@ final class ProductionManifestV3Tests: XCTestCase {
     }
 
     func testProductionV3PreservesV2OperationalRecordsExceptSignedPeakStorageAndSelectionCopy() throws {
+        let retiredModelID = "omnilingual-asr-300m-ctc-int8"
         let v2Data = try fixtureData("manifest_v2.production-migration.json")
         let v3Data = try Data(
             contentsOf: repositoryRoot.appendingPathComponent("models/manifest.json")
         )
-        var v2Models = try rawModels(in: v2Data)
+        var v2Models = try rawModels(in: v2Data).filter {
+            $0["id"] as? String != retiredModelID
+        }
         var v3Models = try rawModels(in: v3Data)
         for index in v2Models.indices {
             normalizeMutableManifestModel(&v2Models[index])
@@ -75,9 +85,13 @@ final class ProductionManifestV3Tests: XCTestCase {
 
         XCTAssertEqual(v2.manifestVersion, 2)
         XCTAssertEqual(v2.models.count, 43)
+        XCTAssertEqual(v3.models.count, 42)
+        XCTAssertFalse(v3.models.contains { $0.id == retiredModelID })
         XCTAssertEqual(
             v3.models.map(normalizingV3PresentationCopy),
-            v2.models.map(normalizingV3PresentationCopy)
+            v2.models
+                .filter { $0.id != retiredModelID }
+                .map(normalizingV3PresentationCopy)
         )
         XCTAssertTrue(
             v3.models.allSatisfy {
@@ -209,7 +223,19 @@ final class ProductionManifestV3Tests: XCTestCase {
             description: model.description,
             sizeBytes: model.sizeBytes,
             files: model.files,
-            licenses: model.licenses,
+            licenses: model.licenses.map {
+                guard $0.licenseTextUrl
+                        == Self.retiredCanaryLicenseURL
+                else {
+                    return $0
+                }
+                return ModelLicense(
+                    scope: $0.scope,
+                    spdxId: $0.spdxId,
+                    name: $0.name,
+                    licenseTextUrl: Self.currentCanaryLicenseURL
+                )
+            },
             provenance: model.provenance,
             runtimeParameters: model.runtimeParameters,
             hallucinationThresholds: model.hallucinationThresholds,
@@ -231,6 +257,15 @@ final class ProductionManifestV3Tests: XCTestCase {
 
     private func normalizeMutableManifestModel(_ model: inout [String: Any]) {
         model.removeValue(forKey: "installationStorage")
+        if var licenses = model["licenses"] as? [[String: Any]] {
+            for index in licenses.indices
+            where licenses[index]["licenseTextUrl"] as? String
+                == Self.retiredCanaryLicenseURL {
+                licenses[index]["licenseTextUrl"] =
+                    Self.currentCanaryLicenseURL
+            }
+            model["licenses"] = licenses
+        }
         guard var presentation = model["presentation"] as? [String: Any] else {
             return
         }

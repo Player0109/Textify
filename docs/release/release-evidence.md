@@ -14,7 +14,10 @@ category, the release commit, recorder, time, notes, and one or more separately
 hashed subject attachments. The validator rejects generic label-only files,
 missing or changed files, symlinks, hard links, and path escapes. Every build
 artifact also names its attachment ID, so its declared digest must match
-retained bytes.
+retained bytes. After notarization and stapling, use
+`script/release/bind_release_artifact_evidence.sh` to retain the final DMG
+under the evidence root and add its independently computed digest to both
+lists before the final assembly.
 
 The declaration must cover:
 

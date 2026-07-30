@@ -1,7 +1,7 @@
 # Textify Curated Models
 
-The signed catalog shipped with the current app contains 43 curated choices:
-40 transcription models and three independent voice-cleaning models. The ASR
+The signed catalog shipped with the current app contains 42 curated choices:
+39 transcription models and three independent voice-cleaning models. The ASR
 choices are Whisper small.en; Experimental Whisper Large V2 and V3 q5_0; Whisper
 Large V3 Turbo q5_0 and a separate MLX Turbo entry; Accurate Canary-Qwen 2.5B;
 Parakeet TDT 0.6B V3, V2, and TDT-CTC 110M; Parakeet RNNT 1.1B; Cohere
@@ -11,7 +11,7 @@ Japanese, and Korean; plus Experimental Qwen3-ASR 0.6B and 1.7B entries in MLX
 8-bit and GGUF BF16, Q8_0, and Q5_K_M formats; plus Experimental Parakeet TDT
 V2, Parakeet TDT V3, and Nemotron 3.5 ASR entries in MLX and GGUF F16, Q8_0,
 and Q5_K_M formats; plus Granite Speech 4.1 2B AR and NAR, Voxtral Mini 4B
-Realtime 2602, MOSS Transcribe-Diarize 0.9B, and Omnilingual ASR 300M CTC.
+Realtime 2602, and MOSS Transcribe-Diarize 0.9B.
 The catalog and signature are bundled; model weights
 remain external and are downloaded only after the user chooses a model.
 
@@ -36,12 +36,11 @@ choice and becomes active when installed. Installing or switching a cleaner
 never changes the transcription model. The converted checkpoints are
 Apache-2.0.
 
-The GitHub Pages catalog may temporarily lag an app release. Textify verifies
-the bundled and remote catalogs independently and selects the whole catalog
-with the newer signed `generatedAt` timestamp. A model is visible only after
-its exact artifacts, checksums, provenance, licenses, runtime, accelerator,
-capabilities, support tier, finalization/accuracy guidance, requirements, and
-minimum app version are in that selected catalog.
+Textify uses only the signed catalog bundled with its current app version. A
+model becomes visible only in a new Textify release after its exact artifacts,
+checksums, provenance, licenses, runtime, accelerator, capabilities, support
+tier, finalization/accuracy guidance, requirements, and minimum app version are
+included in that bundled catalog.
 
 ## Balanced - Whisper small.en q5_1
 
@@ -416,12 +415,13 @@ punctuated first reference under the 700 ms budget. See the
 The reusable additional engine boundary is sherpa-onnx v1.13.2 at commit
 `13d0ae6c539d2809d32f5eaa3ef1db0c459d0b24`, not one custom runtime per model.
 Textify now ships production paths for ReazonSpeech and SenseVoiceSmall. Its
-broader released C/Swift evaluation surface covers Dolphin and Omnilingual ASR,
-while sherpa-onnx also exposes the separately deferred Qwen3-ASR ONNX route,
-Moonshine V2, Cohere Transcribe, Fun-ASR Nano, and FireRedASR. Each new architecture
-still requires a small explicit shim extension plus exact-artifact quality,
-latency, memory, license, and accelerator evaluation. A provider option alone
-is not accelerator proof.
+released C/Swift evaluation surface covers Dolphin, while historical native
+benchmark records preserve the Omnilingual ASR evaluation. sherpa-onnx also
+exposes the separately deferred Qwen3-ASR ONNX route, Moonshine V2, Cohere
+Transcribe, Fun-ASR Nano, and FireRedASR. Each new architecture still requires
+a small explicit shim extension plus exact-artifact quality, latency, memory,
+license, and accelerator evaluation. A provider option alone is not accelerator
+proof.
 
 | Candidate | Decision |
 | --- | --- |

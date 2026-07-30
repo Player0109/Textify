@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import TextifyRuntime
+import TextifySettings
 
 enum DictationOverlayPresentation {
     static func state(for status: DictationRuntimeStatus) -> RecordingOverlayState {
@@ -59,7 +60,46 @@ private extension ProductionDictationError {
 
 @MainActor
 protocol RecordingOverlayPresenting: AnyObject {
-    func present(_ state: RecordingOverlayState)
+    func present(
+        _ state: RecordingOverlayState,
+        preferences: RecordingOverlayPreferences
+    )
+}
+
+enum RecordingOverlayGeometry {
+    static let baseSize = CGSize(width: 344, height: 88)
+    static let bottomInset: CGFloat = 22
+
+    static func size(
+        preferences: RecordingOverlayPreferences
+    ) -> CGSize {
+        let scale = CGFloat(preferences.normalized().scale)
+        return CGSize(
+            width: baseSize.width * scale,
+            height: baseSize.height * scale
+        )
+    }
+
+    static func frame(
+        visibleFrame: CGRect,
+        preferences: RecordingOverlayPreferences
+    ) -> CGRect {
+        let preferences = preferences.normalized()
+        let size = size(preferences: preferences)
+        let proposedOrigin = CGPoint(
+            x: visibleFrame.midX - size.width / 2
+                + CGFloat(preferences.xOffset),
+            y: visibleFrame.minY + bottomInset
+                + CGFloat(preferences.yOffset)
+        )
+        let maximumX = max(visibleFrame.minX, visibleFrame.maxX - size.width)
+        let maximumY = max(visibleFrame.minY, visibleFrame.maxY - size.height)
+        let origin = CGPoint(
+            x: min(max(proposedOrigin.x, visibleFrame.minX), maximumX),
+            y: min(max(proposedOrigin.y, visibleFrame.minY), maximumY)
+        )
+        return CGRect(origin: origin, size: size)
+    }
 }
 
 private struct RecordingOverlayApplication {
@@ -106,7 +146,10 @@ final class RecordingOverlayPresenter: RecordingOverlayPresenting {
         self.applicationProvider = WorkspaceRecordingOverlayApplicationProvider()
     }
 
-    func present(_ state: RecordingOverlayState) {
+    func present(
+        _ state: RecordingOverlayState,
+        preferences: RecordingOverlayPreferences
+    ) {
         guard state != .hidden else {
             window?.orderOut(nil)
             return
@@ -126,11 +169,16 @@ final class RecordingOverlayPresenter: RecordingOverlayPresenting {
         let application = sessionApplication ?? .unavailable
         let window = window ?? RecordingOverlayWindow(
             state: state,
-            application: application
+            application: application,
+            preferences: preferences
         )
         self.window = window
-        window.update(state: state, application: application)
-        window.positionAtBottomCenter()
+        window.update(
+            state: state,
+            application: application,
+            preferences: preferences
+        )
+        window.position(preferences: preferences)
         window.reveal()
     }
 }
@@ -141,16 +189,21 @@ final class RecordingOverlayWindow: NSWindow {
 
     fileprivate init(
         state: RecordingOverlayState = .recording(elapsedSeconds: 0),
-        application: RecordingOverlayApplication = .unavailable
+        application: RecordingOverlayApplication = .unavailable,
+        preferences: RecordingOverlayPreferences = .defaults
     ) {
         let content = RecordingOverlayContent(
             state: state,
-            application: application
+            application: application,
+            preferences: preferences
         )
         self.hostingView = NSHostingView(rootView: content)
+        let size = RecordingOverlayGeometry.size(
+            preferences: preferences
+        )
 
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 344, height: 88),
+            contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
@@ -168,11 +221,17 @@ final class RecordingOverlayWindow: NSWindow {
 
     fileprivate func update(
         state: RecordingOverlayState,
-        application: RecordingOverlayApplication
+        application: RecordingOverlayApplication,
+        preferences: RecordingOverlayPreferences
     ) {
+        let size = RecordingOverlayGeometry.size(
+            preferences: preferences
+        )
+        setContentSize(size)
         hostingView.rootView = RecordingOverlayContent(
             state: state,
-            application: application
+            application: application,
+            preferences: preferences
         )
     }
 
@@ -197,21 +256,27 @@ final class RecordingOverlayWindow: NSWindow {
         }
     }
 
-    func positionAtBottomCenter(screen: NSScreen? = NSScreen.main ?? NSScreen.screens.first) {
+    func position(
+        preferences: RecordingOverlayPreferences,
+        screen: NSScreen? = NSScreen.main ?? NSScreen.screens.first
+    ) {
         guard let screen else {
             return
         }
-        let visibleFrame = screen.visibleFrame
-        setFrameOrigin(NSPoint(
-            x: visibleFrame.midX - frame.width / 2,
-            y: visibleFrame.minY + 22
-        ))
+        setFrame(
+            RecordingOverlayGeometry.frame(
+                visibleFrame: screen.visibleFrame,
+                preferences: preferences
+            ),
+            display: false
+        )
     }
 }
 
 private struct RecordingOverlayContent: View {
     let state: RecordingOverlayState
     let application: RecordingOverlayApplication
+    let preferences: RecordingOverlayPreferences
 
     private let cornerRadius: CGFloat = 21
 
@@ -233,6 +298,13 @@ private struct RecordingOverlayContent: View {
         .shadow(color: .black.opacity(0.38), radius: 14, y: 7)
         .padding(8)
         .frame(width: 344, height: 88)
+        .scaleEffect(CGFloat(preferences.scale))
+        .frame(
+            width: RecordingOverlayGeometry.baseSize.width
+                * CGFloat(preferences.scale),
+            height: RecordingOverlayGeometry.baseSize.height
+                * CGFloat(preferences.scale)
+        )
         .preferredColorScheme(.dark)
         .accessibilityElement(children: .combine)
     }

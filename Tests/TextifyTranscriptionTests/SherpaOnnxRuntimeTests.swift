@@ -373,44 +373,6 @@ final class SherpaOnnxRuntimeTests: XCTestCase {
         await runtime.unload()
     }
 
-    func testNativeBackendTranscribesPinnedOmnilingualModelWhenEnabled() async throws {
-        guard ProcessInfo.processInfo.environment["TEXTIFY_RUN_ARTICLE_ASR_NATIVE_TESTS"] == "1" else {
-            throw XCTSkip(
-                "Set TEXTIFY_RUN_ARTICLE_ASR_NATIVE_TESTS=1 for the pinned Omnilingual ASR smoke."
-            )
-        }
-        let workspace = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-        let runtimeDirectory = workspace
-            .appendingPathComponent("Vendor/sherpa-onnx/v1.13.2/lib", isDirectory: true)
-        let modelDirectory = workspace
-            .appendingPathComponent(
-                ".build/model-artifact-audit/omnilingual-asr-300m-ctc-int8",
-                isDirectory: true
-            )
-        guard FileManager.default.fileExists(
-            atPath: modelDirectory.appendingPathComponent("model.int8.onnx").path
-        ) else {
-            XCTFail("The pinned Omnilingual ASR audit model is not present.")
-            return
-        }
-        let runtime = SherpaOnnxRuntime(runtimeDirectory: runtimeDirectory.path)
-        try await runtime.load(
-            modelID: "omnilingual-asr-300m-ctc-int8",
-            modelDirectory: modelDirectory.path,
-            variant: .omnilingualASR300M,
-            languageCode: "auto",
-            warmup: false
-        )
-
-        let audioURL = workspace.appendingPathComponent(
-            "Benchmarks/RealtimeASR/.benchmark-data/openslr31/LibriSpeech/dev-clean-2/1272/141231/1272-141231-0000.flac"
-        )
-        let result = try await runtime.transcribe(Self.loadPCMMono16K(from: audioURL))
-        XCTAssertTrue(result.text.lowercased().contains("universe"))
-        XCTAssertLessThan(result.timing?.inferenceDurationMs ?? .max, 10_000)
-        await runtime.unload()
-    }
-
     private static func makeTemporaryDirectory() throws -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("TextifySherpaOnnxTests-\(UUID().uuidString)", isDirectory: true)

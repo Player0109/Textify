@@ -287,6 +287,19 @@ public struct ModelInstallQueue: Codable, Equatable, Sendable {
     }
 
     @discardableResult
+    public mutating func removeAttempts(
+        forArtifactID artifactID: String
+    ) -> [ModelInstallQueueAttempt] {
+        let removed = attempts.filter {
+            $0.artifactID == artifactID
+        }
+        attempts.removeAll {
+            $0.artifactID == artifactID
+        }
+        return removed
+    }
+
+    @discardableResult
     public mutating func authorize(
         artifactID: String,
         authorizedArtifactIdentity:

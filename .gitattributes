@@ -1,0 +1,2 @@
+# Preserve byte-for-byte upstream legal text, including its original whitespace.
+THIRD_PARTY_LICENSES/** -whitespace

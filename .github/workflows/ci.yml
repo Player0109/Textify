@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  swiftpm:
+    name: SwiftPM (macOS 14 arm64)
+    runs-on: macos-14
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Verify runner architecture
+        run: |
+          test "$(uname -m)" = "arm64"
+          swift --version
+
+      - name: Verify signed model catalog
+        env:
+          TEXTIFY_MODEL_MANIFEST_PUBLIC_KEY_BASE64: eg6XVGVQ4Kqh1dtN3B8JcFTtK0RSxkxd79W5tfIlfos=
+          TEXTIFY_MODEL_MANIFEST_KEY_ID: textify-model-manifest-2026-huggingface
+        run: script/models/verify_model_manifest.sh models/manifest.json models/manifest.json.sig
+
+      - name: Verify signed model revocations
+        env:
+          TEXTIFY_MODEL_REVOCATION_KEY_ID: textify-model-manifest-2026-huggingface
+        run: script/models/verify_model_revocations.sh models/revocations.json models/revocations.json.sig
+
+      - name: Run test suite
+        run: swift test --jobs 2
+
+      - name: Build release executable
+        run: swift build --configuration release --arch arm64 --jobs 2
+
+      - name: Verify release architecture
+        run: |
+          binary_path="$(swift build --configuration release --arch arm64 --show-bin-path)/Textify"
+          test -x "$binary_path"
+          test "$(lipo -archs "$binary_path")" = "arm64"

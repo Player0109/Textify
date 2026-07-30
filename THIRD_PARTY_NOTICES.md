@@ -36,6 +36,10 @@ the application bundle or this repository snapshot.
   tokenizer assets from the original OpenAI repository
 - Original models: https://huggingface.co/openai
 - Model and conversion license: MIT
+- Copied license texts:
+  `THIRD_PARTY_LICENSES/OpenAI-Whisper.txt`,
+  `THIRD_PARTY_LICENSES/whisper.cpp.txt`, and
+  `THIRD_PARTY_LICENSES/ggml-small.en-q5_1.LICENSES.txt`
 - Every artifact revision, byte size, and checksum is pinned by the signed
   Textify model catalog
 
@@ -62,6 +66,20 @@ and Paraformer inference on Apple Silicon.
 - Pinned revision: 19600a485baa4998812e4654b70d2bab8f2c9949
 - License: Apache-2.0
 - Copied license text: `THIRD_PARTY_LICENSES/FluidAudio.txt`
+- Linked fastcluster notice:
+  `THIRD_PARTY_LICENSES/FluidAudio-fastcluster.txt`
+- Linked VBx notice: `THIRD_PARTY_LICENSES/FluidAudio-VBx.txt`
+
+## SwiftNIO and Swift Crypto
+
+Textify links SwiftNIO Core `2.101.3` and Swift Crypto `4.5.1` through its
+local runtime and integrity-verification paths.
+
+- SwiftNIO revision: `0b18836bd8b0162e7e17a995a3fbee20ed8f3b2b`
+- Swift Crypto revision: `47d3869a7291f085c1fb9fb1e6d3b97a793f45c6`
+- Exact copied notices:
+  `THIRD_PARTY_LICENSES/SwiftNIO-NOTICE.txt` and
+  `THIRD_PARTY_LICENSES/SwiftCrypto-NOTICE.txt`
 
 ## NVIDIA Parakeet models
 
@@ -88,8 +106,25 @@ the application bundle or this repository snapshot.
   https://huggingface.co/handy-computer/parakeet-tdt-0.6b-v3-gguf at
   `85ac09ea12fc4b1112fa76810059364bc6adc9de`
 - Model license: CC-BY-4.0 for all catalog entries
+- Copied model license text: `THIRD_PARTY_LICENSES/CC-BY-4.0.txt`
 - Every runtime artifact revision and file checksum is pinned by the signed
   Textify model catalog
+
+## NVIDIA Canary-Qwen model
+
+Canary-Qwen model assets are optional external downloads and are not included
+in the application bundle or this repository snapshot.
+
+- Original model: https://huggingface.co/nvidia/canary-qwen-2.5b
+- Q4_K_M GGUF conversion:
+  https://huggingface.co/handy-computer/canary-qwen-2.5b-gguf at
+  `3370d4e2f28cc70eea79dfc9f2f43fb91eef3163`
+- Canary-Qwen model weights and conversion: CC-BY-4.0
+- Copied model license text: `THIRD_PARTY_LICENSES/CC-BY-4.0.txt`
+- Qwen 2.5 language-model component: Apache-2.0
+- transcribe.cpp runtime and conversion tooling: MIT
+- Every selected artifact, revision, byte size, and checksum is pinned by the
+  signed Textify model catalog
 
 ## MLX and MLX Audio Swift
 
@@ -105,6 +140,25 @@ use the package's network-backed pretrained-model loader.
 - Exact direct and transitive revisions: `Package.resolved`
 - Exact copied license texts for MLX, Hugging Face Swift, Swift project,
   EventSource, and yyjson dependencies: `THIRD_PARTY_LICENSES/`
+- Linked MLX Swift nested component texts:
+  `THIRD_PARTY_LICENSES/MLXSwift-fmt.txt`,
+  `THIRD_PARTY_LICENSES/MLXSwift-nlohmann-json.txt`,
+  `THIRD_PARTY_LICENSES/MLXSwift-metal-cpp.txt`, and
+  `THIRD_PARTY_LICENSES/MLXSwift-MLX-Core.txt`
+
+## LiteRT-LM
+
+Textify links a pinned arm64 slice of Google's LiteRT-LM native runtime for
+eligible local model paths.
+
+- Upstream repository: https://github.com/google-ai-edge/LiteRT-LM
+- Pinned release: `v0.14.0`
+- SwiftPM binary artifact:
+  https://github.com/google-ai-edge/LiteRT-LM/releases/download/v0.14.0/CLiteRTLM_mac.xcframework.zip
+- SwiftPM artifact checksum:
+  `450615483509aaa6d34b321fdc6862e41a224b674468ab10aff64ebe113d21b7`
+- License: Apache-2.0
+- Copied license text: `THIRD_PARTY_LICENSES/LiteRT-LM.txt`
 
 ## MossFormer2 SE voice-cleaning models
 
@@ -149,6 +203,8 @@ Nemotron model assets are optional external downloads and are not included in
 the application bundle or this repository snapshot.
 
 - Original model: https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b
+- Attribution: Licensed by NVIDIA Corporation under the NVIDIA Open Model
+  License.
 - MLX conversion: https://huggingface.co/mlx-community/nemotron-3.5-asr-streaming-0.6b
   at `e550040c0478027ed679b2b6b0d055502c103663`
 - GGUF conversion: https://huggingface.co/handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf
@@ -156,6 +212,9 @@ the application bundle or this repository snapshot.
 - The exact pinned MLX source card declares the NVIDIA Open Model License; the
   exact pinned GGUF source card declares OpenMDW-1.1. The signed catalog records
   the license attached to each selected source.
+- Copied model license texts:
+  `THIRD_PARTY_LICENSES/NVIDIA_Open_Model_License.txt` and
+  `THIRD_PARTY_LICENSES/OpenMDW-1.1.txt`
 - The GGUF repository publishes F16, Q8_0, and Q5_K_M, not BF16.
 - Textify uses batch transcription only and does not expose upstream streaming
   partials.
@@ -196,8 +255,9 @@ offline.
 - ONNX Runtime repository: https://github.com/microsoft/onnxruntime
 - ONNX Runtime version: `1.24.4`
 - ONNX Runtime license: MIT
-- Copied license texts: `THIRD_PARTY_LICENSES/sherpa-onnx.txt` and
-  `THIRD_PARTY_LICENSES/ONNX_Runtime.txt`
+- Copied license texts: `THIRD_PARTY_LICENSES/sherpa-onnx.txt`,
+  `THIRD_PARTY_LICENSES/ONNX_Runtime.txt`, and the complete
+  `THIRD_PARTY_LICENSES/ONNX_Runtime_ThirdPartyNotices.txt`
 - Exact release-asset and selected-file hashes:
   `Vendor/sherpa-onnx/v1.13.2/UPSTREAM.md`
 
@@ -215,13 +275,64 @@ whisper.cpp symbols.
 - Upstream commit: `5a5a49664a8ea1f0e5b3be1dfc544730d1b62561`
 - Vendored ggml commit: `707321c4cf6d21cb4bc831aa8b687dbf01a521ce`
 - License: MIT
-- Copied license text: `THIRD_PARTY_LICENSES/transcribe.cpp.txt`
+- Copied license texts: `THIRD_PARTY_LICENSES/transcribe.cpp.txt`,
+  `THIRD_PARTY_LICENSES/transcribe.cpp-ggml.txt`, and
+  `THIRD_PARTY_LICENSES/transcribe.cpp-miniz.txt`
 - Local language-prompt compatibility patch and exact build provenance:
   `Vendor/transcribe.cpp/v0.1.3/UPSTREAM.md`
 
 The runtime is built for arm64 macOS 14 with Metal and Accelerate. Textify
 requires an actual Metal model backend and rejects CPU fallback for catalog
 entries using this engine.
+
+## IBM Granite Speech models
+
+Granite Speech model assets are optional external downloads and are not
+included in the application bundle or this repository snapshot.
+
+- Original autoregressive model:
+  https://huggingface.co/ibm-granite/granite-speech-4.1-2b
+- Original non-autoregressive model:
+  https://huggingface.co/ibm-granite/granite-speech-4.1-2b-nar
+- Q5_K_M GGUF conversions:
+  https://huggingface.co/handy-computer/granite-speech-4.1-2b-gguf at
+  `58e7710fd7039ded5a185668eef5f71ca5d9d919` and
+  https://huggingface.co/handy-computer/granite-speech-4.1-2b-nar-gguf at
+  `ca53e8273416eb7e888f19bcebbcb9b6ab3edc17`
+- Original models and converted checkpoints: Apache-2.0
+- transcribe.cpp runtime and conversion tooling: MIT
+- Every selected artifact, revision, byte size, and checksum is pinned by the
+  signed Textify model catalog
+
+## Mistral Voxtral Mini model
+
+Voxtral model assets are optional external downloads and are not included in
+the application bundle or this repository snapshot.
+
+- Original model:
+  https://huggingface.co/mistralai/Voxtral-Mini-4B-Realtime-2602
+- Q4_K_M GGUF conversion:
+  https://huggingface.co/handy-computer/Voxtral-Mini-4B-Realtime-2602-gguf
+  at `b3e1c979e3775cbd0a49a65878a0ec7f06789ed7`
+- Original model and converted checkpoint: Apache-2.0
+- transcribe.cpp runtime and conversion tooling: MIT
+- Every selected artifact, revision, byte size, and checksum is pinned by the
+  signed Textify model catalog
+
+## OpenMOSS MOSS Transcribe-Diarize model
+
+MOSS Transcribe-Diarize model assets are optional external downloads and are
+not included in the application bundle or this repository snapshot.
+
+- Original model:
+  https://huggingface.co/OpenMOSS-Team/MOSS-Transcribe-Diarize
+- Q5_K_M GGUF conversion:
+  https://huggingface.co/handy-computer/MOSS-Transcribe-Diarize-gguf at
+  `6fdfa33aed776bbb0ac11a1a9835634fe6d75dd7`
+- Original model and converted checkpoint: Apache-2.0
+- transcribe.cpp runtime and conversion tooling: MIT
+- Every selected artifact, revision, byte size, and checksum is pinned by the
+  signed Textify model catalog
 
 ## Fun-ASR MLT-Nano model
 

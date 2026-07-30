@@ -52,6 +52,31 @@ The script writes `path/to/manifest.json.sig` with this envelope shape:
 }
 ```
 
+## Sign The Bundled Revocation Pair
+
+The independently typed revocation envelope may use the same allowlisted
+maintainer key, but it is signed over the distinct model-revocations canonical
+payload. Create or review `models/revocations.json`, advance its `generatedAt`
+revision monotonically, then run:
+
+```bash
+TEXTIFY_MODEL_REVOCATION_KEY_ID='textify-model-manifest-2026-huggingface' \
+  script/models/sign_model_revocations.sh \
+    models/revocations.json \
+    models/revocations.json.sig
+
+TEXTIFY_MODEL_REVOCATION_KEY_ID='textify-model-manifest-2026-huggingface' \
+  script/models/verify_model_revocations.sh \
+    models/revocations.json \
+    models/revocations.json.sig
+```
+
+The signer reads the matching private key from the existing manifest-signing
+Keychain service by default; a separately managed service can be named with
+`TEXTIFY_MODEL_REVOCATION_KEYCHAIN_SERVICE`. Only the exact signed pair and
+public trust entry are committed. The private key is never printed or copied
+into the repository.
+
 The app and verification helper temporarily accept the previously deployed
 four-field raw-byte signature envelope so existing V1.1 installs can still
 download the production model. The signing helper emits only the canonical
@@ -140,15 +165,13 @@ catalog may advertise only a released variant implemented by the pinned
 FluidAudio version; a conversion repository existing on its own is not enough.
 
 The app release embeds this signed pair under
-`Contents/Resources/ModelCatalog/`. The app verifies it at runtime and selects
-a valid remote catalog only when the remote signed `generatedAt` timestamp is
-at least as new; remote failure falls back to the complete valid bundled pair.
-Model weights are never embedded in the app.
+`Contents/Resources/ModelCatalog/`. The app verifies that bundled pair locally
+and uses it as the only runtime catalog. Catalog changes require a new Textify
+app release. Model weights are never embedded in the app.
 
-After verification, the same pair may also be published to GitHub Pages:
-
-- `https://player0109.github.io/Textify/models/manifest.json`
-- `https://player0109.github.io/Textify/models/manifest.json.sig`
+Do not rely on a GitHub Pages catalog to update installed builds. Legacy
+endpoint tooling may retain an archival copy, but current Textify builds do not
+request it.
 
 Model files may use an immutable Textify GitHub Release asset, for example:
 

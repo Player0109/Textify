@@ -27,15 +27,16 @@ not count.
 | Granite Speech 4.1 2B-NAR | Supported | transcribe.cpp 0.1.3, Q5_K_M GGUF, Metal |
 | Qwen3-ASR-0.6B | Supported | MLX Audio Swift and transcribe.cpp Metal choices |
 | Kyutai STT 1B en_fr | Native port required | Kyutai publishes an Apple MLX checkpoint, but Textify has no delayed-streams Swift runtime boundary |
-| Omnilingual ASR | Supported | sherpa-onnx 1.13.2, 300M CTC INT8 ONNX, CPU |
+| Omnilingual ASR | Retired after evaluation | Native support was removed after the exact artifact produced unacceptable measured quality |
 | MOSS-Transcribe-Diarize 0.9B | Supported | transcribe.cpp 0.1.3, Q5_K_M GGUF, Metal |
 | diffusion-gemma-asr-small | Native port required | The adapter requires Whisper-small plus the separately licensed 26B DiffusionGemma backbone; no compatible Textify runtime exists |
 
-Eleven of the sixteen exact article models now have working Textify routes.
-The five remaining entries are deliberately absent from the production catalog
-so users cannot download a model that the app cannot execute.
+Ten of the sixteen exact article models have current working Textify routes.
+Omnilingual ASR was retired after its quality evaluation, and the five remaining
+entries are deliberately absent from the production catalog so users cannot
+download a model that the app cannot execute.
 
-## Newly exposed artifacts
+## Exact artifacts evaluated
 
 | Model | Immutable source revision | Artifact |
 | --- | --- | --- |
@@ -45,9 +46,10 @@ so users cannot download a model that the app cannot execute.
 | MOSS-Transcribe-Diarize 0.9B | `6fdfa33aed776bbb0ac11a1a9835634fe6d75dd7` | `MOSS-Transcribe-Diarize-Q5_K_M.gguf` |
 | Omnilingual ASR 300M | `6abf1ece20cd2308bdb7d13cd78ec1c44fa4c094` | `model.int8.onnx` and `tokens.txt` |
 
-Every file URL in `models/manifest.json` is commit-pinned and includes its
-exact byte count and SHA-256. These models remain `Unrated` until they complete
-Textify's checksum-pinned catalog benchmark policy.
+The first four rows remain commit-pinned in `models/manifest.json` with exact
+byte counts and SHA-256 values. The Omnilingual row preserves the immutable
+artifact identity used for the retired model's historical evaluation; it is no
+longer present in the production catalog.
 
 ## Remaining native work
 

@@ -420,7 +420,7 @@ final class RuntimeAdaptersTests: XCTestCase {
         XCTAssertEqual(load?.threadCount, 4)
     }
 
-    func testSherpaOnnxAdapterAllowsAutomaticLanguageForOmnilingualASR() async throws {
+    func testSherpaOnnxAdapterRejectsRetiredOmnilingualASRVariant() async throws {
         let runtime = FakeSherpaOnnxRuntime()
         let adapter = SherpaOnnxRuntimeTranscribingAdapter(runtime: runtime)
 
@@ -432,7 +432,7 @@ final class RuntimeAdaptersTests: XCTestCase {
             useGPU: false,
             threadCount: 8,
             engine: .sherpaOnnx,
-            variant: SherpaOnnxModelVariant.omnilingualASR300M.rawValue,
+            variant: "omnilingual-asr-300m-ctc-int8",
             accelerator: .cpu,
             artifactLayout: .modelDirectory,
             runtimeParameters: RuntimeParameters(
@@ -450,13 +450,20 @@ final class RuntimeAdaptersTests: XCTestCase {
             )
         )
 
-        try await adapter.prepare(model: model)
+        do {
+            try await adapter.prepare(model: model)
+            XCTFail("Expected the retired Omnilingual variant to be rejected.")
+        } catch let error as SherpaOnnxRuntimeError {
+            XCTAssertEqual(
+                error,
+                .unsupportedVariant("omnilingual-asr-300m-ctc-int8")
+            )
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
 
         let load = await runtime.loadSnapshot()
-        XCTAssertEqual(load?.variant, .omnilingualASR300M)
-        XCTAssertEqual(load?.languageCode, "auto")
-        XCTAssertEqual(load?.computeRoute, .cpu)
-        XCTAssertEqual(load?.threadCount, 4)
+        XCTAssertNil(load)
     }
 
     func testMultiEngineAdapterRequiresPreparedEngine() async {
@@ -509,9 +516,18 @@ final class RuntimeAdaptersTests: XCTestCase {
         XCTAssertEqual(activeModel?.localModelPath, modelURL.path)
         let readiness = await resolver.readiness(for: activeModel)
         XCTAssertEqual(readiness, .ready(modelID: model.id))
+
+        preferences.transcriptionLanguage = .automatic
+        let automaticModel = await resolver.resolveActiveModel(preferences: preferences)
+        XCTAssertEqual(automaticModel?.runtimeParameters.language, "en")
+        XCTAssertEqual(automaticModel?.runtimeParameters.detectLanguage, false)
+
+        preferences.transcriptionLanguage = .spanish
+        let unsupportedModel = await resolver.resolveActiveModel(preferences: preferences)
+        XCTAssertNil(unsupportedModel)
     }
 
-    func testModelResolverPreservesRuntimeRequiredAutomaticLanguageForQwen() async throws {
+    func testModelResolverForcesSelectedLanguageForMultilingualQwen() async throws {
         let directory = Self.temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let layout = ModelStorageLayout(rootDirectory: directory)
@@ -586,19 +602,33 @@ final class RuntimeAdaptersTests: XCTestCase {
         )
         var preferences = AppPreferences.defaults
         preferences.activeModelID = modelID
-        preferences.transcriptionLanguage = .english
+        for selectedLanguage in [
+            TranscriptionLanguage.english,
+            .hindi,
+            .chinese,
+        ] {
+            preferences.transcriptionLanguage = selectedLanguage
+            let resolvedModel = await resolver.resolveActiveModel(preferences: preferences)
+            let activeModel = try XCTUnwrap(resolvedModel)
 
-        let resolvedModel = await resolver.resolveActiveModel(preferences: preferences)
-        let activeModel = try XCTUnwrap(resolvedModel)
-
-        XCTAssertEqual(activeModel.runtimeParameters.language, "auto")
-        XCTAssertTrue(activeModel.runtimeParameters.detectLanguage)
-        XCTAssertNoThrow(
-            try TranscribeCppRuntime.requireSupportedLanguage(
+            XCTAssertEqual(
                 activeModel.runtimeParameters.language,
-                variant: .qwen3ASR1_7B
+                selectedLanguage.rawValue
             )
-        )
+            XCTAssertFalse(activeModel.runtimeParameters.detectLanguage)
+            XCTAssertNoThrow(
+                try TranscribeCppRuntime.requireSupportedLanguage(
+                    activeModel.runtimeParameters.language,
+                    variant: .qwen3ASR1_7B
+                )
+            )
+        }
+
+        preferences.transcriptionLanguage = .automatic
+        let automaticResolution = await resolver.resolveActiveModel(preferences: preferences)
+        let automaticModel = try XCTUnwrap(automaticResolution)
+        XCTAssertEqual(automaticModel.runtimeParameters.language, "auto")
+        XCTAssertTrue(automaticModel.runtimeParameters.detectLanguage)
     }
 
     func testModelResolverKeepsVoiceCleanerSeparateFromTranscriptionModel() async throws {

@@ -22,7 +22,9 @@ struct SettingsRootView: View {
                 HStack(spacing: 0) {
                     SettingsSidebar(selection: $router.selectedPane)
 
-                    Divider()
+                    Rectangle()
+                        .fill(TextifyVisualIdentity.separator)
+                        .frame(width: 1)
 
                     paneView(for: router.selectedPane)
                 }
@@ -94,101 +96,304 @@ struct SettingsRootView: View {
 private struct SettingsSidebar: View {
     @Environment(AppServices.self) private var services
     @Binding var selection: SettingsPane
+    @State private var hoveredPane: SettingsPane?
+
+    private let setupPanes: [SettingsPane] = [
+        .general,
+        .dictation,
+        .transcriptionModels,
+        .voiceCleaning,
+    ]
+    private let systemPanes: [SettingsPane] = [
+        .privacy,
+        .logs,
+        .advanced,
+    ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 10) {
-                TextifyVoiceMark(state: .processing, height: 22)
-
-                Text("Textify")
-                    .font(.system(size: 16, weight: .semibold))
-            }
+            brandLockup
             .padding(.horizontal, 24)
             .padding(.top, 45)
-            .padding(.bottom, 18)
+            .padding(.bottom, 24)
 
-            VStack(spacing: 2) {
-                ForEach(SettingsPane.productionVisiblePanes) { pane in
-                    Button {
-                        selection = pane
-                    } label: {
-                        HStack(spacing: 11) {
-                            Image(systemName: pane.systemImage)
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(selection == pane ? TextifyVisualIdentity.voiceViolet : Color.white.opacity(0.62))
-                                .frame(width: 18)
-                            Text(pane.sidebarTitle)
-                                .font(
-                                    .body.weight(
-                                        selection == pane
-                                            ? .semibold
-                                            : .regular
-                                    )
-                                )
-                                .fixedSize(
-                                    horizontal: false,
-                                    vertical: true
-                                )
-                            Spacer(minLength: 0)
-                        }
-                        .foregroundStyle(selection == pane ? Color.white : Color.white.opacity(0.62))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
-                        .frame(minHeight: 35)
-                        .background(
-                            selection == pane ? TextifyVisualIdentity.consoleSelection : Color.clear,
-                            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        )
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(selection == pane ? .isSelected : [])
+            sidebarGroup("SETUP", panes: setupPanes)
 
-                    if pane == .voiceCleaning {
-                        Divider()
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 8)
-                    }
-                }
-            }
-            .padding(.leading, 15)
-            .padding(.trailing, 8)
+            sidebarGroup("SYSTEM", panes: systemPanes)
+                .padding(.top, 17)
 
             Spacer(minLength: 20)
 
             sidebarStatus
-                .padding(.horizontal, 24)
+                .padding(.horizontal, 16)
                 .padding(.bottom, 20)
         }
         .frame(width: TextifyWindowMetrics.sidebarWidth)
-        .background(TextifyVisualIdentity.sidebarSurface)
+        .background {
+            ZStack {
+                TextifyVisualIdentity.sidebarSurface
+                LinearGradient(
+                    colors: [
+                        TextifyVisualIdentity.voiceViolet.opacity(0.075),
+                        .clear,
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .center
+                )
+            }
+        }
     }
 
+    private var brandLockup: some View {
+        HStack(spacing: 11) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                TextifyVisualIdentity.voiceViolet.opacity(0.24),
+                                TextifyVisualIdentity.voiceViolet.opacity(0.08),
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                TextifyVoiceMark(state: .processing, height: 20)
+            }
+            .frame(width: 36, height: 36)
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(
+                        TextifyVisualIdentity.voiceViolet.opacity(0.22),
+                        lineWidth: 1
+                    )
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Textify")
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                Text("ON-DEVICE DICTATION")
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .tracking(0.6)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func sidebarGroup(
+        _ title: String,
+        panes: [SettingsPane]
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(title)
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .tracking(0.8)
+                .foregroundStyle(.tertiary)
+                .padding(.leading, 27)
+
+            VStack(spacing: 3) {
+                ForEach(panes) { pane in
+                    sidebarButton(for: pane)
+                }
+            }
+        }
+        .padding(.horizontal, 10)
+    }
+
+    private func sidebarButton(for pane: SettingsPane) -> some View {
+        let isSelected = selection == pane
+        let isHovered = hoveredPane == pane
+
+        return Button {
+            selection = pane
+        } label: {
+            HStack(spacing: 10) {
+                Capsule(style: .continuous)
+                    .fill(
+                        isSelected
+                            ? TextifyVisualIdentity.voiceViolet
+                            : Color.clear
+                    )
+                    .frame(width: 3, height: 18)
+
+                Image(systemName: pane.systemImage)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(
+                        isSelected
+                            ? TextifyVisualIdentity.voiceViolet
+                            : Color.white.opacity(0.58)
+                    )
+                    .frame(width: 18)
+
+                Text(pane.sidebarTitle)
+                    .font(
+                        .system(
+                            size: 13,
+                            weight: isSelected ? .semibold : .regular
+                        )
+                    )
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(
+                isSelected
+                    ? Color.white
+                    : Color.white.opacity(isHovered ? 0.82 : 0.62)
+            )
+            .padding(.horizontal, 8)
+            .frame(minHeight: 38)
+            .background(
+                isSelected
+                    ? TextifyVisualIdentity.consoleSelection
+                    : isHovered
+                        ? Color.white.opacity(0.035)
+                        : Color.clear,
+                in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .stroke(
+                        isSelected
+                            ? TextifyVisualIdentity.voiceViolet.opacity(0.16)
+                            : Color.clear,
+                        lineWidth: 1
+                    )
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering in
+            if isHovering {
+                hoveredPane = pane
+            } else if hoveredPane == pane {
+                hoveredPane = nil
+            }
+        }
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    @ViewBuilder
     private var sidebarStatus: some View {
         let canDictate = services.dictation.readiness.canDictate
-        return HStack(spacing: 8) {
-            Circle()
-                .fill(canDictate ? TextifyVisualIdentity.readyMint : TextifyVisualIdentity.warmWarning)
-                .frame(width: 7, height: 7)
+        let statusColor = canDictate
+            ? TextifyVisualIdentity.readyMint
+            : TextifyVisualIdentity.warmWarning
+
+        if canDictate {
+            sidebarStatusContent(
+                canDictate: true,
+                statusColor: statusColor,
+                showsDisclosure: false
+            )
+        } else {
+            Button {
+                selection = SettingsSetupNavigation.destination(
+                    for: services.dictation.readiness
+                )
+            } label: {
+                sidebarStatusContent(
+                    canDictate: false,
+                    statusColor: statusColor,
+                    showsDisclosure: true
+                )
+            }
+            .buttonStyle(.plain)
+            .help("Open the next setup requirement")
+            .accessibilityHint("Opens the next setup requirement.")
+        }
+    }
+
+    private func sidebarStatusContent(
+        canDictate: Bool,
+        statusColor: Color,
+        showsDisclosure: Bool
+    ) -> some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(statusColor.opacity(0.14))
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 7, height: 7)
+            }
+            .frame(width: 26, height: 26)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(TextifyReadinessPresentation.title(canDictate: canDictate))
                     .font(.system(size: 13, weight: .medium))
-                Text(canDictate ? services.preferences.trigger.displayName : "Review setup requirements")
+                Text(
+                    canDictate
+                        ? services.preferences.trigger.displayName
+                        : SettingsSetupNavigation.detail(
+                            for: services.dictation.readiness
+                        )
+                )
                     .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
+
+            Spacer(minLength: 0)
+
+            if showsDisclosure {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
         }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            TextifyVisualIdentity.cardSurface.opacity(0.72),
+            in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .stroke(TextifyVisualIdentity.separator, lineWidth: 1)
+        }
         .accessibilityElement(children: .combine)
+    }
+}
+
+enum SettingsSetupNavigation {
+    static func destination(
+        for readiness: ReadinessSnapshot
+    ) -> SettingsPane {
+        if readiness.permissions.microphone != .granted
+            || readiness.permissions.accessibility != .granted {
+            return .privacy
+        }
+        return .transcriptionModels
+    }
+
+    static func detail(for readiness: ReadinessSnapshot) -> String {
+        guard destination(for: readiness) != .privacy else {
+            return "Grant required permissions"
+        }
+
+        switch readiness.model {
+        case .noActiveModel:
+            return "Choose a transcription model"
+        case .missing, .failed:
+            return "Repair the active model"
+        case .loading, .warming:
+            return "Model setup is in progress"
+        case .revoked:
+            return "Replace the active model"
+        case .ready:
+            return "Review transcription model"
+        }
     }
 }
 
 struct PersistentStorageUnavailableView: View {
     var body: some View {
         ZStack {
-            Color(nsColor: .windowBackgroundColor)
+            TextifyAcousticBackdrop()
 
             TextifyCard(padding: 28) {
                 VStack(spacing: 16) {
@@ -235,7 +440,7 @@ extension SettingsPane {
     var sidebarTitle: String {
         switch self {
         case .general:
-            return "General Settings"
+            return "General"
         case .dictation:
             return "Dictation"
         case .transcriptionModels:
@@ -259,8 +464,8 @@ private struct GeneralSettingsPane: View {
         @Bindable var services = services
 
         SettingsPaneLayout(
-            title: "General Preferences",
-            subtitle: "Configure Textify to match your workflow and preferences."
+            title: "General",
+            subtitle: "See readiness at a glance and choose how Textify starts."
         ) {
             SettingsSection("Status") {
                 HStack(spacing: 20) {
@@ -293,7 +498,6 @@ private struct GeneralSettingsPane: View {
                 }
                 .accessibilityElement(children: .combine)
             }
-            .padding(.top, 15)
 
             SettingsSection("Behavior") {
                 LabeledContent {
@@ -462,6 +666,17 @@ private struct DictationSettingsPane: View {
                 LabeledContent("Microphone", value: "System Default")
             }
 
+            SettingsSection("Floating Icon") {
+                FloatingIconSettingsView(
+                    preferences: services.preferences.recordingOverlay,
+                    xOffset: overlayPreferenceBinding(\.xOffset),
+                    yOffset: overlayPreferenceBinding(\.yOffset),
+                    scale: overlayPreferenceBinding(\.scale)
+                ) {
+                    services.setRecordingOverlayPreferences(.defaults)
+                }
+            }
+
             SettingsSection("Trigger Test") {
                 HStack(spacing: 14) {
                     TextifyKeycap(title: services.preferences.trigger.displayName)
@@ -527,6 +742,416 @@ private struct DictationSettingsPane: View {
             get: { services.preferences.transcriptionLanguage },
             set: { services.setTranscriptionLanguage($0) }
         )
+    }
+
+    private func overlayPreferenceBinding(
+        _ keyPath: WritableKeyPath<RecordingOverlayPreferences, Double>
+    ) -> Binding<Double> {
+        Binding(
+            get: {
+                services.preferences.recordingOverlay[keyPath: keyPath]
+            },
+            set: { value in
+                var preferences = services.preferences.recordingOverlay
+                preferences[keyPath: keyPath] = value
+                services.setRecordingOverlayPreferences(preferences)
+            }
+        )
+    }
+}
+
+private struct FloatingIconSettingsView: View {
+    let preferences: RecordingOverlayPreferences
+    @Binding var xOffset: Double
+    @Binding var yOffset: Double
+    @Binding var scale: Double
+    let reset: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 16) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Place the indicator where it stays out of your way.")
+                        .font(.callout.weight(.medium))
+                    Text("Offsets start at the active display's bottom center.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 12)
+
+                Button(action: reset) {
+                    Label(
+                        "Reset Position & Scale",
+                        systemImage: "arrow.counterclockwise"
+                    )
+                }
+                .buttonStyle(.borderless)
+                .controlSize(.small)
+                .disabled(preferences == .defaults)
+            }
+
+            FloatingIconPreview(preferences: preferences)
+
+            VStack(spacing: 8) {
+                FloatingIconControlRow(
+                    icon: "arrow.left.and.right",
+                    title: "X Offset",
+                    detail: "Left / Right",
+                    value: $xOffset,
+                    range: RecordingOverlayPreferences.xOffsetRange,
+                    step: 1,
+                    lowerLabel: "Left",
+                    upperLabel: "Right"
+                ) { value in
+                    "\(Int(value.rounded())) pt"
+                }
+
+                FloatingIconControlRow(
+                    icon: "arrow.up.and.down",
+                    title: "Y Offset",
+                    detail: "Down / Up",
+                    value: $yOffset,
+                    range: RecordingOverlayPreferences.yOffsetRange,
+                    step: 1,
+                    lowerLabel: "Down",
+                    upperLabel: "Up"
+                ) { value in
+                    "\(Int(value.rounded())) pt"
+                }
+
+                FloatingIconControlRow(
+                    icon: "arrow.up.left.and.arrow.down.right",
+                    title: "Scale",
+                    detail: "Indicator size",
+                    value: $scale,
+                    range: RecordingOverlayPreferences.scaleRange,
+                    step: 0.05,
+                    lowerLabel: "50%",
+                    upperLabel: "200%"
+                ) { value in
+                    "\(Int((value * 100).rounded()))%"
+                }
+            }
+        }
+    }
+}
+
+private struct FloatingIconControlRow: View {
+    let icon: String
+    let title: String
+    let detail: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let step: Double
+    let lowerLabel: String
+    let upperLabel: String
+    let valueLabel: (Double) -> String
+
+    var body: some View {
+        VStack(spacing: 9) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(TextifyVisualIdentity.voiceViolet)
+                    .frame(width: 28, height: 28)
+                    .background(
+                        TextifyVisualIdentity.voiceViolet.opacity(0.12),
+                        in: RoundedRectangle(
+                            cornerRadius: 7,
+                            style: .continuous
+                        )
+                    )
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(.callout.weight(.semibold))
+                    Text(detail)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 12)
+
+                HStack(spacing: 6) {
+                    Text(valueLabel(value))
+                        .font(
+                            .system(
+                                size: 12,
+                                weight: .semibold,
+                                design: .rounded
+                            )
+                        )
+                        .monospacedDigit()
+                        .foregroundStyle(.primary)
+                        .frame(minWidth: 62)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(
+                            TextifyVisualIdentity.raisedSurface,
+                            in: Capsule(style: .continuous)
+                        )
+                        .overlay {
+                            Capsule(style: .continuous)
+                                .stroke(
+                                    TextifyVisualIdentity.separator,
+                                    lineWidth: 1
+                                )
+                        }
+                        .accessibilityHidden(true)
+
+                    Stepper(
+                        "Adjust \(title)",
+                        value: quantizedValue,
+                        in: range,
+                        step: step
+                    )
+                    .labelsHidden()
+                    .controlSize(.small)
+                    .fixedSize()
+                    .accessibilityLabel("Adjust \(title)")
+                    .accessibilityValue(valueLabel(value))
+                }
+            }
+
+            Slider(value: quantizedValue, in: range)
+                .accessibilityLabel(title)
+                .accessibilityValue(valueLabel(value))
+
+            HStack {
+                Text(lowerLabel)
+                Spacer()
+                Text(upperLabel)
+            }
+            .font(.system(size: 10, weight: .medium, design: .rounded))
+            .foregroundStyle(.secondary)
+            .accessibilityHidden(true)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.white.opacity(0.025))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(TextifyVisualIdentity.separator, lineWidth: 1)
+        }
+    }
+
+    private var quantizedValue: Binding<Double> {
+        Binding(
+            get: { value },
+            set: { newValue in
+                let steps = (
+                    (newValue - range.lowerBound) / step
+                ).rounded()
+                let quantized = range.lowerBound + steps * step
+                let clamped = min(
+                    max(quantized, range.lowerBound),
+                    range.upperBound
+                )
+                guard clamped != value else {
+                    return
+                }
+                value = clamped
+            }
+        )
+    }
+}
+
+private struct FloatingIconPreview: View {
+    let preferences: RecordingOverlayPreferences
+
+    private let indicatorSize = CGSize(width: 104, height: 28)
+
+    var body: some View {
+        GeometryReader { geometry in
+            let preferences = preferences.normalized()
+            let scale = CGFloat(preferences.scale)
+            let scaledIndicatorSize = CGSize(
+                width: indicatorSize.width * scale,
+                height: indicatorSize.height * scale
+            )
+
+            ZStack {
+                previewBackground
+
+                centerGuide(in: geometry.size)
+
+                previewIndicator
+                    .scaleEffect(scale)
+                    .frame(
+                        width: scaledIndicatorSize.width,
+                        height: scaledIndicatorSize.height
+                    )
+                    .position(
+                        x: indicatorX(
+                            in: geometry.size,
+                            indicatorWidth: scaledIndicatorSize.width,
+                            offset: preferences.xOffset
+                        ),
+                        y: indicatorY(
+                            in: geometry.size,
+                            indicatorHeight: scaledIndicatorSize.height,
+                            offset: preferences.yOffset
+                        )
+                    )
+
+                previewHeader(preferences)
+            }
+        }
+        .frame(height: 132)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Floating icon preview")
+        .accessibilityValue(accessibilityValue)
+    }
+
+    private var previewBackground: some View {
+        RoundedRectangle(cornerRadius: 11, style: .continuous)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        TextifyVisualIdentity.raisedSurface.opacity(0.82),
+                        TextifyVisualIdentity.windowSurface.opacity(0.92)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .stroke(TextifyVisualIdentity.separator, lineWidth: 1)
+            }
+    }
+
+    private func centerGuide(in size: CGSize) -> some View {
+        Path { path in
+            path.move(to: CGPoint(x: size.width / 2, y: 34))
+            path.addLine(
+                to: CGPoint(x: size.width / 2, y: size.height - 10)
+            )
+            path.move(to: CGPoint(x: 12, y: size.height - 10))
+            path.addLine(
+                to: CGPoint(x: size.width - 12, y: size.height - 10)
+            )
+        }
+        .stroke(
+            Color.white.opacity(0.12),
+            style: StrokeStyle(lineWidth: 1, dash: [3, 4])
+        )
+    }
+
+    private var previewIndicator: some View {
+        HStack(spacing: 7) {
+            Circle()
+                .fill(TextifyVisualIdentity.recordCoral)
+                .frame(width: 6, height: 6)
+
+            TextifyVoiceMark(state: .recording, height: 12)
+
+            Text("Textify")
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.white.opacity(0.88))
+        }
+        .frame(width: indicatorSize.width, height: indicatorSize.height)
+        .background {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.10, green: 0.11, blue: 0.13),
+                            Color(red: 0.045, green: 0.05, blue: 0.06)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .stroke(Color.white.opacity(0.14), lineWidth: 0.75)
+        }
+        .shadow(color: .black.opacity(0.42), radius: 7, y: 4)
+    }
+
+    private func previewHeader(
+        _ preferences: RecordingOverlayPreferences
+    ) -> some View {
+        VStack {
+            HStack(spacing: 8) {
+                Label("Live Preview", systemImage: "display")
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Text(
+                    "X \(signedPoints(preferences.xOffset))"
+                        + "  •  Y \(signedPoints(preferences.yOffset))"
+                        + "  •  \(Int((preferences.scale * 100).rounded()))%"
+                )
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+
+            Spacer()
+        }
+    }
+
+    private func indicatorX(
+        in size: CGSize,
+        indicatorWidth: CGFloat,
+        offset: Double
+    ) -> CGFloat {
+        let normalizedOffset = CGFloat(
+            offset / RecordingOverlayPreferences.xOffsetRange.upperBound
+        )
+        let travel = max(0, (size.width - indicatorWidth) / 2 - 14)
+        return size.width / 2 + normalizedOffset * travel
+    }
+
+    private func indicatorY(
+        in size: CGSize,
+        indicatorHeight: CGFloat,
+        offset: Double
+    ) -> CGFloat {
+        let defaultY = size.height - indicatorHeight / 2 - 13
+        let normalizedOffset = CGFloat(
+            offset / RecordingOverlayPreferences.yOffsetRange.upperBound
+        )
+
+        if normalizedOffset >= 0 {
+            let upwardTravel = max(
+                0,
+                defaultY - indicatorHeight / 2 - 34
+            )
+            return defaultY - normalizedOffset * upwardTravel
+        }
+
+        let downwardTravel = max(
+            0,
+            size.height - indicatorHeight / 2 - 4 - defaultY
+        )
+        return defaultY - normalizedOffset * downwardTravel
+    }
+
+    private var accessibilityValue: String {
+        let preferences = preferences.normalized()
+        return "X offset \(Int(preferences.xOffset.rounded())) points, "
+            + "Y offset \(Int(preferences.yOffset.rounded())) points, "
+            + "scale \(Int((preferences.scale * 100).rounded())) percent"
+    }
+
+    private func signedPoints(_ value: Double) -> String {
+        let rounded = Int(value.rounded())
+        if rounded > 0 {
+            return "+\(rounded)"
+        }
+        return "\(rounded)"
     }
 }
 
@@ -691,7 +1316,8 @@ struct ModelsSettingsPane: View {
         return ModelCatalogSettingsPaneLayout(
             title: destination.title,
             subtitle: destination.subtitle,
-            maxContentWidth: 1_360,
+            maxContentWidth:
+                destination == .voiceCleaning ? 880 : 1_360,
             catalogViewportRestoration: viewportRestoration
         ) {
             catalogStatus(hasRows: !catalogExperience.rows.isEmpty)
@@ -1555,34 +2181,16 @@ struct ModelsSettingsPane: View {
     @ViewBuilder
     private func catalogStatus(hasRows: Bool) -> some View {
         let coordinator = services.modelCatalogCoordinator
-        if coordinator.stagedRevision != nil {
-            HStack(spacing: 10) {
-                Label(
-                    "A verified catalog update is ready.",
-                    systemImage: "checkmark.shield"
-                )
-                .font(.callout)
-                Spacer(minLength: 12)
-                Button("Apply Now") {
-                    coordinator.applyStagedUpdate()
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-            }
-            .padding(12)
-            .background(TextifyVisualIdentity.voiceViolet.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-        }
         if let issue = coordinator.securityIssue {
             HStack(spacing: 10) {
                 Image(systemName: "exclamationmark.shield.fill")
                     .foregroundStyle(.red)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Signed catalog update rejected")
+                    Text("Bundled model list failed verification")
                         .font(.callout.weight(.semibold))
                     Text(
                         "Security check: \(issue.reason.displayName). "
-                            + "The last trusted catalog remains available."
+                            + "Reinstall or update Textify."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -1595,29 +2203,18 @@ struct ModelsSettingsPane: View {
             switch coordinator.status {
             case .checking where coordinator.manifest == nil:
                 EmptyView()
-            case .checking, .checkingForUpdates:
-                Label("Checking for signed catalog updates", systemImage: "arrow.triangle.2.circlepath")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            case .updateAvailable:
+            case .checking, .checkingForUpdates, .updateAvailable, .offline:
                 EmptyView()
-            case .offline:
-                Label(
-                    "Offline — using the last trusted catalog.",
-                    systemImage: "network.slash"
-                )
-                .font(.callout)
-                .foregroundStyle(.secondary)
             case let .requiresNewerTextify(manifestVersion):
                 Label(
-                    "Catalog version \(manifestVersion) requires a newer Textify.",
+                    "The bundled model list uses version \(manifestVersion) and requires a newer Textify.",
                     systemImage: "arrow.down.app"
                 )
                 .font(.callout)
                 .foregroundStyle(.orange)
             case .unavailable:
                 if hasRows {
-                    Text(coordinator.errorMessage ?? "")
+                    Text("Textify could not reverify its bundled model list.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -3382,6 +3979,9 @@ private struct ModelCatalogInspectorView: View {
             ModelInspectorFactRow(label: "Provenance", value: artifact.provenance)
                 .textSelection(.enabled)
             ModelInspectorFactRow(label: "License", value: artifact.license)
+            if let sourceAndLicense = artifact.sourceAndLicense {
+                ModelSourceLicenseButton(presentation: sourceAndLicense)
+            }
             if let sourceURL = artifact.sourceURL {
                 Link(destination: sourceURL) {
                     Label("Open Upstream Source", systemImage: "arrow.up.right.square")
@@ -3862,7 +4462,7 @@ enum ModelCatalogEmptyPresentation {
         case .purpose:
             return "shippingbox"
         case .unavailable:
-            return "wifi.exclamationmark"
+            return "exclamationmark.triangle"
         case .securityFailure:
             return "exclamationmark.shield"
         case .requiresNewerTextify:
@@ -3873,7 +4473,7 @@ enum ModelCatalogEmptyPresentation {
     var title: String {
         switch self {
         case .checking:
-            return "Checking signed catalog"
+            return "Loading model list"
         case let .query(state):
             return state.title
         case let .purpose(destination):
@@ -3890,7 +4490,7 @@ enum ModelCatalogEmptyPresentation {
     var detail: String {
         switch self {
         case .checking:
-            return "Textify is verifying trusted catalog data. Model actions will appear when the check finishes."
+            return "Textify is preparing the model list included with this app."
         case let .query(state):
             return state.detail
         case let .purpose(destination):
@@ -3903,7 +4503,7 @@ enum ModelCatalogEmptyPresentation {
                     "Textify could not verify the model list included with this app. Reinstall or update Textify. Existing local dictation may continue with an already loaded model; no catalog actions are available."
             )
         case let .requiresNewerTextify(manifestVersion):
-            return "This signed catalog uses schema version \(manifestVersion), which this version of Textify cannot present."
+            return "The bundled model list uses schema version \(manifestVersion), which this version of Textify cannot present."
         }
     }
 
@@ -5008,20 +5608,27 @@ private struct ModelFactRow: View {
 private struct PrivacySettingsPane: View {
     @Environment(AppServices.self) private var services
     @State private var permissionMessage: String?
+    @State private var isRequestingPermissions = false
+    @State private var permissionRequestTask: Task<Void, Never>?
 
     var body: some View {
         SettingsPaneLayout(title: "Privacy") {
             SettingsSection("Permissions") {
+                PermissionSetupGuide(
+                    presentation: permissionSetupPresentation,
+                    isWorking: isRequestingPermissions,
+                    action: performPrimaryPermissionAction
+                )
+
+                Divider()
+
                 PermissionRow(
                     name: "Microphone",
                     status: services.dictation.readiness.permissions.microphone.settingsStatusLabel,
-                    actionTitle: "Request Access"
+                    actionTitle: microphoneActionTitle,
+                    isDisabled: isRequestingPermissions
                 ) {
-                    Task {
-                        let state = await ProductionPermissionRequester.requestMicrophone()
-                        permissionMessage = state.permissionRequestMessage(for: "Microphone")
-                        _ = await services.dictation.refreshReadiness()
-                    }
+                    performMicrophoneAction(continuesSetup: false)
                 }
 
                 Divider()
@@ -5029,19 +5636,17 @@ private struct PrivacySettingsPane: View {
                 PermissionRow(
                     name: "Accessibility",
                     status: services.dictation.readiness.permissions.accessibility.settingsStatusLabel,
-                    actionTitle: "Open Prompt"
+                    actionTitle: accessibilityActionTitle,
+                    isDisabled: isRequestingPermissions
                 ) {
-                    ProductionPermissionRequester.requestAccessibilityPrompt()
-                    Task {
-                        _ = await services.dictation.refreshReadiness()
-                        permissionMessage = services.dictation.readiness.permissions.accessibility
-                            .permissionRequestMessage(for: "Accessibility")
-                    }
+                    performAccessibilityAction()
                 }
 
                 if services.dictation.readiness.permissions.accessibility != .granted {
                     Divider()
-                    AccessibilityAppDragSource()
+                    AccessibilityAppDragSource(
+                        isSetupDisabled: isRequestingPermissions
+                    )
                 }
 
                 if let permissionMessage {
@@ -5133,10 +5738,23 @@ private struct PrivacySettingsPane: View {
         .task {
             await monitorAccessibilityPermission()
         }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: NSApplication.didBecomeActiveNotification
+            )
+        ) { _ in
+            Task {
+                _ = await refreshPermissions()
+            }
+        }
+        .onDisappear {
+            permissionRequestTask?.cancel()
+            permissionRequestTask = nil
+        }
     }
 
     private func monitorAccessibilityPermission() async {
-        var displayedState = await refreshPermissionState()
+        var displayedState = (await refreshPermissions()).accessibility
 
         while !Task.isCancelled {
             do {
@@ -5144,20 +5762,119 @@ private struct PrivacySettingsPane: View {
             } catch {
                 return
             }
-            displayedState = await refreshPermissionState()
+            displayedState = (await refreshPermissions()).accessibility
         }
     }
 
-    private func refreshPermissionState() async -> RuntimePermissionState {
-        let previousState = services.dictation.readiness.permissions.accessibility
+    private func refreshPermissions() async -> RuntimePermissionSnapshot {
+        let previous = services.dictation.readiness.permissions
         let snapshot = await services.dictation.refreshReadiness()
-        let updatedState = snapshot.permissions.accessibility
+        let updated = snapshot.permissions
 
-        if previousState != updatedState,
-           permissionMessage?.hasPrefix("Accessibility") == true {
-            permissionMessage = updatedState.permissionRequestMessage(for: "Accessibility")
+        if previous != updated {
+            permissionMessage = PermissionSetupPresentation(
+                permissions: updated
+            ).statusMessage
         }
-        return updatedState
+        return updated
+    }
+
+    private var permissionSetupPresentation: PermissionSetupPresentation {
+        PermissionSetupPresentation(
+            permissions: services.dictation.readiness.permissions
+        )
+    }
+
+    private var microphoneActionTitle: String? {
+        switch services.dictation.readiness.permissions.microphone {
+        case .unknown:
+            return "Allow Microphone"
+        case .denied:
+            return "Open Microphone Settings"
+        case .granted:
+            return nil
+        }
+    }
+
+    private var accessibilityActionTitle: String? {
+        services.dictation.readiness.permissions.accessibility == .granted
+            ? nil
+            : "Allow Accessibility"
+    }
+
+    private func performPrimaryPermissionAction() {
+        switch permissionSetupPresentation.primaryAction {
+        case .requestMicrophoneThenAccessibility:
+            performMicrophoneAction(continuesSetup: true)
+        case .openMicrophoneSettings:
+            openMicrophoneSettings()
+        case .requestAccessibility:
+            performAccessibilityAction()
+        case .complete:
+            break
+        }
+    }
+
+    private func performMicrophoneAction(continuesSetup: Bool) {
+        guard !isRequestingPermissions else {
+            return
+        }
+
+        if services.dictation.readiness.permissions.microphone == .denied {
+            openMicrophoneSettings()
+            return
+        }
+
+        isRequestingPermissions = true
+        permissionRequestTask?.cancel()
+        permissionRequestTask = Task {
+            defer {
+                isRequestingPermissions = false
+            }
+
+            let state = await ProductionPermissionRequester.requestMicrophone()
+            guard !Task.isCancelled else {
+                return
+            }
+
+            let permissions = await refreshPermissions()
+            guard !Task.isCancelled else {
+                return
+            }
+
+            guard state == .granted else {
+                permissionMessage = state.permissionRequestMessage(
+                    for: "Microphone"
+                )
+                return
+            }
+
+            if continuesSetup, permissions.accessibility != .granted {
+                permissionMessage =
+                    "Microphone is ready. Continue in macOS to allow Accessibility."
+                ProductionPermissionRequester.requestAccessibilityPrompt()
+            }
+        }
+    }
+
+    private func openMicrophoneSettings() {
+        if SystemPrivacySettingsOpener.open(.microphone) {
+            permissionMessage =
+                "Turn on Microphone for Textify in System Settings, then return here."
+        } else {
+            permissionMessage =
+                "Open System Settings → Privacy & Security → Microphone, then turn on Textify."
+        }
+    }
+
+    private func performAccessibilityAction() {
+        ProductionPermissionRequester.requestAccessibilityPrompt()
+        permissionMessage =
+            "Turn on Textify under Accessibility in System Settings."
+
+        Task {
+            _ = await refreshPermissions()
+        }
     }
 
     private func addExcludedApp(_ candidate: ExcludedAppCandidate) {
@@ -5198,8 +5915,246 @@ private struct PrivacySettingsPane: View {
     }
 }
 
-private struct AccessibilityAppDragSource: View {
+enum PermissionSetupAction: Equatable {
+    case requestMicrophoneThenAccessibility
+    case openMicrophoneSettings
+    case requestAccessibility
+    case complete
+}
+
+struct PermissionSetupPresentation: Equatable {
+    let permissions: RuntimePermissionSnapshot
+
+    var completedCount: Int {
+        [
+            permissions.microphone,
+            permissions.accessibility,
+        ].count { $0 == .granted }
+    }
+
+    var primaryAction: PermissionSetupAction {
+        switch permissions.microphone {
+        case .unknown:
+            return .requestMicrophoneThenAccessibility
+        case .denied:
+            return .openMicrophoneSettings
+        case .granted:
+            return permissions.accessibility == .granted
+                ? .complete
+                : .requestAccessibility
+        }
+    }
+
+    var actionTitle: String? {
+        switch primaryAction {
+        case .requestMicrophoneThenAccessibility:
+            return permissions.accessibility == .granted
+                ? "Allow Microphone"
+                : "Allow Permissions"
+        case .openMicrophoneSettings:
+            return "Open Microphone Settings"
+        case .requestAccessibility:
+            return "Allow Accessibility"
+        case .complete:
+            return nil
+        }
+    }
+
+    var title: String {
+        primaryAction == .complete
+            ? "Permissions are ready"
+            : "Allow Textify to listen and type"
+    }
+
+    var detail: String {
+        switch primaryAction {
+        case .requestMicrophoneThenAccessibility:
+            if permissions.accessibility == .granted {
+                return "Allow Microphone so Textify can listen only while your trigger is held."
+            }
+            return "macOS asks for Microphone first, then Accessibility. Textify guides you through both."
+        case .openMicrophoneSettings:
+            return "Microphone was previously denied. Turn it on in System Settings, then return here."
+        case .requestAccessibility:
+            return "Microphone is ready. Allow Accessibility so Textify can type into the active app."
+        case .complete:
+            return "Textify can listen while your trigger is held and type the result into the active app."
+        }
+    }
+
+    var statusMessage: String {
+        switch primaryAction {
+        case .complete:
+            return "Both permissions are granted."
+        case .requestAccessibility:
+            return "Microphone is ready. Accessibility still needs attention."
+        case .requestMicrophoneThenAccessibility, .openMicrophoneSettings:
+            return "Microphone still needs attention."
+        }
+    }
+}
+
+private struct PermissionSetupGuide: View {
+    let presentation: PermissionSetupPresentation
+    let isWorking: Bool
+    let action: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .fill(guideColor.opacity(0.13))
+
+                    Image(
+                        systemName: presentation.primaryAction == .complete
+                            ? "checkmark.shield.fill"
+                            : "checklist"
+                    )
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(guideColor)
+                    .accessibilityHidden(true)
+                }
+                .frame(width: 42, height: 42)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(presentation.title)
+                        .font(.system(.headline, design: .rounded, weight: .semibold))
+                    Text(presentation.detail)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 14)
+
+                if let actionTitle = presentation.actionTitle {
+                    Button(action: action) {
+                        HStack(spacing: 7) {
+                            if isWorking {
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                            Text(actionTitle)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.regular)
+                    .disabled(isWorking)
+                }
+            }
+
+            HStack(spacing: 10) {
+                PermissionSetupStep(
+                    number: 1,
+                    title: "Microphone",
+                    isGranted: presentation.permissions.microphone == .granted,
+                    isCurrent: presentation.permissions.microphone != .granted
+                )
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+
+                PermissionSetupStep(
+                    number: 2,
+                    title: "Accessibility",
+                    isGranted: presentation.permissions.accessibility == .granted,
+                    isCurrent:
+                        presentation.permissions.microphone == .granted
+                            && presentation.permissions.accessibility != .granted
+                )
+            }
+            .accessibilityElement(children: .contain)
+        }
+        .padding(14)
+        .background(
+            TextifyVisualIdentity.raisedSurface.opacity(0.42),
+            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(guideColor.opacity(0.22), lineWidth: 1)
+        }
+    }
+
+    private var guideColor: Color {
+        presentation.primaryAction == .complete
+            ? TextifyVisualIdentity.readyMint
+            : TextifyVisualIdentity.voiceViolet
+    }
+}
+
+private struct PermissionSetupStep: View {
+    let number: Int
+    let title: String
+    let isGranted: Bool
+    let isCurrent: Bool
+
+    var body: some View {
+        HStack(spacing: 9) {
+            ZStack {
+                Circle()
+                    .fill(stepColor.opacity(0.16))
+
+                if isGranted {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 9, weight: .bold))
+                } else {
+                    Text("\(number)")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                }
+            }
+            .frame(width: 24, height: 24)
+            .foregroundStyle(stepColor)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                Text(stepStatus)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            TextifyVisualIdentity.cardSurface.opacity(0.72),
+            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Step \(number), \(title)")
+        .accessibilityValue(stepStatus)
+    }
+
+    private var stepColor: Color {
+        if isGranted {
+            return TextifyVisualIdentity.readyMint
+        }
+        return isCurrent
+            ? TextifyVisualIdentity.voiceViolet
+            : TextifyVisualIdentity.slate
+    }
+
+    private var stepStatus: String {
+        if isGranted {
+            return "Granted"
+        }
+        return isCurrent ? "Next" : "Waiting"
+    }
+}
+
+struct AccessibilityAppDragSource: View {
     private let appURL = Bundle.main.bundleURL
+    let isSetupDisabled: Bool
+
+    init(isSetupDisabled: Bool = false) {
+        self.isSetupDisabled = isSetupDisabled
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -5230,12 +6185,24 @@ private struct AccessibilityAppDragSource: View {
         .contentShape(Rectangle())
         .overlay {
             AppBundleDragSurface(appURL: appURL)
+                .allowsHitTesting(!isSetupDisabled)
                 .accessibilityHidden(true)
         }
+        .opacity(isSetupDisabled ? 0.55 : 1)
         .help("Drag Textify into the Accessibility apps list")
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Drag Textify into the Accessibility apps list")
-        .accessibilityHint("Drop Textify in System Settings, then turn it on.")
+        .accessibilityHint(
+            isSetupDisabled
+                ? "Wait for the Microphone request to finish."
+                : "Press to ask macOS for access, or drop Textify in System Settings."
+        )
+        .accessibilityAction {
+            guard !isSetupDisabled else {
+                return
+            }
+            ProductionPermissionRequester.requestAccessibilityPrompt()
+        }
     }
 }
 
@@ -5666,8 +6633,8 @@ private struct DiagnosticsLogEntryRow: View {
                     }
                     Spacer(minLength: 12)
                     Text(entry.timestamp ?? "Earlier log")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.secondary)
                 }
 
                 if let reasonCode = entry.reasonCode {
@@ -5677,8 +6644,8 @@ private struct DiagnosticsLogEntryRow: View {
                 }
 
                 Text(entry.json)
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(Color.white.opacity(0.55))
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(Color.white.opacity(0.66))
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -5752,7 +6719,7 @@ private struct AdvancedSettingsPane: View {
                 )
             }
 
-            SettingsSection("Timing") {
+            SettingsSection("Diagnostic Data") {
                 Text("Diagnostics use redacted duration values and length buckets only.")
                     .foregroundStyle(.secondary)
             }
@@ -5839,35 +6806,36 @@ extension ModelProviderIdentity {
 }
 
 struct ProductionModelInstallConfiguration: Equatable {
-    let manifestURL: URL
-    let signatureURL: URL
-    let revocationURL: URL?
-    let revocationSignatureURL: URL?
     let trustedKeys: [TrustedModelManifestKey]
 
-    init(
-        manifestURL: URL,
-        signatureURL: URL,
-        revocationURL: URL? = nil,
-        revocationSignatureURL: URL? = nil,
-        trustedKeys: [TrustedModelManifestKey]
-    ) {
-        self.manifestURL = manifestURL
-        self.signatureURL = signatureURL
-        self.revocationURL = revocationURL
-        self.revocationSignatureURL = revocationSignatureURL
+    init(trustedKeys: [TrustedModelManifestKey]) {
         self.trustedKeys = trustedKeys
     }
 
     static let current: ProductionModelInstallConfiguration? = ProductionModelInstallConfiguration(
-        manifestURL: ProductionModelCatalogTrust.manifestURL,
-        signatureURL:
-            ProductionModelCatalogTrust.manifestSignatureURL,
-        revocationURL: ProductionModelCatalogTrust.revocationURL,
-        revocationSignatureURL:
-            ProductionModelCatalogTrust.revocationSignatureURL,
         trustedKeys: ProductionModelCatalogTrust.trustedKeys
     )
+}
+
+enum SystemPrivacySettingsDestination: String, Equatable {
+    case microphone =
+        "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
+    case accessibility =
+        "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+
+    var url: URL {
+        URL(string: rawValue)!
+    }
+}
+
+struct SystemPrivacySettingsOpener {
+    @discardableResult
+    static func open(
+        _ destination: SystemPrivacySettingsDestination,
+        workspace: NSWorkspace = .shared
+    ) -> Bool {
+        workspace.open(destination.url)
+    }
 }
 
 enum ProductionPermissionRequester {
@@ -6020,12 +6988,12 @@ private struct ModelCatalogSettingsPaneLayout<Content: View>: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 22) {
                     TextifyPaneHeader(
                         title: title,
                         subtitle: subtitle
                     )
-                    .padding(.bottom, 6)
+                    .padding(.bottom, 4)
 
                     content
                 }
@@ -6033,16 +7001,18 @@ private struct ModelCatalogSettingsPaneLayout<Content: View>: View {
                     maxWidth: maxContentWidth,
                     alignment: .leading
                 )
-                .padding(.horizontal, 24)
-                .padding(.top, 19)
-                .padding(.bottom, 28)
+                .padding(.horizontal, 28)
+                .padding(.top, 28)
+                .padding(.bottom, 36)
                 .frame(
                     maxWidth: .infinity,
-                    alignment: .topLeading
+                    alignment: .top
                 )
             }
             .scrollContentBackground(.hidden)
-            .background(TextifyVisualIdentity.windowSurface)
+            .background {
+                TextifyAcousticBackdrop()
+            }
             .task(id: catalogViewportRestoration) {
                 guard let request = catalogViewportRestoration
                 else {
@@ -6095,20 +7065,22 @@ private struct SettingsPaneLayout<Content: View>: View {
 
     private var paneScrollView: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 22) {
                 TextifyPaneHeader(title: title, subtitle: subtitle)
-                    .padding(.bottom, 6)
+                    .padding(.bottom, 4)
 
                 content
             }
             .frame(maxWidth: maxContentWidth, alignment: .leading)
-            .padding(.horizontal, 24)
-            .padding(.top, 19)
-            .padding(.bottom, 28)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .padding(.horizontal, 28)
+            .padding(.top, 28)
+            .padding(.bottom, 36)
+            .frame(maxWidth: .infinity, alignment: .top)
         }
         .scrollContentBackground(.hidden)
-        .background(TextifyVisualIdentity.windowSurface)
+        .background {
+            TextifyAcousticBackdrop()
+        }
     }
 
     private var subtitle: String {
@@ -6128,37 +7100,84 @@ private struct SettingsSection<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: 10) {
             TextifySectionLabel(title: title)
-                .padding(.leading, 10)
+                .padding(.leading, 5)
 
-            TextifyCard(padding: 12) {
-                VStack(alignment: .leading, spacing: 12) {
+            TextifyCard(padding: 16) {
+                VStack(alignment: .leading, spacing: 14) {
                     content
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .labeledContentStyle(SettingsValueColumnStyle())
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 4)
+    }
+}
+
+private struct SettingsValueColumnStyle: LabeledContentStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(alignment: .center, spacing: 20) {
+            configuration.label
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            configuration.content
+                .frame(width: 220, alignment: .trailing)
+        }
     }
 }
 
 private struct PermissionRow: View {
     let name: String
     let status: String
-    let actionTitle: String
+    let actionTitle: String?
+    let isDisabled: Bool
     let action: () -> Void
 
     var body: some View {
-        HStack {
-            Text(name)
-            Spacer()
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(TextifyVisualIdentity.voiceViolet)
+                .frame(width: 30, height: 30)
+                .background(
+                    TextifyVisualIdentity.voiceViolet.opacity(0.12),
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name)
+                    .font(.callout.weight(.semibold))
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 12)
+
             TextifyStatusBadge(
                 title: status.uppercased(),
                 tone: status == "Granted" ? .success : .warning
             )
-            Button(actionTitle, action: action)
+
+            if status != "Granted", let actionTitle {
+                Button(actionTitle, action: action)
+                    .controlSize(.small)
+                    .disabled(isDisabled)
+            }
         }
+    }
+
+    private var systemImage: String {
+        name == "Microphone" ? "mic.fill" : "cursorarrow.rays"
+    }
+
+    private var detail: String {
+        if name == "Microphone" {
+            return "Captures speech only while your trigger is held."
+        }
+        return "Types completed dictation into the active app."
     }
 }
 
@@ -6166,11 +7185,41 @@ private struct TriggerTestSummary: View {
     let result: TriggerTestSessionResult
 
     var body: some View {
-        HStack(spacing: 14) {
-            Label("Down", systemImage: result.sawDown ? "checkmark.circle.fill" : "circle")
-            Label("Start", systemImage: result.sawBeginRecording ? "checkmark.circle.fill" : "circle")
-            Label("Release", systemImage: result.sawUp ? "checkmark.circle.fill" : "circle")
+        HStack(spacing: 8) {
+            TriggerTestCheckpoint(title: "Key down", isComplete: result.sawDown)
+            TriggerTestCheckpoint(
+                title: "Recording",
+                isComplete: result.sawBeginRecording
+            )
+            TriggerTestCheckpoint(title: "Released", isComplete: result.sawUp)
         }
-        .foregroundStyle(result.passed ? .green : .secondary)
+    }
+}
+
+private struct TriggerTestCheckpoint: View {
+    let title: String
+    let isComplete: Bool
+
+    var body: some View {
+        Label(
+            title,
+            systemImage: isComplete ? "checkmark.circle.fill" : "circle"
+        )
+        .font(.caption.weight(.medium))
+        .foregroundStyle(
+            isComplete ? TextifyVisualIdentity.readyMint : Color.secondary
+        )
+        .padding(.horizontal, 9)
+        .padding(.vertical, 6)
+        .background(
+            isComplete
+                ? TextifyVisualIdentity.readyMint.opacity(0.1)
+                : TextifyVisualIdentity.raisedSurface.opacity(0.7),
+            in: Capsule(style: .continuous)
+        )
+        .overlay {
+            Capsule(style: .continuous)
+                .stroke(TextifyVisualIdentity.separator, lineWidth: 1)
+        }
     }
 }

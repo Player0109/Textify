@@ -1500,6 +1500,25 @@ Task 1 must merge before parallel Wave 1 work begins.
 - The final Release build was validated interactively and all 800 automated
   tests passed with 12 expected environment-gated skips and zero failures.
 
+## Bundled-Only Model Catalog Handoff - 2026-07-26
+
+- The active user-directed offline-first catalog change owns the narrow
+  production composition, bundled manifest loader, model-transfer catalog
+  integrity prerequisite, Models/onboarding presentation, focused tests, and
+  source-of-truth specification changes required to make the app-bundled signed
+  manifest the only runtime catalog.
+- Textify must not fetch a manifest, manifest signature, revocation body, or
+  revocation signature at launch, when onboarding opens, when a Models
+  destination opens, or before a model transfer. Catalog membership changes
+  ship only through an app release.
+- Existing signed-manifest verification, strict production policy, immutable
+  artifact URLs, size/SHA-256 verification, installed receipts, imported
+  models, and previously accepted sticky revocation state remain intact. Model
+  artifact downloads continue to use the network when explicitly requested.
+- The existing remote catalog coordinator/store and publication machinery may
+  remain as non-production compatibility and release-verification code, but
+  production composition and user-facing recovery actions must not reach it.
+
 ## Retained Model Catalog Navigation Handoff - 2026-07-27
 
 - Issue #26 owns the Settings model-catalog presentation lifetime, the
@@ -1564,3 +1583,212 @@ Task 1 must merge before parallel Wave 1 work begins.
 - Existing bundled-only catalog work in `AppServices.swift`,
   `SettingsRootView.swift`, and coordination/release documentation remains
   independent and must be preserved when this implementation is staged.
+
+## Omnilingual ASR Retirement Handoff - 2026-07-28
+
+- The active user-directed retirement removes
+  `omnilingual-asr-300m-ctc-int8` from the bundled signed catalog, its
+  Omnilingual-specific sherpa-onnx runtime and benchmark routes, and every
+  Textify-managed local copy or transfer remnant.
+- This slice may update Task 4 catalog and queue state, Task 7/13 transcription
+  runtime and shim boundaries, Task 11 production startup composition and
+  focused tests, the standalone benchmark package, current catalog
+  documentation, and the signed manifest pair.
+- Startup cleanup must clear and persist an active Omnilingual preference before
+  deleting data, remove matching Queue Attempts before transfer processing
+  begins, delete partial/staged/retained bytes, and reuse the crash-safe
+  installed-artifact transaction so managed bytes disappear before the
+  Installation Receipt. It is idempotent and retries after relaunch.
+- No replacement model is selected automatically. Historical benchmark reports,
+  changelog entries, prior coordination records, the signed v2 migration
+  fixture, and upstream sherpa-onnx headers remain as audit evidence.
+- Existing bundled-only catalog and bounded-screen-projection edits in the dirty
+  worktree are independent and must be preserved.
+
+## Explicit Transcription Language Handoff - 2026-07-29
+
+- The active user-directed language fix owns the narrow settings-to-runtime
+  language policy in `TextifyRuntime`, the minimum MLX Audio and transcribe.cpp
+  runtime changes needed to carry an explicit supported language to inference,
+  and focused regression tests in their existing test targets.
+- A specific language selected in Settings must disable language detection and
+  reach the active model as that language. Automatic is the only preference
+  that may enable multilingual detection. An active model that does not support
+  a specifically selected language must fail closed instead of silently using
+  its catalog default or automatic detection.
+- Preserve the independent Omnilingual retirement, bundled-only catalog,
+  bounded screen projection, benchmark, manifest, packaging, and other dirty
+  worktree changes.
+- The final Debug test run passed all 846 automated tests with 11 expected
+  environment-gated skips and zero failures.
+
+## Floating Icon Placement Handoff - 2026-07-30
+
+- The active user-directed floating-icon customization owns the narrow Task 5
+  persistence, Task 11 Dictation-settings presentation, overlay-window
+  geometry, and focused settings/app tests needed to expose X offset, Y offset,
+  and scale.
+- The values apply to the existing recording/processing overlay used by every
+  configured trigger. Defaults preserve the current center-bottom placement and
+  size, legacy settings decode to those defaults, and the final window frame
+  remains clamped to the selected screen's visible frame.
+- Preserve the independent model-catalog, explicit-language, benchmark,
+  manifest, runtime, and other dirty-worktree changes. This slice does not add
+  per-trigger profiles or any other overlay appearance controls.
+- Focused persistence, composition, and geometry verification passed 15 tests,
+  `swift build` passed, and `git diff --check` passed. Two full `swift test`
+  attempts were blocked by a repeatable signal 10 in the independent
+  `AppDictationServiceTests` before its first assertion; skipping that suite
+  later exposed a separate signal 11 in `RuntimeAdaptersTests`. Neither
+  crashing suite owns floating-icon settings or overlay geometry.
+
+## Guided Permissions Setup Handoff - 2026-07-30
+
+- The active user-directed permission setup improvement owns the narrow Task 11
+  Privacy presentation, setup-status routing, macOS permission handoff, and
+  focused app tests needed to guide users through Microphone and Accessibility
+  from one primary action.
+- macOS remains the source of truth. This work does not add permission toggles,
+  bypass system consent, change runtime readiness, or reintroduce Input
+  Monitoring as a requirement.
+- Preserve the independent visual-refresh, floating-icon, model-catalog,
+  explicit-language, benchmark, manifest, runtime, and other dirty-worktree
+  changes. The existing onboarding step order remains unchanged.
+- Verification passed 32 focused production UI tests, 11 focused permission
+  and readiness tests, `git diff --check`, staged-build manifest verification,
+  and a visual inspection of the staged Privacy pane.
+- A full `swift test` attempt built successfully and passed all 78
+  `AppCompositionTests` before reproducing the pre-existing signal 10 at the
+  start of `AppDictationServiceTests`. Real TCC consent still requires manual
+  validation with a stably signed installed app because macOS stores permission
+  decisions against app identity.
+
+## Offline Model License Disclosure Handoff - 2026-07-30
+
+- The production open-source release audit owns the narrow legal-disclosure
+  path needed to make every curated model license and notice viewable before
+  download and without network access.
+- This slice may add one isolated bundled-document resolver/view, preserve
+  structured signed source/license/file data in the exact-artifact inspector,
+  add the same disclosure affordance to onboarding, and add focused tests plus
+  release-resource verification.
+- Preserve the independent visual refresh, retained catalog navigation,
+  permissions setup, floating-icon placement, explicit-language routing,
+  manifest, runtime, benchmark, and other dirty-worktree changes. Do not
+  restructure the surrounding model catalog or onboarding UI.
+- License resolution must use the exact signed `licenseTextUrl` where copyright
+  ownership differs, fail closed when a catalog license has no bundled
+  document, and keep upstream links separate from the offline disclosure.
+
+## Signed License Provenance Correction Handoff - 2026-07-30
+
+- The production open-source release audit found one dead signed
+  `licenseTextUrl` and one incomplete bundled model-license copy.
+- This correction owns only the Canary-Qwen transcribe.cpp license URL, the
+  detached manifest signature required by that byte change, the exact
+  commit-pinned FunASR license copy, and focused legal-disclosure/release
+  verification.
+- Preserve every other signed catalog field, runtime, benchmark, model choice,
+  and independent dirty-worktree change. The corrected manifest must pass the
+  existing production-policy verifier before it can be committed.
+
+## Compiled Dependency Attribution Handoff - 2026-07-31
+
+- The production open-source release audit owns the narrow distribution
+  attribution closure for third-party code that is linked into the app or its
+  bundled native libraries.
+- This slice may add exact pinned upstream NOTICE and nested component-license
+  files, identify them in `THIRD_PARTY_NOTICES.md`, include them in both app
+  staging paths, and pin them in release verification.
+- Do not change dependency revisions, package APIs, runtime behavior, or
+  unrelated source files. Every copied text must match the exact dependency or
+  native-runtime revision used by the release build.
+
+## Public Repository Privacy Scrub Handoff - 2026-07-31
+
+- The production open-source release audit owns the one-line replacement of a
+  developer-specific absolute path in the historical implementation plan.
+- Preserve the plan's command, wording, chronology, and every other historical
+  record; only substitute a neutral example checkout path.
+
+## Bundled Revocation Delivery Handoff - 2026-07-31
+
+- The production release security audit owns the narrow startup path that
+  loads an exact bundled signed revocation snapshot before the bundled catalog
+  can be presented or installed.
+- This slice may update production manifest loading, startup composition, and
+  focused app tests. Packaging, signed baseline bytes, evidence gates, and
+  release documentation remain a separate release-engineering handoff.
+- The bundled snapshot must be verified by the existing revocation trust
+  boundary, merged through the existing sticky rollback-state rules, and fail
+  closed when required bytes are absent, malformed, or invalid. It must not
+  weaken persisted revocations or invent unsigned baseline state.
+- Preserve the independent catalog UI, runtime, benchmark, signed manifest,
+  attribution, and other dirty-worktree changes. Agents are not alone in the
+  worktree and must not revert or reformat unrelated edits.
+
+## Fail-Closed Release Publication Handoff - 2026-07-31
+
+- The production release audit owns the narrow DMG-signing, embedded-input
+  identity, and pre-publication ordering corrections in release scripts and
+  `docs/RELEASING.md`.
+- The DMG must carry the configured Developer ID signature before notarization;
+  the mounted app must contain the tracked signed release inputs byte-for-byte;
+  downloaded draft bytes must match an independently retained local digest.
+- The release commit, annotated tag target, remote default branch, evidence
+  declaration, and still-draft GitHub Release must agree before the command
+  that makes the release public. No post-publication check may stand in for a
+  precondition.
+- Preserve archive/export behavior, notarization credentials, manual approval
+  gates, and unrelated release documentation.
+
+## Signed Revocation Baseline Packaging Handoff - 2026-07-31
+
+- The production release audit owns the exact empty v2 authority baseline,
+  detached revocation-domain signature, signing helper, bundle resources, and
+  release gates required by the startup handoff above.
+- The baseline may use the existing allowlisted maintainer Ed25519 key while
+  retaining the distinct model-revocations signature type and canonical
+  payload. Private key bytes remain in the maintainer Keychain and must never
+  enter the repository, logs, or generated evidence.
+- Future withdrawals and restorations replace this tracked pair only with a
+  strictly later reviewed signed revision. The empty baseline does not waive
+  the publication-evidence, rollback, manual review, or two-person approval
+  gates.
+
+## ONNX Runtime Deployment-Target Remediation Handoff - 2026-07-31
+
+- The production release audit owns replacement of the accidentally thinned
+  universal2 ONNX Runtime binary, whose arm64 slice requires macOS 15.5, with
+  Microsoft's exact first-party 1.24.4 arm64 release binary targeting macOS
+  14.
+- This slice may replace only the vendored ONNX dylib and update its pinned
+  source/archive/dylib size and hash provenance plus matching automated release
+  gates. It must retain version `1.24.4`, arm64 architecture, install name,
+  exported ABI, sherpa imports, library validation, and runtime smoke behavior.
+- Preserve the sherpa dylib, public headers, catalog compatibility claims, and
+  unrelated runtime/catalog work. Final acceptance still requires a real
+  macOS 14 sherpa-model smoke from the signed release candidate.
+
+## Release Artifact Surface Verification Handoff - 2026-07-31
+
+- The production release audit owns exact production-entitlement allowlisting,
+  the runtime-selected Whisper metallib gate, and normalization of Xcode's
+  back-deployed Swift compatibility library to the arm64 hardened release
+  contract.
+- This slice may update export/package scripts and artifact verification only.
+  It must not change app entitlements, Whisper kernels, dependency revisions,
+  or application runtime behavior.
+- The exported app must contain only the microphone audio-input entitlement;
+  both the actual SwiftPM Whisper resource and fallback metallib must be valid
+  macOS 14 libraries with required kernels; every shipped Mach-O executable
+  and dylib must be arm64 and carry the expected release signature policy.
+
+## Exact Upstream Legal Text Whitespace Handoff - 2026-07-31
+
+- The production open-source release audit owns a repository attribute that
+  exempts byte-for-byte upstream legal snapshots from Git whitespace
+  normalization and whitespace-error checks.
+- Preserve the upstream license and NOTICE bytes exactly; the exemption must
+  apply only beneath `THIRD_PARTY_LICENSES/` and must not relax checks for
+  application source, scripts, first-party documentation, or configuration.

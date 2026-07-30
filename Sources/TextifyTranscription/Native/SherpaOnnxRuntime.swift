@@ -4,7 +4,6 @@ import TextifySherpaShim
 public enum SherpaOnnxModelVariant: String, Equatable, Sendable {
     case reazonSpeechK2V2 = "reazonspeech-k2-v2"
     case qwen3ASR0_6B = "qwen3-asr-0.6b"
-    case omnilingualASR300M = "omnilingual-asr-300m-ctc-int8"
     case dolphinSmall = "dolphin-small-ctc-multi-lang-int8"
     case senseVoiceSmall = "sensevoice-small-int8-2024-07-17"
 }
@@ -114,19 +113,6 @@ struct SherpaOnnxRuntimeBackend: Sendable {
                 encoderURL: encoderURL,
                 decoderURL: decoderURL,
                 tokenizerURL: tokenizerURL,
-                computeRoute: computeRoute,
-                threadCount: threadCount
-            )
-            return NativeSherpaOnnxSession(context: context)
-
-        case .omnilingualASR300M:
-            let modelURL = modelDirectory.appendingPathComponent("model.int8.onnx")
-            let tokensURL = modelDirectory.appendingPathComponent("tokens.txt")
-            try requireFiles([modelURL, tokensURL])
-            let context = try NativeSherpaOnnxSession.makeOmnilingualContext(
-                runtimeDirectory: runtimeDirectory,
-                modelURL: modelURL,
-                tokensURL: tokensURL,
                 computeRoute: computeRoute,
                 threadCount: threadCount
             )
@@ -275,37 +261,6 @@ private actor NativeSherpaOnnxSession: SherpaOnnxRuntimeSession {
                                 )
                             }
                         }
-                    }
-                }
-            }
-        }
-        guard let context else {
-            throw SherpaOnnxRuntimeError.loadFailed(Self.errorMessage(from: errorBuffer))
-        }
-        return context
-    }
-
-    static func makeOmnilingualContext(
-        runtimeDirectory: URL,
-        modelURL: URL,
-        tokensURL: URL,
-        computeRoute: SherpaOnnxComputeRoute,
-        threadCount: Int
-    ) throws -> OpaquePointer {
-        var errorBuffer = [CChar](repeating: 0, count: 2_048)
-        let context = runtimeDirectory.path.withCString { runtimePath in
-            modelURL.path.withCString { modelPath in
-                tokensURL.path.withCString { tokensPath in
-                    computeRoute.rawValue.withCString { provider in
-                        TextifySherpaCreateOmnilingualASR(
-                            runtimePath,
-                            modelPath,
-                            tokensPath,
-                            provider,
-                            Int32(threadCount),
-                            &errorBuffer,
-                            Int32(errorBuffer.count)
-                        )
                     }
                 }
             }

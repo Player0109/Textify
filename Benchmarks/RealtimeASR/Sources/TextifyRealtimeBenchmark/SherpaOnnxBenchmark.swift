@@ -67,12 +67,6 @@ enum SherpaOnnxBenchmark {
                 modelID: "qwen3-asr-0.6b-int8",
                 license: "Apache-2.0"
             )
-        case .omnilingualASR300M:
-            return Configuration(
-                variant: .omnilingualASR300M,
-                modelID: "omnilingual-asr-300m-ctc-int8",
-                license: "Apache-2.0"
-            )
         case .dolphinSmall:
             return Configuration(
                 variant: .dolphinSmall,

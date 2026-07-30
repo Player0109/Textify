@@ -698,7 +698,7 @@ final class ModelCatalogCoordinatorTests: XCTestCase {
     func testCatalogEmptyPresentationsKeepLoadingTrustAndAvailabilityDistinct() {
         XCTAssertEqual(
             ModelCatalogEmptyPresentation.checking.title,
-            "Checking signed catalog"
+            "Loading model list"
         )
         XCTAssertNil(ModelCatalogEmptyPresentation.checking.actionTitle)
         XCTAssertEqual(
