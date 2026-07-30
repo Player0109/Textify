@@ -43,6 +43,46 @@ require_clean_head_at_commit() {
   require_clean_source_tree
 }
 
+require_manual_release_qa_complete() {
+  local manual_qa_path="$REPO_ROOT/docs/MANUAL_QA.md"
+  local unchecked_items
+  local unresolved_blockers
+  [[ -f "$manual_qa_path" && ! -L "$manual_qa_path" ]]
+  if ! grep -Fqx \
+    "## Known Specification-Conformance Blockers" \
+    "$manual_qa_path"; then
+    echo "MANUAL_QA.md is missing the specification-conformance blocker section." >&2
+    return 1
+  fi
+  unchecked_items="$(
+    grep -nE '^[[:space:]]*- \[ \]' "$manual_qa_path" || true
+  )"
+  unresolved_blockers="$(
+    awk '
+      /^## Known Specification-Conformance Blockers[[:space:]]*$/ {
+        in_blocker_section = 1
+        next
+      }
+      in_blocker_section && /^##[[:space:]]/ {
+        exit
+      }
+      in_blocker_section && /^[[:space:]]*- BLOCKED:/ {
+        print NR ":" $0
+      }
+    ' "$manual_qa_path"
+  )"
+  if [[ -n "$unchecked_items" || -n "$unresolved_blockers" ]]; then
+    echo "Manual QA and specification blockers must be resolved before app publication." >&2
+    if [[ -n "$unchecked_items" ]]; then
+      printf '%s\n' "$unchecked_items" >&2
+    fi
+    if [[ -n "$unresolved_blockers" ]]; then
+      printf '%s\n' "$unresolved_blockers" >&2
+    fi
+    return 1
+  fi
+}
+
 embedded_source_commit() {
   local app_path="$1"
   local info_plist="$app_path/Contents/Info.plist"

@@ -20,11 +20,32 @@ LOCAL_DMG_PATH="$BUILD_DIR/$DMG_NAME"
 LOCAL_CHECKSUM_PATH="$LOCAL_DMG_PATH.sha256"
 REPOSITORY="Player0109/Textify"
 
+require_exact_draft_assets() {
+  local actual_assets
+  local expected_assets
+  actual_assets="$(
+    gh api \
+      "repos/$REPOSITORY/releases/tags/$TAG" \
+      --jq '[.assets[].name] | sort'
+  )"
+  expected_assets="$(
+    jq -cn \
+      --arg dmg "$DMG_NAME" \
+      '[$dmg, ($dmg + ".sha256")] | sort'
+  )"
+  if [[ "$actual_assets" != "$expected_assets" ]]; then
+    echo "Draft release assets do not match the exact production allowlist." >&2
+    printf 'expected: %s\nactual:   %s\n' "$expected_assets" "$actual_assets" >&2
+    return 1
+  fi
+}
+
 [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
 [[ -f "$DECLARATION_PATH" ]]
 [[ -d "$EVIDENCE_ROOT" ]]
 [[ -f "$LOCAL_DMG_PATH" && -f "$LOCAL_CHECKSUM_PATH" ]]
 require_clean_source_tree
+require_manual_release_qa_complete
 
 TEMPORARY_DIRECTORY="$(mktemp -d)"
 MOUNT_DIRECTORY="$TEMPORARY_DIRECTORY/mount"
@@ -97,6 +118,7 @@ require_clean_head_at_commit "$RELEASE_COMMIT"
 [[ "$(
   gh api "repos/$REPOSITORY/releases/tags/$TAG" --jq '.draft'
 )" == "true" ]]
+require_exact_draft_assets
 
 DOWNLOAD_DIRECTORY="$TEMPORARY_DIRECTORY/download"
 mkdir "$DOWNLOAD_DIRECTORY"
@@ -121,6 +143,15 @@ spctl --assess \
   --context context:primary-signature \
   --verbose \
   "$DOWNLOADED_DMG_PATH"
+DMG_SIGNING_DETAILS="$(
+  codesign --display --verbose=4 "$DOWNLOADED_DMG_PATH" 2>&1
+)"
+grep -Fqx \
+  "TeamIdentifier=$TEXTIFY_DEVELOPMENT_TEAM" \
+  <<<"$DMG_SIGNING_DETAILS"
+grep -Fqx \
+  "Authority=$TEXTIFY_SIGNING_IDENTITY" \
+  <<<"$DMG_SIGNING_DETAILS"
 "$REPO_ROOT/script/release/verify_artifact_source_commit.sh" \
   "$DOWNLOADED_DMG_PATH" \
   "$RELEASE_COMMIT"
@@ -147,6 +178,7 @@ MOUNTED=false
 
 require_clean_head_at_commit "$RELEASE_COMMIT"
 [[ "$(git -C "$REPO_ROOT" rev-list -n 1 "$TAG")" == "$RELEASE_COMMIT" ]]
+require_exact_draft_assets
 gh release edit "$TAG" \
   --repo "$REPOSITORY" \
   --draft=false \

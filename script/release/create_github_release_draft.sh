@@ -23,8 +23,8 @@ REPOSITORY="Player0109/Textify"
 [[ -d "$EVIDENCE_ROOT" ]]
 [[ -f "$DMG_PATH" && -f "$CHECKSUM_PATH" ]]
 [[ -f "$NOTES_PATH" ]]
-[[ -f "$REPO_ROOT/docs/MANUAL_QA.md" ]]
 require_clean_source_tree
+require_manual_release_qa_complete
 ! grep -Fq \
   "The Textify $VERSION production app has not been published yet." \
   "$REPO_ROOT/README.md"
@@ -35,16 +35,6 @@ CHANGELOG_RELEASE_DATE="$(
     "$REPO_ROOT/CHANGELOG.md"
 )"
 [[ "$CHANGELOG_RELEASE_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]
-UNCHECKED_QA_ITEMS="$(
-  grep -nE '^[[:space:]]*- \[ \]' \
-    "$REPO_ROOT/docs/MANUAL_QA.md" \
-    || true
-)"
-if [[ -n "$UNCHECKED_QA_ITEMS" ]]; then
-  echo "Every release-blocking MANUAL_QA item must be checked before creating a draft." >&2
-  printf '%s\n' "$UNCHECKED_QA_ITEMS" >&2
-  exit 1
-fi
 
 TEMPORARY_DIRECTORY="$(mktemp -d)"
 cleanup() {
