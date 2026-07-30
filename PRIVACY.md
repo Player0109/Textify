@@ -49,10 +49,12 @@ Network access occurs only for:
   Release asset or an exact commit-pinned public Hugging Face file; and
 - manual app downloads from GitHub Releases that you initiate outside Textify.
 
-GitHub and Hugging Face may receive ordinary request metadata for those
-downloads, such as IP address, user agent, and request time. Textify does not
-add installed model identifiers, local filenames, storage inventory, analytics,
-system profiles, or dictated content to those requests.
+GitHub and Hugging Face receive the requested immutable URL, including its
+repository path and model filename, and ordinary request metadata such as IP
+address, user agent, and request time. The provider can therefore infer which
+model file was requested. Textify does not send a separate installed-model
+inventory, local storage paths, analytics, system profiles, or dictated content
+with those requests.
 
 Automatic updates are deferred in Textify 1.1, so the app does not make update
 checks or send Sparkle system-profile data.

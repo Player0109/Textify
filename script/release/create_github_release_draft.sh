@@ -24,6 +24,16 @@ REPOSITORY="Player0109/Textify"
 [[ -f "$DMG_PATH" && -f "$CHECKSUM_PATH" ]]
 [[ -f "$NOTES_PATH" ]]
 [[ -z "$(git -C "$REPO_ROOT" status --porcelain)" ]]
+! grep -Fq \
+  "The Textify $VERSION production app has not been published yet." \
+  "$REPO_ROOT/README.md"
+CHANGELOG_RELEASE_DATE="$(
+  awk \
+    -v heading="## $VERSION - " \
+    'index($0, heading) == 1 { print substr($0, length(heading) + 1); exit }' \
+    "$REPO_ROOT/CHANGELOG.md"
+)"
+[[ "$CHANGELOG_RELEASE_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]
 
 TEMPORARY_DIRECTORY="$(mktemp -d)"
 cleanup() {

@@ -16,17 +16,26 @@ concurrency:
 
 jobs:
   swiftpm:
-    name: SwiftPM (macOS 14 arm64)
-    runs-on: macos-14
+    name: SwiftPM (macOS 26 arm64, deployment 14.0)
+    runs-on: macos-26
     timeout-minutes: 120
+    env:
+      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - name: Verify runner architecture
+      - name: Verify runner and toolchain
         run: |
           test "$(uname -m)" = "arm64"
-          swift --version
+          xcode_major="$(xcodebuild -version | sed -nE 's/^Xcode ([0-9]+).*/\1/p')"
+          test -n "$xcode_major"
+          (( xcode_major >= 26 ))
+          swift_components="$(swift --version 2>&1 | sed -nE 's/.*Apple Swift version ([0-9]+)\.([0-9]+).*/\1 \2/p')"
+          read -r swift_major swift_minor <<<"$swift_components"
+          test -n "$swift_major"
+          test -n "$swift_minor"
+          (( swift_major > 6 || (swift_major == 6 && swift_minor >= 2) ))
 
       - name: Verify signed model catalog
         env:
@@ -45,8 +54,14 @@ jobs:
       - name: Build release executable
         run: swift build --configuration release --arch arm64 --jobs 2
 
-      - name: Verify release architecture
+      - name: Verify release architecture and deployment target
         run: |
           binary_path="$(swift build --configuration release --arch arm64 --show-bin-path)/Textify"
           test -x "$binary_path"
           test "$(lipo -archs "$binary_path")" = "arm64"
+          executable_minos="$(
+            otool -l "$binary_path" \
+              | awk '$1 == "cmd" { in_build_version = ($2 == "LC_BUILD_VERSION"); next }
+                     in_build_version && $1 == "minos" { print $2; exit }'
+          )"
+          test "$executable_minos" = "14.0"

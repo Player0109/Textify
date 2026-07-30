@@ -16,8 +16,10 @@ struct SettingsRootView: View {
         @Bindable var router = services.settingsRouter
 
         Group {
-            if services.startupIssue != nil {
-                PersistentStorageUnavailableView()
+            if let startupIssue = services.startupIssue {
+                PersistentStorageUnavailableView(
+                    issue: startupIssue.runtimeIssue
+                )
             } else {
                 HStack(spacing: 0) {
                     SettingsSidebar(selection: $router.selectedPane)
@@ -391,6 +393,14 @@ enum SettingsSetupNavigation {
 }
 
 struct PersistentStorageUnavailableView: View {
+    let issue: AppRuntimeIssue
+
+    init(
+        issue: AppRuntimeIssue = .persistentStorageUnavailable
+    ) {
+        self.issue = issue
+    }
+
     var body: some View {
         ZStack {
             TextifyAcousticBackdrop()
@@ -406,9 +416,9 @@ struct PersistentStorageUnavailableView: View {
                     }
                     .frame(width: 72, height: 72)
 
-                    Text("Textify storage is unavailable")
+                    Text(title)
                         .font(.system(.title2, design: .rounded, weight: .bold))
-                    Text(AppRuntimeIssue.persistentStorageUnavailable.userMessage)
+                    Text(issue.userMessage)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: 460)
@@ -423,6 +433,19 @@ struct PersistentStorageUnavailableView: View {
             .padding(32)
         }
         .tint(TextifyVisualIdentity.voiceViolet)
+    }
+
+    private var title: String {
+        switch issue {
+        case .persistentStorageUnavailable:
+            return "Textify storage is unavailable"
+        case .modelTrustUnavailable:
+            return "Textify model trust is unavailable"
+        case .retiredModelCleanupFailed:
+            return "Textify model cleanup is incomplete"
+        case .hotkeyMonitorUnavailable:
+            return "Textify trigger is unavailable"
+        }
     }
 }
 
@@ -716,11 +739,13 @@ private struct DictationSettingsPane: View {
                         tone: services.dictation.readiness.canDictate ? .success : .warning
                     )
                 }
-                if services.runtimeIssue == .hotkeyMonitorUnavailable {
-                    Text(AppRuntimeIssue.hotkeyMonitorUnavailable.userMessage)
+                if let runtimeIssue = services.runtimeIssue {
+                    Text(runtimeIssue.userMessage)
                         .foregroundStyle(.orange)
-                    Button("Retry Trigger") {
-                        services.startRuntime()
+                    if runtimeIssue == .hotkeyMonitorUnavailable {
+                        Button("Retry Trigger") {
+                            services.startRuntime()
+                        }
                     }
                 }
             }

@@ -156,10 +156,10 @@ final class TextifyOnboardingWindowPresenter {
 final class TextifyMainWindowPresenter {
     static let shared = TextifyMainWindowPresenter()
 
-    private var window: NSWindow?
+    private(set) var window: NSWindow?
     private var windowDelegate: TextifyMainWindowSessionDelegate?
 
-    private init() {}
+    init() {}
 
     var isVisible: Bool {
         window?.isVisible == true
@@ -198,10 +198,8 @@ final class TextifyMainWindowPresenter {
                 .environment(services)
         )
         let windowDelegate = TextifyMainWindowSessionDelegate {
-            [weak self, weak services] in
+            [weak services] in
             services?.resetModelCatalogPresentationSession()
-            self?.window = nil
-            self?.windowDelegate = nil
         }
         window.delegate = windowDelegate
         window.center()

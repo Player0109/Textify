@@ -78,6 +78,12 @@ struct MenuBarRoot: View {
         if services.runtimeIssue == .persistentStorageUnavailable {
             return "Storage Unavailable"
         }
+        if services.runtimeIssue == .modelTrustUnavailable {
+            return "Model Trust Unavailable"
+        }
+        if services.runtimeIssue == .retiredModelCleanupFailed {
+            return "Model Cleanup Required"
+        }
         if services.runtimeIssue == .hotkeyMonitorUnavailable {
             return "Trigger Unavailable"
         }
@@ -149,6 +155,10 @@ extension AppRuntimeIssue {
         switch self {
         case .persistentStorageUnavailable:
             return "Check storage permissions"
+        case .modelTrustUnavailable:
+            return "Reinstall from a verified release"
+        case .retiredModelCleanupFailed:
+            return "Reopen Textify to retry cleanup"
         case .hotkeyMonitorUnavailable:
             return "Retry the trigger in Textify"
         }

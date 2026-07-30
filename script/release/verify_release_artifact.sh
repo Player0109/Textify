@@ -21,6 +21,42 @@ plist_value() {
   /usr/libexec/PlistBuddy -c "Print :$1" "$INFO_PLIST"
 }
 
+macos_version_is_at_most_14_0() {
+  local version="$1"
+  if [[ ! "$version" =~ ^[0-9]+([.][0-9]+){0,2}$ ]]; then
+    return 1
+  fi
+  local major minor patch
+  IFS=. read -r major minor patch <<<"$version"
+  minor="${minor:-0}"
+  patch="${patch:-0}"
+  (( major < 14 || (major == 14 && minor == 0 && patch == 0) ))
+}
+
+assert_macos_14_compatible_macho() {
+  local binary_path="$1"
+  local minimum_versions minimum_version
+  minimum_versions="$(
+    otool -l "$binary_path" \
+      | awk '$1 == "cmd" { load_command = $2; next }
+             load_command == "LC_BUILD_VERSION" && $1 == "minos" {
+               print $2
+               load_command = ""
+             }
+             load_command == "LC_VERSION_MIN_MACOSX" && $1 == "version" {
+               print $2
+               load_command = ""
+             }'
+  )"
+  [[ -n "$minimum_versions" ]]
+  while IFS= read -r minimum_version; do
+    if ! macos_version_is_at_most_14_0 "$minimum_version"; then
+      echo "$binary_path requires macOS $minimum_version, later than 14.0." >&2
+      return 1
+    fi
+  done <<<"$minimum_versions"
+}
+
 [[ "$(plist_value CFBundleIdentifier)" == "io.github.Player0109.Textify" ]]
 [[ "$(plist_value CFBundleShortVersionString)" == "$EXPECTED_VERSION" ]]
 [[ "$(plist_value CFBundleVersion)" == "1" ]]
@@ -171,6 +207,17 @@ otool -l "$TRANSCRIBE_CPP_LIBRARY" \
 EXECUTABLE="$APP_PATH/Contents/MacOS/$(plist_value CFBundleExecutable)"
 [[ -x "$EXECUTABLE" ]]
 [[ "$(lipo -archs "$EXECUTABLE")" == "arm64" ]]
+EXECUTABLE_MINOS="$(
+  otool -l "$EXECUTABLE" \
+    | awk '$1 == "cmd" { in_build_version = ($2 == "LC_BUILD_VERSION"); next }
+           in_build_version && $1 == "minos" { print $2; exit }'
+)"
+[[ "$EXECUTABLE_MINOS" == "14.0" ]]
+
+while IFS= read -r -d '' packaged_file; do
+  [[ "$(file -b "$packaged_file")" == *Mach-O* ]] || continue
+  assert_macos_14_compatible_macho "$packaged_file"
+done < <(find "$APP_PATH/Contents" -type f -print0)
 
 codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 SIGNING_DETAILS="$(codesign --display --verbose=4 "$APP_PATH" 2>&1)"

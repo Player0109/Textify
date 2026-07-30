@@ -107,6 +107,9 @@ requests are not accepted at this time; see
 Report vulnerabilities privately as described in
 [SECURITY.md](.github/SECURITY.md).
 
+Building from source requires an Apple Silicon Mac and Xcode 26 with Swift 6.2
+or later. The resulting app still targets macOS 14.
+
 Build and test locally:
 
 ```bash

@@ -32,6 +32,8 @@ final class AppServices {
         ModelTransferNetworkObserver?
     @ObservationIgnored private let modelWorkflowDurabilityObserver:
         ModelWorkflowDurabilityObserver
+    @ObservationIgnored private let productionModelManifestLoader:
+        ProductionModelManifestLoader?
 
     private var installedModelsStore: InstalledModelsStore
 
@@ -45,6 +47,7 @@ final class AppServices {
         installOperation: { [weak self] modelID, onStateChange in
             guard let self,
                   self.startupIssue == nil,
+                  self.modelCatalogCoordinator.securityIssue == nil,
                   ProductionModelInstallConfiguration.current != nil
             else {
                 throw ModelInstallCoordinatorError.storageOrConfigurationUnavailable
@@ -303,6 +306,7 @@ final class AppServices {
     static func production(
         pathFactory: () throws -> AppPaths,
         fileManager: FileManager = .default,
+        modelCatalogResourceDirectory: URL? = Bundle.main.resourceURL,
         launchAtLogin: any LaunchAtLoginManaging,
         launchAtLoginLocation: any LaunchAtLoginLocationChecking
     ) -> AppServices {
@@ -310,6 +314,8 @@ final class AppServices {
             return production(
                 paths: try pathFactory(),
                 fileManager: fileManager,
+                modelCatalogResourceDirectory:
+                    modelCatalogResourceDirectory,
                 launchAtLogin: launchAtLogin,
                 launchAtLoginLocation: launchAtLoginLocation,
                 startupIssue: nil
@@ -318,6 +324,8 @@ final class AppServices {
             return production(
                 paths: AppPaths.temporaryFallback(fileManager: fileManager),
                 fileManager: fileManager,
+                modelCatalogResourceDirectory:
+                    modelCatalogResourceDirectory,
                 launchAtLogin: launchAtLogin,
                 launchAtLoginLocation: launchAtLoginLocation,
                 startupIssue: .applicationPathsUnavailable(String(describing: error))
@@ -344,6 +352,8 @@ final class AppServices {
         modelTransferNetworkObserver: ModelTransferNetworkObserver? = nil,
         modelWorkflowDurabilityObserver:
             ModelWorkflowDurabilityObserver = .none,
+        productionModelManifestLoader:
+            ProductionModelManifestLoader? = nil,
         startupIssue: AppStartupIssue? = nil
     ) {
         self.paths = paths
@@ -368,8 +378,10 @@ final class AppServices {
         self.modelTransferNetworkObserver = modelTransferNetworkObserver
         self.modelWorkflowDurabilityObserver =
             modelWorkflowDurabilityObserver
+        self.productionModelManifestLoader =
+            productionModelManifestLoader
         self.startupIssue = startupIssue
-        self.runtimeIssue = startupIssue == nil ? nil : .persistentStorageUnavailable
+        self.runtimeIssue = startupIssue?.runtimeIssue
         let installedModelsStore = Self.loadInstalledModelsStore(paths: paths)
         self.installedModelsStore = installedModelsStore
         self.managedReadinessByModelID = Dictionary(
@@ -391,15 +403,28 @@ final class AppServices {
         refreshRetainedModelCatalogFeatures()
         modelTransferNetworkObserver?.start { [weak self] in
             Task { @MainActor [weak self] in
-                self?.modelInstallCoordinator.networkDidBecomeAvailable()
+                guard let self,
+                      self.startupIssue == nil,
+                      self.modelCatalogCoordinator.securityIssue == nil
+                else {
+                    return
+                }
+                self.modelInstallCoordinator.networkDidBecomeAvailable()
             }
         }
         refreshModelStorageInventory()
     }
 
     func startRuntime() {
-        guard startupIssue == nil else {
-            runtimeIssue = .persistentStorageUnavailable
+        if let startupIssue {
+            hotkeyMonitor.stop()
+            runtimeIssue = startupIssue.runtimeIssue
+            runtimeStarted = false
+            return
+        }
+        guard modelCatalogCoordinator.securityIssue == nil else {
+            hotkeyMonitor.stop()
+            runtimeIssue = .modelTrustUnavailable
             runtimeStarted = false
             return
         }
@@ -505,6 +530,11 @@ final class AppServices {
             guard let self else {
                 return
             }
+            guard self.startupIssue == nil,
+                  self.modelCatalogCoordinator.securityIssue == nil
+            else {
+                return
+            }
             self.modelInstallCoordinator.enforceKnownRevocations()
             Task { @MainActor [weak self] in
                 await self?.enforceModelRevocations()
@@ -514,13 +544,14 @@ final class AppServices {
 
     private func makeProductionModelCatalogCoordinator() -> ModelCatalogCoordinator {
         guard startupIssue == nil,
-              let configuration = ProductionModelInstallConfiguration.current
+              let loader = productionModelManifestLoader
         else {
             return ModelCatalogCoordinator {
                 throw ModelCatalogRefreshError.unavailable
             }
         }
 
+        let configuration = loader.configuration
         let verifier = ManifestVerifier(
             trustedKeys: configuration.trustedKeys,
             legacyPolicy: .publishedV1_1
@@ -532,9 +563,6 @@ final class AppServices {
             ),
             catalogVerifier: verifier,
             durabilityObserver: modelWorkflowDurabilityObserver
-        )
-        let loader = ProductionModelManifestLoader(
-            configuration: configuration
         )
         var bootstrapIssue: TrustedCatalogSecurityIssue?
         var revocationState = TrustedModelRevocationState()
@@ -768,6 +796,7 @@ final class AppServices {
         let localState = modelCatalogPresentationLocalState(
             onDiskBytesByModelID: onDiskBytesByModelID
         )
+        let transferState = modelTransferPresentationState
         return ModelCatalogExperience(
             trustedManifest: modelCatalogCoordinator.manifest,
             compatibilityResolver: modelCatalogCompatibilityResolver,
@@ -776,7 +805,7 @@ final class AppServices {
                 transcriptionModelID: preferences.activeModelID,
                 voiceCleaningModelID: preferences.activeVoiceCleaningModelID
             ),
-            transferStatesByModelID: modelInstallCoordinator.artifactStates,
+            transferStatesByModelID: transferState.artifactStates,
             revocationOverlay: modelCatalogCoordinator.revocationOverlay,
             managedReadinessByModelID: localState.readiness,
             onDiskBytesByModelID: localState.measuredBytes,
@@ -796,19 +825,20 @@ final class AppServices {
         let localState = modelCatalogPresentationLocalState(
             onDiskBytesByModelID: nil
         )
+        let transferState = modelTransferPresentationState
         var request = ModelCatalogDerivationRequest(
             catalogRevision: modelCatalogCoordinator.presentedRevision
                 ?? modelCatalogCoordinator.manifest?.generatedAt,
             trustedManifest: modelCatalogCoordinator.manifest,
             compatibilityContext: modelCatalogCompatibilityResolver.context,
             localRevision: UInt64(
-                max(0, modelInstallCoordinator.revision)
+                max(0, transferState.revision)
             ),
             installedRecords: installedModelRecords,
             activeTranscriptionModelID: preferences.activeModelID,
             activeVoiceCleaningModelID:
                 preferences.activeVoiceCleaningModelID,
-            transferStatesByModelID: modelInstallCoordinator.artifactStates,
+            transferStatesByModelID: transferState.artifactStates,
             revocationOverlay: modelCatalogCoordinator.revocationOverlay,
             managedReadinessByModelID: localState.readiness,
             onDiskBytesByModelID: localState.measuredBytes,
@@ -827,6 +857,21 @@ final class AppServices {
             includesRichTransferState: purpose == .voiceCleaning
         )
         return request
+    }
+
+    private var modelTransferPresentationState: (
+        revision: Int,
+        artifactStates: [String: DownloadState]
+    ) {
+        guard startupIssue == nil,
+              modelCatalogCoordinator.securityIssue == nil
+        else {
+            return (0, [:])
+        }
+        return (
+            modelInstallCoordinator.revision,
+            modelInstallCoordinator.artifactStates
+        )
     }
 
     func modelCatalogFeature(
@@ -1827,6 +1872,7 @@ final class AppServices {
     private static func production(
         paths: AppPaths,
         fileManager: FileManager,
+        modelCatalogResourceDirectory: URL?,
         launchAtLogin: any LaunchAtLoginManaging,
         launchAtLoginLocation: any LaunchAtLoginLocationChecking,
         startupIssue: AppStartupIssue?
@@ -1834,11 +1880,19 @@ final class AppServices {
         let settingsStore = SettingsStore(storage: .file(paths.settingsFileURL), fileManager: fileManager)
         let diagnosticsLogger = DiagnosticsLogger(directory: paths.logsDirectory)
         let modelLayout = ModelStorageLayout(rootDirectory: paths.modelsDirectory)
-        try? RetiredManagedModelCleanup.omnilingualASR300M.run(
-            settingsStore: settingsStore,
-            layout: modelLayout,
-            fileManager: fileManager
-        )
+        var resolvedStartupIssue = startupIssue
+        if resolvedStartupIssue == nil {
+            do {
+                try RetiredManagedModelCleanup.omnilingualASR300M.run(
+                    settingsStore: settingsStore,
+                    layout: modelLayout,
+                    fileManager: fileManager
+                )
+            } catch {
+                resolvedStartupIssue =
+                    .retiredManagedModelCleanupFailed
+            }
+        }
         let whisperRuntime = WhisperRuntime()
         let parakeetRuntime = ParakeetRuntime()
         let paraformerRuntime = ParaformerRuntime()
@@ -1899,7 +1953,15 @@ final class AppServices {
             launchAtLogin: launchAtLogin,
             launchAtLoginLocation: launchAtLoginLocation,
             modelTransferNetworkObserver: ModelTransferNetworkObserver(),
-            startupIssue: startupIssue
+            productionModelManifestLoader:
+                ProductionModelInstallConfiguration.current.map {
+                    ProductionModelManifestLoader(
+                        configuration: $0,
+                        resourceDirectory:
+                            modelCatalogResourceDirectory
+                    )
+                },
+            startupIssue: resolvedStartupIssue
         )
     }
 
@@ -2102,16 +2164,32 @@ struct ModelTransferNetworkRecoveryState {
 
 enum AppStartupIssue: Equatable {
     case applicationPathsUnavailable(String)
+    case retiredManagedModelCleanupFailed
+
+    var runtimeIssue: AppRuntimeIssue {
+        switch self {
+        case .applicationPathsUnavailable:
+            return .persistentStorageUnavailable
+        case .retiredManagedModelCleanupFailed:
+            return .retiredModelCleanupFailed
+        }
+    }
 }
 
 enum AppRuntimeIssue: Equatable {
     case persistentStorageUnavailable
+    case modelTrustUnavailable
+    case retiredModelCleanupFailed
     case hotkeyMonitorUnavailable
 
     var userMessage: String {
         switch self {
         case .persistentStorageUnavailable:
             return "Textify cannot access its Application Support folder. Check disk space and folder permissions, then reopen Textify. Dictation and model installation are disabled to protect your settings and model data."
+        case .modelTrustUnavailable:
+            return "Textify could not verify its bundled model catalog and revocation data. Reinstall Textify from a verified release. Dictation and model installation are disabled to protect your model data."
+        case .retiredModelCleanupFailed:
+            return "Textify could not safely finish retiring an unsupported model. Check disk space and folder permissions, then reopen Textify. Dictation and model installation are disabled so cleanup can retry without losing managed data."
         case .hotkeyMonitorUnavailable:
             return "Textify could not start the dictation trigger. Retry the trigger, or reopen Textify."
         }

@@ -64,6 +64,24 @@ final class AppCompositionTests: XCTestCase {
         XCTAssertNil(resetFeature.hierarchyState.scrollAnchorID)
     }
 
+    @MainActor
+    func testClosingAndReopeningMainWindowReusesPresenterOwnedWindow() throws {
+        let services = try Self.makeServices()
+        let presenter = TextifyMainWindowPresenter()
+        defer {
+            presenter.window?.close()
+        }
+
+        presenter.show(services: services)
+        let firstWindow = try XCTUnwrap(presenter.window)
+        firstWindow.close()
+
+        presenter.show(services: services)
+        let reopenedWindow = try XCTUnwrap(presenter.window)
+
+        XCTAssertTrue(firstWindow === reopenedWindow)
+    }
+
     func testClosingLastWindowDoesNotTerminateTextify() {
         XCTAssertFalse(
             AppDelegate().applicationShouldTerminateAfterLastWindowClosed(NSApplication.shared)
@@ -341,6 +359,105 @@ final class AppCompositionTests: XCTestCase {
             ).installedStoreURL
         ).load()
         XCTAssertNotNil(installed.record(forModelID: retired.id))
+    }
+
+    @MainActor
+    func testProductionCompositionBlocksRuntimeAndQueueRecoveryWhenRetiredCleanupFails() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let retired = try Self.retiredOmnilingualModel()
+        let retiredDirectory = try Self.writeInstalledArtifact(
+            retired,
+            to: paths
+        )
+        let settingsStore = SettingsStore(
+            storage: .file(paths.settingsFileURL)
+        )
+        var preferences = AppPreferences.defaults
+        preferences.onboardingCompleted = true
+        preferences.activeModelID = retired.id
+        settingsStore.save(preferences)
+
+        let layout = ModelStorageLayout(
+            rootDirectory: paths.modelsDirectory
+        )
+        var queue = ModelInstallQueue()
+        _ = try queue.authorize(
+            artifactID: retired.id,
+            authorizedArtifactIdentity:
+                ModelInstallArtifactIdentity(model: retired),
+            purpose: .transcription,
+            action: .install,
+            attemptID: "retired-recovery-attempt",
+            createdAt: "2026-07-31T00:00:00Z"
+        )
+        try queue.transition(
+            attemptID: "retired-recovery-attempt",
+            to: DownloadState(
+                modelID: retired.id,
+                phase: .checkingSpace
+            )
+        )
+        try queue.transition(
+            attemptID: "retired-recovery-attempt",
+            to: DownloadState(
+                modelID: retired.id,
+                phase: .downloading
+            )
+        )
+        let queueStore = ModelInstallQueueStore(
+            fileURL: layout.installQueueURL
+        )
+        try queueStore.save(queue)
+
+        let services = AppServices.production(
+            pathFactory: { paths },
+            fileManager: FailingSettingsSaveFileManager(),
+            launchAtLogin:
+                FakeLaunchAtLoginManager(status: .disabled),
+            launchAtLoginLocation:
+                FixedLaunchAtLoginLocation(isSupported: true)
+        )
+        let coordinator = AppLaunchCoordinator(
+            services: services,
+            showOnboarding: {},
+            showMainWindow: {}
+        )
+
+        await coordinator.run()
+        for _ in 0..<20 {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(
+            services.startupIssue,
+            .retiredManagedModelCleanupFailed
+        )
+        XCTAssertEqual(
+            services.runtimeIssue,
+            .retiredModelCleanupFailed
+        )
+        XCTAssertFalse(services.hotkeyMonitor.isRunning)
+        XCTAssertEqual(
+            try queueStore.load()
+                .attempt(id: "retired-recovery-attempt")?
+                .state.phase,
+            .downloading
+        )
+        XCTAssertEqual(
+            SettingsStore(storage: .file(paths.settingsFileURL))
+                .load().activeModelID,
+            retired.id
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: retiredDirectory.path
+            )
+        )
+        XCTAssertNotNil(
+            try InstalledModelsStorePersistence(
+                fileURL: layout.installedStoreURL
+            ).load().record(forModelID: retired.id)
+        )
     }
 
     @MainActor
@@ -2596,6 +2713,92 @@ final class AppCompositionTests: XCTestCase {
     }
 
     @MainActor
+    func testMissingBundledTrustBlocksPreparationAndHotkeyStartup() async throws {
+        let resources = try Self.makeModelCatalogResourceDirectory(
+            copyProductionTrust: false
+        )
+        defer {
+            try? FileManager.default.removeItem(at: resources)
+        }
+        let tap = FakeCGEventTapClient()
+        let transcriber = ActivationTranscriberSpy()
+        let services = try Self.makeServices(
+            hotkeyMonitor: GlobalHotkeyMonitor(
+                permissionClient: InputMonitoringPermissionClient(
+                    status: { .granted },
+                    requestAccess: { .granted }
+                ),
+                eventTapClient: tap
+            ),
+            models: ReadyRuntimeModelResolver(),
+            transcriber: transcriber,
+            productionModelManifestLoader:
+                Self.productionModelManifestLoader(resources: resources)
+        )
+
+        services.startRuntime()
+        for _ in 0..<20 {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(
+            services.modelCatalogCoordinator.securityIssue?.reason,
+            .bundledCatalogInvalid
+        )
+        XCTAssertEqual(services.runtimeIssue, .modelTrustUnavailable)
+        XCTAssertEqual(tap.startCount, 0)
+        XCTAssertFalse(services.hotkeyMonitor.isRunning)
+        let preparedModelIDs = await transcriber.preparedModelIDs()
+        XCTAssertTrue(preparedModelIDs.isEmpty)
+    }
+
+    @MainActor
+    func testCorruptPersistedRevocationStateBlocksRuntimeWithoutOverwritingState() async throws {
+        let paths = try Self.makeTemporaryPaths()
+        let resources = try Self.makeModelCatalogResourceDirectory(
+            copyProductionTrust: true
+        )
+        defer {
+            try? FileManager.default.removeItem(at: resources)
+        }
+        let corruptState = Data("not trusted revocation state".utf8)
+        let stateURL = paths.rollbackStateLayout.revocationStateFileURL
+        try corruptState.write(to: stateURL)
+        let tap = FakeCGEventTapClient()
+        let transcriber = ActivationTranscriberSpy()
+        let services = try Self.makeServices(
+            paths: paths,
+            hotkeyMonitor: GlobalHotkeyMonitor(
+                permissionClient: InputMonitoringPermissionClient(
+                    status: { .granted },
+                    requestAccess: { .granted }
+                ),
+                eventTapClient: tap
+            ),
+            models: ReadyRuntimeModelResolver(),
+            transcriber: transcriber,
+            productionModelManifestLoader:
+                Self.productionModelManifestLoader(resources: resources)
+        )
+
+        services.startRuntime()
+        for _ in 0..<20 {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(
+            services.modelCatalogCoordinator.securityIssue?.reason,
+            .cacheCorruption
+        )
+        XCTAssertEqual(services.runtimeIssue, .modelTrustUnavailable)
+        XCTAssertEqual(tap.startCount, 0)
+        XCTAssertFalse(services.hotkeyMonitor.isRunning)
+        let preparedModelIDs = await transcriber.preparedModelIDs()
+        XCTAssertTrue(preparedModelIDs.isEmpty)
+        XCTAssertEqual(try Data(contentsOf: stateURL), corruptState)
+    }
+
+    @MainActor
     func testStartRuntimeCanRetryAfterUserInputDisablesStartedMonitor() async throws {
         let tap = FakeCGEventTapClient()
         let services = try Self.makeServices(
@@ -3197,7 +3400,9 @@ final class AppCompositionTests: XCTestCase {
         overlayPresenter: (any RecordingOverlayPresenting)? = nil,
         waitBeforeProcessingIndicator: @escaping @Sendable () async -> Void = {},
         modelWorkflowDurabilityObserver:
-            ModelWorkflowDurabilityObserver = .none
+            ModelWorkflowDurabilityObserver = .none,
+        productionModelManifestLoader:
+            ProductionModelManifestLoader? = nil
     ) throws -> AppServices {
         let paths = try providedPaths ?? makeTemporaryPaths()
         let settingsStore = providedSettingsStore
@@ -3238,7 +3443,9 @@ final class AppCompositionTests: XCTestCase {
             overlayPresenter: overlayPresenter,
             waitBeforeProcessingIndicator: waitBeforeProcessingIndicator,
             modelWorkflowDurabilityObserver:
-                modelWorkflowDurabilityObserver
+                modelWorkflowDurabilityObserver,
+            productionModelManifestLoader:
+                productionModelManifestLoader
         )
     }
 
@@ -3395,6 +3602,53 @@ final class AppCompositionTests: XCTestCase {
                     .omnilingualASR300M.artifactID
             }
         )
+    }
+
+    private static func productionModelManifestLoader(
+        resources: URL
+    ) -> ProductionModelManifestLoader {
+        ProductionModelManifestLoader(
+            configuration: ProductionModelInstallConfiguration(
+                trustedKeys: ProductionModelCatalogTrust.trustedKeys
+            ),
+            resourceDirectory: resources
+        )
+    }
+
+    private static func makeModelCatalogResourceDirectory(
+        copyProductionTrust: Bool
+    ) throws -> URL {
+        let resources = temporaryDirectory()
+        let catalogDirectory = resources.appendingPathComponent(
+            ProductionModelManifestLoader.bundledDirectoryName,
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: catalogDirectory,
+            withIntermediateDirectories: true
+        )
+        guard copyProductionTrust else {
+            return resources
+        }
+
+        let sourceDirectory = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("models", isDirectory: true)
+        for filename in [
+            ProductionModelManifestLoader.bundledManifestName,
+            ProductionModelManifestLoader.bundledSignatureName,
+            ProductionModelManifestLoader.bundledRevocationName,
+            ProductionModelManifestLoader
+                .bundledRevocationSignatureName,
+        ] {
+            try FileManager.default.copyItem(
+                at: sourceDirectory.appendingPathComponent(filename),
+                to: catalogDirectory.appendingPathComponent(filename)
+            )
+        }
+        return resources
     }
 
     private static func makeTemporaryPaths() throws -> AppPaths {

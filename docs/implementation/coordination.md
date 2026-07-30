@@ -1792,3 +1792,55 @@ Task 1 must merge before parallel Wave 1 work begins.
 - Preserve the upstream license and NOTICE bytes exactly; the exemption must
   apply only beneath `THIRD_PARTY_LICENSES/` and must not relax checks for
   application source, scripts, first-party documentation, or configuration.
+
+## Post-Review Runtime Trust And Retirement Handoff - 2026-07-31
+
+- The production release review remediation owns the narrow startup gates in
+  `AppServices.swift` and focused app-composition tests needed to block runtime
+  startup when bundled/persisted model trust cannot be established or retired
+  Omnilingual cleanup cannot finish safely.
+- Catalog/revocation bootstrap failure must prevent model preparation and
+  hotkey startup without discarding sticky revocation state. Retirement
+  cleanup failure must prevent runtime and transfer recovery from starting so
+  cleanup can retry on the next launch.
+- Preserve the signed catalog/revocation formats, normal successful startup,
+  model selection behavior, and unrelated UI/runtime work.
+
+## Post-Review Persistent Window Handoff - 2026-07-31
+
+- The production release review remediation owns the main-window presenter and
+  one focused test proving close/reopen retains and reuses the same `NSWindow`.
+- Closing may reset the catalog presentation session, but must not release the
+  presenter-owned window or delegate. Preserve onboarding-window behavior,
+  Dock/menu-bar routing, and all visual layout.
+
+## Post-Review Release Provenance And CI Handoff - 2026-07-31
+
+- The production open-source release audit owns the CI runner/toolchain
+  correction, executable deployment-target assertions, and archive-source
+  cleanliness gates identified by independent review.
+- CI must use an Apple-silicon runner with Swift 6.2 or later while proving the
+  produced Textify executable still targets macOS 14.0. Archive creation must
+  capture one clean committed source state and refuse to stamp output if the
+  worktree or `HEAD` changes before the archive completes.
+- This slice may update `.github/workflows/ci.yml`, release validation and
+  artifact-verification scripts, `build_archive.sh`, and the matching build
+  prerequisites in public/release documentation. It must not weaken manual
+  macOS 14 real-device, Developer ID, notarization, or evidence gates.
+
+## Exact Release Input Byte Preservation Handoff - 2026-07-31
+
+- The production open-source release audit owns `.gitattributes` rules that
+  disable line-ending conversion for copied third-party legal snapshots and
+  the detached-signature-bound catalog/revocation payloads.
+- Keep whitespace diagnostics enabled everywhere else. Do not rewrite the
+  protected files; their currently verified hashes and signatures must remain
+  unchanged.
+
+## Post-Review Automated Evidence Count Handoff - 2026-07-31
+
+- The production release review remediation may update only the automated test
+  count and matching validation description in `docs/MANUAL_QA.md` after the
+  integrated release gate finishes.
+- Preserve every manual checkbox, human-approval requirement, credentialed
+  signing/notarization blocker, and real-device evidence requirement.

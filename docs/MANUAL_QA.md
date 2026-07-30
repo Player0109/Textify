@@ -630,14 +630,14 @@ with the release evidence; do not commit machine-specific `.trace` data.
 
 ## Production Candidate Automated Verification - 2026-07-31
 
-- PASS: `bash script/release/validate_release.sh` completed 862 tests with 11
+- PASS: `bash script/release/validate_release.sh` completed 866 tests with 11
   expected opt-in native/hardware skips and zero failures, verified the tracked
   signed 42-entry v3 catalog and empty signed v2 revocation baseline, built the
   arm64 Release executable, and passed release metadata, exact production
   entitlement, native dependency, deployment-target, legal notice, provenance,
   and shell-syntax checks.
 - PASS: the local CI-equivalent path verified the signed catalog, ran
-  the same 862-test suite, built the arm64 Release executable, and confirmed
+  the same 866-test suite, built the arm64 Release executable, and confirmed
   its architecture.
 - PASS: `bash script/build_and_run.sh --stage-full-release` built and staged the
   Xcode Release app, verified the exact signed catalog and revocation pairs,

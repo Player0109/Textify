@@ -341,6 +341,18 @@ rules, additive state ownership, and the designated rollback contract are in
 
 ## Public Docs And Manual QA Gate
 
+The committed app-release candidate must describe an available release rather
+than a future one. Before the final validation used for archive creation or
+evidence collection:
+
+- replace the README's pre-release installation notice with the final
+  installation wording; and
+- replace `1.1.0 - Unreleased` in the changelog with the actual release date.
+
+Do not make those claims while the app remains ineligible for publication.
+Keeping the pre-release wording means the production tag and app release must
+not be created.
+
 Before publishing the GitHub Release, verify the public docs do not promise
 deferred or unsupported V1.1 behavior:
 

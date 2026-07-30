@@ -1,2 +1,8 @@
 # Preserve byte-for-byte upstream legal text, including its original whitespace.
-THIRD_PARTY_LICENSES/** -whitespace
+THIRD_PARTY_LICENSES/** -text -whitespace
+
+# These payloads are signature-bound to their exact tracked bytes.
+models/manifest.json -text
+models/manifest.json.sig -text
+models/revocations.json -text
+models/revocations.json.sig -text

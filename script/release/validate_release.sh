@@ -4,6 +4,43 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 cd "$REPO_ROOT"
 
+macos_version_is_at_most_14_0() {
+  local version="$1"
+  if [[ ! "$version" =~ ^[0-9]+([.][0-9]+){0,2}$ ]]; then
+    return 1
+  fi
+  local major minor patch
+  IFS=. read -r major minor patch <<<"$version"
+  minor="${minor:-0}"
+  patch="${patch:-0}"
+  (( major < 14 || (major == 14 && minor == 0 && patch == 0) ))
+}
+
+assert_macos_14_compatible_macho() {
+  local binary_path="$1"
+  local minimum_versions minimum_version
+  [[ -f "$binary_path" ]]
+  minimum_versions="$(
+    otool -l "$binary_path" \
+      | awk '$1 == "cmd" { load_command = $2; next }
+             load_command == "LC_BUILD_VERSION" && $1 == "minos" {
+               print $2
+               load_command = ""
+             }
+             load_command == "LC_VERSION_MIN_MACOSX" && $1 == "version" {
+               print $2
+               load_command = ""
+             }'
+  )"
+  [[ -n "$minimum_versions" ]]
+  while IFS= read -r minimum_version; do
+    if ! macos_version_is_at_most_14_0 "$minimum_version"; then
+      echo "$binary_path requires macOS $minimum_version, later than 14.0." >&2
+      return 1
+    fi
+  done <<<"$minimum_versions"
+}
+
 ensure_xcode_project
 TEXTIFY_MODEL_MANIFEST_PUBLIC_KEY_BASE64="eg6XVGVQ4Kqh1dtN3B8JcFTtK0RSxkxd79W5tfIlfos=" \
   TEXTIFY_MODEL_MANIFEST_KEY_ID="textify-model-manifest-2026-huggingface" \
@@ -14,6 +51,23 @@ TEXTIFY_MODEL_REVOCATION_KEY_ID="textify-model-manifest-2026-huggingface" \
     models/revocations.json.sig
 swift test
 swift build -c release --arch arm64
+RELEASE_BIN_DIRECTORY="$(swift build -c release --arch arm64 --show-bin-path)"
+RELEASE_EXECUTABLE="$RELEASE_BIN_DIRECTORY/Textify"
+[[ -x "$RELEASE_EXECUTABLE" ]]
+[[ "$(lipo -archs "$RELEASE_EXECUTABLE")" == "arm64" ]]
+RELEASE_EXECUTABLE_MINOS="$(
+  otool -l "$RELEASE_EXECUTABLE" \
+    | awk '$1 == "cmd" { in_build_version = ($2 == "LC_BUILD_VERSION"); next }
+           in_build_version && $1 == "minos" { print $2; exit }'
+)"
+[[ "$RELEASE_EXECUTABLE_MINOS" == "14.0" ]]
+for release_dependency in \
+  "$RELEASE_BIN_DIRECTORY/libCLiteRTLM_mac.dylib" \
+  Vendor/sherpa-onnx/v1.13.2/lib/libsherpa-onnx-c-api.dylib \
+  Vendor/sherpa-onnx/v1.13.2/lib/libonnxruntime.1.24.4.dylib \
+  Vendor/transcribe.cpp/v0.1.3/lib/libtextify-transcribe.0.1.3.dylib; do
+  assert_macos_14_compatible_macho "$release_dependency"
+done
 plutil -lint Resources/Info.plist
 [[ "$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" Resources/Info.plist)" == "io.github.Player0109.Textify" ]]
 [[ "$(/usr/libexec/PlistBuddy -c "Print :LSUIElement" Resources/Info.plist)" == "true" ]]
@@ -34,7 +88,6 @@ done
 [[ "$(find Resources/Assets.xcassets/AppIcon.appiconset -name 'AppIcon-*.png' -type f | wc -l | tr -d ' ')" == "10" ]]
 ! rg -n "SUFeedURL|SUPublicEDKey|Sparkle" Resources Sources Package.swift project.yml
 ! rg -n "Run Mock Dictation|Mock dictation|Developer Mode|Check for Updates|transcript history" Sources/Textify
-lipo -archs .build/arm64-apple-macosx/release/Textify | rg '^arm64$'
 printf '%s  %s\n' \
   'c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4' \
   'LICENSE' \
