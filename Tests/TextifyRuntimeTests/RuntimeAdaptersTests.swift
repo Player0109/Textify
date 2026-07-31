@@ -84,7 +84,8 @@ final class RuntimeAdaptersTests: XCTestCase {
             ),
             maximumDurationSeconds: 60,
             onSpeechDetected: {},
-            onMaximumDurationReached: {}
+            onMaximumDurationReached: {},
+            onRecordingError: { _ in }
         )
 
         XCTAssertEqual(engine.selectedInput, .device(deviceUID: "fixture-device-uid"))

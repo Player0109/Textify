@@ -13,8 +13,8 @@ enum MicrophoneInputPresentationCopy {
             return selectedInputUnavailable
         case .microphonePermissionDenied:
             return "Microphone access is required to show the input level."
-        case .unsupportedInput, .alreadyRecording, .notRecording,
-             .inputNodeUnavailable, .unsupportedInputFormat,
+        case .alreadyRecording, .notRecording, .inputNodeUnavailable,
+             .unsupportedInputFormat,
              .engineStartFailed, .conversionFailed, .emptyRecording,
              .deviceChangedDuringRecording:
             return "The microphone input level is temporarily unavailable."

@@ -2,27 +2,59 @@
 import AudioToolbox
 import CoreAudio
 
-public final class SystemAudioEngineClient: AudioEngineClient, @unchecked Sendable {
+public final class SystemAudioEngineClient:
+    AudioEngineClient,
+    AudioInputChangeObserving,
+    @unchecked Sendable
+{
     private let engine = AVAudioEngine()
     private let resolveDeviceID:
         @Sendable (LiveAudioInput) throws -> AudioDeviceID
+    private let makeInputDeviceObserver: (
+        AudioDeviceID,
+        String,
+        AudioUnit,
+        @escaping @Sendable () -> Void
+    ) -> any CoreAudioInputDeviceObserving
+    private let observationLock = NSLock()
+    private var inputChangeHandler: (@Sendable () -> Void)?
+    private var inputDeviceObserver: (any CoreAudioInputDeviceObserving)?
     private var tapInstalled = false
 
-    public init() {
-        self.resolveDeviceID = { input in
+    public convenience init() {
+        self.init(resolveDeviceID: { input in
             try CoreAudioInputDevices.resolveDeviceID(for: input)
-        }
+        })
     }
 
     init(
         resolveDeviceID: @escaping @Sendable (
             LiveAudioInput
-        ) throws -> AudioDeviceID
+        ) throws -> AudioDeviceID,
+        makeInputDeviceObserver: @escaping (
+            AudioDeviceID,
+            String,
+            AudioUnit,
+            @escaping @Sendable () -> Void
+        ) -> any CoreAudioInputDeviceObserving = {
+            deviceID,
+            expectedUID,
+            audioUnit,
+            onChange in
+            CoreAudioInputDeviceObserver(
+                deviceID: deviceID,
+                expectedUID: expectedUID,
+                audioUnit: audioUnit,
+                onChange: onChange
+            )
+        }
     ) {
         self.resolveDeviceID = resolveDeviceID
+        self.makeInputDeviceObserver = makeInputDeviceObserver
     }
 
     public func selectInput(_ input: LiveAudioInput) throws {
+        stopInputObservation()
         let deviceID = try resolveDeviceID(input)
         let inputNode = engine.inputNode
         guard let audioUnit = inputNode.audioUnit else {
@@ -52,6 +84,49 @@ public final class SystemAudioEngineClient: AudioEngineClient, @unchecked Sendab
             }
             throw LiveAudioRecorderError.unsupportedInputFormat
         }
+
+        do {
+            let deviceUID = try CoreAudioInputDevices.deviceUID(
+                for: deviceID
+            )
+            if case let .device(expectedUID) = input,
+               deviceUID != expectedUID
+            {
+                throw LiveAudioRecorderError.selectedInputUnavailable
+            }
+            observationLock.lock()
+            let selectedInputChangeHandler = inputChangeHandler
+            observationLock.unlock()
+            let observer = makeInputDeviceObserver(
+                deviceID,
+                deviceUID,
+                audioUnit
+            ) {
+                selectedInputChangeHandler?()
+            }
+            observationLock.lock()
+            inputDeviceObserver = observer
+            observationLock.unlock()
+
+            do {
+                try observer.start()
+            } catch {
+                observationLock.lock()
+                if let currentObserver = inputDeviceObserver,
+                   currentObserver === observer
+                {
+                    inputDeviceObserver = nil
+                }
+                observationLock.unlock()
+                observer.stop()
+                throw error
+            }
+        } catch {
+            if case .device = input {
+                throw LiveAudioRecorderError.selectedInputUnavailable
+            }
+            throw LiveAudioRecorderError.inputNodeUnavailable
+        }
     }
 
     public func start() throws {
@@ -60,10 +135,12 @@ public final class SystemAudioEngineClient: AudioEngineClient, @unchecked Sendab
     }
 
     public func stop() {
+        stopInputObservation()
         engine.stop()
     }
 
     public func reset() {
+        stopInputObservation()
         engine.reset()
     }
 
@@ -86,5 +163,21 @@ public final class SystemAudioEngineClient: AudioEngineClient, @unchecked Sendab
         }
         engine.inputNode.removeTap(onBus: 0)
         tapInstalled = false
+    }
+
+    func setInputChangeHandler(
+        _ handler: (@Sendable () -> Void)?
+    ) {
+        observationLock.lock()
+        inputChangeHandler = handler
+        observationLock.unlock()
+    }
+
+    private func stopInputObservation() {
+        observationLock.lock()
+        let observer = inputDeviceObserver
+        inputDeviceObserver = nil
+        observationLock.unlock()
+        observer?.stop()
     }
 }

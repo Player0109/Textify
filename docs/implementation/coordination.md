@@ -1962,3 +1962,17 @@ Task 1 must merge before parallel Wave 1 work begins.
 - Developer ID signing, notarization, stapling, Gatekeeper validation, and
   production release publication remain outside this handoff and fail closed
   without maintainer credentials.
+
+## Active Input Observer Review Remediation Handoff - 2026-07-31
+
+- The production release review reopened the audio/runtime slice narrowly for
+  startup and teardown races in active-input observation. The CoreAudio owner
+  may change `CoreAudioInputDevices.swift`, `SystemAudioEngineClient.swift`,
+  and focused observer tests to serialize listener ownership, make queued
+  validation lifecycle-safe, and add hardware-free cleanup coverage.
+- The microphone-stream owner may change only
+  `MicrophoneInputClient.swift` and its focused tests to ensure termination
+  during startup cannot subsequently install a tap or start capture.
+- Preserve exact stable-UID routing, keep System Default bound to the original
+  device while that stream remains valid, and do not add a listener for default
+  input preference changes. Manual hardware evidence remains unchecked.

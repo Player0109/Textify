@@ -139,7 +139,9 @@ public protocol RuntimeAudioRecording: Sendable {
         microphone: MicrophoneSelection,
         maximumDurationSeconds: Double,
         onSpeechDetected: @escaping @Sendable () -> Void,
-        onMaximumDurationReached: @escaping @Sendable () -> Void
+        onMaximumDurationReached: @escaping @Sendable () -> Void,
+        onRecordingError:
+            @escaping @Sendable (LiveAudioRecorderError) -> Void
     ) async throws
     func finishRecording() async throws -> CanonicalAudioBuffer
     func discardRecording() async

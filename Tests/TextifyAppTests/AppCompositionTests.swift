@@ -3525,6 +3525,60 @@ final class AppCompositionTests: XCTestCase {
     }
 
     @MainActor
+    func testMeterDisconnectRefreshesPersistedInputAsUnavailable() async throws {
+        let probe = MicrophoneLevelStreamProbe()
+        var preferences = AppPreferences.defaults
+        preferences.microphoneSelection = .device(
+            deviceUID: "desk-mic",
+            lastSeenDisplayName: "Desk Microphone"
+        )
+        let services = try Self.makeServices(
+            preferences: preferences,
+            microphoneInputClient: probe.client(
+                devices: [
+                    MicrophoneDevice(
+                        id: "desk-mic",
+                        displayName: "Desk Microphone"
+                    ),
+                ]
+            )
+        )
+        _ = await services.dictation.refreshReadiness()
+        services.settingsRouter.selectedPane = .dictation
+        services.setMainWindowVisibility(true)
+        for _ in 0..<100 where probe.inputs.isEmpty {
+            await Task.yield()
+        }
+
+        probe.disconnectCurrentInput()
+        for _ in 0..<100
+            where services.microphoneInputPresentation.isMonitoring
+        {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(
+            services.microphoneInputPresentation.monitoringError,
+            .selectedInputUnavailable
+        )
+        XCTAssertTrue(
+            services.microphoneInputPresentation.devices.isEmpty
+        )
+        XCTAssertEqual(
+            services.microphoneInputPresentation.presentedDevices(
+                selection: services.preferences.microphoneSelection
+            ),
+            [
+                MicrophoneDevice(
+                    id: "desk-mic",
+                    displayName: "Desk Microphone",
+                    isAvailable: false
+                ),
+            ]
+        )
+    }
+
+    @MainActor
     func testFailedMicrophoneRefreshClearsStaleAvailableDevices() throws {
         let refreshProbe = MicrophoneDeviceRefreshProbe(
             devices: [
@@ -4192,7 +4246,9 @@ private actor FakeRuntimeAudioRecorder: RuntimeAudioRecording {
         microphone: MicrophoneSelection,
         maximumDurationSeconds: Double,
         onSpeechDetected: @escaping @Sendable () -> Void,
-        onMaximumDurationReached: @escaping @Sendable () -> Void
+        onMaximumDurationReached: @escaping @Sendable () -> Void,
+        onRecordingError:
+            @escaping @Sendable (LiveAudioRecorderError) -> Void
     ) async throws {}
 
     func finishRecording() async throws -> CanonicalAudioBuffer {
@@ -4273,14 +4329,25 @@ private actor SuspendedModelInstallGate {
 
 private final class MicrophoneLevelStreamProbe: @unchecked Sendable {
     private let lock = NSLock()
+    private var availableDevices: [MicrophoneDevice] = []
     private var recordedInputs: [LiveAudioInput] = []
     private var recordedTerminationCount = 0
     private var continuations:
         [AsyncThrowingStream<Float, Error>.Continuation] = []
 
     func client(devices: [MicrophoneDevice]) -> MicrophoneInputClient {
-        MicrophoneInputClient(
-            inputDevices: { devices },
+        lock.lock()
+        availableDevices = devices
+        lock.unlock()
+        return MicrophoneInputClient(
+            inputDevices: { [weak self] in
+                guard let self else {
+                    return []
+                }
+                self.lock.lock()
+                defer { self.lock.unlock() }
+                return self.availableDevices
+            },
             levelStream: { [weak self] input in
                 AsyncThrowingStream(
                     bufferingPolicy: .bufferingNewest(1)
@@ -4304,6 +4371,16 @@ private final class MicrophoneLevelStreamProbe: @unchecked Sendable {
                     continuation.yield(0.42)
                 }
             }
+        )
+    }
+
+    func disconnectCurrentInput() {
+        lock.lock()
+        availableDevices = []
+        let continuation = continuations.last
+        lock.unlock()
+        continuation?.finish(
+            throwing: LiveAudioRecorderError.selectedInputUnavailable
         )
     }
 

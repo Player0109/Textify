@@ -56,6 +56,13 @@ public struct MicrophoneInputClient: Sendable {
         AsyncThrowingStream(
             bufferingPolicy: .bufferingNewest(1)
         ) { continuation in
+            let inputChangeError: LiveAudioRecorderError
+            switch input {
+            case .systemDefault:
+                inputChangeError = .inputNodeUnavailable
+            case .device:
+                inputChangeError = .selectedInputUnavailable
+            }
             let session = MicrophoneLevelStreamSession(
                 engineClient: engineClient
             )
@@ -64,9 +71,20 @@ public struct MicrophoneInputClient: Sendable {
             }
 
             do {
-                try session.start(input: input) { level in
-                    continuation.yield(level)
-                }
+                try session.start(
+                    input: input,
+                    inputChangeError: inputChangeError,
+                    onLevel: { level in
+                        continuation.yield(level)
+                    },
+                    onInputChange: {
+                        Task {
+                            continuation.finish(
+                                throwing: inputChangeError
+                            )
+                        }
+                    }
+                )
             } catch {
                 session.stop()
                 continuation.finish(throwing: error)
@@ -77,8 +95,14 @@ public struct MicrophoneInputClient: Sendable {
 
 private final class MicrophoneLevelStreamSession: @unchecked Sendable {
     private let engineClient: any AudioEngineClient
-    private let lock = NSLock()
+    private let stateLock = NSLock()
+    private let engineLock = NSLock()
+    private let teardownQueue = DispatchQueue(
+        label: "io.github.Player0109.Textify.microphone-level-teardown"
+    )
     private var isStopped = false
+    private var stopError: LiveAudioRecorderError?
+    private var didTearDown = false
 
     init(engineClient: any AudioEngineClient) {
         self.engineClient = engineClient
@@ -86,31 +110,123 @@ private final class MicrophoneLevelStreamSession: @unchecked Sendable {
 
     func start(
         input: LiveAudioInput,
-        onLevel: @escaping @Sendable (Float) -> Void
+        inputChangeError: LiveAudioRecorderError,
+        onLevel: @escaping @Sendable (Float) -> Void,
+        onInputChange: @escaping @Sendable () -> Void
     ) throws {
-        try engineClient.selectInput(input)
-        try engineClient.installTap { buffer, _ in
-            onLevel(Self.normalizedLevel(from: buffer))
+        (engineClient as? AudioInputChangeObserving)?
+            .setInputChangeHandler { [weak self] in
+                self?.inputChanged(
+                    with: inputChangeError,
+                    onInputChange: onInputChange
+                )
+            }
+
+        try performStartupStep {
+            try engineClient.selectInput(input)
         }
-        try engineClient.start()
+        try performStartupStep {
+            try engineClient.installTap { buffer, _ in
+                onLevel(Self.normalizedLevel(from: buffer))
+            }
+        }
+        try performStartupStep {
+            try engineClient.start()
+        }
     }
 
     func stop() {
-        lock.lock()
-        guard !isStopped else {
-            lock.unlock()
+        markStopped()
+        tearDownEngine()
+    }
+
+    private func inputChanged(
+        with error: LiveAudioRecorderError,
+        onInputChange: @escaping @Sendable () -> Void
+    ) {
+        guard markStopped(with: error) else {
             return
         }
-        isStopped = true
-        lock.unlock()
 
+        teardownQueue.async { [weak self] in
+            self?.tearDownEngine()
+        }
+        onInputChange()
+    }
+
+    private func performStartupStep(
+        _ operation: () throws -> Void
+    ) throws {
+        engineLock.lock()
+        defer { engineLock.unlock() }
+
+        if let error = startupStopError() {
+            tearDownEngineLocked()
+            throw error
+        }
+
+        do {
+            try operation()
+        } catch {
+            markStopped()
+            tearDownEngineLocked()
+            throw error
+        }
+
+        if let error = startupStopError() {
+            tearDownEngineLocked()
+            throw error
+        }
+    }
+
+    @discardableResult
+    private func markStopped(
+        with error: LiveAudioRecorderError? = nil
+    ) -> Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        guard !isStopped else {
+            return false
+        }
+        isStopped = true
+        stopError = error
+        return true
+    }
+
+    private func startupStopError() -> Error? {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        guard isStopped else {
+            return nil
+        }
+        return stopError ?? CancellationError()
+    }
+
+    private func tearDownEngine() {
+        engineLock.lock()
+        defer { engineLock.unlock() }
+        tearDownEngineLocked()
+    }
+
+    private func tearDownEngineLocked() {
+        stateLock.lock()
+        guard !didTearDown else {
+            stateLock.unlock()
+            return
+        }
+        didTearDown = true
+        stateLock.unlock()
+
+        (engineClient as? AudioInputChangeObserving)?
+            .setInputChangeHandler(nil)
         engineClient.removeTap()
         engineClient.stop()
         engineClient.reset()
     }
 
     deinit {
-        stop()
+        markStopped()
+        tearDownEngine()
     }
 
     private static func normalizedLevel(

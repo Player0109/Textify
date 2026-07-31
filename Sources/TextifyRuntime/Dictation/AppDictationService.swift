@@ -625,6 +625,14 @@ public final class AppDictationService {
                         }
                         await self.handleTriggerAction(.finishRecording)
                     }
+                },
+                onRecordingError: { [weak self] error in
+                    Task { @MainActor in
+                        await self?.handleRecordingError(
+                            error,
+                            sessionID: sessionID
+                        )
+                    }
                 }
             )
 
@@ -645,6 +653,33 @@ public final class AppDictationService {
             resetTriggerStateMachine()
             status = Self.status(forAudioStartError: error)
         }
+    }
+
+    private func handleRecordingError(
+        _ error: LiveAudioRecorderError,
+        sessionID: UUID
+    ) async {
+        guard activeSessionID == sessionID else {
+            return
+        }
+        switch status {
+        case .waitingForActivation, .recording:
+            break
+        case .idle, .processing, .inserting, .completed, .cancelled,
+             .failed, .blocked:
+            return
+        }
+
+        activationTimerToken = nil
+        targetCaptureToken = nil
+        activationTarget = nil
+        activeSessionID = nil
+        activeSessionPreferences = nil
+        activeSegmentContext = nil
+        currentSegment = nil
+        resetTriggerStateMachine()
+        status = Self.status(forAudioFinishError: error)
+        await dependencies.audio.discardRecording()
     }
 
     private func finishRecording() async {
@@ -1239,7 +1274,6 @@ public final class AppDictationService {
             return .failed(.microphoneChanged)
         case .microphonePermissionDenied,
              .selectedInputUnavailable,
-             .unsupportedInput,
              .alreadyRecording,
              .notRecording,
              .inputNodeUnavailable,

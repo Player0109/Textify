@@ -84,6 +84,9 @@ final class MicrophoneInputPresentation {
                 }
                 self?.level = 0
                 self?.monitoringError = error
+                if error == .selectedInputUnavailable {
+                    self?.refreshDevices()
+                }
                 self?.isMonitoring = false
                 self?.monitoringTask = nil
                 self?.monitoredSelection = nil

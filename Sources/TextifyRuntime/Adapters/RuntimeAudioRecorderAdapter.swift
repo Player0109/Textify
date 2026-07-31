@@ -12,7 +12,9 @@ public actor RuntimeAudioRecorderAdapter: RuntimeAudioRecording {
         microphone: MicrophoneSelection,
         maximumDurationSeconds: Double,
         onSpeechDetected: @escaping @Sendable () -> Void,
-        onMaximumDurationReached: @escaping @Sendable () -> Void
+        onMaximumDurationReached: @escaping @Sendable () -> Void,
+        onRecordingError:
+            @escaping @Sendable (LiveAudioRecorderError) -> Void
     ) async throws {
         let input: LiveAudioInput
         switch microphone {
@@ -26,7 +28,8 @@ public actor RuntimeAudioRecorderAdapter: RuntimeAudioRecording {
             input: input,
             maximumDurationSeconds: maximumDurationSeconds,
             onSpeechDetected: onSpeechDetected,
-            onMaximumDurationReached: onMaximumDurationReached
+            onMaximumDurationReached: onMaximumDurationReached,
+            onRecordingError: onRecordingError
         )
     }
 
