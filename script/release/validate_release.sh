@@ -4,6 +4,11 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 cd "$REPO_ROOT"
 
+if ! command -v rg >/dev/null; then
+  echo "ripgrep (rg) is required for release-source validation." >&2
+  exit 1
+fi
+
 macos_version_is_at_most_14_0() {
   local version="$1"
   if [[ ! "$version" =~ ^[0-9]+([.][0-9]+){0,2}$ ]]; then
