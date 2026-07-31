@@ -1877,17 +1877,15 @@ struct ModelCheckpointInspectorSurface: View {
                                                 .allowsModelOperations
                                     )
                                     Button(
-                                        artifact.row.measuredLocalBytes == nil
-                                            ? "Remove — Size Pending"
-                                            : "Remove",
+                                        canDelete(artifact)
+                                            ? "Remove"
+                                            : "Remove — Size Pending",
                                         systemImage: "trash",
                                         role: .destructive
                                     ) {
                                         onRemove(artifact)
                                     }
-                                    .disabled(
-                                        artifact.row.measuredLocalBytes == nil
-                                    )
+                                    .disabled(!canDelete(artifact))
                                 } label: {
                                     Image(systemName: "ellipsis.circle")
                                 }
@@ -1960,7 +1958,11 @@ struct ModelCheckpointInspectorSurface: View {
                 }
             }
 
-            if let model = row.selectedArtifact.row.operationalModel {
+            if let sourceLicense =
+                ModelCheckpointInspectorSourceLicensePresentation(
+                    artifact: row.selectedArtifact
+                )
+            {
                 section("Source & License") {
                     ModelCheckpointInspectorFact(
                         label: "Selected Exact Artifact",
@@ -1969,12 +1971,9 @@ struct ModelCheckpointInspectorSurface: View {
                             .displayName
                     )
                     ModelSourceLicenseButton(
-                        presentation:
-                            ModelSourceLicensePresentation(model: model)
+                        presentation: sourceLicense.sourceAndLicense
                     )
-                    if let sourceURL = URL(
-                        string: model.provenance.sourceUrl
-                    ) {
+                    if let sourceURL = sourceLicense.upstreamSourceURL {
                         Link(destination: sourceURL) {
                             Label(
                                 "Open Upstream Source",
@@ -2048,6 +2047,14 @@ struct ModelCheckpointInspectorSurface: View {
 
     private var installedArtifacts: [ModelCatalogExactArtifactPresentation] {
         row.checkpoint.artifacts.filter(\.row.isInstalled)
+    }
+
+    private func canDelete(
+        _ artifact: ModelCatalogExactArtifactPresentation
+    ) -> Bool {
+        artifact.row.visibleActions(
+            for: .exactArtifact(artifact.id)
+        ).contains(.delete)
     }
 
     private var languageDescription: String {

@@ -23,12 +23,20 @@ struct ModelCheckpointAccessibilityVisualPolicy: Equatable, Sendable {
         emphasizesControlBoundaries =
             increaseContrast || differentiateWithoutColor
     }
+}
 
-    static let standard = ModelCheckpointAccessibilityVisualPolicy(
-        increaseContrast: false,
-        differentiateWithoutColor: false,
-        reduceTransparency: false
-    )
+struct ModelCheckpointInspectorSourceLicensePresentation: Equatable {
+    let sourceAndLicense: ModelSourceLicensePresentation
+    let upstreamSourceURL: URL?
+
+    init?(artifact: ModelCatalogExactArtifactPresentation) {
+        guard let model = artifact.row.operationalModel else {
+            return nil
+        }
+        let sourceAndLicense = ModelSourceLicensePresentation(model: model)
+        self.sourceAndLicense = sourceAndLicense
+        upstreamSourceURL = sourceAndLicense.sourceURL
+    }
 }
 
 struct ModelCheckpointLayoutMetrics: Equatable {

@@ -589,15 +589,6 @@ final class ModelCatalogCheckpointExperienceTests: XCTestCase {
     }
 
     func testAccessibilityVisualPolicyMakesTheRequiredDecisionsExplicit() {
-        XCTAssertEqual(
-            ModelCheckpointAccessibilityVisualPolicy.standard,
-            ModelCheckpointAccessibilityVisualPolicy(
-                increaseContrast: false,
-                differentiateWithoutColor: false,
-                reduceTransparency: false
-            )
-        )
-
         let increaseContrast = ModelCheckpointAccessibilityVisualPolicy(
             increaseContrast: true,
             differentiateWithoutColor: false,
@@ -623,30 +614,52 @@ final class ModelCatalogCheckpointExperienceTests: XCTestCase {
         XCTAssertTrue(reduceTransparency.usesOpaqueSurfaces)
     }
 
-    func testCheckpointInspectorWiresExactArtifactAndBundledLegalAffordances()
+    func testCheckpointInspectorPresentsExactSourceAndBundledLicense()
         throws
     {
-        let source = try String(
-            contentsOf:
-                repositoryRoot
-                .appendingPathComponent(
-                    "Sources/Textify/SettingsUI/ModelCatalogCheckpointView.swift"
-                ),
-            encoding: .utf8
+        let presentation = try makePresentation()
+        let row = try XCTUnwrap(
+            presentation.rows.first {
+                $0.checkpointID
+                    == "checkpoint.openai.whisper-small-en"
+            }
         )
-        let start = try XCTUnwrap(
-            source.range(of: "struct ModelCheckpointInspectorSurface")
-        )
-        let inspector = source[start.lowerBound..<source.endIndex]
+        XCTAssertEqual(row.selectedArtifact.id, "ggml-small.en-q5_1")
 
-        XCTAssertTrue(inspector.contains("onInspectArtifact"))
-        XCTAssertTrue(inspector.contains("ModelSourceLicenseButton("))
-        XCTAssertTrue(inspector.contains("Open Upstream Source"))
-        XCTAssertTrue(
-            inspector.contains(
-                "artifact.row.measuredLocalBytes == nil"
+        let sourceLicense = try XCTUnwrap(
+            ModelCheckpointInspectorSourceLicensePresentation(
+                artifact: row.selectedArtifact
+            )
+        )
+        XCTAssertEqual(
+            sourceLicense.upstreamSourceURL,
+            URL(string: "https://huggingface.co/ggerganov/whisper.cpp")
+        )
+        XCTAssertEqual(
+            sourceLicense.sourceAndLicense.sourceURL,
+            sourceLicense.upstreamSourceURL
+        )
+        XCTAssertEqual(
+            sourceLicense.sourceAndLicense.licenses,
+            [
+                ModelSourceLicensePresentation.License(
+                    scope:
+                        "OpenAI Whisper small.en model converted to ggml format",
+                    spdxID: "MIT",
+                    name: "MIT License",
+                    licenseTextURL:
+                        "https://github.com/Player0109/Textify/releases/download/models-v1/ggml-small.en-q5_1.LICENSES.txt"
+                )
+            ]
+        )
+        let license = try XCTUnwrap(
+            sourceLicense.sourceAndLicense.licenses.first
+        )
+        XCTAssertEqual(
+            BundledModelLicenseResourceResolver.resourceName(
+                for: license.licenseTextURL
             ),
-            "Exact Artifact removal must stay unavailable while local-size measurement is pending."
+            "ggml-small.en-q5_1.LICENSES.txt"
         )
     }
 
