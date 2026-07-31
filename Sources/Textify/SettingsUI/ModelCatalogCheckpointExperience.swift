@@ -7,6 +7,38 @@ enum ModelCheckpointLayoutMode: Equatable {
     case stacked
 }
 
+struct ModelCheckpointAccessibilityVisualPolicy: Equatable, Sendable {
+    let usesOpaqueSurfaces: Bool
+    let emphasizesSelectionBoundaries: Bool
+    let emphasizesControlBoundaries: Bool
+
+    init(
+        increaseContrast: Bool,
+        differentiateWithoutColor: Bool,
+        reduceTransparency: Bool
+    ) {
+        usesOpaqueSurfaces = reduceTransparency
+        emphasizesSelectionBoundaries =
+            increaseContrast || differentiateWithoutColor
+        emphasizesControlBoundaries =
+            increaseContrast || differentiateWithoutColor
+    }
+}
+
+struct ModelCheckpointInspectorSourceLicensePresentation: Equatable {
+    let sourceAndLicense: ModelSourceLicensePresentation
+    let upstreamSourceURL: URL?
+
+    init?(artifact: ModelCatalogExactArtifactPresentation) {
+        guard let model = artifact.row.operationalModel else {
+            return nil
+        }
+        let sourceAndLicense = ModelSourceLicensePresentation(model: model)
+        self.sourceAndLicense = sourceAndLicense
+        upstreamSourceURL = sourceAndLicense.sourceURL
+    }
+}
+
 struct ModelCheckpointLayoutMetrics: Equatable {
     let modelColumnFloor: CGFloat
     let qualityColumnFloor: CGFloat
@@ -252,7 +284,42 @@ enum ModelCheckpointKeyboardResult: Equatable {
     case ignored
     case focus(String)
     case inspect(String)
-    case delete(String)
+    case inspectArtifact(String)
+    case expand(String)
+    case collapse(String)
+    case deleteArtifact(String)
+}
+
+struct ModelCheckpointDeletionCandidate: Equatable, Sendable {
+    let checkpointID: String
+    let artifactID: String
+    let isInstalled: Bool
+    let hasMeasuredLocalSize: Bool
+    let allowsDeletion: Bool
+
+    var isEligible: Bool {
+        isInstalled && hasMeasuredLocalSize && allowsDeletion
+    }
+}
+
+enum ModelCheckpointDeletionPolicy {
+    static func artifactID(
+        explicitlySelectedArtifactID: String?,
+        focusedCheckpointID: String?,
+        candidates: [ModelCheckpointDeletionCandidate]
+    ) -> String? {
+        guard let explicitlySelectedArtifactID,
+            let focusedCheckpointID,
+            let candidate = candidates.first(where: {
+                $0.checkpointID == focusedCheckpointID
+                    && $0.artifactID == explicitlySelectedArtifactID
+            }),
+            candidate.isEligible
+        else {
+            return nil
+        }
+        return candidate.artifactID
+    }
 }
 
 enum ModelCheckpointKeyboardNavigation {
@@ -260,6 +327,10 @@ enum ModelCheckpointKeyboardNavigation {
         for command: ModelCatalogKeyboardCommand,
         focusedCheckpointID: String?,
         checkpointIDs: [String],
+        expandedCheckpointID: String? = nil,
+        expandableCheckpointIDs: Set<String> = [],
+        inspectionArtifactID: String? = nil,
+        deletionArtifactID: String? = nil,
         pageSize: Int = 8
     ) -> ModelCheckpointKeyboardResult {
         guard !checkpointIDs.isEmpty else {
@@ -287,11 +358,24 @@ enum ModelCheckpointKeyboardNavigation {
         case .end:
             destination = checkpointIDs.count - 1
         case .activate:
+            if let inspectionArtifactID {
+                return .inspectArtifact(inspectionArtifactID)
+            }
             return .inspect(checkpointIDs[currentIndex])
         case .deleteSelection:
-            return .delete(checkpointIDs[currentIndex])
-        case .collapse, .expand:
-            return .ignored
+            return deletionArtifactID.map(
+                ModelCheckpointKeyboardResult.deleteArtifact
+            ) ?? .ignored
+        case .collapse:
+            let checkpointID = checkpointIDs[currentIndex]
+            return expandedCheckpointID == checkpointID
+                ? .collapse(checkpointID)
+                : .ignored
+        case .expand:
+            let checkpointID = checkpointIDs[currentIndex]
+            return expandableCheckpointIDs.contains(checkpointID)
+                ? .expand(checkpointID)
+                : .ignored
         }
         return .focus(checkpointIDs[destination])
     }

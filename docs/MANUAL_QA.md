@@ -114,27 +114,44 @@ release-blocking.
 - [ ] 46. With Increase Contrast or Differentiate Without Color enabled, the
   checkpoint catalog adds stronger selection and control boundaries. Complete
   the corresponding Reduce Transparency visual pass before approval.
+- [ ] 47. Dictation Language defaults to English, persists across relaunch,
+  and prepares the active model again after a compatible change. Automatic
+  invokes detection only for a capable multilingual model and otherwise uses a
+  fixed-language model's signed language. An explicit compatible choice is
+  forwarded with detection off; an unsupported explicit choice cannot
+  transcribe or silently fall back. The Models pane filters an explicit
+  language by default, Browse All Languages reveals incompatible choices
+  without changing the preference, and Use requires confirmation before
+  changing to a supported language. Confirm the full post-processing pipeline
+  runs only for explicit English, while Automatic and explicit non-English
+  output receive whitespace trimming only.
+
+## Dictation Language Decision
+
+The product owner chose to retain the Dictation Language selector for V1.1.
+`docs/SPEC.md` now defines its persisted preference, Automatic and explicit
+routing, catalog discovery behavior, fail-closed compatibility, and effective
+post-processing. This documentation decision removes the former specification
+mismatch; it does not satisfy release-blocking check 47 without interactive
+evidence from the final candidate.
 
 ## Known Specification-Conformance Blockers
 
-- BLOCKED: checks 42 and 43 cannot pass in the current implementation. Textify
-  resets microphone selection to System Default and does not ship the live
-  input meters required by `docs/SPEC.md`. Production app publication requires
-  either the specified implementation or an explicit product decision that
-  narrows the authoritative specification; checking the boxes alone is not a
-  substitute.
-- BLOCKED: `docs/SPEC.md` still says V1 has no language selector, while the
-  shipping Settings UI exposes one and the public documentation describes it.
-  The product owner must explicitly choose and document the production
-  behavior before evidence is assembled against the specification.
-- BLOCKED: checks 44 through 46 cannot pass on the current checkpoint-first
-  catalog surface. Independent review confirmed ambiguous Checkpoint-level
-  destructive keyboard routing, missing source/license affordances in the
-  normal inspector, and missing contrast/differentiate-without-color
-  adaptation. These require implementation and accessibility evidence, not
-  checklist-only approval.
-- Source publication is allowed while these items remain open. A `v1.1.0` tag,
-  draft app release, or production DMG publication is not.
+- BLOCKED: checks 42 and 43 now have automated coverage for stable CoreAudio identity,
+  fail-closed unavailable-device behavior, scalar-only metering, and
+  visibility-scoped teardown. They remain unchecked until repeated with real
+  hardware and permissions against the final candidate.
+- BLOCKED: checks 44 through 46 now have automated coverage for explicit hierarchy
+  semantics, exact-artifact-only destructive routing, source and bundled
+  license actions, and accessibility appearance inputs. They remain unchecked
+  until the keyboard, VoiceOver, Increase Contrast, Differentiate Without
+  Color, and Reduce Transparency passes are completed against the final
+  candidate.
+- BLOCKED: check 47 has automated routing and persistence coverage, but its full
+  multilingual and post-processing matrix remains unchecked until exercised
+  against the final candidate.
+- Source publication is allowed while these evidence gates remain open. A
+  `v1.1.0` tag, draft app release, or production DMG publication is not.
 
 ## Supporting Commands
 
@@ -459,8 +476,8 @@ This verification includes the then-current nine-model catalog.
   The standalone benchmark package's three tests also passed.
 - PASS: the final detached signature verifies the 23-model catalog with key ID
   `textify-model-manifest-2026-huggingface`; structural tests cover every Qwen
-  runtime variant, artifact layout, automatic-language contract, size, hash,
-  and measured picker presentation.
+  runtime variant, artifact layout, Automatic and explicit-language contracts,
+  size, hash, and measured picker presentation.
 - PASS: `script/build_and_run.sh --stage-full-release` produced the arm64 app
   at `dist/Textify.app`. It contains byte-identical catalog/signature files,
   the verified MLX Metal library and transcribe.cpp runtime, no model weights,
@@ -671,15 +688,12 @@ with the release evidence; do not commit machine-specific `.trace` data.
 
 ## Production Candidate Automated Verification - 2026-07-31
 
-- PASS: `bash script/release/validate_release.sh` completed 866 tests with 11
+- PASS: `bash script/release/validate_release.sh` completed 899 tests with 11
   expected opt-in native/hardware skips and zero failures, verified the tracked
   signed 42-entry v3 catalog and empty signed v2 revocation baseline, built the
   arm64 Release executable, and passed release metadata, exact production
   entitlement, native dependency, deployment-target, legal notice, provenance,
   and shell-syntax checks.
-- PASS: the local CI-equivalent path verified the signed catalog, ran
-  the same 866-test suite, built the arm64 Release executable, and confirmed
-  its architecture.
 - PASS: `bash script/build_and_run.sh --stage-full-release` built and staged the
   Xcode Release app, verified the exact signed catalog and revocation pairs,
   checked all required legal resources, the first-party macOS 14 ONNX runtime,

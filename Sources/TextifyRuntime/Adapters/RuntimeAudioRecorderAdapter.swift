@@ -12,16 +12,24 @@ public actor RuntimeAudioRecorderAdapter: RuntimeAudioRecording {
         microphone: MicrophoneSelection,
         maximumDurationSeconds: Double,
         onSpeechDetected: @escaping @Sendable () -> Void,
-        onMaximumDurationReached: @escaping @Sendable () -> Void
+        onMaximumDurationReached: @escaping @Sendable () -> Void,
+        onRecordingError:
+            @escaping @Sendable (LiveAudioRecorderError) -> Void
     ) async throws {
-        guard microphone == .systemDefault else {
-            throw LiveAudioRecorderError.unsupportedInput
+        let input: LiveAudioInput
+        switch microphone {
+        case .systemDefault:
+            input = .systemDefault
+        case .device(let deviceUID, _):
+            input = .device(deviceUID: deviceUID)
         }
 
         try await recorder.startRecording(
+            input: input,
             maximumDurationSeconds: maximumDurationSeconds,
             onSpeechDetected: onSpeechDetected,
-            onMaximumDurationReached: onMaximumDurationReached
+            onMaximumDurationReached: onMaximumDurationReached,
+            onRecordingError: onRecordingError
         )
     }
 

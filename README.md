@@ -56,8 +56,14 @@ GitHub Release DMG and replace the installed app.
 1. Complete the Microphone and Accessibility permission steps in onboarding.
 2. Choose and install a transcription model from the bundled signed catalog.
 3. Focus a text field, hold Right Command, speak, and release the key.
-4. Use Settings to change the model, language, trigger, or recording-overlay
-   placement. Textify 1.1 records from the system-default microphone.
+4. Use Settings to change the model, language, microphone, trigger, or
+   recording-overlay placement. Textify follows the macOS System Default input
+   unless you select a specific available microphone.
+
+Onboarding and Settings show a live input level only while their Microphone
+surface is visible. If a specifically selected microphone disconnects, Textify
+keeps that selection visible as unavailable and does not silently record from a
+different device.
 
 Textify stops recording at the active model's declared safe limit. Most
 catalog entries allow the app-wide 60-second maximum; some models use a shorter

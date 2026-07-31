@@ -111,6 +111,7 @@ final class TextifyOnboardingWindowPresenter {
     static let shared = TextifyOnboardingWindowPresenter()
 
     private var window: NSWindow?
+    private var windowDelegate: TextifyMainWindowSessionDelegate?
 
     private init() {}
 
@@ -118,6 +119,9 @@ final class TextifyOnboardingWindowPresenter {
         if let window {
             window.makeKeyAndOrderFront(nil)
             NSApplication.shared.activate(ignoringOtherApps: true)
+            services.setOnboardingWindowVisibility(
+                TextifyMainWindowSessionDelegate.isActuallyVisible(window)
+            )
             return
         }
 
@@ -145,10 +149,21 @@ final class TextifyOnboardingWindowPresenter {
             }
                 .environment(services)
         )
+        let windowDelegate = TextifyMainWindowSessionDelegate(
+            sessionDidEnd: {},
+            visibilityDidChange: { [weak services] isVisible in
+                services?.setOnboardingWindowVisibility(isVisible)
+            }
+        )
+        window.delegate = windowDelegate
         window.center()
         window.makeKeyAndOrderFront(nil)
         NSApplication.shared.activate(ignoringOtherApps: true)
         self.window = window
+        self.windowDelegate = windowDelegate
+        services.setOnboardingWindowVisibility(
+            TextifyMainWindowSessionDelegate.isActuallyVisible(window)
+        )
     }
 }
 
@@ -162,13 +177,19 @@ final class TextifyMainWindowPresenter {
     init() {}
 
     var isVisible: Bool {
-        window?.isVisible == true
+        guard let window else {
+            return false
+        }
+        return TextifyMainWindowSessionDelegate.isActuallyVisible(window)
     }
 
     func show(services: AppServices) {
         if let window {
             window.makeKeyAndOrderFront(nil)
             NSApplication.shared.activate(ignoringOtherApps: true)
+            services.setMainWindowVisibility(
+                TextifyMainWindowSessionDelegate.isActuallyVisible(window)
+            )
             return
         }
 
@@ -197,28 +218,70 @@ final class TextifyMainWindowPresenter {
             rootView: SettingsRootView()
                 .environment(services)
         )
-        let windowDelegate = TextifyMainWindowSessionDelegate {
-            [weak services] in
-            services?.resetModelCatalogPresentationSession()
-        }
+        let windowDelegate = TextifyMainWindowSessionDelegate(
+            sessionDidEnd: { [weak services] in
+                services?.resetModelCatalogPresentationSession()
+            },
+            visibilityDidChange: { [weak services] isVisible in
+                services?.setMainWindowVisibility(isVisible)
+            }
+        )
         window.delegate = windowDelegate
         window.center()
         window.makeKeyAndOrderFront(nil)
         NSApplication.shared.activate(ignoringOtherApps: true)
         self.window = window
         self.windowDelegate = windowDelegate
+        services.setMainWindowVisibility(
+            TextifyMainWindowSessionDelegate.isActuallyVisible(window)
+        )
     }
 }
 
 @MainActor
 final class TextifyMainWindowSessionDelegate: NSObject, NSWindowDelegate {
     private let sessionDidEnd: @MainActor () -> Void
+    private let visibilityDidChange: @MainActor (Bool) -> Void
 
-    init(sessionDidEnd: @escaping @MainActor () -> Void) {
+    init(
+        sessionDidEnd: @escaping @MainActor () -> Void,
+        visibilityDidChange: @escaping @MainActor (Bool) -> Void = { _ in }
+    ) {
         self.sessionDidEnd = sessionDidEnd
+        self.visibilityDidChange = visibilityDidChange
     }
 
     func windowWillClose(_ notification: Notification) {
+        visibilityDidChange(false)
         sessionDidEnd()
+    }
+
+    func windowDidBecomeKey(_ notification: Notification) {
+        reportVisibility(notification)
+    }
+
+    func windowDidMiniaturize(_ notification: Notification) {
+        visibilityDidChange(false)
+    }
+
+    func windowDidDeminiaturize(_ notification: Notification) {
+        reportVisibility(notification)
+    }
+
+    func windowDidChangeOcclusionState(_ notification: Notification) {
+        reportVisibility(notification)
+    }
+
+    private func reportVisibility(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else {
+            return
+        }
+        visibilityDidChange(Self.isActuallyVisible(window))
+    }
+
+    static func isActuallyVisible(_ window: NSWindow) -> Bool {
+        window.isVisible
+            && !window.isMiniaturized
+            && window.occlusionState.contains(.visible)
     }
 }

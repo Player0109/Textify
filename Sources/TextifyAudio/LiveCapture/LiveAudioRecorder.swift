@@ -5,6 +5,8 @@ public actor LiveAudioRecorder {
     private let permissionClient: MicrophonePermissionClient
     private let configuration: LiveAudioRecordingConfiguration
     private let engineClient: AudioEngineClient
+    private let beforeIngestionTaskCompletion:
+        (@Sendable () async -> Void)?
 
     private var lifecycle: Lifecycle = .idle
     private var nextSessionID: UInt64 = 0
@@ -23,12 +25,29 @@ public actor LiveAudioRecorder {
         self.permissionClient = permissionClient
         self.configuration = configuration
         self.engineClient = engineClient
+        self.beforeIngestionTaskCompletion = nil
+    }
+
+    init(
+        permissionClient: MicrophonePermissionClient,
+        configuration: LiveAudioRecordingConfiguration,
+        engineClient: AudioEngineClient,
+        beforeIngestionTaskCompletion:
+            @escaping @Sendable () async -> Void
+    ) {
+        self.permissionClient = permissionClient
+        self.configuration = configuration
+        self.engineClient = engineClient
+        self.beforeIngestionTaskCompletion = beforeIngestionTaskCompletion
     }
 
     public func startRecording(
+        input: LiveAudioInput? = nil,
         maximumDurationSeconds: Double? = nil,
         onSpeechDetected: @escaping @Sendable () -> Void,
-        onMaximumDurationReached: @escaping @Sendable () -> Void
+        onMaximumDurationReached: @escaping @Sendable () -> Void,
+        onRecordingError:
+            @escaping @Sendable (LiveAudioRecorderError) -> Void = { _ in }
     ) async throws {
         let sessionID = try reserveStartupSession()
 
@@ -36,10 +55,6 @@ public actor LiveAudioRecorder {
             try await ensureMicrophonePermission()
             guard lifecycle == .starting(sessionID) else {
                 throw LiveAudioRecorderError.alreadyRecording
-            }
-            guard configuration.input == .systemDefault else {
-                clearRecordingState(for: sessionID)
-                throw LiveAudioRecorderError.unsupportedInput
             }
         } catch let error as LiveAudioRecorderError {
             clearRecordingState(for: sessionID)
@@ -51,17 +66,34 @@ public actor LiveAudioRecorder {
 
         let (ingestionStream, ingestionPipeline) = LiveAudioIngestionPipeline.makeStream(sessionID: sessionID)
         self.ingestionPipeline = ingestionPipeline
+        let beforeIngestionTaskCompletion = self.beforeIngestionTaskCompletion
         ingestionTask = Task { [weak self] in
             for await event in ingestionStream {
-                await self?.handleIngestionEvent(event, onSpeechDetected: onSpeechDetected)
+                await self?.handleIngestionEvent(
+                    event,
+                    onSpeechDetected: onSpeechDetected,
+                    onRecordingError: onRecordingError
+                )
             }
+            await beforeIngestionTaskCompletion?()
         }
 
         do {
+            let selectedInput = input ?? configuration.input
+            (engineClient as? AudioInputChangeObserving)?
+                .setInputChangeHandler {
+                    ingestionPipeline.fail(
+                        with: .deviceChangedDuringRecording
+                    )
+                }
+            try engineClient.selectInput(selectedInput)
+            try ingestionPipeline.throwIfFailed()
             try engineClient.installTap { buffer, _ in
                 ingestionPipeline.ingest(buffer)
             }
+            try ingestionPipeline.throwIfFailed()
             try engineClient.start()
+            try ingestionPipeline.throwIfFailed()
             lifecycle = .recording(sessionID)
             scheduleMaximumDurationCallback(
                 for: sessionID,
@@ -142,13 +174,17 @@ public actor LiveAudioRecorder {
 
     private func handleIngestionEvent(
         _ event: LiveAudioIngestionEvent,
-        onSpeechDetected: @escaping @Sendable () -> Void
+        onSpeechDetected: @escaping @Sendable () -> Void,
+        onRecordingError:
+            @escaping @Sendable (LiveAudioRecorderError) -> Void
     ) {
         switch event {
         case .audio(let sessionID, let canonical):
             ingest(canonical, for: sessionID, onSpeechDetected: onSpeechDetected)
         case .terminalError(let sessionID, let error):
-            recordTerminalError(error, for: sessionID)
+            if recordTerminalError(error, for: sessionID) {
+                onRecordingError(error)
+            }
         }
     }
 
@@ -168,17 +204,23 @@ public actor LiveAudioRecorder {
         }
     }
 
-    private func recordTerminalError(_ error: LiveAudioRecorderError, for sessionID: RecordingSessionID) {
+    @discardableResult
+    private func recordTerminalError(
+        _ error: LiveAudioRecorderError,
+        for sessionID: RecordingSessionID
+    ) -> Bool {
         guard lifecycle.sessionID == sessionID else {
-            return
+            return false
         }
 
         switch lifecycle {
         case .recording, .finishing, .stoppedAwaitingFinish:
             lifecycle = .failedAwaitingFinish(sessionID, error)
+            capturedSamples.removeAll(keepingCapacity: false)
             stopEngine()
+            return true
         case .failedAwaitingFinish, .idle, .starting:
-            return
+            return false
         }
     }
 
@@ -242,8 +284,11 @@ public actor LiveAudioRecorder {
     }
 
     private func stopEngine(cancelMaximumDuration: Bool = true) {
+        (engineClient as? AudioInputChangeObserving)?
+            .setInputChangeHandler(nil)
         engineClient.removeTap()
         engineClient.stop()
+        engineClient.reset()
         if cancelMaximumDuration {
             cancelMaximumDurationCallback()
         }
@@ -356,6 +401,7 @@ private final class LiveAudioIngestionPipeline: @unchecked Sendable {
     private let conversionSession = CanonicalAudioConverter().makeSession()
     private let continuation: AsyncStream<LiveAudioIngestionEvent>.Continuation
     private var isFinished = false
+    private var terminalError: LiveAudioRecorderError?
 
     private init(
         sessionID: LiveAudioRecorder.RecordingSessionID,
@@ -429,12 +475,32 @@ private final class LiveAudioIngestionPipeline: @unchecked Sendable {
         finishLocked()
     }
 
+    func fail(with error: LiveAudioRecorderError) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard !isFinished else {
+            return
+        }
+        finishLocked(with: error)
+    }
+
+    func throwIfFailed() throws {
+        lock.lock()
+        defer { lock.unlock() }
+
+        if let terminalError {
+            throw terminalError
+        }
+    }
+
     private func finishLocked(with error: LiveAudioRecorderError? = nil) {
         guard !isFinished else {
             return
         }
 
         if let error {
+            terminalError = error
             continuation.yield(.terminalError(sessionID, error))
         }
         isFinished = true

@@ -1,5 +1,6 @@
 public enum LiveAudioInput: Equatable, Sendable {
     case systemDefault
+    case device(deviceUID: String)
 }
 
 public struct LiveAudioRecordingConfiguration: Equatable, Sendable {

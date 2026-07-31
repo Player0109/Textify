@@ -2,6 +2,7 @@ public enum ProductionDictationError: Error, Equatable, Sendable {
     case readinessBlocked(ReadinessBlocker)
     case excludedApp
     case concurrentDictation
+    case selectedMicrophoneUnavailable
     case audioStartFailed
     case audioFinishFailed
     case audioConversionFailed

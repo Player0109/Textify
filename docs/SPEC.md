@@ -1,6 +1,6 @@
 # Textify V1 Spec
 
-Snapshot date: 2026-07-30
+Snapshot date: 2026-07-31
 
 This document captures the Textify V1 product and technical decisions from the
 original product-discovery sequence through Q350. It is a current-state
@@ -18,8 +18,8 @@ the system-default or an explicitly selected microphone, and is distributed as
 a manually updated GitHub Release DMG. It now supports a signed multi-model
 catalog, multiple installed models, safe switching/deletion, verified custom
 Whisper import, several local Apple Silicon runtimes, multilingual model
-routing, vocabulary and replacement pairs, and optional MossFormer2 speech
-enhancement before ASR.
+routing with a persisted Dictation Language selector, vocabulary and
+replacement pairs, and optional MossFormer2 speech enhancement before ASR.
 It still omits Sparkle, transcript history, per-app profiles, cloud ASR, and
 live partial transcription. The trigger is user-selectable from the four
 curated choices, with Right Command as the default. A runtime is not a public
@@ -647,6 +647,7 @@ Excluded:
 Controls:
 
 - Dictation Trigger
+- Dictation Language
 - Microphone
 - Test Trigger
 - Floating Icon X Offset
@@ -669,7 +670,26 @@ No spoken-punctuation toggle.
 
 No filler cleanup toggle.
 
-No language selector in V1.
+Dictation Language:
+
+- Default value: English.
+- Choices come from Textify's fixed supported-language list and are stored
+  locally in `settings.json` under the `transcriptionLanguage` preference.
+- The Settings -> Dictation picker exposes only choices supported by the active
+  transcription model. A fixed single-language model exposes only that
+  language; a verified multilingual model also exposes Automatic.
+- Automatic asks a model with verified language-detection support to detect
+  the language. With a fixed-language model, Automatic uses that model's
+  signed fixed language and does not claim that detection occurred.
+- An explicit language forces that language for inference and disables
+  automatic detection.
+- An explicit language that the active model does not declare is a fail-closed
+  readiness state: do not transcribe with another language or silently switch
+  models.
+- Changing the selection persists immediately and prepares the active model
+  again when it supports the new choice.
+- Reset Onboarding retains the language preference. Reset All Settings restores
+  English.
 
 No insertion method selector.
 
@@ -733,6 +753,22 @@ Catalog availability:
 - Model-list changes ship only through a new Textify app release.
 - A missing or invalid bundled manifest is a release-integrity failure, not an
   offline state.
+
+Language discovery:
+
+- For an explicit Dictation Language, the Models pane normally shows compatible
+  transcription checkpoints plus the active checkpoint, even if that active
+  checkpoint is now incompatible.
+- Automatic does not language-filter the catalog.
+- Search and Browse All Languages temporarily reveal all transcription
+  checkpoints. Browse All Languages changes discovery only; it does not change
+  the persisted Dictation Language or weaken runtime compatibility.
+- An incompatible row identifies the unsupported selected language. Choosing
+  Use on it requires an explicit confirmation to change Dictation Language to
+  a supported choice before activation.
+- Catalog presentation is advisory. Runtime admission independently checks the
+  selected explicit language against the signed model capabilities and fails
+  closed on a mismatch.
 
 Support tiers are curator labels, not measurements. The Models pane must never
 derive quality or speed bars from `tier`. Quality and speed sorting uses
@@ -1467,6 +1503,7 @@ Model storage:
 
 ```text
 ~/Library/Application Support/Textify/
+├── settings.json
 ├── vocabulary.json
 ├── custom-words.json
 ├── excluded-apps.json
@@ -1829,10 +1866,12 @@ Runtime parameter policy for all initial V1 models:
 
 This block documents the initial English Whisper presets. The current
 multi-model catalog may declare a fixed supported language or language
-detection according to an engine's verified capabilities. Capture uses each
-entry's `maxAudioSeconds`; production policy accepts 1–60 seconds generally and
-at most 29 seconds for Paraformer so its 30-second native input window cannot
-silently truncate post-release audio.
+detection according to an engine's verified capabilities. The persisted
+Dictation Language preference is applied at runtime only within the selected
+model's signed capabilities. Capture uses each entry's `maxAudioSeconds`;
+production policy accepts 1–60 seconds generally and at most 29 seconds for
+Paraformer so its 30-second native input window cannot silently truncate
+post-release audio.
 
 ```json
 {
@@ -1850,10 +1889,19 @@ silently truncate post-release audio.
 }
 ```
 
-Specific runtime decisions:
+Language runtime decisions:
 
-- Force English with `language: "en"`.
-- Do not auto-detect language.
+- English remains the default user preference.
+- For an explicit selection, pass the selected language code and set
+  `detectLanguage: false`.
+- For Automatic on a model with verified detection, pass the runtime's
+  automatic sentinel and set `detectLanguage: true`.
+- For Automatic on a fixed-language model, retain that model's signed
+  `language` and `detectLanguage: false`.
+- Never pass an unsupported explicit language. Treat a catalog/runtime
+  capability mismatch as not ready and perform no inference or insertion.
+- The JSON preset above remains the fixed English policy for the initial
+  English Whisper entries.
 - Do not translate.
 - Use deterministic greedy decoding.
 - No beam search in V1.
@@ -2099,6 +2147,16 @@ Pipeline order:
 6. Final whitespace/capitalization pass
 7. Plain text output for insertion
 
+Effective language policy:
+
+- The complete pipeline above runs only when Dictation Language is explicitly
+  English.
+- Automatic and every explicit non-English selection preserve the runtime's
+  language-specific output and apply only leading/trailing whitespace
+  trimming. This remains true when Automatic happens to detect English.
+- This policy is based on the persisted user selection, not on a guessed
+  transcript language.
+
 No cleanup intensity setting.
 
 No LLM cleanup in V1.
@@ -2341,6 +2399,7 @@ Clipboard:
 Settings stored locally:
 
 - app preferences
+- dictation language selection
 - selected model
 - vocabulary replacements
 - custom words

@@ -782,6 +782,33 @@ final class AppDictationServiceTests: XCTestCase {
         XCTAssertEqual(service.status, .cancelled(.escapeKey))
     }
 
+    func testSelectedMicrophoneUnavailableStartErrorHasSpecificStatus() async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.audio.setStartError(
+            LiveAudioRecorderError.selectedInputUnavailable
+        )
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+
+        XCTAssertEqual(
+            service.status,
+            .failed(.selectedMicrophoneUnavailable)
+        )
+    }
+
+    func testOtherAudioStartErrorsRemainGenericStartFailures() async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.audio.setStartError(
+            LiveAudioRecorderError.engineStartFailed
+        )
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+
+        XCTAssertEqual(service.status, .failed(.audioStartFailed))
+    }
+
     func testFinishRecordingErrorAfterCancellationKeepsCancellationStatus() async {
         let fakes = RuntimeFakes.ready()
         await fakes.audio.suspendFinish(callNumber: 1)
@@ -1263,6 +1290,28 @@ final class AppDictationServiceTests: XCTestCase {
         )
     }
 
+    func testAudioDeviceChangeCallbackCancelsAndDiscardsImmediately() async {
+        var preferences = AppPreferences.defaults
+        preferences.microphoneSelection = .device(
+            deviceUID: "fixture-microphone",
+            lastSeenDisplayName: "Fixture Microphone"
+        )
+        let fakes = RuntimeFakes.ready(preferences: preferences)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+        await fakes.audio.emitRecordingError(
+            .deviceChangedDuringRecording,
+            callbackIndex: 0
+        )
+        await settle()
+
+        let discardCount = await fakes.audio.discardCount()
+        XCTAssertEqual(service.status, .failed(.microphoneChanged))
+        XCTAssertNil(service.currentSegment)
+        XCTAssertEqual(discardCount, 1)
+    }
+
     func testTranscriptionFailureMapsToFailedTranscriptionFailed() async {
         let fakes = RuntimeFakes.ready()
         await fakes.transcriber.setTranscribeError(WhisperRuntimeError.transcriptionFailed("fixture"))
@@ -1668,8 +1717,11 @@ private actor FakeRuntimeAudio: RuntimeAudioRecording {
     private var finishError: Error?
     private var callbacks: [@Sendable () -> Void] = []
     private var maximumDurationCallbacks: [@Sendable () -> Void] = []
+    private var recordingErrorCallbacks:
+        [@Sendable (LiveAudioRecorderError) -> Void] = []
     private var startCountValue = 0
     private var finishCountValue = 0
+    private var discardCountValue = 0
     private var maximumDurationSecondsValues: [Double] = []
     private var suspendStartUntilReleased = false
     private var startSuspensionContinuation: CheckedContinuation<Void, Never>?
@@ -1683,6 +1735,10 @@ private actor FakeRuntimeAudio: RuntimeAudioRecording {
 
     func finishCount() -> Int {
         finishCountValue
+    }
+
+    func discardCount() -> Int {
+        discardCountValue
     }
 
     func lastMaximumDurationSeconds() -> Double? {
@@ -1705,7 +1761,9 @@ private actor FakeRuntimeAudio: RuntimeAudioRecording {
         microphone: MicrophoneSelection,
         maximumDurationSeconds: Double,
         onSpeechDetected: @escaping @Sendable () -> Void,
-        onMaximumDurationReached: @escaping @Sendable () -> Void
+        onMaximumDurationReached: @escaping @Sendable () -> Void,
+        onRecordingError:
+            @escaping @Sendable (LiveAudioRecorderError) -> Void
     ) async throws {
         startCountValue += 1
         maximumDurationSecondsValues.append(maximumDurationSeconds)
@@ -1719,6 +1777,7 @@ private actor FakeRuntimeAudio: RuntimeAudioRecording {
         }
         callbacks.append(onSpeechDetected)
         maximumDurationCallbacks.append(onMaximumDurationReached)
+        recordingErrorCallbacks.append(onRecordingError)
     }
 
     func finishRecording() async throws -> CanonicalAudioBuffer {
@@ -1737,6 +1796,7 @@ private actor FakeRuntimeAudio: RuntimeAudioRecording {
     }
 
     func discardRecording() async {
+        discardCountValue += 1
     }
 
     func setFinishError(_ error: Error?) {
@@ -1780,6 +1840,16 @@ private actor FakeRuntimeAudio: RuntimeAudioRecording {
             return
         }
         maximumDurationCallbacks[callbackIndex]()
+    }
+
+    func emitRecordingError(
+        _ error: LiveAudioRecorderError,
+        callbackIndex: Int
+    ) {
+        guard recordingErrorCallbacks.indices.contains(callbackIndex) else {
+            return
+        }
+        recordingErrorCallbacks[callbackIndex](error)
     }
 }
 

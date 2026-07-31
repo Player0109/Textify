@@ -22,6 +22,7 @@ final class AppServices {
     let launchAtLogin: any LaunchAtLoginManaging
     let launchAtLoginLocation: any LaunchAtLoginLocationChecking
     let modelCatalogCompatibilityResolver: ModelCatalogCompatibilityResolver
+    let microphoneInputPresentation: MicrophoneInputPresentation
     @ObservationIgnored private let modelCatalogDerivationEngine =
         ModelCatalogDerivationEngine()
     @ObservationIgnored private lazy var modelCatalogFeatures =
@@ -269,9 +270,15 @@ final class AppServices {
     var launchAtLoginStatus: LaunchAtLoginStatus
     var launchAtLoginOperationError: String?
     var launchAtLoginFailedRequestedEnabled: Bool?
-    var onboardingStep = OnboardingStep.welcome
+    var onboardingStep = OnboardingStep.welcome {
+        didSet {
+            reconcileMicrophoneMonitoring()
+        }
+    }
     var overlayState = RecordingOverlayState.hidden
     var runtimeIssue: AppRuntimeIssue?
+    private(set) var isMainWindowVisible = false
+    private(set) var isOnboardingWindowVisible = false
     private(set) var revokedActiveTranscriptionModelID: String?
     private(set) var revokedActiveVoiceCleaningModelID: String?
     private(set) var modelRemovalStatus: AppModelRemovalStatus?
@@ -342,6 +349,7 @@ final class AppServices {
         launchAtLogin: any LaunchAtLoginManaging,
         launchAtLoginLocation: any LaunchAtLoginLocationChecking = LaunchAtLoginLocationChecker(),
         modelCatalogCompatibilityResolver: ModelCatalogCompatibilityResolver = .current(),
+        microphoneInputClient: MicrophoneInputClient = .live,
         overlayPresenter: (any RecordingOverlayPresenting)? = nil,
         waitBeforeProcessingIndicator: @escaping @Sendable () async -> Void = {
             try? await Task.sleep(nanoseconds: 900_000_000)
@@ -364,6 +372,9 @@ final class AppServices {
         self.launchAtLogin = launchAtLogin
         self.launchAtLoginLocation = launchAtLoginLocation
         self.modelCatalogCompatibilityResolver = modelCatalogCompatibilityResolver
+        self.microphoneInputPresentation = MicrophoneInputPresentation(
+            client: microphoneInputClient
+        )
         let storageScanner = ModelStorageInventoryScanner(
             layout: ModelStorageLayout(rootDirectory: paths.modelsDirectory),
             fileManager: FileManager.default
@@ -393,6 +404,7 @@ final class AppServices {
         self.launchAtLoginStatus = launchAtLoginLocation.isSupported ? launchAtLogin.status() : .unsupportedLocation
         updateOverlay()
         observeDictationStatus()
+        observeDictationReadiness()
         Task { @MainActor [weak self] in
             await self?.refreshManagedModelReadiness()
         }
@@ -454,9 +466,13 @@ final class AppServices {
         }
 
         let result = hotkeyMonitor.start(
-            onEvent: { event in
+            onEvent: { [weak self] event in
                 Task { @MainActor in
+                    if case .triggerDown = event {
+                        self?.microphoneInputPresentation.stopMonitoring()
+                    }
                     await dictation.handleTriggerEvent(event)
+                    self?.reconcileMicrophoneMonitoring()
                 }
             },
             onFailure: { [weak self] error in
@@ -512,6 +528,7 @@ final class AppServices {
                 guard let self else {
                     return
                 }
+                self.reconcileMicrophoneMonitoring()
                 self.updateOverlay()
                 self.scheduleTerminalStatusDismissal(for: self.dictation.status)
                 if self.dictation.currentSegment == nil,
@@ -521,6 +538,122 @@ final class AppServices {
                 }
                 self.observeDictationStatus()
             }
+        }
+    }
+
+    private func observeDictationReadiness() {
+        withObservationTracking {
+            _ = dictation.readiness
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else {
+                    return
+                }
+                self.reconcileMicrophoneMonitoring()
+                self.observeDictationReadiness()
+            }
+        }
+    }
+
+    @discardableResult
+    func setMicrophoneSelection(_ selection: MicrophoneSelection) -> Bool {
+        guard preferences.microphoneSelection != selection else {
+            reconcileMicrophoneMonitoring()
+            return true
+        }
+
+        let previousSelection = preferences.microphoneSelection
+        preferences.microphoneSelection = selection
+        guard savePreferences() else {
+            preferences.microphoneSelection = previousSelection
+            reconcileMicrophoneMonitoring()
+            return false
+        }
+
+        reconcileMicrophoneMonitoring()
+        return true
+    }
+
+    func refreshMicrophoneInputs() {
+        microphoneInputPresentation.refreshDevices()
+
+        if case let .device(deviceUID, lastSeenDisplayName) =
+            preferences.microphoneSelection,
+           let currentDevice = microphoneInputPresentation.devices.first(
+               where: { $0.id == deviceUID }
+           ),
+           currentDevice.displayName != lastSeenDisplayName {
+            let previousSelection = preferences.microphoneSelection
+            preferences.microphoneSelection = .device(
+                deviceUID: deviceUID,
+                lastSeenDisplayName: currentDevice.displayName
+            )
+            if !savePreferences() {
+                preferences.microphoneSelection = previousSelection
+            }
+        }
+
+        reconcileMicrophoneMonitoring()
+    }
+
+    func setMainWindowVisibility(_ isVisible: Bool) {
+        isMainWindowVisible = isVisible
+        if isVisible {
+            refreshMicrophoneInputs()
+        } else {
+            reconcileMicrophoneMonitoring()
+        }
+    }
+
+    func setOnboardingWindowVisibility(_ isVisible: Bool) {
+        isOnboardingWindowVisible = isVisible
+        if isVisible {
+            refreshMicrophoneInputs()
+        } else {
+            reconcileMicrophoneMonitoring()
+        }
+    }
+
+    func settingsPaneDidChange() {
+        reconcileMicrophoneMonitoring()
+    }
+
+    func applicationDidBecomeActive() {
+        guard isMainWindowVisible || isOnboardingWindowVisible else {
+            return
+        }
+        refreshMicrophoneInputs()
+    }
+
+    private func reconcileMicrophoneMonitoring() {
+        guard dictation.readiness.permissions.microphone == .granted,
+              microphoneMonitoringSurfaceIsVisible,
+              !dictationStatusUsesMicrophone
+        else {
+            microphoneInputPresentation.stopMonitoring()
+            return
+        }
+
+        microphoneInputPresentation.startMonitoring(
+            selection: preferences.microphoneSelection
+        )
+    }
+
+    private var microphoneMonitoringSurfaceIsVisible: Bool {
+        (isOnboardingWindowVisible && onboardingStep == .microphone)
+            || (
+                isMainWindowVisible
+                    && settingsRouter.selectedPane == .dictation
+            )
+    }
+
+    private var dictationStatusUsesMicrophone: Bool {
+        switch dictation.status {
+        case .waitingForActivation, .recording:
+            return true
+        case .idle, .processing, .inserting, .completed, .cancelled,
+             .blocked, .failed:
+            return false
         }
     }
 
@@ -1913,11 +2046,7 @@ final class AppServices {
             mlxAudio: MLXAudioRuntimeTranscribingAdapter(runtime: mlxAudioRuntime),
             liteRTLM: LiteRTLMRuntimeTranscribingAdapter(runtime: liteRTLMRuntime)
         )
-        var preferences = settingsStore.load()
-        if preferences.microphoneSelection != .systemDefault {
-            preferences.microphoneSelection = .systemDefault
-            settingsStore.save(preferences)
-        }
+        let preferences = settingsStore.load()
         let trigger = hotkeyTrigger(for: preferences.trigger)
         let targetChecker = SystemInsertionTargetChecker()
         let dependencies = RuntimeDependencies(

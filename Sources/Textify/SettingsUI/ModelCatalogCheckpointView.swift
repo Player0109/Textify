@@ -117,6 +117,9 @@ struct ModelCheckpointCatalogSurface: View, Equatable {
     let disabledReason: String?
     let focusedCheckpointID: String?
     let selectedCheckpointID: String?
+    let selectedExactArtifactID: String?
+    let expandedCheckpointID: String?
+    let visualPolicy: ModelCheckpointAccessibilityVisualPolicy
     let keyboardFocus: FocusState<Bool>.Binding
     let transferRegistry: ModelCatalogTransferStateRegistry
     let transferTopologyVersion: UInt64
@@ -134,6 +137,10 @@ struct ModelCheckpointCatalogSurface: View, Equatable {
             && lhs.disabledReason == rhs.disabledReason
             && lhs.focusedCheckpointID == rhs.focusedCheckpointID
             && lhs.selectedCheckpointID == rhs.selectedCheckpointID
+            && lhs.selectedExactArtifactID
+                == rhs.selectedExactArtifactID
+            && lhs.expandedCheckpointID == rhs.expandedCheckpointID
+            && lhs.visualPolicy == rhs.visualPolicy
             && lhs.keyboardFocus.wrappedValue
                 == rhs.keyboardFocus.wrappedValue
             && lhs.transferRegistry === rhs.transferRegistry
@@ -148,7 +155,8 @@ struct ModelCheckpointCatalogSurface: View, Equatable {
                 if let title = section.title {
                     ModelCheckpointFamilyHeader(
                         title: title,
-                        provider: section.providerName
+                        provider: section.providerName,
+                        visualPolicy: visualPolicy
                     )
                 }
                 ForEach(section.rows) { row in
@@ -161,6 +169,11 @@ struct ModelCheckpointCatalogSurface: View, Equatable {
                             keyboardFocus.wrappedValue
                                 && focusedCheckpointID == row.id,
                         isSelected: selectedCheckpointID == row.id,
+                        selectedExactArtifactID:
+                            selectedExactArtifactID,
+                        isVersionDisclosurePresented:
+                            expandedCheckpointID == row.id,
+                        visualPolicy: visualPolicy,
                         transferCell: transferRegistry.cellIfPresent(
                             for: row.selectedArtifactID
                         ),
@@ -172,14 +185,18 @@ struct ModelCheckpointCatalogSurface: View, Equatable {
             .id(layoutMode)
         }
         .background {
-            LinearGradient(
-                colors: [
-                    TextifyVisualIdentity.cardSurfaceTop,
-                    TextifyVisualIdentity.cardSurfaceBottom,
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            if visualPolicy.usesOpaqueSurfaces {
+                TextifyVisualIdentity.cardSurface
+            } else {
+                LinearGradient(
+                    colors: [
+                        TextifyVisualIdentity.cardSurfaceTop,
+                        TextifyVisualIdentity.cardSurfaceBottom,
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
         }
         .clipShape(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -198,7 +215,10 @@ struct ModelCheckpointCatalogSurface: View, Equatable {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 ),
-                lineWidth: 0.8
+                lineWidth:
+                    visualPolicy.emphasizesControlBoundaries
+                    ? 1.5
+                    : 0.8
             )
         }
         .shadow(
@@ -302,6 +322,7 @@ private struct ModelCheckpointColumnHeader: View {
 private struct ModelCheckpointFamilyHeader: View {
     let title: String
     let provider: String?
+    let visualPolicy: ModelCheckpointAccessibilityVisualPolicy
     private let metrics = ModelCheckpointLayoutMetrics.current
 
     var body: some View {
@@ -317,12 +338,30 @@ private struct ModelCheckpointFamilyHeader: View {
         }
         .padding(.horizontal, metrics.horizontalPadding / 2)
         .frame(minHeight: 48)
-        .background(Color.primary.opacity(0.035))
+        .background(
+            visualPolicy.usesOpaqueSurfaces
+                ? TextifyVisualIdentity.cardSurface
+                : Color.primary.opacity(0.035)
+        )
         .overlay(alignment: .bottom) {
-            Divider()
+            Rectangle()
+                .fill(
+                    visualPolicy.emphasizesControlBoundaries
+                        ? Color.primary
+                        : TextifyVisualIdentity.separator
+                )
+                .frame(
+                    height:
+                        visualPolicy.emphasizesControlBoundaries ? 1.5 : 1
+                )
         }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
+        .accessibilityLabel(
+            provider.map {
+                "\(title), \($0), Family, level 1"
+            } ?? "\(title), Family, level 1"
+        )
     }
 }
 
@@ -333,6 +372,9 @@ private struct ModelCheckpointCatalogRow: View {
     let disabledReason: String?
     let isKeyboardFocused: Bool
     let isSelected: Bool
+    let selectedExactArtifactID: String?
+    let isVersionDisclosurePresented: Bool
+    let visualPolicy: ModelCheckpointAccessibilityVisualPolicy
     let transferCell: ModelCatalogTransferStateCell?
     let onCommand: (ModelCatalogScreenCommand) -> Void
     private let metrics = ModelCheckpointLayoutMetrics.current
@@ -438,14 +480,22 @@ private struct ModelCheckpointCatalogRow: View {
         }
         .background {
             if row.isActive {
-                LinearGradient(
-                    colors: [
-                        TextifyVisualIdentity.consoleSelection.opacity(0.9),
-                        TextifyVisualIdentity.voiceViolet.opacity(0.055),
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
+                if visualPolicy.usesOpaqueSurfaces {
+                    TextifyVisualIdentity.consoleSelection
+                } else {
+                    LinearGradient(
+                        colors: [
+                            TextifyVisualIdentity.consoleSelection.opacity(
+                                0.9
+                            ),
+                            TextifyVisualIdentity.voiceViolet.opacity(0.055),
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                }
+            } else if visualPolicy.usesOpaqueSurfaces {
+                TextifyVisualIdentity.cardSurface
             }
         }
         .overlay(alignment: .leading) {
@@ -462,11 +512,23 @@ private struct ModelCheckpointCatalogRow: View {
                 .padding(.leading, 42)
         }
         .overlay {
-            if isKeyboardFocused {
+            if isKeyboardFocused
+                || (
+                    visualPolicy.emphasizesSelectionBoundaries
+                        && hasSemanticSelection
+                )
+            {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .stroke(
-                        TextifyVisualIdentity.voiceViolet.opacity(0.72),
-                        lineWidth: 2
+                        visualPolicy.emphasizesSelectionBoundaries
+                            ? Color.primary
+                            : TextifyVisualIdentity.voiceViolet.opacity(
+                                0.72
+                            ),
+                        lineWidth:
+                            visualPolicy.emphasizesSelectionBoundaries
+                            ? 2.5
+                            : 2
                     )
                     .padding(3)
                     .accessibilityHidden(true)
@@ -475,11 +537,22 @@ private struct ModelCheckpointCatalogRow: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(row.accessibilitySummary)
         .accessibilityValue(
-            transferCell?.snapshot.accessibilityValue
-                ?? row.lifecycleState
-                ?? String(localized: "Not installed")
+            [
+                transferCell?.snapshot.accessibilityValue
+                    ?? row.lifecycleState
+                    ?? String(localized: "Not installed"),
+                row.versionCount > 1
+                    ? (
+                        isVersionDisclosurePresented
+                            ? String(localized: "Expanded")
+                            : String(localized: "Collapsed")
+                    )
+                    : nil,
+            ].compactMap { $0 }.joined(separator: ", ")
         )
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityAddTraits(
+            hasSemanticSelection ? .isSelected : []
+        )
         .accessibilityActions {
             accessibilityActions
         }
@@ -523,17 +596,22 @@ private struct ModelCheckpointCatalogRow: View {
                     )
                     .fixedSize(horizontal: true, vertical: true)
                 }
+                if visualPolicy.emphasizesSelectionBoundaries,
+                    hasSemanticSelection
+                {
+                    Label("Selected", systemImage: "checkmark.circle.fill")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.primary)
+                }
                 ModelCheckpointVersionControl(
                     row: row,
                     isBusy: isBusy,
-                    onUse: {
-                        onCommand(
-                            .use(
-                                checkpointID: row.checkpointID,
-                                artifactID: $0
-                            )
-                        )
-                    }
+                    selectedExactArtifactID:
+                        selectedExactArtifactID,
+                    isPresented:
+                        isVersionDisclosurePresented,
+                    visualPolicy: visualPolicy,
+                    onCommand: onCommand
                 )
                 Text(row.description)
                     .font(.callout)
@@ -551,12 +629,32 @@ private struct ModelCheckpointCatalogRow: View {
                     .foregroundStyle(TextifyVisualIdentity.warmWarning)
                 }
                 if row.versionCount == 1 {
-                    Text(row.selectedArtifactName)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                    Button {
+                        onCommand(
+                            .inspectArtifact(
+                                artifactID: row.selectedArtifactID
+                            )
+                        )
+                    } label: {
+                        Label(
+                            row.selectedArtifactName,
+                            systemImage: "shippingbox"
+                        )
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel(
+                        "Inspect Exact Artifact \(row.selectedArtifactName)"
+                    )
                 }
             }
         }
+    }
+
+    private var hasSemanticSelection: Bool {
+        isSelected || row.containsArtifact(selectedExactArtifactID)
     }
 
     private var state: some View {
@@ -632,6 +730,52 @@ private struct ModelCheckpointCatalogRow: View {
         ) {
             onCommand(.inspect(checkpointID: row.checkpointID))
         }
+        if row.versionCount > 1 {
+            Button(
+                isVersionDisclosurePresented
+                    ? "Hide Exact Artifacts"
+                    : "Choose Exact Artifact",
+                systemImage:
+                    isVersionDisclosurePresented
+                    ? "chevron.up"
+                    : "chevron.down"
+            ) {
+                onCommand(
+                    .setVersionDisclosure(
+                        checkpointID: row.checkpointID,
+                        isExpanded: !isVersionDisclosurePresented
+                    )
+                )
+            }
+            Menu("Exact Artifacts") {
+                ForEach(row.versionOptions) { option in
+                    Button {
+                        onCommand(
+                            .inspectArtifact(artifactID: option.id)
+                        )
+                    } label: {
+                        Label(
+                            option.displayName,
+                            systemImage:
+                                option.id == selectedExactArtifactID
+                                ? "checkmark"
+                                : "shippingbox"
+                        )
+                    }
+                }
+            }
+        } else {
+            Button(
+                "Inspect Exact Artifact",
+                systemImage: "shippingbox"
+            ) {
+                onCommand(
+                    .inspectArtifact(
+                        artifactID: row.selectedArtifactID
+                    )
+                )
+            }
+        }
         if row.installOnlyAvailable {
             Button(
                 "Install Only",
@@ -676,12 +820,14 @@ private struct ModelCheckpointCatalogRow: View {
                     || row.selectedArtifactIsRevoked
                     || !row.selectedArtifactAllowsOperations
             )
+        }
+        if let deletionArtifactID {
             Button(
-                "Remove",
+                "Remove Exact Artifact",
                 systemImage: "trash",
                 role: .destructive
             ) {
-                onCommand(.remove(artifactID: row.selectedArtifactID))
+                onCommand(.remove(artifactID: deletionArtifactID))
             }
             .disabled(isBusy)
         }
@@ -691,6 +837,37 @@ private struct ModelCheckpointCatalogRow: View {
     private var accessibilityActions: some View {
         Button("Inspect") {
             onCommand(.inspect(checkpointID: row.checkpointID))
+        }
+        if row.versionCount > 1 {
+            Button(
+                isVersionDisclosurePresented
+                    ? "Collapse Exact Artifacts"
+                    : "Expand Exact Artifacts"
+            ) {
+                onCommand(
+                    .setVersionDisclosure(
+                        checkpointID: row.checkpointID,
+                        isExpanded: !isVersionDisclosurePresented
+                    )
+                )
+            }
+            ForEach(row.versionOptions) { option in
+                Button("Inspect Exact Artifact \(option.displayName)") {
+                    onCommand(
+                        .inspectArtifact(artifactID: option.id)
+                    )
+                }
+            }
+        } else {
+            Button(
+                "Inspect Exact Artifact \(row.selectedArtifactName)"
+            ) {
+                onCommand(
+                    .inspectArtifact(
+                        artifactID: row.selectedArtifactID
+                    )
+                )
+            }
         }
         switch row.primaryAction {
         case .use:
@@ -736,10 +913,18 @@ private struct ModelCheckpointCatalogRow: View {
             Button("Reveal in Finder") {
                 onCommand(.reveal(artifactID: row.selectedArtifactID))
             }
-            Button("Remove") {
-                onCommand(.remove(artifactID: row.selectedArtifactID))
+        }
+        if let deletionArtifactID {
+            Button("Remove Exact Artifact") {
+                onCommand(.remove(artifactID: deletionArtifactID))
             }
         }
+    }
+
+    private var deletionArtifactID: String? {
+        row.deletionArtifactID(
+            explicitlySelectedArtifactID: selectedExactArtifactID
+        )
     }
 
     private func labeledField<Content: View>(
@@ -847,10 +1032,10 @@ private struct ModelCheckpointTransferStateView: View {
 private struct ModelCheckpointVersionControl: View {
     let row: ModelCatalogScreenRow
     let isBusy: Bool
-    let onUse: (String) -> Void
-
-    @State private var showsPopover = false
-    @State private var showsComparison = false
+    let selectedExactArtifactID: String?
+    let isPresented: Bool
+    let visualPolicy: ModelCheckpointAccessibilityVisualPolicy
+    let onCommand: (ModelCatalogScreenCommand) -> Void
 
     var body: some View {
         Group {
@@ -858,59 +1043,148 @@ private struct ModelCheckpointVersionControl: View {
             case .none:
                 EmptyView()
             case .popover:
-                Button("\(row.versionCount) versions") {
-                    showsPopover = true
+                versionButton(
+                    title: "\(row.versionCount) versions",
+                    systemImage:
+                        isPresented
+                        ? "chevron.up.circle.fill"
+                        : "chevron.down.circle"
+                ) {
+                    setPresented(!isPresented)
                 }
-                .buttonStyle(.plain)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(TextifyVisualIdentity.voiceViolet)
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: true)
-                .popover(isPresented: $showsPopover) {
+                .popover(isPresented: presentationBinding) {
                     ModelVersionChoiceView(
                         row: row,
                         isBusy: isBusy,
-                        onUse: onUse
+                        explicitlySelectedArtifactID:
+                            selectedExactArtifactID,
+                        visualPolicy: visualPolicy,
+                        onSelect: selectArtifact,
+                        onUse: useArtifact,
+                        onDismiss: {
+                            setPresented(false)
+                        }
                     )
                 }
             case .comparisonSheet:
-                Button("Compare \(row.versionCount) versions") {
-                    showsComparison = true
+                versionButton(
+                    title: "Compare \(row.versionCount) versions",
+                    systemImage:
+                        isPresented
+                        ? "chevron.up.circle.fill"
+                        : "chevron.down.circle"
+                ) {
+                    setPresented(!isPresented)
                 }
-                .buttonStyle(.plain)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(TextifyVisualIdentity.voiceViolet)
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: true)
-                .sheet(isPresented: $showsComparison) {
+                .sheet(isPresented: presentationBinding) {
                     ModelVersionComparisonSheet(
                         row: row,
                         isBusy: isBusy,
-                        onUse: onUse
+                        explicitlySelectedArtifactID:
+                            selectedExactArtifactID,
+                        visualPolicy: visualPolicy,
+                        onSelect: selectArtifact,
+                        onUse: useArtifact,
+                        onDismiss: {
+                            setPresented(false)
+                        }
                     )
                 }
             }
         }
+    }
+
+    private var presentationBinding: Binding<Bool> {
+        Binding(
+            get: { isPresented },
+            set: setPresented
+        )
+    }
+
+    @ViewBuilder
+    private func versionButton(
+        title: String,
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        if visualPolicy.emphasizesControlBoundaries {
+            Button(action: action) {
+                Label(title, systemImage: systemImage)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .font(.caption.weight(.semibold))
+        } else {
+            Button(action: action) {
+                Label(title, systemImage: systemImage)
+            }
+            .buttonStyle(.plain)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(TextifyVisualIdentity.voiceViolet)
+        }
+    }
+
+    private func setPresented(_ presented: Bool) {
+        onCommand(
+            .setVersionDisclosure(
+                checkpointID: row.checkpointID,
+                isExpanded: presented
+            )
+        )
+    }
+
+    private func selectArtifact(_ artifactID: String) {
+        onCommand(
+            .selectArtifact(
+                checkpointID: row.checkpointID,
+                artifactID: artifactID
+            )
+        )
+    }
+
+    private func useArtifact(_ artifactID: String) {
+        onCommand(
+            .use(
+                checkpointID: row.checkpointID,
+                artifactID: artifactID
+            )
+        )
     }
 }
 
 private struct ModelVersionChoiceView: View {
     let row: ModelCatalogScreenRow
     let isBusy: Bool
+    let explicitlySelectedArtifactID: String?
+    let visualPolicy: ModelCheckpointAccessibilityVisualPolicy
+    let onSelect: (String) -> Void
     let onUse: (String) -> Void
+    let onDismiss: () -> Void
 
     @State private var selectedArtifactID: String
 
     init(
         row: ModelCatalogScreenRow,
         isBusy: Bool,
-        onUse: @escaping (String) -> Void
+        explicitlySelectedArtifactID: String?,
+        visualPolicy: ModelCheckpointAccessibilityVisualPolicy,
+        onSelect: @escaping (String) -> Void,
+        onUse: @escaping (String) -> Void,
+        onDismiss: @escaping () -> Void
     ) {
         self.row = row
         self.isBusy = isBusy
+        self.explicitlySelectedArtifactID =
+            explicitlySelectedArtifactID
+        self.visualPolicy = visualPolicy
+        self.onSelect = onSelect
         self.onUse = onUse
+        self.onDismiss = onDismiss
         _selectedArtifactID = State(
-            initialValue: row.selectedArtifactID
+            initialValue:
+                explicitlySelectedArtifactID.flatMap {
+                    row.containsArtifact($0) ? $0 : nil
+                } ?? row.selectedArtifactID
         )
     }
 
@@ -925,6 +1199,7 @@ private struct ModelVersionChoiceView: View {
             ForEach(row.versionOptions) { option in
                 Button {
                     selectedArtifactID = option.id
+                    onSelect(option.id)
                 } label: {
                     HStack(alignment: .top, spacing: 9) {
                         Image(
@@ -977,9 +1252,36 @@ private struct ModelVersionChoiceView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(8)
+                    .background {
+                        if visualPolicy.usesOpaqueSurfaces {
+                            TextifyVisualIdentity.cardSurface
+                        }
+                    }
+                    .overlay {
+                        if visualPolicy.emphasizesSelectionBoundaries,
+                            selectedArtifactID == option.id
+                        {
+                            RoundedRectangle(
+                                cornerRadius: 7,
+                                style: .continuous
+                            )
+                            .stroke(Color.primary, lineWidth: 2)
+                        }
+                    }
                 }
                 .buttonStyle(.plain)
-                .disabled(!option.isActionable)
+                .accessibilityLabel(option.accessibilitySummary)
+                .accessibilityValue(
+                    option.id == explicitlySelectedArtifactID
+                        ? String(localized: "Selected")
+                        : String(localized: "Not selected")
+                )
+                .accessibilityAddTraits(
+                    option.id == explicitlySelectedArtifactID
+                        ? .isSelected
+                        : []
+                )
             }
 
             Divider()
@@ -995,17 +1297,29 @@ private struct ModelVersionChoiceView: View {
                 .disabled(
                     isBusy
                         || selectedArtifactID == row.selectedArtifactID
-                        || selectedOption == nil
+                        || selectedOption?.isActionable != true
                 )
             }
         }
         .padding(16)
         .frame(width: 420)
+        .background(
+            visualPolicy.usesOpaqueSurfaces
+                ? TextifyVisualIdentity.windowSurface
+                : Color.clear
+        )
+        .onKeyPress(
+            keys: [.leftArrow],
+            phases: .down
+        ) { _ in
+            onDismiss()
+            return .handled
+        }
     }
 
     private var selectedOption: ModelCatalogScreenVersionOption? {
         row.versionOptions.first {
-            $0.id == selectedArtifactID && $0.isActionable
+            $0.id == selectedArtifactID
         }
     }
 }
@@ -1013,21 +1327,36 @@ private struct ModelVersionChoiceView: View {
 private struct ModelVersionComparisonSheet: View {
     let row: ModelCatalogScreenRow
     let isBusy: Bool
+    let explicitlySelectedArtifactID: String?
+    let visualPolicy: ModelCheckpointAccessibilityVisualPolicy
+    let onSelect: (String) -> Void
     let onUse: (String) -> Void
+    let onDismiss: () -> Void
 
-    @Environment(\.dismiss) private var dismiss
     @State private var selectedArtifactID: String
 
     init(
         row: ModelCatalogScreenRow,
         isBusy: Bool,
-        onUse: @escaping (String) -> Void
+        explicitlySelectedArtifactID: String?,
+        visualPolicy: ModelCheckpointAccessibilityVisualPolicy,
+        onSelect: @escaping (String) -> Void,
+        onUse: @escaping (String) -> Void,
+        onDismiss: @escaping () -> Void
     ) {
         self.row = row
         self.isBusy = isBusy
+        self.explicitlySelectedArtifactID =
+            explicitlySelectedArtifactID
+        self.visualPolicy = visualPolicy
+        self.onSelect = onSelect
         self.onUse = onUse
+        self.onDismiss = onDismiss
         _selectedArtifactID = State(
-            initialValue: row.selectedArtifactID
+            initialValue:
+                explicitlySelectedArtifactID.flatMap {
+                    row.containsArtifact($0) ? $0 : nil
+                } ?? row.selectedArtifactID
         )
     }
 
@@ -1041,7 +1370,7 @@ private struct ModelVersionComparisonSheet: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Close", action: dismiss.callAsFunction)
+                Button("Close", action: onDismiss)
             }
             .padding(18)
 
@@ -1069,6 +1398,7 @@ private struct ModelVersionComparisonSheet: View {
                     GridRow {
                         Button {
                             selectedArtifactID = option.id
+                            onSelect(option.id)
                         } label: {
                             Image(
                                 systemName:
@@ -1078,6 +1408,17 @@ private struct ModelVersionComparisonSheet: View {
                             )
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel(option.accessibilitySummary)
+                        .accessibilityValue(
+                            option.id == explicitlySelectedArtifactID
+                                ? String(localized: "Selected")
+                                : String(localized: "Not selected")
+                        )
+                        .accessibilityAddTraits(
+                            option.id == explicitlySelectedArtifactID
+                                ? .isSelected
+                                : []
+                        )
                         VStack(alignment: .leading, spacing: 2) {
                             Text(option.displayName)
                                 .font(.callout.weight(.semibold))
@@ -1109,7 +1450,22 @@ private struct ModelVersionComparisonSheet: View {
                     }
                     .font(.caption)
                     .padding(.vertical, 10)
-                    .disabled(!option.isActionable)
+                    .background {
+                        if visualPolicy.usesOpaqueSurfaces {
+                            TextifyVisualIdentity.cardSurface
+                        }
+                    }
+                    .overlay {
+                        if visualPolicy.emphasizesSelectionBoundaries,
+                            selectedArtifactID == option.id
+                        {
+                            RoundedRectangle(
+                                cornerRadius: 7,
+                                style: .continuous
+                            )
+                            .stroke(Color.primary, lineWidth: 2)
+                        }
+                    }
                 }
             }
             .padding(.horizontal, 18)
@@ -1144,7 +1500,7 @@ private struct ModelVersionComparisonSheet: View {
                         return
                     }
                     onUse(option.id)
-                    dismiss()
+                    onDismiss()
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(
@@ -1156,6 +1512,18 @@ private struct ModelVersionComparisonSheet: View {
             .padding(18)
         }
         .frame(minWidth: 760, minHeight: 500)
+        .background(
+            visualPolicy.usesOpaqueSurfaces
+                ? TextifyVisualIdentity.windowSurface
+                : Color.clear
+        )
+        .onKeyPress(
+            keys: [.leftArrow],
+            phases: .down
+        ) { _ in
+            onDismiss()
+            return .handled
+        }
     }
 
     private var selectedOption: ModelCatalogScreenVersionOption? {
@@ -1174,6 +1542,17 @@ struct VoiceCleaningFeatureCard: View {
         ) -> Void
     let onDisable: () -> Void
     let onInspect: (ModelCheckpointRowPresentation) -> Void
+    let onInspectExactArtifact: (String) -> Void
+    let onRemoveExactArtifact: (String) -> Void
+
+    @State private var selectedExactArtifactID: String?
+    @State private var expandedCheckpointID: String?
+    @Environment(\.colorSchemeContrast)
+    private var colorSchemeContrast
+    @Environment(\.accessibilityDifferentiateWithoutColor)
+    private var differentiateWithoutColor
+    @Environment(\.accessibilityReduceTransparency)
+    private var reduceTransparency
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -1212,15 +1591,21 @@ struct VoiceCleaningFeatureCard: View {
                             ModelCheckpointVersionControl(
                                 row: ModelCatalogScreenRow(row),
                                 isBusy: isBusy,
-                                onUse: { artifactID in
-                                    guard let artifact =
-                                        row.checkpoint.artifacts.first(
-                                            where: { $0.id == artifactID }
-                                        )
-                                    else {
-                                        return
-                                    }
-                                    onUse(row, artifact)
+                                selectedExactArtifactID:
+                                    selectedExactArtifactID,
+                                isPresented:
+                                    expandedCheckpointID == row.checkpointID,
+                                visualPolicy:
+                                    ModelCheckpointAccessibilityVisualPolicy(
+                                        increaseContrast:
+                                            colorSchemeContrast == .increased,
+                                        differentiateWithoutColor:
+                                            differentiateWithoutColor,
+                                        reduceTransparency:
+                                            reduceTransparency
+                                    ),
+                                onCommand: {
+                                    handleVersionCommand($0, row: row)
                                 }
                             )
                         }
@@ -1290,19 +1675,28 @@ struct VoiceCleaningFeatureCard: View {
         }
         .padding(18)
         .background {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            row?.isActive == true
-                                ? TextifyVisualIdentity.consoleSelection
-                                : TextifyVisualIdentity.cardSurfaceTop,
-                            TextifyVisualIdentity.cardSurfaceBottom,
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+            if visualPolicy.usesOpaqueSurfaces {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(
+                        row?.isActive == true
+                            ? TextifyVisualIdentity.consoleSelection
+                            : TextifyVisualIdentity.cardSurface
                     )
-                )
+            } else {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                row?.isActive == true
+                                    ? TextifyVisualIdentity.consoleSelection
+                                    : TextifyVisualIdentity.cardSurfaceTop,
+                                TextifyVisualIdentity.cardSurfaceBottom,
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
         }
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -1319,7 +1713,10 @@ struct VoiceCleaningFeatureCard: View {
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
-                    lineWidth: row?.isActive == true ? 1 : 0.8
+                    lineWidth:
+                        visualPolicy.emphasizesControlBoundaries
+                        ? 1.5
+                        : row?.isActive == true ? 1 : 0.8
                 )
         }
         .shadow(
@@ -1328,6 +1725,43 @@ struct VoiceCleaningFeatureCard: View {
             y: 3
         )
         .help(disabledReason ?? "")
+    }
+
+    private var visualPolicy:
+        ModelCheckpointAccessibilityVisualPolicy
+    {
+        ModelCheckpointAccessibilityVisualPolicy(
+            increaseContrast: colorSchemeContrast == .increased,
+            differentiateWithoutColor: differentiateWithoutColor,
+            reduceTransparency: reduceTransparency
+        )
+    }
+
+    private func handleVersionCommand(
+        _ command: ModelCatalogScreenCommand,
+        row: ModelCheckpointRowPresentation
+    ) {
+        switch command {
+        case let .selectArtifact(_, artifactID):
+            selectedExactArtifactID = artifactID
+        case let .inspectArtifact(artifactID):
+            selectedExactArtifactID = artifactID
+            expandedCheckpointID = nil
+            onInspectExactArtifact(artifactID)
+        case let .setVersionDisclosure(checkpointID, isExpanded):
+            expandedCheckpointID = isExpanded ? checkpointID : nil
+        case let .use(_, artifactID):
+            guard let artifact = row.checkpoint.artifacts.first(
+                where: { $0.id == artifactID }
+            ) else {
+                return
+            }
+            onUse(row, artifact)
+        case let .remove(artifactID):
+            onRemoveExactArtifact(artifactID)
+        case .inspect, .installOnly, .cancel, .retry, .verify, .reveal:
+            break
+        }
     }
 }
 
@@ -1339,6 +1773,7 @@ struct ModelCheckpointInspectorSurface: View {
     let onReinstall: (ModelCatalogExactArtifactPresentation) -> Void
     let onReveal: (ModelCatalogExactArtifactPresentation) -> Void
     let onRemove: (ModelCatalogExactArtifactPresentation) -> Void
+    let onInspectArtifact: (ModelCatalogExactArtifactPresentation) -> Void
 
     @State private var showsTechnicalDetails = false
 
@@ -1408,7 +1843,10 @@ struct ModelCheckpointInspectorSurface: View {
                                                     fromByteCount: $0,
                                                     countStyle: .file
                                                 )
-                                        } ?? artifact.row.sizeDescription
+                                        } ?? String(
+                                            localized:
+                                                "Calculating local size…"
+                                        )
                                     )
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -1439,12 +1877,15 @@ struct ModelCheckpointInspectorSurface: View {
                                                 .allowsModelOperations
                                     )
                                     Button(
-                                        "Remove",
+                                        canDelete(artifact)
+                                            ? "Remove"
+                                            : "Remove — Size Pending",
                                         systemImage: "trash",
                                         role: .destructive
                                     ) {
                                         onRemove(artifact)
                                     }
+                                    .disabled(!canDelete(artifact))
                                 } label: {
                                     Image(systemName: "ellipsis.circle")
                                 }
@@ -1456,42 +1897,91 @@ struct ModelCheckpointInspectorSurface: View {
                             }
                         }
                         .padding(.vertical, 3)
+                        .accessibilityElement(children: .contain)
+                        .accessibilityLabel(
+                            "Exact Artifact \(artifact.metadata.presentation.displayName)"
+                        )
                     }
                 }
             }
 
             section("Versions") {
                 ForEach(row.versionOptions) { option in
-                    HStack(alignment: .top, spacing: 9) {
-                        Image(
-                            systemName:
-                                option.id == row.selectedArtifactID
-                                ? "circle.inset.filled"
-                                : "circle"
-                        )
-                        .foregroundStyle(
-                            option.id == row.selectedArtifactID
-                                ? TextifyVisualIdentity.voiceViolet
-                                : .secondary
-                        )
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(option.displayName)
-                                .font(.callout.weight(.semibold))
-                            Text(
-                                "\(option.runtime) • \(option.downloadSize) • \(option.state)"
+                    Button {
+                        onInspectArtifact(option.artifact)
+                    } label: {
+                        HStack(alignment: .top, spacing: 9) {
+                            Image(
+                                systemName:
+                                    option.id == row.selectedArtifactID
+                                    ? "circle.inset.filled"
+                                    : "circle"
                             )
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            Text(option.accuracyTradeoff)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(
-                                    horizontal: false,
-                                    vertical: true
+                            .foregroundStyle(
+                                option.id == row.selectedArtifactID
+                                    ? TextifyVisualIdentity.voiceViolet
+                                    : .secondary
+                            )
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(option.displayName)
+                                    .font(.callout.weight(.semibold))
+                                Text(
+                                    "\(option.runtime) • \(option.downloadSize) • \(option.state)"
                                 )
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                Text(option.accuracyTradeoff)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(
+                                        horizontal: false,
+                                        vertical: true
+                                    )
+                            }
+                            Spacer()
+                            Image(systemName: "info.circle")
+                                .foregroundStyle(.secondary)
                         }
                     }
-                    .accessibilityElement(children: .combine)
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        "Inspect Exact Artifact \(option.displayName)"
+                    )
+                    .accessibilityValue(
+                        "\(option.state), Exact Artifact, level 3"
+                    )
+                    .accessibilityAddTraits(
+                        option.id == row.selectedArtifactID
+                            ? .isSelected
+                            : []
+                    )
+                }
+            }
+
+            if let sourceLicense =
+                ModelCheckpointInspectorSourceLicensePresentation(
+                    artifact: row.selectedArtifact
+                )
+            {
+                section("Source & License") {
+                    ModelCheckpointInspectorFact(
+                        label: "Selected Exact Artifact",
+                        value:
+                            row.selectedArtifact.metadata.presentation
+                            .displayName
+                    )
+                    ModelSourceLicenseButton(
+                        presentation: sourceLicense.sourceAndLicense
+                    )
+                    if let sourceURL = sourceLicense.upstreamSourceURL {
+                        Link(destination: sourceURL) {
+                            Label(
+                                "Open Upstream Source",
+                                systemImage: "arrow.up.right.square"
+                            )
+                        }
+                        .font(.callout)
+                    }
                 }
             }
 
@@ -1557,6 +2047,14 @@ struct ModelCheckpointInspectorSurface: View {
 
     private var installedArtifacts: [ModelCatalogExactArtifactPresentation] {
         row.checkpoint.artifacts.filter(\.row.isInstalled)
+    }
+
+    private func canDelete(
+        _ artifact: ModelCatalogExactArtifactPresentation
+    ) -> Bool {
+        artifact.row.visibleActions(
+            for: .exactArtifact(artifact.id)
+        ).contains(.delete)
     }
 
     private var languageDescription: String {

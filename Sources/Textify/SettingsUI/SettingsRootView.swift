@@ -47,6 +47,7 @@ struct SettingsRootView: View {
                 ModelCatalogPerformanceTrace.event("navigation-start")
                 services.modelCatalogCoordinator.destinationOpened(purpose)
             }
+            services.settingsPaneDidChange()
         }
         .onChange(of: router.selectedPane) { previousPane, nextPane in
             if nextPane.modelPurpose != nil {
@@ -56,6 +57,17 @@ struct SettingsRootView: View {
                 from: previousPane.modelPurpose,
                 to: nextPane.modelPurpose
             )
+            services.settingsPaneDidChange()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: NSApplication.didBecomeActiveNotification
+            )
+        ) { _ in
+            Task {
+                _ = await services.dictation.refreshReadiness()
+                services.applicationDidBecomeActive()
+            }
         }
         .onDisappear {
             if let purpose = router.selectedPane.modelPurpose {
@@ -662,6 +674,8 @@ enum LaunchAtLoginToggleModel {
 private struct DictationSettingsPane: View {
     @Environment(AppServices.self) private var services
     @State private var triggerTest = OnboardingTriggerTestController()
+    @State private var microphonePermissionTask: Task<Void, Never>?
+    @State private var microphonePermissionMessage: String?
 
     var body: some View {
         SettingsPaneLayout(title: "Dictation") {
@@ -686,7 +700,12 @@ private struct DictationSettingsPane: View {
                     .frame(width: 220)
                 }
                 Divider()
-                LabeledContent("Microphone", value: "System Default")
+                LabeledContent("Microphone") {
+                    microphoneMenu
+                        .frame(width: 220, alignment: .trailing)
+                }
+                Divider()
+                microphoneLevelOrPermission
             }
 
             SettingsSection("Floating Icon") {
@@ -750,8 +769,14 @@ private struct DictationSettingsPane: View {
                 }
             }
         }
+        .task {
+            _ = await services.dictation.refreshReadiness()
+            services.refreshMicrophoneInputs()
+        }
         .onDisappear {
             triggerTest.stop()
+            microphonePermissionTask?.cancel()
+            microphonePermissionTask = nil
         }
     }
 
@@ -767,6 +792,187 @@ private struct DictationSettingsPane: View {
             get: { services.preferences.transcriptionLanguage },
             set: { services.setTranscriptionLanguage($0) }
         )
+    }
+
+    private var microphoneMenu: some View {
+        Menu {
+            Button {
+                services.setMicrophoneSelection(.systemDefault)
+            } label: {
+                microphoneMenuLabel(
+                    "System Default",
+                    isSelected:
+                        services.preferences.microphoneSelection
+                            == .systemDefault
+                )
+            }
+
+            Divider()
+
+            let devices =
+                services.microphoneInputPresentation.presentedDevices(
+                    selection: services.preferences.microphoneSelection
+                )
+            if devices.isEmpty {
+                Text("No input devices found")
+            } else {
+                ForEach(devices) { device in
+                    Button {
+                        services.setMicrophoneSelection(
+                            .device(
+                                deviceUID: device.id,
+                                lastSeenDisplayName: device.displayName
+                            )
+                        )
+                    } label: {
+                        microphoneMenuLabel(
+                            device.isAvailable
+                                ? device.displayName
+                                : "\(device.displayName) — Unavailable",
+                            isSelected: isSelectedMicrophone(device.id)
+                        )
+                    }
+                    .disabled(!device.isAvailable)
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Text(selectedMicrophoneTitle)
+                    .lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption2)
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .accessibilityLabel("Microphone")
+        .accessibilityValue(selectedMicrophoneTitle)
+    }
+
+    @ViewBuilder
+    private var microphoneLevelOrPermission: some View {
+        if services.dictation.readiness.permissions.microphone == .granted {
+            VStack(alignment: .leading, spacing: 10) {
+                if services.microphoneInputPresentation
+                    .deviceRefreshFailed {
+                    HStack {
+                        Label(
+                            "The microphone list could not be refreshed.",
+                            systemImage: "exclamationmark.triangle"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+
+                        Spacer()
+
+                        Button("Retry") {
+                            services.refreshMicrophoneInputs()
+                        }
+                        .controlSize(.small)
+                    }
+                }
+
+                MicrophoneInputLevelView(
+                    level: services.microphoneInputPresentation.level,
+                    isMonitoring:
+                        services.microphoneInputPresentation.isMonitoring,
+                    error:
+                        services.microphoneInputPresentation.monitoringError
+                )
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(
+                    "Allow Microphone access to preview the selected input level."
+                )
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+                Button(microphonePermissionActionTitle) {
+                    performMicrophonePermissionAction()
+                }
+                .disabled(microphonePermissionTask != nil)
+
+                if let microphonePermissionMessage {
+                    Text(microphonePermissionMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func microphoneMenuLabel(
+        _ title: String,
+        isSelected: Bool
+    ) -> some View {
+        if isSelected {
+            Label(title, systemImage: "checkmark")
+        } else {
+            Text(title)
+        }
+    }
+
+    private func isSelectedMicrophone(_ deviceUID: String) -> Bool {
+        guard case let .device(selectedUID, _) =
+            services.preferences.microphoneSelection
+        else {
+            return false
+        }
+        return selectedUID == deviceUID
+    }
+
+    private var selectedMicrophoneTitle: String {
+        switch services.preferences.microphoneSelection {
+        case .systemDefault:
+            return "System Default"
+        case let .device(deviceUID, lastSeenDisplayName):
+            let isAvailable =
+                services.microphoneInputPresentation.devices.contains {
+                    $0.id == deviceUID
+                }
+            return isAvailable
+                ? lastSeenDisplayName
+                : "\(lastSeenDisplayName) — Unavailable"
+        }
+    }
+
+    private var microphonePermissionActionTitle: String {
+        services.dictation.readiness.permissions.microphone == .denied
+            ? "Open Microphone Settings"
+            : "Request Microphone Access"
+    }
+
+    private func performMicrophonePermissionAction() {
+        guard microphonePermissionTask == nil else {
+            return
+        }
+
+        if services.dictation.readiness.permissions.microphone == .denied {
+            if SystemPrivacySettingsOpener.open(.microphone) {
+                microphonePermissionMessage =
+                    "Turn on Microphone for Textify in System Settings, then return here."
+            } else {
+                microphonePermissionMessage =
+                    "Open System Settings → Privacy & Security → Microphone, then turn on Textify."
+            }
+            return
+        }
+
+        microphonePermissionTask = Task {
+            defer {
+                microphonePermissionTask = nil
+            }
+            let state =
+                await ProductionPermissionRequester.requestMicrophone()
+            guard !Task.isCancelled else {
+                return
+            }
+            microphonePermissionMessage =
+                state.permissionRequestMessage(for: "Microphone")
+            _ = await services.dictation.refreshReadiness()
+            services.refreshMicrophoneInputs()
+        }
     }
 
     private func overlayPreferenceBinding(
@@ -1264,10 +1470,17 @@ struct ModelsSettingsPane: View {
         ModelCheckpointPendingLanguageUse?
     @State private var checkpointInspectorMode:
         ModelCheckpointInspectorMode = .sheet
+    @State private var expandedCheckpointID: String?
     @FocusState private var catalogHasKeyboardFocus: Bool
     @FocusState private var focusedCatalogRowID: ModelCatalogHierarchyRowID?
     @AccessibilityFocusState private var accessibilityFocusedCatalogRowID:
         ModelCatalogHierarchyRowID?
+    @Environment(\.colorSchemeContrast)
+    private var colorSchemeContrast
+    @Environment(\.accessibilityDifferentiateWithoutColor)
+    private var differentiateWithoutColor
+    @Environment(\.accessibilityReduceTransparency)
+    private var reduceTransparency
 
     init(
         destination: ModelCatalogPurposeDestination,
@@ -1455,7 +1668,16 @@ struct ModelsSettingsPane: View {
                         disabledReason: modelTransactionDisabledReason,
                         onUse: useCheckpointArtifact,
                         onDisable: disableVoiceCleaning,
-                        onInspect: inspectCheckpoint
+                        onInspect: inspectCheckpoint,
+                        onInspectExactArtifact: inspectExactArtifact,
+                        onRemoveExactArtifact: { artifactID in
+                            guard let artifact =
+                                exactArtifactPresentation(artifactID)
+                            else {
+                                return
+                            }
+                            removeCheckpointArtifact(artifact)
+                        }
                     )
                 } else if checkpointPresentation.rows.isEmpty
                     && standaloneInstalledRows.isEmpty
@@ -1474,6 +1696,12 @@ struct ModelsSettingsPane: View {
                                 focusedCheckpointID,
                             selectedCheckpointID:
                                 selectedCheckpointID,
+                            selectedExactArtifactID:
+                                selectedExactArtifactID,
+                            expandedCheckpointID:
+                                expandedCheckpointID,
+                            visualPolicy:
+                                checkpointAccessibilityVisualPolicy,
                             keyboardFocus: $catalogHasKeyboardFocus,
                             transferRegistry:
                                 featureModel.transferStateRegistry,
@@ -1561,6 +1789,11 @@ struct ModelsSettingsPane: View {
             of: featureModel.snapshot?.screenProjection.rows.map(\.id),
             initial: true
         ) { _, checkpointIDs in
+            if let expandedCheckpointID,
+                checkpointIDs?.contains(expandedCheckpointID) != true
+            {
+                self.expandedCheckpointID = nil
+            }
             guard featureModel.checkpointOrderIDs.isEmpty,
                 let checkpointIDs,
                 !checkpointIDs.isEmpty
@@ -1693,6 +1926,8 @@ struct ModelsSettingsPane: View {
                 .home,
                 .end,
                 .return,
+                .leftArrow,
+                .rightArrow,
                 .delete,
             ],
             phases: .down
@@ -1784,12 +2019,35 @@ struct ModelsSettingsPane: View {
     }
 
     private var selectedCheckpointID: String? {
-        guard case let .checkpoint(id) =
+        switch featureModel.hierarchyState.selection {
+        case let .checkpoint(id):
+            return id
+        case let .exactArtifact(artifactID):
+            return featureModel.snapshot?.screenProjection.rows.first {
+                $0.containsArtifact(artifactID)
+            }?.checkpointID
+        case nil:
+            return nil
+        }
+    }
+
+    private var selectedExactArtifactID: String? {
+        guard case let .exactArtifact(id) =
             featureModel.hierarchyState.selection
         else {
             return nil
         }
         return id
+    }
+
+    private var checkpointAccessibilityVisualPolicy:
+        ModelCheckpointAccessibilityVisualPolicy
+    {
+        ModelCheckpointAccessibilityVisualPolicy(
+            increaseContrast: colorSchemeContrast == .increased,
+            differentiateWithoutColor: differentiateWithoutColor,
+            reduceTransparency: reduceTransparency
+        )
     }
 
     private var preferredInspectorMode: ModelCheckpointInspectorMode {
@@ -1851,7 +2109,10 @@ struct ModelsSettingsPane: View {
                 onVerify: verifyCheckpointArtifact,
                 onReinstall: reinstallCheckpointArtifact,
                 onReveal: revealCheckpointArtifact,
-                onRemove: removeCheckpointArtifact
+                onRemove: removeCheckpointArtifact,
+                onInspectArtifact: { artifact in
+                    inspectExactArtifact(artifact.id)
+                }
             )
         } else {
             ModelCatalogInspectorView(
@@ -1917,6 +2178,32 @@ struct ModelsSettingsPane: View {
                 return
             }
             inspectCheckpoint(row)
+        case let .selectArtifact(checkpointID, artifactID):
+            guard screenRow(checkpointID)?.containsArtifact(artifactID)
+                == true
+            else {
+                return
+            }
+            selectExactArtifactForInspector(artifactID)
+            let rowID = ModelCatalogHierarchyRowID.checkpoint(
+                checkpointID
+            )
+            featureModel.hierarchyState.focus(rowID)
+            featureModel.hierarchyState.scroll(to: rowID)
+        case let .inspectArtifact(artifactID):
+            inspectExactArtifact(artifactID)
+        case let .setVersionDisclosure(checkpointID, isExpanded):
+            guard (screenRow(checkpointID)?.versionCount ?? 0) > 1 else {
+                expandedCheckpointID = nil
+                return
+            }
+            expandedCheckpointID =
+                isExpanded ? checkpointID : nil
+            let rowID = ModelCatalogHierarchyRowID.checkpoint(
+                checkpointID
+            )
+            featureModel.hierarchyState.focus(rowID)
+            featureModel.hierarchyState.scroll(to: rowID)
         case let .use(checkpointID, artifactID):
             useCheckpointArtifact(
                 checkpointID: checkpointID,
@@ -1947,7 +2234,9 @@ struct ModelsSettingsPane: View {
             }
             revealCheckpointArtifact(artifact)
         case let .remove(artifactID):
-            selectExactArtifactForInspector(artifactID)
+            guard selectedExactArtifactID == artifactID else {
+                return
+            }
             beginSelectedRemoval()
         }
     }
@@ -1955,6 +2244,7 @@ struct ModelsSettingsPane: View {
     private func inspectCheckpoint(
         _ row: ModelCheckpointRowPresentation
     ) {
+        expandedCheckpointID = nil
         let selection = ModelCatalogHierarchySelection
             .checkpoint(row.checkpointID)
         featureModel.hierarchyState.select(selection)
@@ -1966,6 +2256,16 @@ struct ModelsSettingsPane: View {
                     query: catalogQuery
                 )
         )
+        checkpointInspectorMode = preferredInspectorMode
+        featureModel.showsInspector = true
+    }
+
+    private func inspectExactArtifact(_ artifactID: String) {
+        guard exactArtifactPresentation(artifactID) != nil else {
+            return
+        }
+        expandedCheckpointID = nil
+        selectExactArtifactForInspector(artifactID)
         checkpointInspectorMode = preferredInspectorMode
         featureModel.showsInspector = true
     }
@@ -2179,6 +2479,16 @@ struct ModelsSettingsPane: View {
         let selection = ModelCatalogHierarchySelection
             .exactArtifact(artifactID)
         featureModel.hierarchyState.select(selection)
+        if let checkpointID =
+            featureModel.snapshot?.screenProjection.rows.first(
+                where: { $0.containsArtifact(artifactID) }
+            )?.checkpointID {
+            let rowID = ModelCatalogHierarchyRowID.checkpoint(
+                checkpointID
+            )
+            featureModel.hierarchyState.focus(rowID)
+            featureModel.hierarchyState.scroll(to: rowID)
+        }
         featureModel.inspectorController.select(
             selection,
             in: featureModel.snapshot?.experience
@@ -2376,6 +2686,10 @@ struct ModelsSettingsPane: View {
             command = .end
         case .return:
             command = .activate
+        case .leftArrow:
+            command = .collapse
+        case .rightArrow:
+            command = .expand
         case .delete where keyPress.modifiers.contains(.command):
             command = .deleteSelection
         default:
@@ -2394,14 +2708,40 @@ struct ModelsSettingsPane: View {
             return .ignored
         }
 
+        let effectiveFocusedCheckpointID =
+            focusedCheckpointID ?? presentation.rows.first?.checkpointID
+        let focusedRow = presentation.rows.first {
+            $0.checkpointID == effectiveFocusedCheckpointID
+        }
+        let focusedInspectionArtifactID =
+            focusedRow?.containsArtifact(selectedExactArtifactID) == true
+            ? selectedExactArtifactID
+            : nil
+        let deletionArtifactID =
+            ModelCheckpointDeletionPolicy.artifactID(
+                explicitlySelectedArtifactID:
+                    selectedExactArtifactID,
+                focusedCheckpointID:
+                    effectiveFocusedCheckpointID,
+                candidates:
+                    presentation.rows.flatMap(\.deletionCandidates)
+            )
         let result = ModelCheckpointKeyboardNavigation.result(
             for: command,
-            focusedCheckpointID: focusedCheckpointID,
-            checkpointIDs: presentation.rows.map(\.id)
+            focusedCheckpointID: effectiveFocusedCheckpointID,
+            checkpointIDs: presentation.rows.map(\.id),
+            expandedCheckpointID: expandedCheckpointID,
+            expandableCheckpointIDs: Set(
+                presentation.rows.filter {
+                    $0.versionCount > 1
+                }.map(\.checkpointID)
+            ),
+            inspectionArtifactID: focusedInspectionArtifactID,
+            deletionArtifactID: deletionArtifactID
         )
         switch result {
         case .ignored:
-            return .ignored
+            return command == .deleteSelection ? .handled : .ignored
         case let .focus(id):
             let rowID = ModelCatalogHierarchyRowID.checkpoint(id)
             featureModel.hierarchyState.focus(rowID)
@@ -2416,14 +2756,27 @@ struct ModelsSettingsPane: View {
             )
         case let .inspect(id):
             handleCatalogScreenCommand(.inspect(checkpointID: id))
-        case let .delete(id):
-            guard let row = presentation.rows.first(where: {
-                $0.id == id
-            }) else {
-                return .ignored
-            }
+        case let .inspectArtifact(artifactID):
             handleCatalogScreenCommand(
-                .remove(artifactID: row.selectedArtifactID)
+                .inspectArtifact(artifactID: artifactID)
+            )
+        case let .expand(checkpointID):
+            handleCatalogScreenCommand(
+                .setVersionDisclosure(
+                    checkpointID: checkpointID,
+                    isExpanded: true
+                )
+            )
+        case let .collapse(checkpointID):
+            handleCatalogScreenCommand(
+                .setVersionDisclosure(
+                    checkpointID: checkpointID,
+                    isExpanded: false
+                )
+            )
+        case let .deleteArtifact(artifactID):
+            handleCatalogScreenCommand(
+                .remove(artifactID: artifactID)
             )
         }
         return .handled

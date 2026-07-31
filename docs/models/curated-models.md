@@ -236,10 +236,11 @@ needed for a trustworthy multilingual production route. See the
 
 ### Qwen3-ASR / MLX and transcribe.cpp Metal GPU
 
-Qwen3-ASR 0.6B and 1.7B are published as Experimental automatic-language
-choices. Each architecture has one native MLX Audio Swift 8-bit directory and
-three GGUF choices through transcribe.cpp: BF16, Q8_0, and Q5_K_M. The MLX
-directories are pinned to `mlx-community/Qwen3-ASR-0.6B-8bit` commit
+Qwen3-ASR 0.6B and 1.7B are published as Experimental multilingual choices
+with Automatic and explicit language selection. Each architecture has one
+native MLX Audio Swift 8-bit directory and three GGUF choices through
+transcribe.cpp: BF16, Q8_0, and Q5_K_M. The MLX directories are pinned to
+`mlx-community/Qwen3-ASR-0.6B-8bit` commit
 `89e96d92ba34aca20b3e29fb10cc284097d1219f` and
 `mlx-community/Qwen3-ASR-1.7B-8bit` commit
 `a8379a2e2f9e313c9292cdf1af4055ab56d50d55`. Their nine required inference
@@ -255,11 +256,13 @@ entry records its own exact filename, size, SHA-256, revision, and Apache-2.0
 model license; the native MLX and transcribe.cpp runtime layers are MIT.
 
 Both runtimes keep model inference local, require a verified Metal backend,
-cap recordings at 60 seconds, and use the architecture's automatic language
-detection. Textify does not send an explicit language hint because the Qwen3-ASR
-GGUF implementation does not support one. The entries advertise the 30
-languages declared by the upstream checkpoint and remain Experimental while
-Textify expands its per-language corpus evidence.
+and cap recordings at 60 seconds. Automatic sends no language hint so the
+architecture detects the language. An explicit compatible selection is
+forwarded to the MLX or GGUF runtime and disables detection. Textify rejects an
+explicit language before inference unless it is declared by the signed entry
+and supported by that runtime variant. The entries advertise the 30 languages
+declared by the upstream checkpoint and remain Experimental while Textify
+expands its per-language corpus evidence.
 
 On the fixed English sample, MLX 0.6B and 1.7B measured 3.20% and 1.83% WER
 with 191.5 ms and 211.5 ms median finalization. The GGUF routes measured

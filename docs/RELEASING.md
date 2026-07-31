@@ -174,8 +174,10 @@ Textify GitHub Release assets or exact commit-pinned Hugging Face URLs.
    evidence.
    Qwen3-ASR MLX and GGUF variants remain Experimental until their exact
    artifacts pass Textify's install-shaped Metal smokes and fixed-corpus
-   measurements. They require automatic language detection; do not send an
-   explicit language prompt through either runtime.
+   measurements. They support Automatic detection and explicit language
+   selection only for languages declared by the signed catalog and accepted by
+   the runtime variant. Preserve both routes in release validation, and fail
+   closed before inference for any unsupported explicit language.
    Parakeet TDT V2/V3 and Nemotron MLX/GGUF variants likewise remain
    Experimental until their declared multilingual routes gain representative
    per-language evidence. The Handy repositories publish F16 rather than BF16

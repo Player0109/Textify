@@ -1,6 +1,6 @@
 public enum LiveAudioRecorderError: Error, Equatable, Sendable {
     case microphonePermissionDenied
-    case unsupportedInput
+    case selectedInputUnavailable
     case alreadyRecording
     case notRecording
     case inputNodeUnavailable

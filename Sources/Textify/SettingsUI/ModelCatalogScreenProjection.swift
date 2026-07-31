@@ -97,8 +97,19 @@ struct ModelCatalogScreenVersionOption: Equatable, Identifiable, Sendable {
     let isActionable: Bool
     let isSelected: Bool
     let isRecommended: Bool
+    let isInstalled: Bool
+    let measuredLocalBytes: Int64?
+    let allowsDeletion: Bool
+    let outlineLevel: Int
+    let logicalPosition: Int
+    let logicalCount: Int
 
-    init(_ option: ModelCheckpointVersionOption) {
+    init(
+        _ option: ModelCheckpointVersionOption,
+        outlineLevel: Int,
+        logicalPosition: Int,
+        logicalCount: Int
+    ) {
         id = option.id
         displayName = option.displayName
         runtime = option.runtime
@@ -116,11 +127,30 @@ struct ModelCatalogScreenVersionOption: Equatable, Identifiable, Sendable {
         isActionable = option.isActionable
         isSelected = option.isSelected
         isRecommended = option.isRecommended
+        isInstalled = option.artifact.row.isInstalled
+        measuredLocalBytes = option.artifact.row.measuredLocalBytes
+        allowsDeletion = option.artifact.row.actions.contains(.delete)
+        self.outlineLevel = outlineLevel
+        self.logicalPosition = logicalPosition
+        self.logicalCount = logicalCount
+    }
+
+    var accessibilitySummary: String {
+        [
+            displayName,
+            String(localized: "Exact Artifact, level \(outlineLevel)"),
+            state,
+            String(
+                localized:
+                    "Row \(logicalPosition) of \(logicalCount)"
+            ),
+        ].joined(separator: ", ")
     }
 }
 
 struct ModelCatalogScreenRow: Equatable, Identifiable, Sendable {
     let checkpointID: String
+    let familyName: String
     let provider: ModelProviderIdentity
     let providerLogoKey: ModelProviderLogoKey?
     let title: String
@@ -165,11 +195,12 @@ struct ModelCatalogScreenRow: Equatable, Identifiable, Sendable {
 
     init(
         _ row: ModelCheckpointRowPresentation,
-        outlineLevel: Int = 1,
+        outlineLevel: Int = 2,
         logicalPosition: Int = 1,
         logicalCount: Int = 1
     ) {
         checkpointID = row.checkpointID
+        familyName = row.familyName
         let resolvedProvider = ModelProviderIdentity.resolve(
             from: row.familyName,
             row.providerName
@@ -195,9 +226,15 @@ struct ModelCatalogScreenRow: Equatable, Identifiable, Sendable {
         languageCompatibilityNote = row.languageCompatibilityNote
         selectedLanguage = row.selectedLanguage
         versionRoute = row.versionRoute
-        versionOptions = row.versionOptions.map(
-            ModelCatalogScreenVersionOption.init
-        )
+        let options = row.versionOptions
+        versionOptions = options.enumerated().map { index, option in
+            ModelCatalogScreenVersionOption(
+                option,
+                outlineLevel: outlineLevel + 1,
+                logicalPosition: index + 1,
+                logicalCount: options.count
+            )
+        }
         transferAttemptID = row.selectedArtifact.row.install?.state.attemptID
         isActive = row.isActive
         isInstalled = row.isInstalled
@@ -209,6 +246,7 @@ struct ModelCatalogScreenRow: Equatable, Identifiable, Sendable {
         self.logicalPosition = logicalPosition
         self.logicalCount = logicalCount
         accessibilitySummary = [
+            String(localized: "\(row.familyName), Family, level 1"),
             row.accessibilityLabel(for: .wide),
             String(localized: "Checkpoint, level \(outlineLevel)"),
             String(localized: "Quality \(row.qualityLabel)"),
@@ -232,6 +270,36 @@ struct ModelCatalogScreenRow: Equatable, Identifiable, Sendable {
             selectedLanguage: selectedLanguage,
             supportedLanguageCodes: supportedLanguages
         )
+    }
+
+    var deletionCandidates: [ModelCheckpointDeletionCandidate] {
+        versionOptions.map {
+            ModelCheckpointDeletionCandidate(
+                checkpointID: checkpointID,
+                artifactID: $0.id,
+                isInstalled: $0.isInstalled,
+                hasMeasuredLocalSize: $0.measuredLocalBytes != nil,
+                allowsDeletion: $0.allowsDeletion
+            )
+        }
+    }
+
+    func deletionArtifactID(
+        explicitlySelectedArtifactID: String?
+    ) -> String? {
+        ModelCheckpointDeletionPolicy.artifactID(
+            explicitlySelectedArtifactID:
+                explicitlySelectedArtifactID,
+            focusedCheckpointID: checkpointID,
+            candidates: deletionCandidates
+        )
+    }
+
+    func containsArtifact(_ artifactID: String?) -> Bool {
+        guard let artifactID else {
+            return false
+        }
+        return versionOptions.contains { $0.id == artifactID }
     }
 }
 
@@ -267,7 +335,7 @@ struct ModelCatalogScreenProjection: Equatable, Sendable {
                     logicalPosition += 1
                     return ModelCatalogScreenRow(
                         row,
-                        outlineLevel: section.title == nil ? 1 : 2,
+                        outlineLevel: 2,
                         logicalPosition: logicalPosition,
                         logicalCount: logicalCount
                     )
@@ -279,6 +347,9 @@ struct ModelCatalogScreenProjection: Equatable, Sendable {
 
 enum ModelCatalogScreenCommand: Equatable, Sendable {
     case inspect(checkpointID: String)
+    case selectArtifact(checkpointID: String, artifactID: String)
+    case inspectArtifact(artifactID: String)
+    case setVersionDisclosure(checkpointID: String, isExpanded: Bool)
     case use(checkpointID: String, artifactID: String)
     case installOnly(checkpointID: String, artifactID: String)
     case cancel(attemptID: String)

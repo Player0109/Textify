@@ -625,6 +625,14 @@ public final class AppDictationService {
                         }
                         await self.handleTriggerAction(.finishRecording)
                     }
+                },
+                onRecordingError: { [weak self] error in
+                    Task { @MainActor in
+                        await self?.handleRecordingError(
+                            error,
+                            sessionID: sessionID
+                        )
+                    }
                 }
             )
 
@@ -643,8 +651,35 @@ public final class AppDictationService {
             currentSegment = nil
             activationTarget = nil
             resetTriggerStateMachine()
-            status = .failed(.audioStartFailed)
+            status = Self.status(forAudioStartError: error)
         }
+    }
+
+    private func handleRecordingError(
+        _ error: LiveAudioRecorderError,
+        sessionID: UUID
+    ) async {
+        guard activeSessionID == sessionID else {
+            return
+        }
+        switch status {
+        case .waitingForActivation, .recording:
+            break
+        case .idle, .processing, .inserting, .completed, .cancelled,
+             .failed, .blocked:
+            return
+        }
+
+        activationTimerToken = nil
+        targetCaptureToken = nil
+        activationTarget = nil
+        activeSessionID = nil
+        activeSessionPreferences = nil
+        activeSegmentContext = nil
+        currentSegment = nil
+        resetTriggerStateMachine()
+        status = Self.status(forAudioFinishError: error)
+        await dependencies.audio.discardRecording()
     }
 
     private func finishRecording() async {
@@ -1238,13 +1273,22 @@ public final class AppDictationService {
         case .deviceChangedDuringRecording:
             return .failed(.microphoneChanged)
         case .microphonePermissionDenied,
-             .unsupportedInput,
+             .selectedInputUnavailable,
              .alreadyRecording,
              .notRecording,
              .inputNodeUnavailable,
              .engineStartFailed:
             return .failed(.audioFinishFailed)
         }
+    }
+
+    private static func status(forAudioStartError error: Error) -> DictationRuntimeStatus {
+        guard let audioError = error as? LiveAudioRecorderError,
+              audioError == .selectedInputUnavailable
+        else {
+            return .failed(.audioStartFailed)
+        }
+        return .failed(.selectedMicrophoneUnavailable)
     }
 }
 

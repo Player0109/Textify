@@ -3352,12 +3352,12 @@ final class AppCompositionTests: XCTestCase {
     }
 
     @MainActor
-    func testProductionCompositionMigratesUnsupportedExplicitMicrophoneToSystemDefault() throws {
+    func testProductionCompositionPreservesExplicitMicrophoneSelection() throws {
         let paths = try Self.makeTemporaryPaths()
         var preferences = AppPreferences.defaults
         preferences.microphoneSelection = .device(
-            deviceUID: "legacy-device",
-            lastSeenDisplayName: "Legacy Microphone"
+            deviceUID: "saved-device",
+            lastSeenDisplayName: "Saved Microphone"
         )
         SettingsStore(storage: .file(paths.settingsFileURL)).save(preferences)
 
@@ -3367,8 +3367,264 @@ final class AppCompositionTests: XCTestCase {
             launchAtLoginLocation: FixedLaunchAtLoginLocation(isSupported: true)
         )
 
-        XCTAssertEqual(services.preferences.microphoneSelection, .systemDefault)
-        XCTAssertEqual(services.settingsStore.load().microphoneSelection, .systemDefault)
+        XCTAssertEqual(
+            services.preferences.microphoneSelection,
+            .device(
+                deviceUID: "saved-device",
+                lastSeenDisplayName: "Saved Microphone"
+            )
+        )
+        XCTAssertEqual(
+            services.settingsStore.load().microphoneSelection,
+            services.preferences.microphoneSelection
+        )
+    }
+
+    @MainActor
+    func testRefreshingMicrophonesUpdatesSavedDisplayNameForStableUID() throws {
+        var preferences = AppPreferences.defaults
+        preferences.microphoneSelection = .device(
+            deviceUID: "desk-mic",
+            lastSeenDisplayName: "Old Name"
+        )
+        let services = try Self.makeServices(
+            preferences: preferences,
+            microphoneInputClient: MicrophoneInputClient(
+                inputDevices: {
+                    [
+                        MicrophoneDevice(
+                            id: "desk-mic",
+                            displayName: "Studio Microphone"
+                        ),
+                    ]
+                },
+                levelStream: { _ in
+                    AsyncThrowingStream { continuation in
+                        continuation.finish()
+                    }
+                }
+            )
+        )
+
+        services.refreshMicrophoneInputs()
+
+        let expected = MicrophoneSelection.device(
+            deviceUID: "desk-mic",
+            lastSeenDisplayName: "Studio Microphone"
+        )
+        XCTAssertEqual(services.preferences.microphoneSelection, expected)
+        XCTAssertEqual(
+            services.settingsStore.load().microphoneSelection,
+            expected
+        )
+    }
+
+    @MainActor
+    func testRefreshingMicrophonesDoesNotReplaceUnavailableSavedSelection() throws {
+        var preferences = AppPreferences.defaults
+        preferences.microphoneSelection = .device(
+            deviceUID: "disconnected-mic",
+            lastSeenDisplayName: "Travel Microphone"
+        )
+        let services = try Self.makeServices(
+            preferences: preferences,
+            microphoneInputClient: MicrophoneInputClient(
+                inputDevices: { [] },
+                levelStream: { _ in
+                    AsyncThrowingStream { continuation in
+                        continuation.finish()
+                    }
+                }
+            )
+        )
+
+        services.refreshMicrophoneInputs()
+
+        XCTAssertEqual(
+            services.preferences.microphoneSelection,
+            .device(
+                deviceUID: "disconnected-mic",
+                lastSeenDisplayName: "Travel Microphone"
+            )
+        )
+        XCTAssertEqual(
+            services.microphoneInputPresentation.presentedDevices(
+                selection: services.preferences.microphoneSelection
+            ),
+            [
+                MicrophoneDevice(
+                    id: "disconnected-mic",
+                    displayName: "Travel Microphone",
+                    isAvailable: false
+                ),
+            ]
+        )
+    }
+
+    @MainActor
+    func testMicrophoneMeterFollowsVisibleDictationSurfaceAndSelection() async throws {
+        let probe = MicrophoneLevelStreamProbe()
+        let services = try Self.makeServices(
+            microphoneInputClient: probe.client(
+                devices: [
+                    MicrophoneDevice(
+                        id: "desk-mic",
+                        displayName: "Desk Microphone"
+                    ),
+                ]
+            )
+        )
+        _ = await services.dictation.refreshReadiness()
+        services.settingsRouter.selectedPane = .dictation
+
+        services.setMainWindowVisibility(true)
+        for _ in 0..<100 where probe.inputs.count < 1 {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(probe.inputs, [.systemDefault])
+        XCTAssertTrue(services.microphoneInputPresentation.isMonitoring)
+
+        services.setOnboardingWindowVisibility(true)
+        XCTAssertTrue(
+            services.microphoneInputPresentation.isMonitoring,
+            "Either visible microphone surface must keep metering active."
+        )
+
+        XCTAssertTrue(
+            services.setMicrophoneSelection(
+                .device(
+                    deviceUID: "desk-mic",
+                    lastSeenDisplayName: "Desk Microphone"
+                )
+            )
+        )
+        for _ in 0..<100 where probe.inputs.count < 2 {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(
+            probe.inputs,
+            [.systemDefault, .device(deviceUID: "desk-mic")]
+        )
+        XCTAssertEqual(
+            services.settingsStore.load().microphoneSelection,
+            .device(
+                deviceUID: "desk-mic",
+                lastSeenDisplayName: "Desk Microphone"
+            )
+        )
+
+        services.setMainWindowVisibility(false)
+        for _ in 0..<100 where probe.terminationCount < 2 {
+            await Task.yield()
+        }
+
+        XCTAssertFalse(services.microphoneInputPresentation.isMonitoring)
+        XCTAssertEqual(probe.terminationCount, 2)
+    }
+
+    @MainActor
+    func testMeterDisconnectRefreshesPersistedInputAsUnavailable() async throws {
+        let probe = MicrophoneLevelStreamProbe()
+        var preferences = AppPreferences.defaults
+        preferences.microphoneSelection = .device(
+            deviceUID: "desk-mic",
+            lastSeenDisplayName: "Desk Microphone"
+        )
+        let services = try Self.makeServices(
+            preferences: preferences,
+            microphoneInputClient: probe.client(
+                devices: [
+                    MicrophoneDevice(
+                        id: "desk-mic",
+                        displayName: "Desk Microphone"
+                    ),
+                ]
+            )
+        )
+        _ = await services.dictation.refreshReadiness()
+        services.settingsRouter.selectedPane = .dictation
+        services.setMainWindowVisibility(true)
+        for _ in 0..<100 where probe.inputs.isEmpty {
+            await Task.yield()
+        }
+
+        probe.disconnectCurrentInput()
+        for _ in 0..<100
+            where services.microphoneInputPresentation.isMonitoring
+        {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(
+            services.microphoneInputPresentation.monitoringError,
+            .selectedInputUnavailable
+        )
+        XCTAssertTrue(
+            services.microphoneInputPresentation.devices.isEmpty
+        )
+        XCTAssertEqual(
+            services.microphoneInputPresentation.presentedDevices(
+                selection: services.preferences.microphoneSelection
+            ),
+            [
+                MicrophoneDevice(
+                    id: "desk-mic",
+                    displayName: "Desk Microphone",
+                    isAvailable: false
+                ),
+            ]
+        )
+    }
+
+    @MainActor
+    func testFailedMicrophoneRefreshClearsStaleAvailableDevices() throws {
+        let refreshProbe = MicrophoneDeviceRefreshProbe(
+            devices: [
+                MicrophoneDevice(
+                    id: "desk-mic",
+                    displayName: "Desk Microphone"
+                ),
+            ]
+        )
+        var preferences = AppPreferences.defaults
+        preferences.microphoneSelection = .device(
+            deviceUID: "desk-mic",
+            lastSeenDisplayName: "Desk Microphone"
+        )
+        let services = try Self.makeServices(
+            preferences: preferences,
+            microphoneInputClient: refreshProbe.client
+        )
+
+        services.refreshMicrophoneInputs()
+        XCTAssertEqual(
+            services.microphoneInputPresentation.devices.map(\.id),
+            ["desk-mic"]
+        )
+
+        refreshProbe.failRefreshes()
+        services.refreshMicrophoneInputs()
+
+        XCTAssertTrue(
+            services.microphoneInputPresentation.deviceRefreshFailed
+        )
+        XCTAssertTrue(
+            services.microphoneInputPresentation.devices.isEmpty
+        )
+        XCTAssertEqual(
+            services.microphoneInputPresentation.presentedDevices(
+                selection: services.preferences.microphoneSelection
+            ),
+            [
+                MicrophoneDevice(
+                    id: "desk-mic",
+                    displayName: "Desk Microphone",
+                    isAvailable: false
+                ),
+            ]
+        )
     }
 
     @MainActor
@@ -3394,6 +3650,14 @@ final class AppCompositionTests: XCTestCase {
         launchAtLogin: FakeLaunchAtLoginManager? = nil,
         launchAtLoginLocation: any LaunchAtLoginLocationChecking = FixedLaunchAtLoginLocation(isSupported: true),
         modelCatalogCompatibilityResolver: ModelCatalogCompatibilityResolver = .current(),
+        microphoneInputClient: MicrophoneInputClient = MicrophoneInputClient(
+            inputDevices: { [] },
+            levelStream: { _ in
+                AsyncThrowingStream { continuation in
+                    continuation.finish()
+                }
+            }
+        ),
         models: any RuntimeModelResolving = FakeRuntimeModelResolver(),
         transcriber: any RuntimeTranscribing = FakeRuntimeTranscriber(),
         voiceCleaner: any RuntimeVoiceCleaning = DisabledRuntimeVoiceCleaning(),
@@ -3440,6 +3704,7 @@ final class AppCompositionTests: XCTestCase {
             launchAtLogin: launchAtLogin,
             launchAtLoginLocation: launchAtLoginLocation,
             modelCatalogCompatibilityResolver: modelCatalogCompatibilityResolver,
+            microphoneInputClient: microphoneInputClient,
             overlayPresenter: overlayPresenter,
             waitBeforeProcessingIndicator: waitBeforeProcessingIndicator,
             modelWorkflowDurabilityObserver:
@@ -3981,7 +4246,9 @@ private actor FakeRuntimeAudioRecorder: RuntimeAudioRecording {
         microphone: MicrophoneSelection,
         maximumDurationSeconds: Double,
         onSpeechDetected: @escaping @Sendable () -> Void,
-        onMaximumDurationReached: @escaping @Sendable () -> Void
+        onMaximumDurationReached: @escaping @Sendable () -> Void,
+        onRecordingError:
+            @escaping @Sendable (LiveAudioRecorderError) -> Void
     ) async throws {}
 
     func finishRecording() async throws -> CanonicalAudioBuffer {
@@ -4057,6 +4324,117 @@ private actor SuspendedModelInstallGate {
         let continuation = continuation
         self.continuation = nil
         continuation?.resume()
+    }
+}
+
+private final class MicrophoneLevelStreamProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private var availableDevices: [MicrophoneDevice] = []
+    private var recordedInputs: [LiveAudioInput] = []
+    private var recordedTerminationCount = 0
+    private var continuations:
+        [AsyncThrowingStream<Float, Error>.Continuation] = []
+
+    func client(devices: [MicrophoneDevice]) -> MicrophoneInputClient {
+        lock.lock()
+        availableDevices = devices
+        lock.unlock()
+        return MicrophoneInputClient(
+            inputDevices: { [weak self] in
+                guard let self else {
+                    return []
+                }
+                self.lock.lock()
+                defer { self.lock.unlock() }
+                return self.availableDevices
+            },
+            levelStream: { [weak self] input in
+                AsyncThrowingStream(
+                    bufferingPolicy: .bufferingNewest(1)
+                ) { continuation in
+                    guard let self else {
+                        continuation.finish()
+                        return
+                    }
+                    self.lock.lock()
+                    self.recordedInputs.append(input)
+                    self.continuations.append(continuation)
+                    self.lock.unlock()
+                    continuation.onTermination = { [weak self] _ in
+                        guard let self else {
+                            return
+                        }
+                        self.lock.lock()
+                        self.recordedTerminationCount += 1
+                        self.lock.unlock()
+                    }
+                    continuation.yield(0.42)
+                }
+            }
+        )
+    }
+
+    func disconnectCurrentInput() {
+        lock.lock()
+        availableDevices = []
+        let continuation = continuations.last
+        lock.unlock()
+        continuation?.finish(
+            throwing: LiveAudioRecorderError.selectedInputUnavailable
+        )
+    }
+
+    var inputs: [LiveAudioInput] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recordedInputs
+    }
+
+    var terminationCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return recordedTerminationCount
+    }
+}
+
+private enum MicrophoneDeviceRefreshFixtureError: Error {
+    case unavailable
+}
+
+private final class MicrophoneDeviceRefreshProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private let devices: [MicrophoneDevice]
+    private var shouldFail = false
+
+    init(devices: [MicrophoneDevice]) {
+        self.devices = devices
+    }
+
+    var client: MicrophoneInputClient {
+        MicrophoneInputClient(
+            inputDevices: { [weak self] in
+                guard let self else {
+                    throw MicrophoneDeviceRefreshFixtureError.unavailable
+                }
+                self.lock.lock()
+                defer { self.lock.unlock() }
+                guard !self.shouldFail else {
+                    throw MicrophoneDeviceRefreshFixtureError.unavailable
+                }
+                return self.devices
+            },
+            levelStream: { _ in
+                AsyncThrowingStream { continuation in
+                    continuation.finish()
+                }
+            }
+        )
+    }
+
+    func failRefreshes() {
+        lock.lock()
+        shouldFail = true
+        lock.unlock()
     }
 }
 
