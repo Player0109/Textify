@@ -135,6 +135,7 @@ DMG="build/release/Textify-1.1.0-unsigned-preview.1-arm64.dmg"
 
 git fetch origin master
 test "$(git rev-parse origin/master)" = "$SOURCE_COMMIT"
+test -z "$(git status --porcelain=v1 --untracked-files=all)"
 script/release/verify_artifact_source_commit.sh \
   "$DMG" \
   "$SOURCE_COMMIT" \
@@ -167,6 +168,7 @@ script/release/verify_artifact_source_commit.sh \
   --allow-unsigned-dmg
 test "$(gh api "repos/Player0109/Textify/releases/tags/$TAG" --jq .draft)" = true
 test "$(gh api "repos/Player0109/Textify/releases/tags/$TAG" --jq .prerelease)" = true
+test -z "$(git status --porcelain=v1 --untracked-files=all)"
 gh release edit "$TAG" \
   --draft=false \
   --prerelease \
