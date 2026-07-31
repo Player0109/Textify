@@ -140,6 +140,7 @@ struct OnboardingRootView: View {
         ) { _ in
             Task {
                 _ = await services.dictation.refreshReadiness()
+                services.applicationDidBecomeActive()
             }
         }
         .onDisappear {
@@ -396,6 +397,17 @@ struct OnboardingRootView: View {
                     permissionMessage = state.permissionRequestMessage(for: "Microphone")
                     _ = await services.dictation.refreshReadiness()
                 }
+            }
+            if services.dictation.readiness.permissions.microphone
+                == .granted {
+                MicrophoneInputLevelView(
+                    level: services.microphoneInputPresentation.level,
+                    isMonitoring:
+                        services.microphoneInputPresentation.isMonitoring,
+                    error:
+                        services.microphoneInputPresentation.monitoringError
+                )
+                .padding(.top, 4)
             }
             if let permissionMessage {
                 Text(permissionMessage)

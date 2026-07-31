@@ -782,6 +782,33 @@ final class AppDictationServiceTests: XCTestCase {
         XCTAssertEqual(service.status, .cancelled(.escapeKey))
     }
 
+    func testSelectedMicrophoneUnavailableStartErrorHasSpecificStatus() async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.audio.setStartError(
+            LiveAudioRecorderError.selectedInputUnavailable
+        )
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+
+        XCTAssertEqual(
+            service.status,
+            .failed(.selectedMicrophoneUnavailable)
+        )
+    }
+
+    func testOtherAudioStartErrorsRemainGenericStartFailures() async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.audio.setStartError(
+            LiveAudioRecorderError.engineStartFailed
+        )
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+
+        XCTAssertEqual(service.status, .failed(.audioStartFailed))
+    }
+
     func testFinishRecordingErrorAfterCancellationKeepsCancellationStatus() async {
         let fakes = RuntimeFakes.ready()
         await fakes.audio.suspendFinish(callNumber: 1)

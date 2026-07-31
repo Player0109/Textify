@@ -37,6 +37,51 @@ final class LiveAudioRecorderTests: XCTestCase {
         await recorder.discardRecording()
     }
 
+    func testRoutesExplicitInputBeforeInstallingTapAndStartingEngine() async throws {
+        let permission = MicrophonePermissionClient(
+            status: { .granted },
+            requestAccess: { .granted }
+        )
+        let engine = FakeAudioEngineClient()
+        let recorder = LiveAudioRecorder(permissionClient: permission, engineClient: engine)
+        let input = LiveAudioInput.device(deviceUID: "fixture-device-uid")
+
+        try await recorder.startRecording(
+            input: input,
+            onSpeechDetected: {},
+            onMaximumDurationReached: {}
+        )
+
+        XCTAssertEqual(engine.selectedInputs, [input])
+        XCTAssertEqual(engine.callOrder, [.selectInput, .installTap, .start])
+        await recorder.discardRecording()
+    }
+
+    func testUnavailableExplicitInputDoesNotInstallTapOrStartEngine() async throws {
+        let permission = MicrophonePermissionClient(
+            status: { .granted },
+            requestAccess: { .granted }
+        )
+        let engine = FakeAudioEngineClient()
+        engine.selectInputError = LiveAudioRecorderError.selectedInputUnavailable
+        let recorder = LiveAudioRecorder(permissionClient: permission, engineClient: engine)
+
+        do {
+            try await recorder.startRecording(
+                input: .device(deviceUID: "missing-device-uid"),
+                onSpeechDetected: {},
+                onMaximumDurationReached: {}
+            )
+            XCTFail("Expected unavailable explicit input to fail")
+        } catch let error as LiveAudioRecorderError {
+            XCTAssertEqual(error, .selectedInputUnavailable)
+        }
+
+        XCTAssertFalse(engine.tapInstalled)
+        XCTAssertFalse(engine.started)
+        XCTAssertEqual(engine.resetCallCount, 1)
+    }
+
     func testConcurrentStartDuringPermissionRequestIsRejected() async throws {
         let permissionGate = PermissionRequestGate()
         let permission = MicrophonePermissionClient(
@@ -318,6 +363,15 @@ final class FakeAudioEngineClient: AudioEngineClient, @unchecked Sendable {
     private let lock = NSLock()
     private var state = State()
 
+    enum Call: Equatable {
+        case selectInput
+        case installTap
+        case start
+        case removeTap
+        case stop
+        case reset
+    }
+
     var started: Bool {
         withLock { state.started }
     }
@@ -338,6 +392,29 @@ final class FakeAudioEngineClient: AudioEngineClient, @unchecked Sendable {
         withLock { state.installTapCallCount }
     }
 
+    var resetCallCount: Int {
+        withLock { state.resetCallCount }
+    }
+
+    var selectedInputs: [LiveAudioInput] {
+        withLock { state.selectedInputs }
+    }
+
+    var callOrder: [Call] {
+        withLock { state.callOrder }
+    }
+
+    var selectInputError: LiveAudioRecorderError? {
+        get {
+            withLock { state.selectInputError }
+        }
+        set {
+            withLock {
+                state.selectInputError = newValue
+            }
+        }
+    }
+
     var onStop: (@Sendable () -> Void)? {
         get {
             withLock { state.onStop }
@@ -353,24 +430,42 @@ final class FakeAudioEngineClient: AudioEngineClient, @unchecked Sendable {
         withLock {
             state.started = true
             state.startCallCount += 1
+            state.callOrder.append(.start)
         }
     }
 
     func stop() {
         let hook = withLock {
             state.stopped = true
+            state.callOrder.append(.stop)
             return state.onStop
         }
         hook?()
     }
 
-    func reset() {}
+    func reset() {
+        withLock {
+            state.resetCallCount += 1
+            state.callOrder.append(.reset)
+        }
+    }
+
+    func selectInput(_ input: LiveAudioInput) throws {
+        try withLock {
+            state.selectedInputs.append(input)
+            state.callOrder.append(.selectInput)
+            if let selectInputError = state.selectInputError {
+                throw selectInputError
+            }
+        }
+    }
 
     func installTap(_ handler: @escaping @Sendable (AVAudioPCMBuffer, AVAudioTime) -> Void) throws {
         withLock {
             state.tapInstalled = true
             state.tapHandler = handler
             state.installTapCallCount += 1
+            state.callOrder.append(.installTap)
         }
     }
 
@@ -379,6 +474,7 @@ final class FakeAudioEngineClient: AudioEngineClient, @unchecked Sendable {
             state.removedTapHandler = state.tapHandler
             state.tapInstalled = false
             state.tapHandler = nil
+            state.callOrder.append(.removeTap)
         }
     }
 
@@ -473,6 +569,10 @@ final class FakeAudioEngineClient: AudioEngineClient, @unchecked Sendable {
         var tapInstalled = false
         var startCallCount = 0
         var installTapCallCount = 0
+        var resetCallCount = 0
+        var selectedInputs: [LiveAudioInput] = []
+        var selectInputError: LiveAudioRecorderError?
+        var callOrder: [Call] = []
         var tapHandler: (@Sendable (AVAudioPCMBuffer, AVAudioTime) -> Void)?
         var removedTapHandler: (@Sendable (AVAudioPCMBuffer, AVAudioTime) -> Void)?
         var onStop: (@Sendable () -> Void)?

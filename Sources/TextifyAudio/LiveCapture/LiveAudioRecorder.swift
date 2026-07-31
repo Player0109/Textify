@@ -26,6 +26,7 @@ public actor LiveAudioRecorder {
     }
 
     public func startRecording(
+        input: LiveAudioInput? = nil,
         maximumDurationSeconds: Double? = nil,
         onSpeechDetected: @escaping @Sendable () -> Void,
         onMaximumDurationReached: @escaping @Sendable () -> Void
@@ -36,10 +37,6 @@ public actor LiveAudioRecorder {
             try await ensureMicrophonePermission()
             guard lifecycle == .starting(sessionID) else {
                 throw LiveAudioRecorderError.alreadyRecording
-            }
-            guard configuration.input == .systemDefault else {
-                clearRecordingState(for: sessionID)
-                throw LiveAudioRecorderError.unsupportedInput
             }
         } catch let error as LiveAudioRecorderError {
             clearRecordingState(for: sessionID)
@@ -58,6 +55,7 @@ public actor LiveAudioRecorder {
         }
 
         do {
+            try engineClient.selectInput(input ?? configuration.input)
             try engineClient.installTap { buffer, _ in
                 ingestionPipeline.ingest(buffer)
             }
@@ -244,6 +242,7 @@ public actor LiveAudioRecorder {
     private func stopEngine(cancelMaximumDuration: Bool = true) {
         engineClient.removeTap()
         engineClient.stop()
+        engineClient.reset()
         if cancelMaximumDuration {
             cancelMaximumDurationCallback()
         }

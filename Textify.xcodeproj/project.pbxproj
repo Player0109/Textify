@@ -45,6 +45,7 @@
 		6D63DC47C566F31B048CD477 /* EventSource.txt in Resources */ = {isa = PBXBuildFile; fileRef = FCA476E0930186FF787D9C63 /* EventSource.txt */; };
 		6DEA13BA30DC7587CC42280E /* sherpa-onnx.txt in Resources */ = {isa = PBXBuildFile; fileRef = 8AD879F0D8719F8540E69AAA /* sherpa-onnx.txt */; };
 		714103EEB527618B39DA750A /* CC-BY-4.0.txt in Resources */ = {isa = PBXBuildFile; fileRef = 19F3C9112A8FB9B7B23EDB20 /* CC-BY-4.0.txt */; };
+		72A9C2EEF7D29E03B6AFFEF5 /* MicrophoneInputPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0CA80C3364EF2EEF1256D77 /* MicrophoneInputPresentation.swift */; };
 		72FD9128A25D1E3C01AF3FF5 /* ModelLegalDocumentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 707BEFBEFCA00386B2567370 /* ModelLegalDocumentView.swift */; };
 		7751FD6B4139F3331CB51F41 /* ModelCatalogScreenProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4617EAD880DB908A8E34931E /* ModelCatalogScreenProjection.swift */; };
 		7BD8D1C22BB1F0EE2536BB3D /* TextifyHotkeys in Frameworks */ = {isa = PBXBuildFile; productRef = 48F8807F9DA4FFCFE56FACA7 /* TextifyHotkeys */; };
@@ -62,6 +63,7 @@
 		B8A079B1778C11DC35E50AED /* TextifyAudio in Frameworks */ = {isa = PBXBuildFile; productRef = B1677768EEB0E11CB0915BF3 /* TextifyAudio */; };
 		BAA39168D933BC34A5957FFD /* ModelInstallProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01131FE96D27558A2041D9B4 /* ModelInstallProgressView.swift */; };
 		BD0036BA21EEB86DC8A5E187 /* MLXSwift-metal-cpp.txt in Resources */ = {isa = PBXBuildFile; fileRef = 1CB5C7E0FACBD19A12792772 /* MLXSwift-metal-cpp.txt */; };
+		C111BF53D199443A9A646E98 /* MicrophoneInputLevelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95E36EA0D2EA524236F27204 /* MicrophoneInputLevelView.swift */; };
 		C68A87C74F49D77057553A11 /* ModelCatalogVariantComparisonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0468CB0F07A06511893A98E0 /* ModelCatalogVariantComparisonView.swift */; };
 		C87B35194E13C6B8347A9AA8 /* LiteRT-LM.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2C6154B49DBC9110E0F6A6C5 /* LiteRT-LM.txt */; };
 		C9718CC256C7A8E964304045 /* ONNX_Runtime_ThirdPartyNotices.txt in Resources */ = {isa = PBXBuildFile; fileRef = D1160F40D4A863F202979D3E /* ONNX_Runtime_ThirdPartyNotices.txt */; };
@@ -136,6 +138,7 @@
 		8B5D8432F1D949AAB6A3D8B5 /* SwiftNIO-NOTICE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "SwiftNIO-NOTICE.txt"; sourceTree = "<group>"; };
 		8BE1E7363BFCFA5AB888ECA0 /* SwiftHuggingFace.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftHuggingFace.txt; sourceTree = "<group>"; };
 		9510A25BCF86D6827E535C91 /* SwiftASN1.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftASN1.txt; sourceTree = "<group>"; };
+		95E36EA0D2EA524236F27204 /* MicrophoneInputLevelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicrophoneInputLevelView.swift; sourceTree = "<group>"; };
 		9951D35B4B5345C255BC7FCF /* MLXSwift.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = MLXSwift.txt; sourceTree = "<group>"; };
 		A832DFCDACE99CAE41017E5F /* SwiftNumerics.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftNumerics.txt; sourceTree = "<group>"; };
 		AC943A14D084BC8D112A71EB /* SettingsRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRootView.swift; sourceTree = "<group>"; };
@@ -149,6 +152,7 @@
 		C32C98F05AD92486666F9717 /* MenuBarRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarRoot.swift; sourceTree = "<group>"; };
 		D1160F40D4A863F202979D3E /* ONNX_Runtime_ThirdPartyNotices.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = ONNX_Runtime_ThirdPartyNotices.txt; sourceTree = "<group>"; };
 		D15B56AA140711CE36EF8A57 /* FluidAudio-VBx.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "FluidAudio-VBx.txt"; sourceTree = "<group>"; };
+		E0CA80C3364EF2EEF1256D77 /* MicrophoneInputPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicrophoneInputPresentation.swift; sourceTree = "<group>"; };
 		E5FCFD81E2C513F4D4C26431 /* ModelCatalogVariantComparison.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogVariantComparison.swift; sourceTree = "<group>"; };
 		E63D1ED9495AC2C1A95E866B /* MLXAudioSwift.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = MLXAudioSwift.txt; sourceTree = "<group>"; };
 		F0C61DAF2351DEC5C3365040 /* Textify.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Textify.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -230,6 +234,7 @@
 				6CF0AB1D69531402DCE40D70 /* AppPaths.swift */,
 				0DE762BA89473A6795A5D976 /* AppServices.swift */,
 				77EBF4271CB3FC9AE19B1DE5 /* LaunchAtLoginController.swift */,
+				E0CA80C3364EF2EEF1256D77 /* MicrophoneInputPresentation.swift */,
 				F57373CBDBD84E287E3A0094 /* ModelStorageInventoryCoordinator.swift */,
 				70DF2341D0286566EE14C37A /* ProductionModelManifestLoader.swift */,
 				5F80B1907E994ACF795B14A1 /* TextifyApp.swift */,
@@ -277,6 +282,7 @@
 			isa = PBXGroup;
 			children = (
 				C32C98F05AD92486666F9717 /* MenuBarRoot.swift */,
+				95E36EA0D2EA524236F27204 /* MicrophoneInputLevelView.swift */,
 				01131FE96D27558A2041D9B4 /* ModelInstallProgressView.swift */,
 				521E635A02FA359283D0D319 /* TextifyVisualSystem.swift */,
 			);
@@ -619,6 +625,8 @@
 				FECC8E50DA0E6FD0AC8F8B50 /* AppServices.swift in Sources */,
 				A144C92E74AAF7D61126BDC4 /* LaunchAtLoginController.swift in Sources */,
 				503BE9FCFD1D80B2DF7C9BA3 /* MenuBarRoot.swift in Sources */,
+				C111BF53D199443A9A646E98 /* MicrophoneInputLevelView.swift in Sources */,
+				72A9C2EEF7D29E03B6AFFEF5 /* MicrophoneInputPresentation.swift in Sources */,
 				1D4C90A954214718ED04E602 /* ModelCatalogArtifactInspection.swift in Sources */,
 				E5EB96C5D1DFC2A3BA781E8B /* ModelCatalogCheckpointExperience.swift in Sources */,
 				CBA00E3F8C259C30BCE570A3 /* ModelCatalogCheckpointView.swift in Sources */,

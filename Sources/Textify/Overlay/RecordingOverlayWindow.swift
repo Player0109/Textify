@@ -46,6 +46,8 @@ private extension ProductionDictationError {
             return "Transcription unavailable."
         case .microphoneChanged:
             return "Microphone changed. Try again."
+        case .selectedMicrophoneUnavailable:
+            return MicrophoneInputPresentationCopy.selectedInputUnavailable
         case .audioStartFailed, .audioFinishFailed, .audioConversionFailed:
             return "Microphone recording failed."
         case .insertionFailed:

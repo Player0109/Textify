@@ -643,7 +643,7 @@ public final class AppDictationService {
             currentSegment = nil
             activationTarget = nil
             resetTriggerStateMachine()
-            status = .failed(.audioStartFailed)
+            status = Self.status(forAudioStartError: error)
         }
     }
 
@@ -1238,6 +1238,7 @@ public final class AppDictationService {
         case .deviceChangedDuringRecording:
             return .failed(.microphoneChanged)
         case .microphonePermissionDenied,
+             .selectedInputUnavailable,
              .unsupportedInput,
              .alreadyRecording,
              .notRecording,
@@ -1245,6 +1246,15 @@ public final class AppDictationService {
              .engineStartFailed:
             return .failed(.audioFinishFailed)
         }
+    }
+
+    private static func status(forAudioStartError error: Error) -> DictationRuntimeStatus {
+        guard let audioError = error as? LiveAudioRecorderError,
+              audioError == .selectedInputUnavailable
+        else {
+            return .failed(.audioStartFailed)
+        }
+        return .failed(.selectedMicrophoneUnavailable)
     }
 }
 

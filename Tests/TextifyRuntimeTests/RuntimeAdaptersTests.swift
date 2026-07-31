@@ -1,3 +1,4 @@
+import AVFoundation
 import CryptoKit
 import Foundation
 import TextifyAudio
@@ -10,6 +11,32 @@ import TextifySettings
 import TextifyTranscription
 @testable import TextifyRuntime
 import XCTest
+
+private final class RuntimeAdapterAudioEngineSpy:
+    AudioEngineClient,
+    @unchecked Sendable
+{
+    private let lock = NSLock()
+    private var selectedInputValue: LiveAudioInput?
+
+    var selectedInput: LiveAudioInput? {
+        lock.withLock { selectedInputValue }
+    }
+
+    func selectInput(_ input: LiveAudioInput) throws {
+        lock.withLock {
+            selectedInputValue = input
+        }
+    }
+
+    func start() throws {}
+    func stop() {}
+    func reset() {}
+    func installTap(
+        _ handler: @escaping @Sendable (AVAudioPCMBuffer, AVAudioTime) -> Void
+    ) throws {}
+    func removeTap() {}
+}
 
 final class RuntimeAdaptersTests: XCTestCase {
     func testSettingsAdapterLoadsAndSavesPreferences() async {
@@ -37,20 +64,31 @@ final class RuntimeAdaptersTests: XCTestCase {
         XCTAssertTrue(json.contains(#""event":"app_started""#))
     }
 
-    func testAudioAdapterRejectsExplicitMicrophoneSelection() async throws {
-        let adapter = RuntimeAudioRecorderAdapter(recorder: LiveAudioRecorder())
-
-        do {
-            try await adapter.startRecording(
-                microphone: .device(deviceUID: "missing", lastSeenDisplayName: "Missing"),
-                maximumDurationSeconds: 60,
-                onSpeechDetected: {},
-                onMaximumDurationReached: {}
+    func testAudioAdapterForwardsExplicitMicrophoneSelectionByUID() async throws {
+        let permission = MicrophonePermissionClient(
+            status: { .granted },
+            requestAccess: { .granted }
+        )
+        let engine = RuntimeAdapterAudioEngineSpy()
+        let adapter = RuntimeAudioRecorderAdapter(
+            recorder: LiveAudioRecorder(
+                permissionClient: permission,
+                engineClient: engine
             )
-            XCTFail("Expected explicit microphone selection to be rejected")
-        } catch let error as LiveAudioRecorderError {
-            XCTAssertEqual(error, .unsupportedInput)
-        }
+        )
+
+        try await adapter.startRecording(
+            microphone: .device(
+                deviceUID: "fixture-device-uid",
+                lastSeenDisplayName: "Fixture Microphone"
+            ),
+            maximumDurationSeconds: 60,
+            onSpeechDetected: {},
+            onMaximumDurationReached: {}
+        )
+
+        XCTAssertEqual(engine.selectedInput, .device(deviceUID: "fixture-device-uid"))
+        await adapter.discardRecording()
     }
 
     func testWhisperAdapterReportsMissingModelAfterFailedPrepare() async throws {

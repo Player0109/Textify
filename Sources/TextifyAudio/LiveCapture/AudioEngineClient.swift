@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 
 public protocol AudioEngineClient: AnyObject, Sendable {
+    func selectInput(_ input: LiveAudioInput) throws
     func start() throws
     func stop()
     func reset()

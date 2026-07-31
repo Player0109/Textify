@@ -380,6 +380,38 @@ final class ModelCatalogCheckpointExperienceTests: XCTestCase {
         }
     }
 
+    func testScreenProjectionExposesFamilyCheckpointAndExactArtifactHierarchy()
+        throws
+    {
+        let projection = ModelCatalogScreenProjection(
+            try makePresentation()
+        )
+        let row = try XCTUnwrap(
+            projection.rows.first {
+                $0.versionCount > 1
+            }
+        )
+
+        XCTAssertEqual(row.outlineLevel, 2)
+        XCTAssertTrue(
+            row.accessibilitySummary.contains("Family, level 1")
+        )
+        XCTAssertTrue(
+            row.accessibilitySummary.contains("Checkpoint, level 2")
+        )
+        XCTAssertEqual(
+            row.versionOptions.map(\.outlineLevel),
+            Array(repeating: 3, count: row.versionCount)
+        )
+        XCTAssertTrue(
+            row.versionOptions.allSatisfy {
+                $0.accessibilitySummary.contains(
+                    "Exact Artifact, level 3"
+                )
+            }
+        )
+    }
+
     func testVoiceCleanerVersionsDoNotInventComparableRatings() throws {
         let presentation = try makePresentation(
             purpose: .voiceCleaning,
@@ -439,6 +471,182 @@ final class ModelCatalogCheckpointExperienceTests: XCTestCase {
                 checkpointIDs: ids
             ),
             .inspect("checkpoint-12")
+        )
+    }
+
+    func testKeyboardNavigationRoutesProgressiveExactArtifactDisclosure()
+    {
+        let ids = ["checkpoint-a", "checkpoint-b"]
+
+        XCTAssertEqual(
+            ModelCheckpointKeyboardNavigation.result(
+                for: .expand,
+                focusedCheckpointID: "checkpoint-a",
+                checkpointIDs: ids,
+                expandableCheckpointIDs: ["checkpoint-a"]
+            ),
+            .expand("checkpoint-a")
+        )
+        XCTAssertEqual(
+            ModelCheckpointKeyboardNavigation.result(
+                for: .collapse,
+                focusedCheckpointID: "checkpoint-a",
+                checkpointIDs: ids,
+                expandedCheckpointID: "checkpoint-a",
+                expandableCheckpointIDs: ["checkpoint-a"]
+            ),
+            .collapse("checkpoint-a")
+        )
+        XCTAssertEqual(
+            ModelCheckpointKeyboardNavigation.result(
+                for: .activate,
+                focusedCheckpointID: "checkpoint-a",
+                checkpointIDs: ids,
+                inspectionArtifactID: "artifact-a"
+            ),
+            .inspectArtifact("artifact-a")
+        )
+    }
+
+    func testDeletionPolicyRequiresOneExplicitInstalledMeasuredExactArtifact()
+    {
+        let candidates = [
+            ModelCheckpointDeletionCandidate(
+                checkpointID: "checkpoint-a",
+                artifactID: "artifact-installed",
+                isInstalled: true,
+                hasMeasuredLocalSize: true,
+                allowsDeletion: true
+            ),
+            ModelCheckpointDeletionCandidate(
+                checkpointID: "checkpoint-a",
+                artifactID: "artifact-size-pending",
+                isInstalled: true,
+                hasMeasuredLocalSize: false,
+                allowsDeletion: true
+            ),
+            ModelCheckpointDeletionCandidate(
+                checkpointID: "checkpoint-a",
+                artifactID: "artifact-not-installed",
+                isInstalled: false,
+                hasMeasuredLocalSize: false,
+                allowsDeletion: false
+            ),
+        ]
+
+        XCTAssertNil(
+            ModelCheckpointDeletionPolicy.artifactID(
+                explicitlySelectedArtifactID: nil,
+                focusedCheckpointID: "checkpoint-a",
+                candidates: candidates
+            ),
+            "A Checkpoint's presented version is not an explicit Exact Artifact selection."
+        )
+        XCTAssertNil(
+            ModelCheckpointDeletionPolicy.artifactID(
+                explicitlySelectedArtifactID: "artifact-size-pending",
+                focusedCheckpointID: "checkpoint-a",
+                candidates: candidates
+            )
+        )
+        XCTAssertNil(
+            ModelCheckpointDeletionPolicy.artifactID(
+                explicitlySelectedArtifactID: "artifact-installed",
+                focusedCheckpointID: "checkpoint-b",
+                candidates: candidates
+            )
+        )
+        XCTAssertEqual(
+            ModelCheckpointDeletionPolicy.artifactID(
+                explicitlySelectedArtifactID: "artifact-installed",
+                focusedCheckpointID: "checkpoint-a",
+                candidates: candidates
+            ),
+            "artifact-installed"
+        )
+    }
+
+    func testCommandDeleteNeverResolvesASelectedCheckpointImplicitly() {
+        let ids = ["checkpoint-a"]
+
+        XCTAssertEqual(
+            ModelCheckpointKeyboardNavigation.result(
+                for: .deleteSelection,
+                focusedCheckpointID: "checkpoint-a",
+                checkpointIDs: ids
+            ),
+            .ignored
+        )
+        XCTAssertEqual(
+            ModelCheckpointKeyboardNavigation.result(
+                for: .deleteSelection,
+                focusedCheckpointID: "checkpoint-a",
+                checkpointIDs: ids,
+                deletionArtifactID: "artifact-installed"
+            ),
+            .deleteArtifact("artifact-installed")
+        )
+    }
+
+    func testAccessibilityVisualPolicyMakesTheRequiredDecisionsExplicit() {
+        XCTAssertEqual(
+            ModelCheckpointAccessibilityVisualPolicy.standard,
+            ModelCheckpointAccessibilityVisualPolicy(
+                increaseContrast: false,
+                differentiateWithoutColor: false,
+                reduceTransparency: false
+            )
+        )
+
+        let increaseContrast = ModelCheckpointAccessibilityVisualPolicy(
+            increaseContrast: true,
+            differentiateWithoutColor: false,
+            reduceTransparency: false
+        )
+        XCTAssertTrue(increaseContrast.emphasizesSelectionBoundaries)
+        XCTAssertTrue(increaseContrast.emphasizesControlBoundaries)
+        XCTAssertFalse(increaseContrast.usesOpaqueSurfaces)
+
+        let differentiate = ModelCheckpointAccessibilityVisualPolicy(
+            increaseContrast: false,
+            differentiateWithoutColor: true,
+            reduceTransparency: false
+        )
+        XCTAssertTrue(differentiate.emphasizesSelectionBoundaries)
+        XCTAssertTrue(differentiate.emphasizesControlBoundaries)
+
+        let reduceTransparency = ModelCheckpointAccessibilityVisualPolicy(
+            increaseContrast: false,
+            differentiateWithoutColor: false,
+            reduceTransparency: true
+        )
+        XCTAssertTrue(reduceTransparency.usesOpaqueSurfaces)
+    }
+
+    func testCheckpointInspectorWiresExactArtifactAndBundledLegalAffordances()
+        throws
+    {
+        let source = try String(
+            contentsOf:
+                repositoryRoot
+                .appendingPathComponent(
+                    "Sources/Textify/SettingsUI/ModelCatalogCheckpointView.swift"
+                ),
+            encoding: .utf8
+        )
+        let start = try XCTUnwrap(
+            source.range(of: "struct ModelCheckpointInspectorSurface")
+        )
+        let inspector = source[start.lowerBound..<source.endIndex]
+
+        XCTAssertTrue(inspector.contains("onInspectArtifact"))
+        XCTAssertTrue(inspector.contains("ModelSourceLicenseButton("))
+        XCTAssertTrue(inspector.contains("Open Upstream Source"))
+        XCTAssertTrue(
+            inspector.contains(
+                "artifact.row.measuredLocalBytes == nil"
+            ),
+            "Exact Artifact removal must stay unavailable while local-size measurement is pending."
         )
     }
 
