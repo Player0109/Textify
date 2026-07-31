@@ -1976,3 +1976,13 @@ Task 1 must merge before parallel Wave 1 work begins.
 - Preserve exact stable-UID routing, keep System Default bound to the original
   device while that stream remains valid, and do not add a listener for default
   input preference changes. Manual hardware evidence remains unchecked.
+
+## Recorder Finish-Lifecycle Test Handoff - 2026-07-31
+
+- Release validation owns the narrow deterministic-test remediation for
+  `LiveAudioRecorder` finishing-state coverage after the existing reentrant
+  task test proved dependent on actor scheduling.
+- This handoff may add an internal post-drain, before-ingestion-task-completion
+  suspension seam and update only the focused recorder tests. It must preserve
+  the public initializer, the production grace duration, the non-idle
+  `alreadyRecording` invariant, and stale-session ingestion coverage.

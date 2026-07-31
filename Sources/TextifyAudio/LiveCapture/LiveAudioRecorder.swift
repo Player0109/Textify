@@ -5,6 +5,8 @@ public actor LiveAudioRecorder {
     private let permissionClient: MicrophonePermissionClient
     private let configuration: LiveAudioRecordingConfiguration
     private let engineClient: AudioEngineClient
+    private let beforeIngestionTaskCompletion:
+        (@Sendable () async -> Void)?
 
     private var lifecycle: Lifecycle = .idle
     private var nextSessionID: UInt64 = 0
@@ -23,6 +25,20 @@ public actor LiveAudioRecorder {
         self.permissionClient = permissionClient
         self.configuration = configuration
         self.engineClient = engineClient
+        self.beforeIngestionTaskCompletion = nil
+    }
+
+    init(
+        permissionClient: MicrophonePermissionClient,
+        configuration: LiveAudioRecordingConfiguration,
+        engineClient: AudioEngineClient,
+        beforeIngestionTaskCompletion:
+            @escaping @Sendable () async -> Void
+    ) {
+        self.permissionClient = permissionClient
+        self.configuration = configuration
+        self.engineClient = engineClient
+        self.beforeIngestionTaskCompletion = beforeIngestionTaskCompletion
     }
 
     public func startRecording(
@@ -50,6 +66,7 @@ public actor LiveAudioRecorder {
 
         let (ingestionStream, ingestionPipeline) = LiveAudioIngestionPipeline.makeStream(sessionID: sessionID)
         self.ingestionPipeline = ingestionPipeline
+        let beforeIngestionTaskCompletion = self.beforeIngestionTaskCompletion
         ingestionTask = Task { [weak self] in
             for await event in ingestionStream {
                 await self?.handleIngestionEvent(
@@ -58,6 +75,7 @@ public actor LiveAudioRecorder {
                     onRecordingError: onRecordingError
                 )
             }
+            await beforeIngestionTaskCompletion?()
         }
 
         do {

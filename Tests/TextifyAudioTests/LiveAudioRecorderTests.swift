@@ -237,24 +237,42 @@ final class LiveAudioRecorderTests: XCTestCase {
             requestAccess: { .granted }
         )
         let engine = FakeAudioEngineClient()
+        let completionGate = IngestionTaskCompletionGate()
         let recorder = LiveAudioRecorder(
             permissionClient: permission,
             configuration: LiveAudioRecordingConfiguration(postReleaseGraceMilliseconds: 0),
-            engineClient: engine
+            engineClient: engine,
+            beforeIngestionTaskCompletion: {
+                await completionGate.wait()
+            }
         )
-        let reentrantStart = StartAttemptBox()
-        engine.onStop = {
-            reentrantStart.launch(recorder: recorder)
-        }
 
         try await recorder.startRecording(onSpeechDetected: {}, onMaximumDurationReached: {})
         try engine.emit(samples: Array(repeating: 0.2, count: 320), sampleRate: 16_000)
 
-        _ = try await recorder.finishRecording()
+        let finishTask = Task {
+            try await recorder.finishRecording()
+        }
+        await completionGate.waitUntilEntered()
 
-        let startDuringFinishOutcome = await reentrantStart.outcome()
-        XCTAssertEqual(startDuringFinishOutcome, .failed(.alreadyRecording))
+        var startError: LiveAudioRecorderError?
+        do {
+            try await recorder.startRecording(
+                onSpeechDetected: {},
+                onMaximumDurationReached: {}
+            )
+        } catch let error as LiveAudioRecorderError {
+            startError = error
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+
+        await completionGate.release()
+        let audio = try await finishTask.value
+
+        XCTAssertEqual(startError, .alreadyRecording)
         XCTAssertEqual(engine.startCallCount, 1)
+        XCTAssertEqual(audio.samples.count, 320)
     }
 
     func testStaleOldSessionIngestionCannotCorruptNextRecording() async throws {
@@ -268,18 +286,13 @@ final class LiveAudioRecorderTests: XCTestCase {
             configuration: LiveAudioRecordingConfiguration(postReleaseGraceMilliseconds: 0),
             engineClient: engine
         )
-        let reentrantStart = StartAttemptBox()
         engine.onStop = {
-            reentrantStart.launch(recorder: recorder)
             try? engine.emitRemovedTap(samples: Array(repeating: 0.9, count: 320), sampleRate: 16_000)
         }
 
         try await recorder.startRecording(onSpeechDetected: {}, onMaximumDurationReached: {})
         try engine.emit(samples: Array(repeating: 0.1, count: 320), sampleRate: 16_000)
         _ = try await recorder.finishRecording()
-
-        let staleStartOutcome = await reentrantStart.outcome()
-        XCTAssertEqual(staleStartOutcome, .failed(.alreadyRecording))
 
         engine.onStop = nil
         try await recorder.startRecording(onSpeechDetected: {}, onMaximumDurationReached: {})
@@ -777,39 +790,37 @@ private actor PermissionRequestGate {
     }
 }
 
-private enum StartAttemptOutcome: Equatable, Sendable {
-    case succeeded
-    case failed(LiveAudioRecorderError)
-    case failedUnexpectedly
-}
+private actor IngestionTaskCompletionGate {
+    private var hasEntered = false
+    private var entryWaiters: [CheckedContinuation<Void, Never>] = []
+    private var releaseContinuation: CheckedContinuation<Void, Never>?
 
-private final class StartAttemptBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var task: Task<StartAttemptOutcome, Never>?
-
-    func launch(recorder: LiveAudioRecorder) {
-        lock.lock()
-        defer { lock.unlock() }
-
-        guard task == nil else {
-            return
+    func wait() async {
+        hasEntered = true
+        let waiters = entryWaiters
+        entryWaiters.removeAll()
+        for waiter in waiters {
+            waiter.resume()
         }
 
-        task = Task {
-            do {
-                try await recorder.startRecording(onSpeechDetected: {}, onMaximumDurationReached: {})
-                return .succeeded
-            } catch let error as LiveAudioRecorderError {
-                return .failed(error)
-            } catch {
-                return .failedUnexpectedly
-            }
+        await withCheckedContinuation { continuation in
+            releaseContinuation = continuation
         }
     }
 
-    func outcome() async -> StartAttemptOutcome {
-        let task = lock.withLock { self.task }
-        return await task?.value ?? .failedUnexpectedly
+    func waitUntilEntered() async {
+        guard !hasEntered else {
+            return
+        }
+        await withCheckedContinuation { continuation in
+            entryWaiters.append(continuation)
+        }
+    }
+
+    func release() {
+        let continuation = releaseContinuation
+        releaseContinuation = nil
+        continuation?.resume()
     }
 }
 
