@@ -125,6 +125,16 @@ Distribution:
 - No PKG installer V1
 - No separate ZIP artifact V1
 
+Temporary non-production exception:
+
+- The product owner may authorize an explicitly labeled `unsigned-preview`
+  GitHub pre-release while Developer ID membership is deferred.
+- Its app is ad-hoc signed for Apple Silicon execution and its DMG is unsigned
+  and unnotarized. The release must document Gatekeeper's scoped manual
+  approval flow and must not consume the production `v1.1.0` tag.
+- This exception does not satisfy, remove, or weaken any production manual-QA,
+  evidence, Developer ID, notarization, stapling, or Gatekeeper requirement.
+
 Compatibility wording in README/releases:
 
 > macOS 14 (Sonoma) or later, Apple Silicon (M1 or later). Intel Macs are not supported.
@@ -163,8 +173,13 @@ Hardened Runtime:
 - Enabled for distribution with `codesign --options runtime`.
 - Do not add Hardened Runtime exception entitlements unless a verified build
   failure proves they are required.
-- Do not disable library validation in distribution. Sign every embedded native
-  library correctly in the release build.
+- Do not disable library validation in production distribution. Sign every
+  embedded native library correctly in the production release build.
+- The temporary unsigned preview may use the existing local
+  `com.apple.security.cs.disable-library-validation` entitlement because its
+  ad-hoc-signed nested libraries have no Developer ID team identity. It must
+  retain Hardened Runtime, disclose this exception, and remain a non-production
+  pre-release.
 
 Info.plist requirements:
 
