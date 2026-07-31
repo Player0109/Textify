@@ -9,6 +9,9 @@ Planned first public app release.
 - Added guided Microphone and Accessibility permission setup, model onboarding,
   Launch at Login, diagnostics export, excluded apps, vocabulary, and
   replacement pairs.
+- Added persistent System Default or exact-device microphone selection,
+  visibility-scoped live input metering, and fail-closed handling when a saved
+  microphone is unavailable.
 - Added a bundled signed 42-entry model catalog: 39 transcription choices and
   three independently selectable MossFormer2 SE voice-cleaning choices.
 - Added resumable, atomic multi-file model installs; switching; exact-artifact
@@ -30,6 +33,9 @@ Planned first public app release.
 - Added adaptive, keyboard-accessible model management with persistent catalog
   navigation, queryable progress, benchmark details, and lifecycle
   announcements.
+- Added explicit Family, Checkpoint, and Exact Artifact semantics, exact-only
+  destructive keyboard routing, working source and bundled-license actions,
+  and stronger accessibility appearance adaptations in the checkpoint catalog.
 - Added floating recording-icon position and scale controls with visible-screen
   clamping.
 - Added optional MossFormer2 SE FP32, FP16, and 8-bit in-memory voice cleaning

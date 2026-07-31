@@ -1916,3 +1916,49 @@ Task 1 must merge before parallel Wave 1 work begins.
   removes the partial file. Preserve the production download transport,
   redirect/range/validator/disconnect/retry coverage, and all unrelated model
   workflow behavior.
+
+## Production App Conformance Remediation Handoff - 2026-07-31
+
+- The product owner explicitly chose to retain the shipping Dictation Language
+  selector. This remediation may align the authoritative specification,
+  release guidance, and unchanged manual-QA decision gate with the persisted,
+  fail-closed language behavior already implemented and tested. It must not
+  remove the selector, reset existing language preferences, or check any
+  manual-QA evidence box.
+- The audio/runtime slice owns `Sources/TextifyAudio`, its focused tests,
+  `RuntimeAudioRecorderAdapter`, the narrow `AppDictationService` audio-error
+  mapping, `ProductionDictationError`, and matching runtime tests. It adds exact
+  CoreAudio UID routing and scalar-only input metering, but does not edit app
+  composition or SwiftUI files.
+- The checkpoint-catalog slice owns only
+  `ModelCatalogCheckpointExperience.swift`,
+  `ModelCatalogScreenProjection.swift`, `ModelCatalogCheckpointView.swift`,
+  the narrow Models keyboard/inspector sections of `SettingsRootView.swift`,
+  and their focused app tests. It must preserve the checkpoint-first visual
+  design while removing implicit Checkpoint deletion, wiring existing bundled
+  source/license presentation, and adding non-color accessibility boundaries.
+  It must not alter model storage, runtime-boundary transactions, catalog
+  trust, or legal resource files.
+- The app microphone slice owns `AppServices.swift`, `OnboardingRootView.swift`,
+  `TextifyApp.swift`, the Dictation-only sections of `SettingsRootView.swift`,
+  and matching app tests. Because `SettingsRootView.swift` is shared with the
+  checkpoint slice, this work starts only after the checkpoint changes have
+  landed in the shared working tree.
+- Manual QA 42 through 46, the three specification-conformance blocker
+  paragraphs, Developer ID signing, notarization, and release publication
+  remain fail-closed until their real-device or credentialed evidence exists.
+
+## Production App Conformance Remediation Completion - 2026-07-31
+
+- The explicit product-owner decision and implemented remediation above
+  supersede the earlier documentation-only instructions that prohibited
+  microphone implementation or public selectable-microphone copy. Public docs
+  may now describe System Default and stable exact-device selection, the
+  visibility-scoped scalar meter, and fail-closed unavailable-device behavior.
+- The stale paragraphs saying checks 42 through 46 cannot pass in the current
+  implementation may be replaced with open evidence gates. Every checkbox
+  remains unchecked until real-device, assistive-technology, and final-candidate
+  evidence is recorded.
+- Developer ID signing, notarization, stapling, Gatekeeper validation, and
+  production release publication remain outside this handoff and fail closed
+  without maintainer credentials.

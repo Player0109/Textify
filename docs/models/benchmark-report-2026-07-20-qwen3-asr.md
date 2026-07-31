@@ -4,8 +4,8 @@ Date: 2026-07-20
 
 Host: Apple M4 Max, arm64, macOS 26.5.1 build 25F80
 
-Status: eight Experimental catalog entries accepted with automatic language
-detection and a 60-second recording cap.
+Status: eight Experimental catalog entries accepted with Automatic and
+explicit compatible-language routing and a 60-second recording cap.
 
 ## Exact artifacts
 
@@ -41,10 +41,13 @@ native Swift speech package already supplies the required local-directory
 Qwen3-ASR loader, so adding those packages would not improve the shipping
 runtime.
 
-Both routes require the actual Metal backend. Qwen3-ASR is wired for automatic
-language detection only: MLX receives no language prompt, and the Textify C
-shim maps its internal `auto` sentinel to a null transcribe.cpp language
-parameter. Explicit language prompts fail closed before inference.
+Both routes require the actual Metal backend. With Automatic selected, MLX
+receives no language prompt and the Textify C shim maps its internal `auto`
+sentinel to a null transcribe.cpp language parameter. With an explicit
+compatible language selected, Textify forwards the normalized language through
+the native MLX or transcribe.cpp route and disables detection. A language not
+declared by the signed catalog entry or accepted by the runtime variant fails
+closed before inference.
 
 ## Fixed English corpus
 
