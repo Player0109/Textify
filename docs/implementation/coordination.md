@@ -1986,3 +1986,13 @@ Task 1 must merge before parallel Wave 1 work begins.
   suspension seam and update only the focused recorder tests. It must preserve
   the public initializer, the production grace duration, the non-idle
   `alreadyRecording` invariant, and stale-session ingestion coverage.
+
+## Local Release Staging Architecture Handoff - 2026-07-31
+
+- Production source-release validation owns the narrow
+  `script/build_and_run.sh --stage-full-release` correction needed to thin
+  Xcode's copied Swift compatibility library in the staged app to arm64.
+- Keep the credentialed archive/export pipeline unchanged: it already thins
+  after export and signs nested code before the app. The local workflow must
+  use ad-hoc signing with `Textify.Local.entitlements`, leave fast staging
+  unchanged, and verify every packaged Mach-O is exactly arm64.

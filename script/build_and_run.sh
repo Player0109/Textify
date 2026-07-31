@@ -21,6 +21,7 @@ WHISPER_RESOURCE_BUNDLE_NAME="Textify_WhisperCppVendor.bundle"
 METAL_LIBRARY="$APP_RESOURCES/default.metallib"
 MLX_METAL_LIBRARY="$APP_MACOS/mlx.metallib"
 LITERT_LM_LIBRARY="$APP_FRAMEWORKS/libCLiteRTLM_mac.dylib"
+SWIFT_COMPATIBILITY_LIBRARY="$APP_FRAMEWORKS/libswiftCompatibilitySpan.dylib"
 MODEL_CATALOG_DIRECTORY="$APP_RESOURCES/ModelCatalog"
 MODEL_CATALOG_MANIFEST="$MODEL_CATALOG_DIRECTORY/manifest.json"
 MODEL_CATALOG_SIGNATURE="$MODEL_CATALOG_DIRECTORY/manifest.json.sig"
@@ -117,6 +118,9 @@ stage_fast_app() {
 }
 
 verify_staged_app() {
+  local packaged_architectures
+  local packaged_file
+
   if [[ ! -s "$METAL_LIBRARY" ]] || ! /usr/bin/file "$METAL_LIBRARY" | /usr/bin/grep -q "MetalLib executable"; then
     echo "staged app is missing a valid Metal library: $METAL_LIBRARY" >&2
     exit 1
@@ -161,6 +165,14 @@ verify_staged_app() {
   [[ "$(lipo -archs "$APP_FRAMEWORKS/libonnxruntime.1.24.4.dylib")" == "arm64" ]]
   [[ "$(lipo -archs "$APP_FRAMEWORKS/libtextify-transcribe.0.1.3.dylib")" == "arm64" ]]
   [[ "$(lipo -archs "$LITERT_LM_LIBRARY")" == "arm64" ]]
+  while IFS= read -r -d '' packaged_file; do
+    [[ "$(/usr/bin/file -b "$packaged_file")" == *Mach-O* ]] || continue
+    packaged_architectures="$(lipo -archs "$packaged_file")"
+    if [[ "$packaged_architectures" != "arm64" ]]; then
+      echo "$packaged_file contains unexpected architectures: $packaged_architectures" >&2
+      exit 1
+    fi
+  done < <(find "$APP_CONTENTS" -type f -print0)
   codesign --verify --strict "$APP_FRAMEWORKS/libsherpa-onnx-c-api.dylib"
   codesign --verify --strict "$APP_FRAMEWORKS/libonnxruntime.1.24.4.dylib"
   codesign --verify --strict "$APP_FRAMEWORKS/libtextify-transcribe.0.1.3.dylib"
@@ -213,12 +225,44 @@ open_full_app() {
   /usr/bin/open -n "$FULL_APP_BUNDLE"
 }
 
+thin_staged_swift_compatibility_library() (
+  local temporary_directory
+
+  [[ -s "$SWIFT_COMPATIBILITY_LIBRARY" ]]
+  temporary_directory="$(mktemp -d)"
+  cleanup_staged_swift_compatibility_library() {
+    rm -rf "$temporary_directory"
+  }
+  trap cleanup_staged_swift_compatibility_library EXIT
+  lipo \
+    "$SWIFT_COMPATIBILITY_LIBRARY" \
+    -thin arm64 \
+    -output "$temporary_directory/libswiftCompatibilitySpan.dylib"
+  mv \
+    "$temporary_directory/libswiftCompatibilitySpan.dylib" \
+    "$SWIFT_COMPATIBILITY_LIBRARY"
+  codesign \
+    --force \
+    --sign - \
+    --timestamp=none \
+    --options runtime \
+    "$SWIFT_COMPATIBILITY_LIBRARY"
+  codesign \
+    --force \
+    --sign - \
+    --timestamp=none \
+    --options runtime \
+    --entitlements "$LOCAL_ENTITLEMENTS" \
+    "$APP_BUNDLE"
+)
+
 stage_full_release_app() {
   "$ROOT_DIR/script/generate_xcode_project.sh"
   xcodebuild -project "$ROOT_DIR/Textify.xcodeproj" -scheme "$APP_NAME" -configuration Release -destination 'platform=macOS' -derivedDataPath "$DERIVED_DATA_DIR" CODE_SIGN_ENTITLEMENTS="$LOCAL_ENTITLEMENTS" build
   [[ -d "$FULL_RELEASE_APP_BUNDLE" ]]
   rm -rf "$APP_BUNDLE"
   /usr/bin/ditto "$FULL_RELEASE_APP_BUNDLE" "$APP_BUNDLE"
+  thin_staged_swift_compatibility_library
   verify_staged_app
   verify_staged_app_launch
 }
