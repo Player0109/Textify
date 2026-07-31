@@ -18,8 +18,8 @@ it from the Dock or the menu-bar **Open Textify** action.
 
 ## Requirements
 
-- macOS 14 Sonoma or later.
-- An Apple Silicon Mac. Textify 1.1 is arm64 only; Intel Macs are unsupported.
+- macOS 14 (Sonoma) or later, Apple Silicon (M1 or later). Intel Macs are not
+  supported.
 - Microphone permission for recording.
 - Accessibility permission for the global Right Command trigger and text
   insertion.
