@@ -92,6 +92,93 @@ license. If
 project regeneration changes `Textify.xcodeproj`, the command stops once so the
 maintainer can review and commit the generated project before rerunning it.
 
+## Temporary Unsigned Preview
+
+An unsigned preview is a separate, explicitly labeled GitHub pre-release. It
+does not satisfy the production manual-QA, evidence, Developer ID, notarization,
+stapling, or Gatekeeper gates, and it must not consume the `v1.1.0` tag.
+
+Only create one after the product owner explicitly accepts the unknown-developer
+installation experience. Build from a clean commit already merged to and
+pushed on `origin/master`:
+
+```bash
+git fetch origin master
+bash script/release/validate_release.sh
+git diff --exit-code
+script/release/make_unsigned_preview.sh 1.1.0 1
+```
+
+The Developer ID identity and notary profile listed in the general prerequisites
+do not apply to this temporary preview. All other build, catalog, legal-resource,
+clean-tree, and GitHub maintainer prerequisites still apply.
+
+This produces:
+
+- `build/release/Textify-1.1.0-unsigned-preview.1-arm64.dmg`
+- `build/release/Textify-1.1.0-unsigned-preview.1-arm64.dmg.sha256`
+
+The helper embeds the exact source commit, builds the full Xcode Release app,
+keeps the app ad-hoc signed for Apple Silicon execution, verifies every staged
+resource and arm64 Mach-O through the existing local staging checks, confirms
+that no Developer ID authority is present, leaves the DMG unsigned, mounts and
+rechecks it, and creates the checksum. It does not create a tag or GitHub
+release.
+
+Publish only with an `unsigned-preview` tag and GitHub's pre-release flag. Start
+as a draft, download and re-verify both uploaded assets, then make it public:
+
+```bash
+TAG="v1.1.0-unsigned-preview.1"
+SOURCE_COMMIT="$(git rev-parse HEAD)"
+DMG="build/release/Textify-1.1.0-unsigned-preview.1-arm64.dmg"
+
+git fetch origin master
+test "$(git rev-parse origin/master)" = "$SOURCE_COMMIT"
+script/release/verify_artifact_source_commit.sh \
+  "$DMG" \
+  "$SOURCE_COMMIT" \
+  --allow-unsigned-dmg
+git tag -a "$TAG" "$SOURCE_COMMIT" -m "Textify 1.1.0 unsigned preview 1"
+git push origin "$TAG"
+gh release create "$TAG" \
+  "$DMG" \
+  "$DMG.sha256" \
+  --verify-tag \
+  --draft \
+  --prerelease \
+  --latest=false \
+  --title "Textify 1.1.0 - Unsigned Preview 1" \
+  --notes-file docs/release/v1.1.0-unsigned-preview.1.md
+
+DOWNLOAD_DIRECTORY="$(mktemp -d)"
+gh release download "$TAG" --dir "$DOWNLOAD_DIRECTORY"
+(
+  cd "$DOWNLOAD_DIRECTORY"
+  shasum -a 256 -c \
+    Textify-1.1.0-unsigned-preview.1-arm64.dmg.sha256
+)
+cmp \
+  "$DMG" \
+  "$DOWNLOAD_DIRECTORY/Textify-1.1.0-unsigned-preview.1-arm64.dmg"
+script/release/verify_artifact_source_commit.sh \
+  "$DOWNLOAD_DIRECTORY/Textify-1.1.0-unsigned-preview.1-arm64.dmg" \
+  "$SOURCE_COMMIT" \
+  --allow-unsigned-dmg
+test "$(gh api "repos/Player0109/Textify/releases/tags/$TAG" --jq .draft)" = true
+test "$(gh api "repos/Player0109/Textify/releases/tags/$TAG" --jq .prerelease)" = true
+gh release edit "$TAG" \
+  --draft=false \
+  --prerelease \
+  --latest=false
+```
+
+The release body and README must state that the app is unnotarized, explain
+the scoped **System Settings → Privacy & Security → Open Anyway** flow, and
+must not recommend disabling Gatekeeper or removing quarantine attributes.
+Permission grants may need to be repeated for later ad-hoc builds. Keep the
+production helpers and all incomplete release gates unchanged.
+
 ## Developer ID Archive, DMG, And Notarization
 
 ```bash

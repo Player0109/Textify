@@ -26,27 +26,40 @@ it from the Dock or the menu-bar **Open Textify** action.
 - Network access when downloading the app or a model. Dictation itself is
   offline after a model is installed.
 
-Production builds are distributed as notarized GitHub Release DMGs. Textify is
+The current public binary is an unsigned GitHub pre-release. A future
+production build will use a Developer ID signed and notarized DMG. Textify is
 not available through the Mac App Store.
 
 ## Installation
 
-The Textify 1.1.0 production app has not been published yet. The existing
-`models-v1` GitHub Release contains model assets for Textify's signed catalog,
-not an installable app.
+The Textify 1.1.0 production app has not been published yet. The download
+below is only an unsigned preview.
 
-When the 1.1.0 app release is available:
+Textify 1.1.0 Unsigned Preview 1 is available for people who are comfortable
+manually approving an unnotarized app. It is not the future `v1.1.0`
+production release.
 
-1. Download `Textify-1.1.0-arm64.dmg` and its `.sha256` file from the
-   [Textify 1.1.0 release](https://github.com/Player0109/Textify/releases/tag/v1.1.0).
-2. Optionally verify the download:
+1. Download `Textify-1.1.0-unsigned-preview.1-arm64.dmg` and its `.sha256`
+   file from the
+   [unsigned preview release](https://github.com/Player0109/Textify/releases/tag/v1.1.0-unsigned-preview.1).
+2. Verify the download:
 
    ```bash
-   shasum -a 256 -c Textify-1.1.0-arm64.dmg.sha256
+   shasum -a 256 -c Textify-1.1.0-unsigned-preview.1-arm64.dmg.sha256
    ```
 
 3. Open the DMG and drag Textify to Applications.
-4. Launch Textify from Applications.
+4. Try to launch Textify from Applications. macOS will block the first launch
+   because this preview has no Developer ID signature or Apple notarization.
+5. If you trust the download, open **System Settings → Privacy & Security**,
+   find the blocked Textify message, choose **Open Anyway**, and confirm.
+
+Do not disable Gatekeeper or remove quarantine attributes system-wide. See
+[Apple's unknown-developer guidance](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac)
+for the scoped approval flow. You can alternatively build Textify from this
+source repository. Because each ad-hoc build has a different code identity,
+macOS may require you to remove and re-add Textify under Accessibility after a
+later preview update.
 
 Automatic updates are deferred in Textify 1.1. To update, download the next
 GitHub Release DMG and replace the installed app.

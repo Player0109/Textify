@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.0 Unsigned Preview 1] - 2026-07-31
+
+- Published the current Apple Silicon app in an explicitly labeled, unsigned
+  and unnotarized GitHub pre-release DMG.
+- Kept the app locally ad-hoc signed for Apple Silicon execution and documented
+  the expected one-time Gatekeeper approval.
+- Reserved `v1.1.0` for the later Developer ID signed, notarized production
+  release.
+
 ## 1.1.0 - Unreleased
 
 Planned first public app release.
@@ -52,3 +61,4 @@ Planned first public app release.
   Release DMG installs.
 
 [1.1.0]: https://github.com/Player0109/Textify/releases/tag/v1.1.0
+[1.1.0 Unsigned Preview 1]: https://github.com/Player0109/Textify/releases/tag/v1.1.0-unsigned-preview.1

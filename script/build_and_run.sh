@@ -257,8 +257,11 @@ thin_staged_swift_compatibility_library() (
 )
 
 stage_full_release_app() {
+  local source_commit
+
+  source_commit="${TEXTIFY_SOURCE_COMMIT:-local-development-not-for-release}"
   "$ROOT_DIR/script/generate_xcode_project.sh"
-  xcodebuild -project "$ROOT_DIR/Textify.xcodeproj" -scheme "$APP_NAME" -configuration Release -destination 'platform=macOS' -derivedDataPath "$DERIVED_DATA_DIR" CODE_SIGN_ENTITLEMENTS="$LOCAL_ENTITLEMENTS" build
+  xcodebuild -project "$ROOT_DIR/Textify.xcodeproj" -scheme "$APP_NAME" -configuration Release -destination 'platform=macOS' -derivedDataPath "$DERIVED_DATA_DIR" CODE_SIGN_ENTITLEMENTS="$LOCAL_ENTITLEMENTS" TEXTIFY_SOURCE_COMMIT="$source_commit" build
   [[ -d "$FULL_RELEASE_APP_BUNDLE" ]]
   rm -rf "$APP_BUNDLE"
   /usr/bin/ditto "$FULL_RELEASE_APP_BUNDLE" "$APP_BUNDLE"

@@ -1996,3 +1996,17 @@ Task 1 must merge before parallel Wave 1 work begins.
   after export and signs nested code before the app. The local workflow must
   use ad-hoc signing with `Textify.Local.entitlements`, leave fast staging
   unchanged, and verify every packaged Mach-O is exactly arm64.
+
+## Unsigned Preview Distribution Handoff - 2026-07-31
+
+- The product owner explicitly authorized a temporary public unsigned app/DMG
+  while Developer ID membership is deferred. This release slice owns the
+  narrow local packaging support and public documentation needed for an
+  unmistakably labeled GitHub pre-release.
+- Publish only under an `unsigned-preview` suffix. Keep `v1.1.0`, the existing
+  Developer ID archive/export/notarization helpers, the production release
+  evidence gates, and every unchecked manual-QA item unchanged.
+- The app inside the DMG may use local ad-hoc signing required for Apple
+  Silicon execution. The DMG must remain unsigned and unnotarized, the release
+  notes must explain Gatekeeper's manual approval, and no documentation may
+  call this artifact a production or trusted Developer ID release.
