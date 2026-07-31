@@ -1,7 +1,9 @@
 # Textify V1.1 Manual QA
 
-Run these checks before publishing a V1.1 GitHub Release. Any unchecked item is
-release-blocking.
+Run these checks before publishing the production `v1.1.0` GitHub Release. Any
+unchecked item blocks that production release. An explicitly authorized,
+clearly labeled unsigned preview follows the separate exception in
+`docs/RELEASING.md` and does not satisfy or remove any item below.
 
 ## Release-Blocking Checks
 
