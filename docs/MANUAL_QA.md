@@ -135,19 +135,19 @@ post-processing. This documentation decision removes the former specification
 mismatch; it does not satisfy release-blocking check 47 without interactive
 evidence from the final candidate.
 
-## Open Production Evidence Gates
+## Known Specification-Conformance Blockers
 
-- Checks 42 and 43 now have automated coverage for stable CoreAudio identity,
+- BLOCKED: checks 42 and 43 now have automated coverage for stable CoreAudio identity,
   fail-closed unavailable-device behavior, scalar-only metering, and
   visibility-scoped teardown. They remain unchecked until repeated with real
   hardware and permissions against the final candidate.
-- Checks 44 through 46 now have automated coverage for explicit hierarchy
+- BLOCKED: checks 44 through 46 now have automated coverage for explicit hierarchy
   semantics, exact-artifact-only destructive routing, source and bundled
   license actions, and accessibility appearance inputs. They remain unchecked
   until the keyboard, VoiceOver, Increase Contrast, Differentiate Without
   Color, and Reduce Transparency passes are completed against the final
   candidate.
-- Check 47 has automated routing and persistence coverage, but its full
+- BLOCKED: check 47 has automated routing and persistence coverage, but its full
   multilingual and post-processing matrix remains unchecked until exercised
   against the final candidate.
 - Source publication is allowed while these evidence gates remain open. A
@@ -688,7 +688,7 @@ with the release evidence; do not commit machine-specific `.trace` data.
 
 ## Production Candidate Automated Verification - 2026-07-31
 
-- PASS: `bash script/release/validate_release.sh` completed 884 tests with 11
+- PASS: `bash script/release/validate_release.sh` completed 899 tests with 11
   expected opt-in native/hardware skips and zero failures, verified the tracked
   signed 42-entry v3 catalog and empty signed v2 revocation baseline, built the
   arm64 Release executable, and passed release metadata, exact production
