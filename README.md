@@ -78,18 +78,19 @@ surface is visible. If a specifically selected microphone disconnects, Textify
 keeps that selection visible as unavailable and does not silently record from a
 different device.
 
-Textify stops recording at the active model's declared safe limit. Most
-catalog entries allow the app-wide 60-second maximum; some models use a shorter
-limit.
+Textify records one uninterrupted trigger hold for up to five minutes. Longer
+captures are divided in memory into model-safe transcription windows, then
+stitched, post-processed, and inserted once. The overlay warns during the final
+ten seconds and switches to processing automatically at the cap.
 
 ## Models
 
-Textify 1.1 ships a signed catalog of 42 choices: 39 transcription models and
+Textify 1.1 ships a signed catalog of 44 choices: 41 transcription models and
 three optional MossFormer2 SE voice-cleaning models. The catalog includes
-Whisper, Parakeet, Paraformer, ReazonSpeech, SenseVoice, Qwen3-ASR, Nemotron,
-Granite Speech, Voxtral, MOSS Transcribe-Diarize, and other eligible local
-routes across whisper.cpp, FluidAudio/Core ML, MLX Audio, transcribe.cpp, and
-sherpa-onnx.
+Whisper, CrisperWhisper 2.0, Parakeet, Paraformer, ReazonSpeech, SenseVoice,
+Qwen3-ASR, Nemotron, Granite Speech, Voxtral, MOSS Transcribe-Diarize, and
+other eligible local routes across whisper.cpp, FluidAudio/Core ML, MLX Audio,
+transcribe.cpp, and sherpa-onnx.
 
 Textify does not bundle speech model binaries. During onboarding or from
 Settings, Textify can download curated model files from immutable Textify

@@ -395,6 +395,20 @@ final class ProductionUITests: XCTestCase {
             sourceName: "alibabasglab/MossFormer2_SE_48K"
         )
         XCTAssertEqual(mossFormer.provider, .alibaba)
+
+        let crisperWhisper = ProductionModelPresentation(
+            id: "crisperwhisper-large",
+            displayName: "Experimental - CrisperWhisper 2.0 Large F16",
+            description: "Local speech model.",
+            details: nil,
+            engineName: "Whisper.cpp",
+            sourceName: "drbaph/CrisperWhisper2.0-GGML"
+        )
+        XCTAssertEqual(crisperWhisper.provider, .nyra)
+        XCTAssertEqual(
+            ModelProviderIdentity.resolve(from: "Nyra Labs", "Whisper"),
+            .nyra
+        )
     }
 
     func testModelProvidersUseRecognizableVendorLogoAssets() {
@@ -404,6 +418,8 @@ final class ProductionUITests: XCTestCase {
         XCTAssertEqual(ModelProviderIdentity.qwen.logoAssetName, "VendorQwen")
         XCTAssertEqual(ModelProviderIdentity.alibaba.logoAssetName, "VendorAlibabaCloud")
         XCTAssertEqual(ModelProviderIdentity.reazon.logoAssetName, "VendorReazon")
+        XCTAssertNil(ModelProviderIdentity.nyra.logoAssetName)
+        XCTAssertEqual(ModelProviderIdentity.nyra.mark, "NY")
         XCTAssertNil(ModelProviderIdentity.apple.logoAssetName)
         XCTAssertEqual(ModelProviderIdentity.apple.systemImage, "apple.logo")
         XCTAssertNil(ModelProviderIdentity.community.logoAssetName)
@@ -481,6 +497,14 @@ final class ProductionUITests: XCTestCase {
             try presentation("mossformer2-se-int8").artifactPrecision,
             .eightBit
         )
+        XCTAssertEqual(
+            try presentation("crisperwhisper-2-large-f16").artifactPrecision,
+            .sixteenBit
+        )
+        XCTAssertEqual(
+            try presentation("crisperwhisper-2-turbo-f16").artifactPrecision,
+            .sixteenBit
+        )
     }
 
     func testReadinessCopyExplainsTheHoldAndReleaseInteraction() {
@@ -557,10 +581,143 @@ final class ProductionUITests: XCTestCase {
     func testOverlayIsVisibleOnlyWhileRecording() {
         XCTAssertEqual(
             DictationOverlayPresentation.state(for: .recording(speechDetected: false)),
-            .recording(elapsedSeconds: 0)
+            .recording(remainingSeconds: nil)
         )
         XCTAssertEqual(DictationOverlayPresentation.state(for: .processing), .hidden)
         XCTAssertEqual(DictationOverlayPresentation.state(for: .idle), .hidden)
+    }
+
+    func testLongDictationOverlayCopyWarnsOnlyDuringFinalTenSeconds() {
+        XCTAssertEqual(
+            DictationSessionPresentationCopy.remainingRecordingSeconds(
+                deadlineUptimeMilliseconds: 300_000,
+                nowUptimeMilliseconds: 0
+            ),
+            300
+        )
+        XCTAssertEqual(
+            DictationSessionPresentationCopy.remainingRecordingSeconds(
+                deadlineUptimeMilliseconds: 300_000,
+                nowUptimeMilliseconds: 290_001
+            ),
+            10
+        )
+        XCTAssertEqual(
+            DictationSessionPresentationCopy.remainingRecordingSeconds(
+                deadlineUptimeMilliseconds: 300_000,
+                nowUptimeMilliseconds: 299_001
+            ),
+            1
+        )
+        XCTAssertEqual(
+            DictationSessionPresentationCopy.remainingRecordingSeconds(
+                deadlineUptimeMilliseconds: 300_000,
+                nowUptimeMilliseconds: 300_001
+            ),
+            0
+        )
+        XCTAssertNil(
+            DictationSessionPresentationCopy.recordingWarning(
+                remainingSeconds: 11
+            )
+        )
+        XCTAssertEqual(
+            DictationSessionPresentationCopy.recordingWarning(
+                remainingSeconds: 10
+            ),
+            "Recording stops in 10s"
+        )
+        XCTAssertEqual(
+            DictationSessionPresentationCopy.recordingWarning(
+                remainingSeconds: 1
+            ),
+            "Recording stops in 1s"
+        )
+        XCTAssertNil(
+            DictationSessionPresentationCopy.recordingWarning(
+                remainingSeconds: 0
+            )
+        )
+    }
+
+    func testLongDictationOverlayCopyExplainsLimitAndWindowProgress() {
+        XCTAssertEqual(
+            DictationSessionPresentationCopy.sessionLimitReached,
+            "5-minute limit reached — processing captured speech."
+        )
+        XCTAssertEqual(
+            DictationSessionPresentationCopy.processingProgress(
+                completedWindows: 2,
+                totalWindows: 4
+            ),
+            "Processing 2 of 4"
+        )
+        XCTAssertNil(
+            DictationSessionPresentationCopy.processingProgress(
+                completedWindows: 1,
+                totalWindows: 1
+            )
+        )
+    }
+
+    func testMenuCopyMatchesLongDictationOverlayCopy() {
+        XCTAssertEqual(
+            MenuBarPresentation.dictationStatusTitle(
+                overlayState: .recording(remainingSeconds: 10),
+                fallback: "Recording"
+            ),
+            "Recording stops in 10s"
+        )
+        XCTAssertEqual(
+            MenuBarPresentation.dictationStatusTitle(
+                overlayState: .sessionLimitReached,
+                fallback: "Processing"
+            ),
+            "5-minute limit reached — processing captured speech."
+        )
+        XCTAssertEqual(
+            MenuBarPresentation.dictationStatusTitle(
+                overlayState: .processingProgress(
+                    completedWindows: 2,
+                    totalWindows: 4
+                ),
+                fallback: "Processing"
+            ),
+            "Processing 2 of 4"
+        )
+    }
+
+    func testRecordingOverlayCapturesApplicationOncePerExplicitSession() {
+        let firstSession = UUID()
+        let secondSession = UUID()
+        XCTAssertTrue(
+            RecordingOverlayApplicationCapturePolicy.shouldCapture(
+                currentSessionID: nil,
+                nextSessionID: firstSession,
+                hasSessionApplication: false
+            )
+        )
+        XCTAssertFalse(
+            RecordingOverlayApplicationCapturePolicy.shouldCapture(
+                currentSessionID: firstSession,
+                nextSessionID: firstSession,
+                hasSessionApplication: true
+            )
+        )
+        XCTAssertFalse(
+            RecordingOverlayApplicationCapturePolicy.shouldCapture(
+                currentSessionID: firstSession,
+                nextSessionID: firstSession,
+                hasSessionApplication: true
+            )
+        )
+        XCTAssertTrue(
+            RecordingOverlayApplicationCapturePolicy.shouldCapture(
+                currentSessionID: firstSession,
+                nextSessionID: secondSession,
+                hasSessionApplication: true
+            )
+        )
     }
 
     func testRecordingOverlayGeometryAppliesOffsetsAndScale() {
@@ -715,6 +872,8 @@ final class ProductionUITests: XCTestCase {
                 "granite-speech-4.1-2b-nar-q5-k-m",
                 "voxtral-mini-4b-realtime-2602-q4-k-m",
                 "moss-transcribe-diarize-0.9b-q5-k-m",
+                "crisperwhisper-2-large-f16",
+                "crisperwhisper-2-turbo-f16",
                 "mossformer2-se-fp32",
                 "mossformer2-se-fp16",
                 "mossformer2-se-int8",

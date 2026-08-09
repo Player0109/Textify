@@ -102,6 +102,10 @@ printf '%s  %s\n' \
   'THIRD_PARTY_LICENSES/CC-BY-4.0.txt' \
   'b5d65a59060e68c4ff940e1eddfa6f94b2d68fdf58ed7f4dd57721c997e35e9d' \
   'THIRD_PARTY_LICENSES/OpenAI-Whisper.txt' \
+  '42f43bf4dc72ef422f91f6ca143f4514e21a68b353940d99091c1addcd0aee79' \
+  'THIRD_PARTY_LICENSES/CrisperWhisper-2.0-Nyra-License.md' \
+  'bccb9e9fa28644216f919d1f80567e49a41990705d3c3b036c334dc03e00dd31' \
+  'THIRD_PARTY_LICENSES/CrisperWhisper.cpp-LICENSE.txt' \
   '5745650da468d88786f6805e04b3458f69f5d884d9aa82fe39a00bb41b59cd1e' \
   'THIRD_PARTY_LICENSES/ggml-small.en-q5_1.LICENSES.txt' \
   '1e62abdfd004da72038581ea98b9dd3a94b7b859d66efa6b13e2992a523ef5cd' \
@@ -138,6 +142,7 @@ grep -Fq 'LiteRT-LM' THIRD_PARTY_NOTICES.md
 grep -Fq 'IBM Granite Speech models' THIRD_PARTY_NOTICES.md
 grep -Fq 'Mistral Voxtral Mini model' THIRD_PARTY_NOTICES.md
 grep -Fq 'OpenMOSS MOSS Transcribe-Diarize model' THIRD_PARTY_NOTICES.md
+grep -Fq 'CrisperWhisper 2.0 models and CrisperWhisper.cpp' THIRD_PARTY_NOTICES.md
 printf '%s  %s\n' \
   'b9dce3ad05294742b57627d86e7815be497a2f426e954476cdc31fea22197318' \
   'Vendor/sherpa-onnx/v1.13.2/lib/libsherpa-onnx-c-api.dylib' \

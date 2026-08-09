@@ -9,7 +9,8 @@ public enum TriggerEvent: Equatable, Sendable {
 
 public enum TriggerAction: Equatable, Sendable {
     case none
-    case startActivationTimer(delayMs: Int)
+    case beginArmedCapture(delayMs: Int)
+    case activateRecording
     case beginRecording
     case cancelAsShortcut
     case cancelRecording

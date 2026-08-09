@@ -1,6 +1,6 @@
 {
   "manifestVersion": 3,
-  "generatedAt": "2026-07-28T15:40:53Z",
+  "generatedAt": "2026-08-03T19:28:33Z",
   "models": [
     {
       "id": "ggml-small.en-q5_1",
@@ -6441,6 +6441,178 @@
       }
     },
     {
+      "id": "crisperwhisper-2-large-f16",
+      "displayName": "Experimental - CrisperWhisper 2.0 Large F16",
+      "tier": "experimental",
+      "description": "Exact F16 GGML conversion of Nyra Labs CrisperWhisper 2.0 Large for offline English dictation in intended mode through Textify's whisper.cpp Metal path.",
+      "sizeBytes": 3094723598,
+      "files": [
+        {
+          "filename": "ggml-crisperwhisper-large-f16.bin",
+          "url": "https://huggingface.co/drbaph/CrisperWhisper2.0-GGML/resolve/4807002cb64c57f78b37ffb4c48e986815a7c885/ggml-crisperwhisper-large-f16.bin",
+          "sha256": "4160d90dcc11fb234bd126c85956e74c866b288524e8ec29a0a0a5c3e11c0cb7",
+          "sizeBytes": 3094723598
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "Nyra Labs CrisperWhisper 2.0 Large model weights and generated outputs",
+          "spdxId": "LicenseRef-Nyra-Health-Non-Commercial-Research",
+          "name": "Nyra Health Non-Commercial Research License",
+          "licenseTextUrl": "https://huggingface.co/nyralabs/CrisperWhisper2.0_large/blob/fe94128aee7cdf1ad43ab59c4b1f7ed6362c1106/LICENSE.md"
+        },
+        {
+          "scope": "CrisperWhisper.cpp conversion and runtime tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/Saganaki22/CrisperWhisper.cpp/13c7b3efdafd8bd20bd6361e7354ce2aa9bec464/LICENSE"
+        },
+        {
+          "scope": "whisper.cpp runtime dependency",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/ggerganov/whisper.cpp/a8d002cfd879315632a579e73f0148d06959de36/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "drbaph/CrisperWhisper2.0-GGML",
+        "sourceUrl": "https://huggingface.co/drbaph/CrisperWhisper2.0-GGML",
+        "sourceRevision": "4807002cb64c57f78b37ffb4c48e986815a7c885",
+        "sourceFile": "ggml-crisperwhisper-large-f16.bin",
+        "originalModelName": "Nyra Labs CrisperWhisper 2.0 Large",
+        "originalModelUrl": "https://huggingface.co/nyralabs/CrisperWhisper2.0_large/tree/fe94128aee7cdf1ad43ab59c4b1f7ed6362c1106",
+        "mirroredBy": "drbaph",
+        "mirroredAt": "2026-07-27"
+      },
+      "runtimeParameters": {
+        "language": "en",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 30
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "whisper_cpp",
+        "variant": "crisperwhisper-2-large-f16",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "en"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "Unrated in Textify; local final-result transcription begins after release",
+        "accuracyTradeoff": "CrisperWhisper 2.0 Large in intended mode; Textify has not published comparable catalog benchmark evidence",
+        "requirements": "Apple Silicon with Metal; about 3.09 GB disk; English-only intended transcription and a 30-second runtime audio-chunk limit"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 3094723598,
+        "peakInstallationBytes": 3094723598
+      }
+    },
+    {
+      "id": "crisperwhisper-2-turbo-f16",
+      "displayName": "Experimental - CrisperWhisper 2.0 Turbo F16",
+      "tier": "experimental",
+      "description": "Exact F16 GGML conversion of Nyra Labs CrisperWhisper 2.0 Turbo for offline English dictation in intended mode through Textify's whisper.cpp Metal path.",
+      "sizeBytes": 1624655191,
+      "files": [
+        {
+          "filename": "ggml-crisperwhisper-turbo-f16.bin",
+          "url": "https://huggingface.co/drbaph/CrisperWhisper2.0-GGML/resolve/4807002cb64c57f78b37ffb4c48e986815a7c885/ggml-crisperwhisper-turbo-f16.bin",
+          "sha256": "f9a12306a577c99cbdaab5a4988725fbceed5a92993baec10436e579116ffa41",
+          "sizeBytes": 1624655191
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "Nyra Labs CrisperWhisper 2.0 Turbo model weights and generated outputs",
+          "spdxId": "LicenseRef-Nyra-Health-Non-Commercial-Research",
+          "name": "Nyra Health Non-Commercial Research License",
+          "licenseTextUrl": "https://huggingface.co/nyralabs/CrisperWhisper2.0_turbo/blob/16424a0a0dad3d7bcc08927451718da49bce8ce0/LICENSE.md"
+        },
+        {
+          "scope": "CrisperWhisper.cpp conversion and runtime tooling",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/Saganaki22/CrisperWhisper.cpp/13c7b3efdafd8bd20bd6361e7354ce2aa9bec464/LICENSE"
+        },
+        {
+          "scope": "whisper.cpp runtime dependency",
+          "spdxId": "MIT",
+          "name": "MIT License",
+          "licenseTextUrl": "https://raw.githubusercontent.com/ggerganov/whisper.cpp/a8d002cfd879315632a579e73f0148d06959de36/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "drbaph/CrisperWhisper2.0-GGML",
+        "sourceUrl": "https://huggingface.co/drbaph/CrisperWhisper2.0-GGML",
+        "sourceRevision": "4807002cb64c57f78b37ffb4c48e986815a7c885",
+        "sourceFile": "ggml-crisperwhisper-turbo-f16.bin",
+        "originalModelName": "Nyra Labs CrisperWhisper 2.0 Turbo",
+        "originalModelUrl": "https://huggingface.co/nyralabs/CrisperWhisper2.0_turbo/tree/16424a0a0dad3d7bcc08927451718da49bce8ce0",
+        "mirroredBy": "drbaph",
+        "mirroredAt": "2026-07-27"
+      },
+      "runtimeParameters": {
+        "language": "en",
+        "detectLanguage": false,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 30
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "whisper_cpp",
+        "variant": "crisperwhisper-2-turbo-f16",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "en"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "Unrated in Textify; local final-result transcription begins after release",
+        "accuracyTradeoff": "CrisperWhisper 2.0 Turbo in intended mode; Textify has not published comparable catalog benchmark evidence",
+        "requirements": "Apple Silicon with Metal; about 1.62 GB disk; English-only intended transcription and a 30-second runtime audio-chunk limit"
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 1624655191,
+        "peakInstallationBytes": 1624655191
+      }
+    },
+    {
       "id": "mossformer2-se-fp32",
       "displayName": "Accurate - MossFormer2 SE FP32",
       "tier": "accurate",
@@ -6894,6 +7066,23 @@
         }
       },
       {
+        "id": "family.nyra-labs.crisperwhisper-2",
+        "purpose": "transcription",
+        "checkpointIDs": [
+          "checkpoint.nyra-labs.crisperwhisper-2-large",
+          "checkpoint.nyra-labs.crisperwhisper-2-turbo"
+        ],
+        "presentation": {
+          "displayName": "CrisperWhisper 2.0",
+          "description": "Nyra Labs CrisperWhisper 2.0 transcription checkpoints.",
+          "provider": {
+            "id": "nyra-labs",
+            "displayName": "Nyra Labs"
+          },
+          "curatedRank": 120
+        }
+      },
+      {
         "id": "family.alibaba.mossformer2-se",
         "purpose": "voice_cleaning",
         "checkpointIDs": [
@@ -7245,6 +7434,34 @@
           "displayName": "MOSS Transcribe-Diarize 0.9B",
           "description": "English and Chinese transcription checkpoint with inline speaker labels.",
           "curatedRank": 0
+        }
+      },
+      {
+        "id": "checkpoint.nyra-labs.crisperwhisper-2-large",
+        "purpose": "transcription",
+        "artifactIDs": [
+          "crisperwhisper-2-large-f16"
+        ],
+        "recommendedArtifactID": "crisperwhisper-2-large-f16",
+        "fallbackArtifactIDs": [],
+        "presentation": {
+          "displayName": "CrisperWhisper 2.0 Large",
+          "description": "CrisperWhisper 2.0 Large checkpoint for English intended transcription.",
+          "curatedRank": 0
+        }
+      },
+      {
+        "id": "checkpoint.nyra-labs.crisperwhisper-2-turbo",
+        "purpose": "transcription",
+        "artifactIDs": [
+          "crisperwhisper-2-turbo-f16"
+        ],
+        "recommendedArtifactID": "crisperwhisper-2-turbo-f16",
+        "fallbackArtifactIDs": [],
+        "presentation": {
+          "displayName": "CrisperWhisper 2.0 Turbo",
+          "description": "CrisperWhisper 2.0 Turbo checkpoint for English intended transcription.",
+          "curatedRank": 10
         }
       },
       {
@@ -8039,6 +8256,44 @@
         },
         "presentation": {
           "displayName": "GGUF Q5_K_M",
+          "curatedRank": 0
+        }
+      },
+      {
+        "id": "crisperwhisper-2-large-f16",
+        "purpose": "transcription",
+        "artifactFormat": "ggml",
+        "numericFormat": "F16",
+        "runtime": "whisper_cpp",
+        "computeRoute": "gpu_via_metal",
+        "compatibility": {
+          "minimumAppVersion": "1.1.0",
+          "minimumMacOSVersion": "14.0.0",
+          "supportedArchitectures": [
+            "arm64"
+          ]
+        },
+        "presentation": {
+          "displayName": "GGML F16",
+          "curatedRank": 0
+        }
+      },
+      {
+        "id": "crisperwhisper-2-turbo-f16",
+        "purpose": "transcription",
+        "artifactFormat": "ggml",
+        "numericFormat": "F16",
+        "runtime": "whisper_cpp",
+        "computeRoute": "gpu_via_metal",
+        "compatibility": {
+          "minimumAppVersion": "1.1.0",
+          "minimumMacOSVersion": "14.0.0",
+          "supportedArchitectures": [
+            "arm64"
+          ]
+        },
+        "presentation": {
+          "displayName": "GGML F16",
           "curatedRank": 0
         }
       },

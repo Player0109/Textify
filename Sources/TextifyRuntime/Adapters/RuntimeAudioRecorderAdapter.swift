@@ -11,6 +11,9 @@ public actor RuntimeAudioRecorderAdapter: RuntimeAudioRecording {
     public func startRecording(
         microphone: MicrophoneSelection,
         maximumDurationSeconds: Double,
+        onCaptureStarted: @escaping @Sendable () -> Void,
+        onFirstAudio:
+            @escaping @Sendable (_ firstSampleUptimeMilliseconds: Int) -> Void,
         onSpeechDetected: @escaping @Sendable () -> Void,
         onMaximumDurationReached: @escaping @Sendable () -> Void,
         onRecordingError:
@@ -27,6 +30,8 @@ public actor RuntimeAudioRecorderAdapter: RuntimeAudioRecording {
         try await recorder.startRecording(
             input: input,
             maximumDurationSeconds: maximumDurationSeconds,
+            onCaptureStarted: onCaptureStarted,
+            onFirstAudio: onFirstAudio,
             onSpeechDetected: onSpeechDetected,
             onMaximumDurationReached: onMaximumDurationReached,
             onRecordingError: onRecordingError

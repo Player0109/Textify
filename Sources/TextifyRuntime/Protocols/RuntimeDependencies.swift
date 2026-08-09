@@ -135,9 +135,15 @@ public extension RuntimeModelResolving {
 }
 
 public protocol RuntimeAudioRecording: Sendable {
+    /// Starts capture and reports the first retained canonical sample at most
+    /// once, after `onCaptureStarted`, as absolute monotonic uptime milliseconds.
+    /// If startup throws, neither capture milestone is invoked.
     func startRecording(
         microphone: MicrophoneSelection,
         maximumDurationSeconds: Double,
+        onCaptureStarted: @escaping @Sendable () -> Void,
+        onFirstAudio:
+            @escaping @Sendable (_ firstSampleUptimeMilliseconds: Int) -> Void,
         onSpeechDetected: @escaping @Sendable () -> Void,
         onMaximumDurationReached: @escaping @Sendable () -> Void,
         onRecordingError:

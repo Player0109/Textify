@@ -28,6 +28,7 @@ float textify_whisper_last_no_speech_probability(TextifyWhisperContext *context)
 float textify_whisper_last_average_log_probability(TextifyWhisperContext *context);
 float textify_whisper_last_compression_ratio(TextifyWhisperContext *context);
 int32_t textify_whisper_uses_gpu(TextifyWhisperContext *context);
+int32_t textify_whisper_is_crisper_model(TextifyWhisperContext *context);
 
 int32_t textify_whisper_compiled_with_metal(void);
 

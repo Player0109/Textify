@@ -28,6 +28,8 @@ final class BenchmarkModelCatalogTests: XCTestCase {
                 "granite-speech-4.1-2b-nar-q5-k-m",
                 "voxtral-mini-4b-realtime-2602-q4-k-m",
                 "moss-transcribe-diarize-0.9b-q5-k-m",
+                "crisperwhisper-2-large-f16",
+                "crisperwhisper-2-turbo-f16",
             ]
         )
 
@@ -98,6 +100,130 @@ final class BenchmarkModelCatalogTests: XCTestCase {
             XCTAssertTrue(file.url.contains("/resolve/c521a4b02f422512d734391fdf08bb08c0862f68/"))
             XCTAssertTrue(presentation.expectedFinalization.contains("ms median"))
             XCTAssertFalse(presentation.expectedFinalization.contains("pending"))
+        }
+    }
+
+    func testCrisperWhisperModelsUsePinnedIntendedModeMetalArtifacts() throws {
+        let manifest = try verifiedManifest()
+        let conversionRevision = "4807002cb64c57f78b37ffb4c48e986815a7c885"
+        let crisperCppLicenseURL =
+            "https://raw.githubusercontent.com/Saganaki22/CrisperWhisper.cpp/"
+            + "13c7b3efdafd8bd20bd6361e7354ce2aa9bec464/LICENSE"
+        let whisperCppLicenseURL =
+            "https://raw.githubusercontent.com/ggerganov/whisper.cpp/"
+            + "a8d002cfd879315632a579e73f0148d06959de36/LICENSE"
+        let expected: [String: (
+            displayName: String,
+            filename: String,
+            sizeBytes: Int64,
+            sha256: String,
+            originalRepository: String,
+            originalRevision: String
+        )] = [
+            "crisperwhisper-2-large-f16": (
+                "Experimental - CrisperWhisper 2.0 Large F16",
+                "ggml-crisperwhisper-large-f16.bin",
+                3_094_723_598,
+                "4160d90dcc11fb234bd126c85956e74c866b288524e8ec29a0a0a5c3e11c0cb7",
+                "nyralabs/CrisperWhisper2.0_large",
+                "fe94128aee7cdf1ad43ab59c4b1f7ed6362c1106"
+            ),
+            "crisperwhisper-2-turbo-f16": (
+                "Experimental - CrisperWhisper 2.0 Turbo F16",
+                "ggml-crisperwhisper-turbo-f16.bin",
+                1_624_655_191,
+                "f9a12306a577c99cbdaab5a4988725fbceed5a92993baec10436e579116ffa41",
+                "nyralabs/CrisperWhisper2.0_turbo",
+                "16424a0a0dad3d7bcc08927451718da49bce8ce0"
+            ),
+        ]
+
+        XCTAssertEqual(
+            manifest.models.filter { expected[$0.id] != nil }.map(\.id),
+            [
+                "crisperwhisper-2-large-f16",
+                "crisperwhisper-2-turbo-f16",
+            ]
+        )
+
+        for (modelID, artifact) in expected {
+            let model = try XCTUnwrap(manifest.models.first { $0.id == modelID })
+            let file = try XCTUnwrap(model.files.first)
+            let presentation = try XCTUnwrap(model.presentation)
+            let originalModelURL =
+                "https://huggingface.co/\(artifact.originalRepository)/tree/"
+                + artifact.originalRevision
+            let nyraLicenseURL =
+                "https://huggingface.co/\(artifact.originalRepository)/blob/"
+                + artifact.originalRevision
+                + "/LICENSE.md"
+
+            XCTAssertEqual(model.displayName, artifact.displayName)
+            XCTAssertEqual(model.tier, "experimental")
+            XCTAssertEqual(model.purpose, .transcription)
+            XCTAssertNil(model.benchmark)
+            XCTAssertEqual(model.runtime.engine, .whisperCpp)
+            XCTAssertEqual(model.runtime.variant, modelID)
+            XCTAssertEqual(model.runtime.accelerator, .metalGPU)
+            XCTAssertEqual(model.runtime.artifactLayout, .singleFile)
+            XCTAssertEqual(model.runtimeParameters.language, "en")
+            XCTAssertFalse(model.runtimeParameters.detectLanguage)
+            XCTAssertFalse(model.runtimeParameters.translate)
+            XCTAssertEqual(model.runtimeParameters.maxAudioSeconds, 30)
+            XCTAssertEqual(model.capabilities.languages, ["en"])
+            XCTAssertFalse(model.capabilities.supportsTranslation)
+            XCTAssertFalse(model.capabilities.supportsCustomVocabulary)
+
+            XCTAssertEqual(model.files.count, 1)
+            XCTAssertEqual(model.sizeBytes, artifact.sizeBytes)
+            XCTAssertEqual(file.filename, artifact.filename)
+            XCTAssertEqual(file.sizeBytes, artifact.sizeBytes)
+            XCTAssertEqual(file.sha256, artifact.sha256)
+            XCTAssertEqual(
+                file.url,
+                "https://huggingface.co/drbaph/CrisperWhisper2.0-GGML/resolve/"
+                    + conversionRevision
+                    + "/"
+                    + artifact.filename
+            )
+            XCTAssertEqual(
+                model.installationStorage,
+                ModelInstallationStorage(
+                    finalArtifactBytes: artifact.sizeBytes,
+                    peakInstallationBytes: artifact.sizeBytes
+                )
+            )
+
+            XCTAssertEqual(
+                model.licenses.map(\.spdxId),
+                [
+                    "LicenseRef-Nyra-Health-Non-Commercial-Research",
+                    "MIT",
+                    "MIT",
+                ]
+            )
+            XCTAssertEqual(
+                model.licenses.map(\.licenseTextUrl),
+                [nyraLicenseURL, crisperCppLicenseURL, whisperCppLicenseURL]
+            )
+            XCTAssertEqual(model.provenance.sourceName, "drbaph/CrisperWhisper2.0-GGML")
+            XCTAssertEqual(
+                model.provenance.sourceUrl,
+                "https://huggingface.co/drbaph/CrisperWhisper2.0-GGML"
+            )
+            XCTAssertEqual(model.provenance.sourceRevision, conversionRevision)
+            XCTAssertEqual(model.provenance.sourceFile, artifact.filename)
+            XCTAssertEqual(model.provenance.originalModelUrl, originalModelURL)
+            XCTAssertEqual(model.provenance.mirroredBy, "drbaph")
+            XCTAssertEqual(model.provenance.mirroredAt, "2026-07-27")
+
+            XCTAssertTrue(presentation.expectedFinalization.contains("Unrated in Textify"))
+            XCTAssertTrue(presentation.accuracyTradeoff.contains("intended mode"))
+            XCTAssertTrue(
+                presentation.requirements.contains(
+                    "30-second runtime audio-chunk limit"
+                )
+            )
         }
     }
 

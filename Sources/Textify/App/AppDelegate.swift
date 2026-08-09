@@ -11,7 +11,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     static var modelInstallActivityProvider: (@MainActor () -> Bool)?
     @MainActor
+    static var modelInstallTerminationConfirmationProvider: (@MainActor () -> Bool)?
+    @MainActor
     static var modelStorageRefreshProvider: (@MainActor () -> Void)?
+    @MainActor
+    static var terminationHandler: (@MainActor () async -> Void)?
+
+    private let terminationReply: @MainActor (NSApplication, Bool) -> Void
+    private var terminationTask: Task<Void, Never>?
+    private var isPresentingTerminationConfirmation = false
+
+    override init() {
+        terminationReply = { application, shouldTerminate in
+            application.reply(toApplicationShouldTerminate: shouldTerminate)
+        }
+        super.init()
+    }
+
+    init(
+        _ terminationReply: @escaping @MainActor (NSApplication, Bool) -> Void
+    ) {
+        self.terminationReply = terminationReply
+        super.init()
+    }
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(Self.activationPolicy())
@@ -48,8 +70,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard Self.modelInstallActivityProvider?() == true else {
+        guard !isPresentingTerminationConfirmation else {
+            return .terminateCancel
+        }
+        guard terminationTask == nil else {
+            return .terminateLater
+        }
+        if Self.modelInstallActivityProvider?() == true {
+            guard confirmTerminationDuringModelInstall() else {
+                return .terminateCancel
+            }
+        }
+        guard let terminationHandler = Self.terminationHandler else {
             return .terminateNow
+        }
+
+        let terminationReply = terminationReply
+        terminationTask = Task { @MainActor in
+            await terminationHandler()
+            terminationReply(sender, true)
+        }
+        return .terminateLater
+    }
+
+    @MainActor
+    private func confirmTerminationDuringModelInstall() -> Bool {
+        guard !isPresentingTerminationConfirmation else {
+            return false
+        }
+        isPresentingTerminationConfirmation = true
+        defer { isPresentingTerminationConfirmation = false }
+        if let confirmationProvider =
+            Self.modelInstallTerminationConfirmationProvider {
+            return confirmationProvider()
         }
 
         let alert = NSAlert()
@@ -57,10 +110,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.informativeText = "Textify will save the Downloads queue and continue it the next time you open the app."
         alert.addButton(withTitle: "Quit")
         alert.addButton(withTitle: "Keep Textify Open")
-        guard alert.runModal() == .alertFirstButtonReturn else {
-            return .terminateCancel
-        }
-        return .terminateNow
+        return alert.runModal() == .alertFirstButtonReturn
     }
 
     @MainActor

@@ -12,6 +12,14 @@ public enum DiagnosticEvent: Encodable, Sendable {
         durationMs: Int
     )
     case dictationBlockedExcludedApp
+    case dictationCaptureTiming(
+        triggerToCaptureRequestMs: Int?,
+        triggerToCaptureStartMs: Int?,
+        triggerToFirstAudioMs: Int?,
+        triggerHoldDurationMs: Int?,
+        shortcutGuardSpeechDetected: Bool,
+        preASROutcome: String
+    )
     case catalogUpdateRejected(
         severity: String,
         reasonCode: String,
@@ -25,7 +33,9 @@ public enum DiagnosticEvent: Encodable, Sendable {
         backendReadiness: String,
         audioDurationMs: Int,
         inferenceDurationMs: Int,
-        textLengthBucket: String
+        textLengthBucket: String,
+        windowCount: Int,
+        terminationReason: String
     )
     case transcriptionDiscarded(
         modelID: String,
@@ -97,6 +107,14 @@ public enum DiagnosticEvent: Encodable, Sendable {
         case severity
         case candidateRevision
         case acceptedRevision
+        case triggerToCaptureRequestMs
+        case triggerToCaptureStartMs
+        case triggerToFirstAudioMs
+        case triggerHoldDurationMs
+        case shortcutGuardSpeechDetected
+        case preASROutcome
+        case windowCount
+        case terminationReason
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -129,6 +147,40 @@ public enum DiagnosticEvent: Encodable, Sendable {
         case .dictationBlockedExcludedApp:
             try container.encode("dictation_blocked_excluded_app", forKey: .event)
 
+        case let .dictationCaptureTiming(
+            triggerToCaptureRequestMs,
+            triggerToCaptureStartMs,
+            triggerToFirstAudioMs,
+            triggerHoldDurationMs,
+            shortcutGuardSpeechDetected,
+            preASROutcome
+        ):
+            try container.encode("dictation_capture_timing", forKey: .event)
+            try container.encodeIfPresent(
+                nonNegative(triggerToCaptureRequestMs),
+                forKey: .triggerToCaptureRequestMs
+            )
+            try container.encodeIfPresent(
+                nonNegative(triggerToCaptureStartMs),
+                forKey: .triggerToCaptureStartMs
+            )
+            try container.encodeIfPresent(
+                nonNegative(triggerToFirstAudioMs),
+                forKey: .triggerToFirstAudioMs
+            )
+            try container.encodeIfPresent(
+                nonNegative(triggerHoldDurationMs),
+                forKey: .triggerHoldDurationMs
+            )
+            try container.encode(
+                shortcutGuardSpeechDetected,
+                forKey: .shortcutGuardSpeechDetected
+            )
+            try container.encode(
+                sanitize(preASROutcome, forKey: .preASROutcome),
+                forKey: .preASROutcome
+            )
+
         case let .catalogUpdateRejected(
             severity,
             reasonCode,
@@ -160,7 +212,9 @@ public enum DiagnosticEvent: Encodable, Sendable {
             backendReadiness,
             audioDurationMs,
             inferenceDurationMs,
-            textLengthBucket
+            textLengthBucket,
+            windowCount,
+            terminationReason
         ):
             try container.encode("speech_recognition_completed", forKey: .event)
             try container.encode(sanitize(modelID, forKey: .modelID), forKey: .modelID)
@@ -170,6 +224,11 @@ public enum DiagnosticEvent: Encodable, Sendable {
             try container.encode(audioDurationMs, forKey: .audioDurationMs)
             try container.encode(inferenceDurationMs, forKey: .inferenceDurationMs)
             try container.encode(sanitize(textLengthBucket, forKey: .textLengthBucket), forKey: .textLengthBucket)
+            try container.encode(max(0, windowCount), forKey: .windowCount)
+            try container.encode(
+                sanitize(terminationReason, forKey: .terminationReason),
+                forKey: .terminationReason
+            )
 
         case let .transcriptionDiscarded(
             modelID,
@@ -232,5 +291,9 @@ public enum DiagnosticEvent: Encodable, Sendable {
 
     private func sanitize(_ value: String?, forKey key: CodingKeys) -> String? {
         value.map { sanitize($0, forKey: key) }
+    }
+
+    private func nonNegative(_ value: Int?) -> Int? {
+        value.map { max(0, $0) }
     }
 }

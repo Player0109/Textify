@@ -826,6 +826,7 @@ struct OnboardingModelCatalog: Equatable {
 }
 
 enum ModelProviderIdentity: String, Equatable, Sendable {
+    case nyra
     case openAI
     case nvidia
     case cohere
@@ -839,6 +840,9 @@ enum ModelProviderIdentity: String, Equatable, Sendable {
 
     static func resolve(from components: String...) -> ModelProviderIdentity {
         let identity = components.joined(separator: " ").lowercased()
+        if identity.contains("nyra") || identity.contains("crisperwhisper") {
+            return .nyra
+        }
         if identity.contains("cohere") {
             return .cohere
         }
@@ -874,6 +878,7 @@ enum ModelProviderIdentity: String, Equatable, Sendable {
 
     var name: String {
         switch self {
+        case .nyra: "Nyra Labs"
         case .openAI: "OpenAI"
         case .nvidia: "NVIDIA"
         case .cohere: "Cohere"
