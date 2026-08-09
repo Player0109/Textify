@@ -100,6 +100,12 @@ final class ModelLegalDocumentTests: XCTestCase {
                 "OpenMDW-1.1.txt",
             "https://raw.githubusercontent.com/modelscope/FunASR/38e421b0c49963a6f46ae2ebbaa24bc5168cc707/MODEL_LICENSE":
                 "FunASR_Model_License_1.1.txt",
+            "https://huggingface.co/nyralabs/CrisperWhisper2.0_large/blob/fe94128aee7cdf1ad43ab59c4b1f7ed6362c1106/LICENSE.md":
+                "CrisperWhisper-2.0-Nyra-License.md",
+            "https://huggingface.co/nyralabs/CrisperWhisper2.0_turbo/blob/16424a0a0dad3d7bcc08927451718da49bce8ce0/LICENSE.md":
+                "CrisperWhisper-2.0-Nyra-License.md",
+            "https://raw.githubusercontent.com/Saganaki22/CrisperWhisper.cpp/13c7b3efdafd8bd20bd6361e7354ce2aa9bec464/LICENSE":
+                "CrisperWhisper.cpp-LICENSE.txt",
         ]
     }
 
@@ -109,6 +115,10 @@ final class ModelLegalDocumentTests: XCTestCase {
                 "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
             "CC-BY-4.0.txt":
                 "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411",
+            "CrisperWhisper-2.0-Nyra-License.md":
+                "42f43bf4dc72ef422f91f6ca143f4514e21a68b353940d99091c1addcd0aee79",
+            "CrisperWhisper.cpp-LICENSE.txt":
+                "bccb9e9fa28644216f919d1f80567e49a41990705d3c3b036c334dc03e00dd31",
             "FluidAudio.txt":
                 "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
             "FunASR_Model_License_1.1.txt":

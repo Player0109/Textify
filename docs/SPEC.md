@@ -1,6 +1,6 @@
 # Textify V1 Spec
 
-Snapshot date: 2026-07-31
+Snapshot date: 2026-08-09
 
 This document captures the Textify V1 product and technical decisions from the
 original product-discovery sequence through Q350. It is a current-state
@@ -21,7 +21,9 @@ Whisper import, several local Apple Silicon runtimes, multilingual model
 routing with a persisted Dictation Language selector, vocabulary and
 replacement pairs, and optional MossFormer2 speech enhancement before ASR.
 It still omits Sparkle, transcript history, per-app profiles, cloud ASR, and
-live partial transcription. The trigger is user-selectable from the four
+live partial transcription. One uninterrupted trigger hold may capture up to
+five minutes; Textify processes longer captures as internal model-safe ASR
+windows and still produces one final insertion. The trigger is user-selectable from the four
 curated choices, with Right Command as the default. A runtime is not a public
 model promise until its exact artifacts and metadata are published in the
 signed catalog. The original product-discovery sequence concluded at Q350;
@@ -46,8 +48,11 @@ V1 is a global dictation app, not a long-form transcription workspace.
 V1 optimizes for short, fast dictation:
 
 - One sentence to one paragraph is the primary path.
-- Max recording duration defaults to about 60 seconds.
-- Long-form transcription, file transcription, and streaming partial captions are out of scope.
+- One trigger-held Dictation Session has a fixed five-minute safety cap.
+- A model's signed audio limit is an internal ASR-window limit, not the user
+  recording limit.
+- Long-form transcription workspaces, file transcription, and streaming
+  partial captions are out of scope.
 
 The app should feel like a quiet system utility with a dependable home:
 
@@ -711,6 +716,12 @@ No insertion method selector.
 Floating Icon controls:
 
 - Apply to the recording/processing overlay for every configured trigger.
+- During the final ten seconds of a Dictation Session, replace the waveform
+  copy with `Recording stops in Ns`.
+- When the five-minute cap fires, show
+  `5-minute limit reached — processing captured speech.` immediately; ordinary
+  short-session processing keeps the delayed indicator.
+- For a multi-window session, processing may advance to `Processing X of Y`.
 - X and Y are point offsets from the default center-bottom position.
 - Scale ranges from 50% to 200%.
 - Defaults are X `0`, Y `0`, and scale `100%`.
@@ -895,6 +906,8 @@ bundle ID maintenance.
 Audio/Data statement:
 
 - Dictated audio is processed in memory.
+- A five-minute canonical 16 kHz mono Float32 capture is about 19.2 MB before
+  array overhead and remains bounded by the session cap.
 - Dictated audio is not saved.
 - No dictation history is kept.
 
@@ -1071,19 +1084,32 @@ Implementation:
 
 Runtime trigger state:
 
-1. Trigger down starts a 250 ms activation window.
-2. Release before 250 ms is an accidental tap and does nothing.
+1. Trigger down starts a 250 ms activation window and an in-memory armed audio
+   capture. The recording overlay remains hidden during this window.
+2. Release before 250 ms is an accidental tap; discard the armed audio with no
+   transcription or insertion.
 3. Any non-trigger key before activation is treated as normal shortcut use and
    dictation does not start.
-4. After 250 ms, recording starts.
+4. After 250 ms, the armed capture commits as the visible recording; do not
+   restart the audio engine at this boundary.
 5. Recording initially enters an armed/no-speech-yet state.
 6. A non-trigger non-modifier key after recording starts but before speech is
    detected is treated as shortcut use: cancel, discard audio, no transcription,
    no insertion.
 7. Once speech is detected, extra keys do not cancel recording.
 8. Esc always cancels recording before or after speech.
-9. Trigger release after speech ends recording and starts transcription/insertion.
-10. Trigger release with no speech is a silent no-op.
+9. Trigger release after activation finishes the capture and runs final edge
+   VAD before transcription/insertion. If target/readiness admission has not
+   yet reached audio startup, cancel that attempt instead of starting the
+   microphone after the physical trigger has already been released.
+10. Trigger release with no speech remains a silent no-op at final edge VAD.
+11. Capture never restarts at internal model-window boundaries. A continuously
+    held trigger automatically ends the Dictation Session at 300 seconds and
+    processes every sample captured up to that boundary.
+12. The physical trigger release after an automatic cap is consumed once and
+    cannot start a second finish, clear processing status, or insert twice.
+13. Model switching, deletion, and revocation rules retain the admitted model
+    identities for the whole Dictation Session, including every ASR window.
 
 Reason: this prevents the common accidental case where a user holds Right
 Command longer than 250 ms, hesitates, then presses a normal shortcut key.
@@ -1265,6 +1291,27 @@ Silence/VAD:
 - Leave about 150 ms safety pad at detected edges.
 - When uncertain, do not trim.
 - Full-clip no speech skips transcription and silently no-ops.
+
+Long Dictation Session processing:
+
+- Apply edge-only trimming once to the complete capture. Never trim artificial
+  internal window edges.
+- Keep the single-window fast path for audio within the admitted model's safe
+  limit (the signed limit minus the 500 ms reserve).
+- For longer captures, target 25-second windows and keep every window at least
+  500 ms below the model's signed `maxAudioSeconds` limit.
+- Search the preceding five seconds for at least 200 ms of silence at or below
+  -45 dBFS using 20 ms RMS frames. Split at the quiet run when found.
+- If no qualifying silence exists, force the boundary with 400 ms of audio
+  overlap. De-duplicate only an exact overlap of at least two whitespace tokens
+  or four CJK characters; preserve a single repeated word.
+- Prepare the admitted ASR model and optional cleaner once, then clean and
+  transcribe windows strictly sequentially.
+- A cleaner failure falls back to raw audio for that window and remains a
+  non-blocking warning. An ASR error or a hallucination-filter rejection in any
+  window aborts the whole Dictation Session; never insert a partial result.
+- Stitch accepted raw window text in order, post-process once, revalidate the
+  key-down target once, and insert once.
 
 No raw audio retention by default.
 
@@ -1883,10 +1930,11 @@ This block documents the initial English Whisper presets. The current
 multi-model catalog may declare a fixed supported language or language
 detection according to an engine's verified capabilities. The persisted
 Dictation Language preference is applied at runtime only within the selected
-model's signed capabilities. Capture uses each entry's `maxAudioSeconds`;
+model's signed capabilities. ASR windowing uses each entry's `maxAudioSeconds`;
 production policy accepts 1–60 seconds generally and at most 29 seconds for
-Paraformer so its 30-second native input window cannot silently truncate
-post-release audio.
+Paraformer. `maxAudioSeconds` bounds each internal ASR window; it does not stop
+the microphone. The product-level Dictation Session cap is independently fixed
+at 300 seconds.
 
 ```json
 {
@@ -1923,8 +1971,9 @@ Language runtime decisions:
 - Use `temperature: 0.0`.
 - Disable temperature fallback in V1.
 - Disable token timestamps.
-- Manifest declares `maxAudioSeconds: 60`, but capture/runtime enforce it before
-  calling whisper.cpp.
+- Manifest `maxAudioSeconds` is enforced for every internal ASR window before
+  calling its native runtime. The orchestrator reserves a 500 ms safety margin
+  below the signed value.
 - Thread count is runtime-owned, not manifest-owned.
 - Metal/GPU enablement and fallback are runtime-owned, not manifest-owned.
 
@@ -2470,7 +2519,14 @@ Allowed as counts/enums/metrics:
 - compression ratio
 - insertion method enum
 - pipeline stage timings
+- aggregate ASR window count
+- closed Dictation Session termination reason: `trigger_released` or
+  `session_limit_reached`
 - event enum such as `dictation_blocked_excluded_app`
+
+`speech_recognition_completed` is emitted once for the whole Dictation Session,
+not once per ASR window. Progress ticks, window boundaries, and transcript
+fragments are never logged.
 
 For excluded-app blocking, diagnostics must not log app name, bundle ID, window
 title, or focused element.

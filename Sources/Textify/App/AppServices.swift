@@ -1,3 +1,4 @@
+import Dispatch
 import Foundation
 import Network
 import Observation
@@ -287,8 +288,12 @@ final class AppServices {
     @ObservationIgnored private var runtimeStarted = false
     @ObservationIgnored private var diagnosticsStarted = false
     @ObservationIgnored private let overlayPresenter: any RecordingOverlayPresenting
+    @ObservationIgnored private let waitBeforeRecordingOverlayTick: @Sendable () async -> Void
+    @ObservationIgnored private let recordingOverlayNowMilliseconds:
+        @Sendable () -> Int
     @ObservationIgnored private let waitBeforeProcessingIndicator: @Sendable () async -> Void
     @ObservationIgnored private let waitBeforeTerminalStatusDismissal: @Sendable () async -> Void
+    @ObservationIgnored private var recordingOverlayTask: Task<Void, Never>?
     @ObservationIgnored private var processingOverlayTask: Task<Void, Never>?
     @ObservationIgnored private var terminalStatusTask: Task<Void, Never>?
     @ObservationIgnored private var modelRevocationEnforcementTask:
@@ -299,6 +304,15 @@ final class AppServices {
         false
     @ObservationIgnored private var pendingModelUseArtifactIDs = Set<String>()
     @ObservationIgnored private var overlayUpdateGeneration = 0
+    @ObservationIgnored private var recordingOverlayUpdateGeneration = 0
+    @ObservationIgnored private var overlaySessionIsActive = false
+    @ObservationIgnored private var overlayRuntimeStatus = DictationRuntimeStatus.idle
+    @ObservationIgnored private var overlaySessionProgress = DictationSessionProgress.inactive
+    @ObservationIgnored private var processingOverlayGateIsOpen = false
+    @ObservationIgnored private var didPresentSessionLimitMessage = false
+    @ObservationIgnored private var sessionLimitMessageProgress:
+        DictationSessionProgress?
+    @ObservationIgnored private var isTerminating = false
     private var managedReadinessByModelID:
         [String: ModelCatalogManagedReadiness] = [:]
 
@@ -351,6 +365,12 @@ final class AppServices {
         modelCatalogCompatibilityResolver: ModelCatalogCompatibilityResolver = .current(),
         microphoneInputClient: MicrophoneInputClient = .live,
         overlayPresenter: (any RecordingOverlayPresenting)? = nil,
+        waitBeforeRecordingOverlayTick: @escaping @Sendable () async -> Void = {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+        },
+        recordingOverlayNowMilliseconds: @escaping @Sendable () -> Int = {
+            Int(DispatchTime.now().uptimeNanoseconds / 1_000_000)
+        },
         waitBeforeProcessingIndicator: @escaping @Sendable () async -> Void = {
             try? await Task.sleep(nanoseconds: 900_000_000)
         },
@@ -384,6 +404,9 @@ final class AppServices {
             try await storageScanner.scan(installedRecords: installedRecords)
         }
         self.overlayPresenter = overlayPresenter ?? RecordingOverlayPresenter()
+        self.waitBeforeRecordingOverlayTick = waitBeforeRecordingOverlayTick
+        self.recordingOverlayNowMilliseconds =
+            recordingOverlayNowMilliseconds
         self.waitBeforeProcessingIndicator = waitBeforeProcessingIndicator
         self.waitBeforeTerminalStatusDismissal = waitBeforeTerminalStatusDismissal
         self.modelTransferNetworkObserver = modelTransferNetworkObserver
@@ -402,8 +425,10 @@ final class AppServices {
         )
         self.preferences = settingsStore.load()
         self.launchAtLoginStatus = launchAtLoginLocation.isSupported ? launchAtLogin.status() : .unsupportedLocation
+        dictation.applyPersistedPreferences(preferences)
         updateOverlay()
         observeDictationStatus()
+        observeDictationSessionProgress()
         observeDictationReadiness()
         Task { @MainActor [weak self] in
             await self?.refreshManagedModelReadiness()
@@ -428,6 +453,9 @@ final class AppServices {
     }
 
     func startRuntime() {
+        guard !isTerminating else {
+            return
+        }
         if let startupIssue {
             hotkeyMonitor.stop()
             runtimeIssue = startupIssue.runtimeIssue
@@ -498,6 +526,28 @@ final class AppServices {
         runtimeStarted = false
     }
 
+    func shutdownForTermination() async {
+        guard !isTerminating else {
+            return
+        }
+        isTerminating = true
+        dictation.beginShutdown()
+        stopRuntime()
+        microphoneInputPresentation.stopMonitoring()
+        recordingOverlayTask?.cancel()
+        recordingOverlayTask = nil
+        endOverlaySession()
+        processingOverlayTask?.cancel()
+        processingOverlayTask = nil
+        terminalStatusTask?.cancel()
+        terminalStatusTask = nil
+        modelRevocationEnforcementRequested = false
+        modelRevocationEnforcementTask?.cancel()
+        await dictation.discardAudioForShutdown()
+        await modelInstallCoordinator.shutdownForTermination()
+        await dictation.shutdown()
+    }
+
     func setTrigger(_ trigger: TextifySettings.TriggerPreference) {
         let wasRunning = hotkeyMonitor.isRunning
         stopRuntime()
@@ -537,6 +587,23 @@ final class AppServices {
                     await self.enforceModelRevocations()
                 }
                 self.observeDictationStatus()
+            }
+        }
+    }
+
+    private func observeDictationSessionProgress() {
+        withObservationTracking {
+            _ = dictation.sessionProgress
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else {
+                    return
+                }
+                self.updateObservedSessionProgressOverlay(
+                    for: self.dictation.sessionProgress,
+                    runtimeStatus: self.dictation.status
+                )
+                self.observeDictationSessionProgress()
             }
         }
     }
@@ -626,7 +693,8 @@ final class AppServices {
     }
 
     private func reconcileMicrophoneMonitoring() {
-        guard dictation.readiness.permissions.microphone == .granted,
+        guard !isTerminating,
+              dictation.readiness.permissions.microphone == .granted,
               microphoneMonitoringSurfaceIsVisible,
               !dictationStatusUsesMicrophone
         else {
@@ -668,6 +736,13 @@ final class AppServices {
             else {
                 return
             }
+            self.dictation.replaceRevokedArtifactIDs(
+                self.runtimeBlockedArtifactIDs(
+                    manifest:
+                        self.modelCatalogCoordinator.authoritativeManifest,
+                    overlay: self.modelCatalogCoordinator.revocationOverlay
+                )
+            )
             self.modelInstallCoordinator.enforceKnownRevocations()
             Task { @MainActor [weak self] in
                 await self?.enforceModelRevocations()
@@ -782,21 +857,200 @@ final class AppServices {
     }
 
     private func updateOverlay() {
+        overlaySessionProgress = dictation.sessionProgress
         updateOverlay(for: dictation.status)
     }
 
     func updateOverlay(for status: DictationRuntimeStatus) {
-        overlayUpdateGeneration &+= 1
-        let generation = overlayUpdateGeneration
-        processingOverlayTask?.cancel()
-        processingOverlayTask = nil
+        let wasRecording = Self.isRecordingStatus(overlayRuntimeStatus)
+        let wasProcessing = Self.isProcessingStatus(overlayRuntimeStatus)
+        beginOverlaySessionIfNeeded(for: status)
+        overlayRuntimeStatus = status
 
-        guard case .processing = status else {
-            presentOverlay(DictationOverlayPresentation.state(for: status))
+        if Self.isRecordingStatus(status) {
+            if !wasRecording {
+                cancelProcessingOverlay()
+                startRecordingOverlayTicker()
+            }
+            refreshRecordingOverlay()
+            return
+        }
+
+        stopRecordingOverlayTicker()
+
+        if Self.isProcessingStatus(status) {
+            if !wasProcessing {
+                cancelProcessingOverlay()
+            }
+            refreshProcessingOverlay()
+            return
+        }
+
+        cancelProcessingOverlay()
+        presentOverlay(DictationOverlayPresentation.state(for: status))
+        endOverlaySessionIfNeeded(for: status)
+    }
+
+    func updateSessionProgressOverlay(
+        for progress: DictationSessionProgress
+    ) {
+        overlaySessionProgress = progress
+        if Self.isRecordingStatus(overlayRuntimeStatus) {
+            refreshRecordingOverlay()
+            return
+        }
+        guard Self.isProcessingStatus(overlayRuntimeStatus) else {
+            return
+        }
+        refreshProcessingOverlay()
+    }
+
+    func updateObservedSessionProgressOverlay(
+        for progress: DictationSessionProgress,
+        runtimeStatus: DictationRuntimeStatus
+    ) {
+        guard Self.isRecordingStatus(runtimeStatus)
+            || Self.isProcessingStatus(runtimeStatus) else {
+            // A terminal status can publish `.inactive` before its status
+            // observer runs. Retain the data without reviving an overlay that
+            // is already ending.
+            overlaySessionProgress = progress
+            return
+        }
+        if overlayRuntimeStatus != runtimeStatus {
+            updateOverlay(for: runtimeStatus)
+        }
+        updateSessionProgressOverlay(for: progress)
+    }
+
+    private static func isRecordingStatus(
+        _ status: DictationRuntimeStatus
+    ) -> Bool {
+        if case .recording = status {
+            return true
+        }
+        return false
+    }
+
+    private static func isProcessingStatus(
+        _ status: DictationRuntimeStatus
+    ) -> Bool {
+        if case .processing = status {
+            return true
+        }
+        return false
+    }
+
+    private func startRecordingOverlayTicker() {
+        guard recordingOverlayTask == nil else {
+            return
+        }
+        recordingOverlayUpdateGeneration &+= 1
+        let generation = recordingOverlayUpdateGeneration
+        let waitBeforeRecordingOverlayTick = waitBeforeRecordingOverlayTick
+        recordingOverlayTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                await waitBeforeRecordingOverlayTick()
+                guard !Task.isCancelled,
+                      let self,
+                      self.recordingOverlayUpdateGeneration == generation,
+                      Self.isRecordingStatus(self.overlayRuntimeStatus)
+                else {
+                    return
+                }
+                self.refreshRecordingOverlay()
+            }
+        }
+    }
+
+    private func stopRecordingOverlayTicker() {
+        recordingOverlayUpdateGeneration &+= 1
+        recordingOverlayTask?.cancel()
+        recordingOverlayTask = nil
+    }
+
+    private func refreshRecordingOverlay() {
+        guard Self.isRecordingStatus(overlayRuntimeStatus) else {
+            return
+        }
+        let remainingSeconds: Int?
+        if case let .recording(deadlineUptimeMilliseconds) =
+            overlaySessionProgress {
+            remainingSeconds =
+                DictationSessionPresentationCopy.remainingRecordingSeconds(
+                    deadlineUptimeMilliseconds: deadlineUptimeMilliseconds,
+                    nowUptimeMilliseconds:
+                        recordingOverlayNowMilliseconds()
+                )
+        } else {
+            remainingSeconds = nil
+        }
+        presentOverlay(.recording(remainingSeconds: remainingSeconds))
+    }
+
+    private func beginOverlaySessionIfNeeded(
+        for status: DictationRuntimeStatus
+    ) {
+        let needsSession: Bool
+        switch status {
+        case .waitingForActivation, .recording, .processing, .inserting,
+             .failed, .blocked:
+            needsSession = true
+        case .idle, .completed, .cancelled:
+            needsSession = false
+        }
+        guard needsSession, !overlaySessionIsActive else {
+            return
+        }
+        overlaySessionIsActive = true
+        overlayPresenter.beginSession()
+    }
+
+    private func endOverlaySessionIfNeeded(
+        for status: DictationRuntimeStatus
+    ) {
+        switch status {
+        case .idle, .completed, .cancelled:
+            endOverlaySession()
+        case .waitingForActivation, .recording, .processing, .inserting,
+             .failed, .blocked:
+            break
+        }
+    }
+
+    private func endOverlaySession() {
+        guard overlaySessionIsActive else {
+            return
+        }
+        overlaySessionIsActive = false
+        overlaySessionProgress = .inactive
+        overlayPresenter.endSession()
+    }
+
+    private func refreshProcessingOverlay() {
+        guard Self.isProcessingStatus(overlayRuntimeStatus) else {
+            return
+        }
+        if case let .processing(_, _, endReason) = overlaySessionProgress,
+           endReason == .sessionLimitReached {
+            openProcessingOverlayImmediately()
+            return
+        }
+        scheduleProcessingOverlayIfNeeded()
+    }
+
+    private func scheduleProcessingOverlayIfNeeded() {
+        if processingOverlayGateIsOpen {
+            presentOverlay(currentProcessingOverlayState())
+            return
+        }
+        guard processingOverlayTask == nil else {
             return
         }
 
         presentOverlay(.hidden)
+        overlayUpdateGeneration &+= 1
+        let generation = overlayUpdateGeneration
         let waitBeforeProcessingIndicator = waitBeforeProcessingIndicator
         processingOverlayTask = Task { @MainActor [weak self] in
             await waitBeforeProcessingIndicator()
@@ -806,9 +1060,65 @@ final class AppServices {
             else {
                 return
             }
-            self.presentOverlay(.processing)
             self.processingOverlayTask = nil
+            self.processingOverlayGateIsOpen = true
+            self.presentOverlay(self.currentProcessingOverlayState())
         }
+    }
+
+    private func openProcessingOverlayImmediately() {
+        overlayUpdateGeneration &+= 1
+        processingOverlayTask?.cancel()
+        processingOverlayTask = nil
+        processingOverlayGateIsOpen = true
+        presentOverlay(currentProcessingOverlayState())
+    }
+
+    private func cancelProcessingOverlay() {
+        overlayUpdateGeneration &+= 1
+        processingOverlayTask?.cancel()
+        processingOverlayTask = nil
+        processingOverlayGateIsOpen = false
+        didPresentSessionLimitMessage = false
+        sessionLimitMessageProgress = nil
+    }
+
+    private func currentProcessingOverlayState() -> RecordingOverlayState {
+        guard case let .processing(
+            completedWindows,
+            totalWindows,
+            endReason
+        ) = overlaySessionProgress else {
+            return .processing
+        }
+
+        if endReason == .sessionLimitReached {
+            if !didPresentSessionLimitMessage {
+                didPresentSessionLimitMessage = true
+                sessionLimitMessageProgress = overlaySessionProgress
+                return .sessionLimitReached
+            }
+            if sessionLimitMessageProgress == overlaySessionProgress {
+                return .sessionLimitReached
+            }
+            guard DictationSessionPresentationCopy.processingProgress(
+                completedWindows: completedWindows,
+                totalWindows: totalWindows
+            ) != nil else {
+                return .sessionLimitReached
+            }
+        }
+
+        if DictationSessionPresentationCopy.processingProgress(
+            completedWindows: completedWindows,
+            totalWindows: totalWindows
+        ) != nil {
+            return .processingProgress(
+                completedWindows: completedWindows,
+                totalWindows: totalWindows
+            )
+        }
+        return .processing
     }
 
     private func presentOverlay(_ state: RecordingOverlayState) {
@@ -876,7 +1186,11 @@ final class AppServices {
     @discardableResult
     func savePreferences() -> Bool {
         settingsStore.save(preferences)
-        return settingsStore.lastError == nil
+        let succeeded = settingsStore.lastError == nil
+        if succeeded {
+            dictation.applyPersistedPreferences(preferences)
+        }
+        return succeeded
     }
 
     func isModelInstalled(_ modelID: String) -> Bool {
@@ -1285,6 +1599,9 @@ final class AppServices {
     }
 
     func reconcilePendingModelUseIntents() {
+        guard !isTerminating else {
+            return
+        }
         for modelID in Array(pendingModelUseArtifactIDs) {
             if let record = installedModel(modelID) {
                 pendingModelUseArtifactIDs.remove(modelID)
@@ -1322,6 +1639,9 @@ final class AppServices {
     func activateInstalledModel(
         _ modelID: String
     ) async -> AppModelActivationResult {
+        guard !isTerminating else {
+            return .dictationInProgress
+        }
         guard let model = installedModel(modelID)?.model else {
             return .notInstalled
         }
@@ -1666,6 +1986,9 @@ final class AppServices {
     }
 
     func enforceModelRevocations() async {
+        guard !isTerminating else {
+            return
+        }
         modelRevocationEnforcementRequested = true
         if let modelRevocationEnforcementTask {
             await modelRevocationEnforcementTask.value
@@ -1686,32 +2009,15 @@ final class AppServices {
     }
 
     private func performModelRevocationEnforcement() async {
+        guard !isTerminating else {
+            return
+        }
         let manifest = modelCatalogCoordinator.authoritativeManifest
         let overlay = modelCatalogCoordinator.revocationOverlay
-        let runtimeBlockedRecords = installedModelsStore.records.filter {
-            overlay.isRevoked(
-                record: $0,
-                trustedManifest: manifest
-            )
-                || !pendingRestorationVerificationIDs(for: $0).isEmpty
-        }
-        var revokedArtifactIDs = Set(
-            runtimeBlockedRecords.map(\.model.id)
+        let revokedArtifactIDs = runtimeBlockedArtifactIDs(
+            manifest: manifest,
+            overlay: overlay
         )
-        for activeID in [
-            preferences.activeModelID,
-            preferences.activeVoiceCleaningModelID,
-        ].compactMap({ $0 })
-        where overlay.isRevoked(
-            artifactID: activeID,
-            trustedManifest: manifest
-        ) || !modelCatalogCoordinator.revocationState
-            .restorationIDsRequiringIntegrityVerification(
-                artifactID: activeID,
-                trustedManifest: manifest
-            ).isEmpty {
-            revokedArtifactIDs.insert(activeID)
-        }
 
         await dictation.updateRevokedArtifactIDs(revokedArtifactIDs)
         modelInstallCoordinator.enforceKnownRevocations()
@@ -1762,6 +2068,35 @@ final class AppServices {
             }
         }
         await refreshManagedModelReadiness()
+    }
+
+    private func runtimeBlockedArtifactIDs(
+        manifest: ModelManifest?,
+        overlay: ModelRevocationOverlay
+    ) -> Set<String> {
+        let runtimeBlockedRecords = installedModelsStore.records.filter {
+            overlay.isRevoked(
+                record: $0,
+                trustedManifest: manifest
+            )
+                || !pendingRestorationVerificationIDs(for: $0).isEmpty
+        }
+        var artifactIDs = Set(runtimeBlockedRecords.map(\.model.id))
+        for activeID in [
+            preferences.activeModelID,
+            preferences.activeVoiceCleaningModelID,
+        ].compactMap({ $0 })
+        where overlay.isRevoked(
+            artifactID: activeID,
+            trustedManifest: manifest
+        ) || !modelCatalogCoordinator.revocationState
+            .restorationIDsRequiringIntegrityVerification(
+                artifactID: activeID,
+                trustedManifest: manifest
+            ).isEmpty {
+            artifactIDs.insert(activeID)
+        }
+        return artifactIDs
     }
 
     func chooseReplacement(for purpose: ModelPurpose) {
@@ -2480,6 +2815,7 @@ final class ModelInstallCoordinator {
     @ObservationIgnored private var activeAttemptID: String?
     @ObservationIgnored private var queue: ModelInstallQueue
     @ObservationIgnored private var persistenceIsAvailable = true
+    @ObservationIgnored private var isTerminating = false
 
     private(set) var revision = 0
     private(set) var persistenceErrorMessage: String?
@@ -2705,6 +3041,19 @@ final class ModelInstallCoordinator {
         }
     }
 
+    func shutdownForTermination() async {
+        guard !isTerminating else {
+            await installTask?.value
+            return
+        }
+        isTerminating = true
+        guard let installTask else {
+            return
+        }
+        installTask.cancel()
+        await installTask.value
+    }
+
     func resume(attemptID: String) {
         guard let attempt = queue.attempt(id: attemptID),
               attempt.state.phase == .paused
@@ -2908,7 +3257,8 @@ final class ModelInstallCoordinator {
     }
 
     private func processNextAttempt() {
-        guard installTask == nil,
+        guard !isTerminating,
+              installTask == nil,
               persistenceIsAvailable,
               let attempt = queue.nextRunnableAttempt
         else {
@@ -3005,6 +3355,10 @@ final class ModelInstallCoordinator {
                         )
                     }
                 }
+                guard !isTerminating, !Task.isCancelled else {
+                    finishCancelledTask(attemptID: attempt.id)
+                    return
+                }
                 if finishIfKnownRevoked(attempt) {
                     return
                 }
@@ -3013,6 +3367,8 @@ final class ModelInstallCoordinator {
                     phase: .installed,
                     message: "Model installed."
                 )
+            } catch where isTerminating || Task.isCancelled {
+                finishCancelledTask(attemptID: attempt.id)
             } catch is CancellationError {
                 finishCancelledTask(attemptID: attempt.id)
             } catch ModelInstallCoordinatorError.networkUnavailable {
@@ -3129,6 +3485,12 @@ final class ModelInstallCoordinator {
 
     private func finishCancelledTask(attemptID: String) {
         guard let attempt = queue.attempt(id: attemptID) else {
+            completeTask(attemptID: attemptID)
+            return
+        }
+        if isTerminating {
+            // Relaunch recovery requeues persisted pipeline-active attempts.
+            associateResumableDataIfAvailable(attemptID: attemptID)
             completeTask(attemptID: attemptID)
             return
         }
@@ -4019,8 +4381,10 @@ enum OnboardingStep: String, CaseIterable, Identifiable {
 
 enum RecordingOverlayState: Equatable {
     case hidden
-    case recording(elapsedSeconds: Int)
+    case recording(remainingSeconds: Int?)
     case processing
+    case processingProgress(completedWindows: Int, totalWindows: Int)
+    case sessionLimitReached
     case cancelled
     case blocked(String)
 }

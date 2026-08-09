@@ -16,6 +16,10 @@ final class ProductionManifestV3Tests: XCTestCase {
 
         XCTAssertEqual(manifest.manifestVersion, 3)
         XCTAssertNoThrow(try ProductionModelPolicy.validateProductionManifest(manifest))
+        XCTAssertEqual(manifest.models.count, 44)
+        XCTAssertEqual(graph.families.count, 14)
+        XCTAssertEqual(graph.checkpoints.count, 24)
+        XCTAssertEqual(graph.artifacts.count, 44)
         XCTAssertEqual(graph.artifacts.count, manifest.models.count)
         XCTAssertEqual(Set(graph.artifacts.map(\.id)), Set(manifest.models.map(\.id)))
         XCTAssertTrue(
@@ -51,10 +55,68 @@ final class ProductionManifestV3Tests: XCTestCase {
         XCTAssertEqual(whisperGGML.artifactFormat, .ggml)
         XCTAssertEqual(whisperGGML.numericFormat, .q5_1)
         XCTAssertEqual(whisperGGML.computeRoute, .gpuViaMetal)
+
+        let crisperFamily = try XCTUnwrap(
+            graph.families.first {
+                $0.id == "family.nyra-labs.crisperwhisper-2"
+            }
+        )
+        XCTAssertEqual(crisperFamily.purpose, .transcription)
+        XCTAssertEqual(
+            crisperFamily.checkpointIDs,
+            [
+                "checkpoint.nyra-labs.crisperwhisper-2-large",
+                "checkpoint.nyra-labs.crisperwhisper-2-turbo",
+            ]
+        )
+        XCTAssertEqual(crisperFamily.presentation.provider.id, "nyra-labs")
+        XCTAssertEqual(crisperFamily.presentation.provider.displayName, "Nyra Labs")
+        XCTAssertEqual(crisperFamily.presentation.curatedRank, 120)
+
+        let crisperCheckpoints = graph.checkpoints.filter {
+            crisperFamily.checkpointIDs.contains($0.id)
+        }
+        XCTAssertEqual(crisperCheckpoints.map(\.id), crisperFamily.checkpointIDs)
+        XCTAssertEqual(crisperCheckpoints.map(\.presentation.curatedRank), [0, 10])
+        XCTAssertEqual(
+            crisperCheckpoints.map(\.artifactIDs),
+            [
+                ["crisperwhisper-2-large-f16"],
+                ["crisperwhisper-2-turbo-f16"],
+            ]
+        )
+        XCTAssertEqual(
+            crisperCheckpoints.map(\.recommendedArtifactID),
+            [
+                "crisperwhisper-2-large-f16",
+                "crisperwhisper-2-turbo-f16",
+            ]
+        )
+        XCTAssertTrue(
+            crisperCheckpoints.allSatisfy { $0.fallbackArtifactIDs.isEmpty }
+        )
+
+        for artifactID in [
+            "crisperwhisper-2-large-f16",
+            "crisperwhisper-2-turbo-f16",
+        ] {
+            let crisperArtifact = try artifact(artifactID, in: graph)
+            XCTAssertEqual(crisperArtifact.purpose, .transcription)
+            XCTAssertEqual(crisperArtifact.artifactFormat, .ggml)
+            XCTAssertEqual(crisperArtifact.numericFormat, .f16)
+            XCTAssertEqual(crisperArtifact.runtime, .whisperCpp)
+            XCTAssertEqual(crisperArtifact.computeRoute, .gpuViaMetal)
+            XCTAssertEqual(crisperArtifact.presentation.displayName, "GGML F16")
+            XCTAssertEqual(crisperArtifact.presentation.curatedRank, 0)
+        }
     }
 
     func testProductionV3PreservesV2OperationalRecordsExceptSignedPeakStorageAndSelectionCopy() throws {
         let retiredModelID = "omnilingual-asr-300m-ctc-int8"
+        let addedModelIDs: Set<String> = [
+            "crisperwhisper-2-large-f16",
+            "crisperwhisper-2-turbo-f16",
+        ]
         let v2Data = try fixtureData("manifest_v2.production-migration.json")
         let v3Data = try Data(
             contentsOf: repositoryRoot.appendingPathComponent("models/manifest.json")
@@ -62,7 +124,12 @@ final class ProductionManifestV3Tests: XCTestCase {
         var v2Models = try rawModels(in: v2Data).filter {
             $0["id"] as? String != retiredModelID
         }
-        var v3Models = try rawModels(in: v3Data)
+        var v3Models = try rawModels(in: v3Data).filter {
+            guard let modelID = $0["id"] as? String else {
+                return true
+            }
+            return !addedModelIDs.contains(modelID)
+        }
         for index in v2Models.indices {
             normalizeMutableManifestModel(&v2Models[index])
         }
@@ -85,10 +152,16 @@ final class ProductionManifestV3Tests: XCTestCase {
 
         XCTAssertEqual(v2.manifestVersion, 2)
         XCTAssertEqual(v2.models.count, 43)
-        XCTAssertEqual(v3.models.count, 42)
+        XCTAssertEqual(v3.models.count, 44)
         XCTAssertFalse(v3.models.contains { $0.id == retiredModelID })
         XCTAssertEqual(
-            v3.models.map(normalizingV3PresentationCopy),
+            Set(v3.models.filter { addedModelIDs.contains($0.id) }.map(\.id)),
+            addedModelIDs
+        )
+        XCTAssertEqual(
+            v3.models
+                .filter { !addedModelIDs.contains($0.id) }
+                .map(normalizingV3PresentationCopy),
             v2.models
                 .filter { $0.id != retiredModelID }
                 .map(normalizingV3PresentationCopy)

@@ -6,7 +6,7 @@ import TextifySettings
 enum DictationOverlayPresentation {
     static func state(for status: DictationRuntimeStatus) -> RecordingOverlayState {
         if case .recording = status {
-            return .recording(elapsedSeconds: 0)
+            return .recording(remainingSeconds: nil)
         }
         if status == .blocked(.excludedApp) {
             return .blocked("Textify disabled for this app.")
@@ -21,7 +21,62 @@ enum DictationOverlayPresentation {
         case .idle, .waitingForActivation, .processing, .inserting, .completed:
             return .hidden
         case .recording:
-            return .recording(elapsedSeconds: 0)
+            return .recording(remainingSeconds: nil)
+        }
+    }
+}
+
+enum DictationSessionPresentationCopy {
+    static let sessionLimitReached =
+        "5-minute limit reached — processing captured speech."
+
+    static func remainingRecordingSeconds(
+        deadlineUptimeMilliseconds: Int,
+        nowUptimeMilliseconds: Int
+    ) -> Int {
+        let remainingMilliseconds = max(
+            0,
+            deadlineUptimeMilliseconds - nowUptimeMilliseconds
+        )
+        let wholeSeconds = remainingMilliseconds / 1_000
+        let partialSecond = remainingMilliseconds % 1_000
+        return wholeSeconds + (partialSecond > 0 ? 1 : 0)
+    }
+
+    static func recordingWarning(remainingSeconds: Int) -> String? {
+        guard remainingSeconds > 0,
+              remainingSeconds <= DictationSessionLimits.warningDurationSeconds
+        else {
+            return nil
+        }
+        return "Recording stops in \(remainingSeconds)s"
+    }
+
+    static func processingProgress(
+        completedWindows: Int,
+        totalWindows: Int
+    ) -> String? {
+        guard totalWindows > 1, completedWindows > 0 else {
+            return nil
+        }
+        return "Processing \(min(completedWindows, totalWindows)) of \(totalWindows)"
+    }
+
+    static func status(for state: RecordingOverlayState) -> String? {
+        switch state {
+        case let .recording(remainingSeconds):
+            return remainingSeconds.flatMap(recordingWarning)
+        case .processing:
+            return nil
+        case let .processingProgress(completedWindows, totalWindows):
+            return processingProgress(
+                completedWindows: completedWindows,
+                totalWindows: totalWindows
+            )
+        case .sessionLimitReached:
+            return sessionLimitReached
+        case .hidden, .cancelled, .blocked:
+            return nil
         }
     }
 }
@@ -62,6 +117,9 @@ private extension ProductionDictationError {
 
 @MainActor
 protocol RecordingOverlayPresenting: AnyObject {
+    func beginSession()
+    func endSession()
+
     func present(
         _ state: RecordingOverlayState,
         preferences: RecordingOverlayPreferences
@@ -114,6 +172,16 @@ private struct RecordingOverlayApplication {
     )
 }
 
+enum RecordingOverlayApplicationCapturePolicy {
+    static func shouldCapture(
+        currentSessionID: UUID?,
+        nextSessionID: UUID,
+        hasSessionApplication: Bool
+    ) -> Bool {
+        currentSessionID != nextSessionID || !hasSessionApplication
+    }
+}
+
 @MainActor
 private protocol RecordingOverlayApplicationProviding {
     func currentApplication() -> RecordingOverlayApplication
@@ -142,10 +210,25 @@ private struct WorkspaceRecordingOverlayApplicationProvider: RecordingOverlayApp
 final class RecordingOverlayPresenter: RecordingOverlayPresenting {
     private var window: RecordingOverlayWindow?
     private var sessionApplication: RecordingOverlayApplication?
+    private var sessionID: UUID?
+    private var applicationSessionID: UUID?
     private let applicationProvider: any RecordingOverlayApplicationProviding
 
     init() {
         self.applicationProvider = WorkspaceRecordingOverlayApplicationProvider()
+    }
+
+    func beginSession() {
+        sessionID = UUID()
+        applicationSessionID = nil
+        sessionApplication = nil
+    }
+
+    func endSession() {
+        window?.orderOut(nil)
+        sessionID = nil
+        applicationSessionID = nil
+        sessionApplication = nil
     }
 
     func present(
@@ -157,15 +240,21 @@ final class RecordingOverlayPresenter: RecordingOverlayPresenting {
             return
         }
 
-        switch state {
-        case .recording, .blocked:
+        if sessionID == nil {
+            beginSession()
+        }
+        guard let activeSessionID = sessionID else {
+            return
+        }
+        let shouldCaptureApplication =
+            RecordingOverlayApplicationCapturePolicy.shouldCapture(
+                currentSessionID: applicationSessionID,
+                nextSessionID: activeSessionID,
+                hasSessionApplication: sessionApplication != nil
+            )
+        if shouldCaptureApplication {
             sessionApplication = applicationProvider.currentApplication()
-        case .processing, .cancelled:
-            if sessionApplication == nil {
-                sessionApplication = applicationProvider.currentApplication()
-            }
-        case .hidden:
-            break
+            applicationSessionID = activeSessionID
         }
 
         let application = sessionApplication ?? .unavailable
@@ -190,7 +279,7 @@ final class RecordingOverlayWindow: NSWindow {
     private let hostingView: NSHostingView<RecordingOverlayContent>
 
     fileprivate init(
-        state: RecordingOverlayState = .recording(elapsedSeconds: 0),
+        state: RecordingOverlayState = .recording(remainingSeconds: nil),
         application: RecordingOverlayApplication = .unavailable,
         preferences: RecordingOverlayPreferences = .defaults
     ) {
@@ -395,9 +484,30 @@ private struct RecordingOverlayContent: View {
             compactStatus("Cancelled — nothing was inserted")
         case .hidden:
             Color.clear.frame(height: 11)
-        case .recording, .processing:
+        case let .recording(remainingSeconds):
+            if let remainingSeconds,
+               let warning = DictationSessionPresentationCopy.recordingWarning(
+                   remainingSeconds: remainingSeconds
+               ) {
+                compactStatus(warning)
+            } else {
+                RecordingSignalWaveform(state: state)
+                    .frame(height: 11)
+            }
+        case .processing:
             RecordingSignalWaveform(state: state)
                 .frame(height: 11)
+        case let .processingProgress(completedWindows, totalWindows):
+            compactStatus(
+                DictationSessionPresentationCopy.processingProgress(
+                    completedWindows: completedWindows,
+                    totalWindows: totalWindows
+                ) ?? "Processing"
+            )
+        case .sessionLimitReached:
+            compactStatus(
+                DictationSessionPresentationCopy.sessionLimitReached
+            )
         }
     }
 
@@ -422,7 +532,7 @@ private struct RecordingOverlayContent: View {
             return .idle
         case .recording:
             return .recording
-        case .processing:
+        case .processing, .processingProgress, .sessionLimitReached:
             return .processing
         case .cancelled:
             return .idle
@@ -437,8 +547,10 @@ private struct RecordingOverlayContent: View {
             return .clear
         case .recording:
             return .red
-        case .processing:
+        case .processing, .processingProgress:
             return .accentColor
+        case .sessionLimitReached:
+            return .orange
         case .cancelled:
             return .secondary
         case .blocked:
@@ -483,9 +595,9 @@ private struct RecordingSignalWaveform: View {
 
     private var animates: Bool {
         switch state {
-        case .recording, .processing:
+        case .recording, .processing, .processingProgress:
             return true
-        case .hidden, .cancelled, .blocked:
+        case .hidden, .sessionLimitReached, .cancelled, .blocked:
             return false
         }
     }
@@ -497,7 +609,14 @@ private struct RecordingSignalWaveform: View {
         }
 
         let normalizedIndex = Double(index) / Double(max(1, barCount - 1))
-        let speed = state == .processing ? 5.4 : 3.9
+        let speed: Double
+        switch state {
+        case .processing, .processingProgress:
+            speed = 5.4
+        case .hidden, .recording, .sessionLimitReached, .cancelled,
+             .blocked:
+            speed = 3.9
+        }
         let time = date.timeIntervalSinceReferenceDate * speed
         let carrier = (sin(time + normalizedIndex * 13.5) + 1) * 0.5
         let detail = (sin(time * 0.63 - normalizedIndex * 27.0) + 1) * 0.5
@@ -513,8 +632,10 @@ private struct RecordingSignalWaveform: View {
         switch state {
         case .recording:
             return Color.white.opacity(0.36 + position * 0.32)
-        case .processing:
+        case .processing, .processingProgress:
             return TextifyVisualIdentity.voiceViolet.opacity(0.42 + position * 0.34)
+        case .sessionLimitReached:
+            return TextifyVisualIdentity.warmWarning.opacity(0.48)
         case .blocked:
             return TextifyVisualIdentity.warmWarning.opacity(0.48)
         case .cancelled:
@@ -574,9 +695,9 @@ private struct RecordingSignalGlow: View {
         switch state {
         case .recording:
             return TextifyVisualIdentity.recordCoral
-        case .processing:
+        case .processing, .processingProgress:
             return TextifyVisualIdentity.voiceViolet
-        case .blocked:
+        case .sessionLimitReached, .blocked:
             return TextifyVisualIdentity.warmWarning
         case .hidden, .cancelled:
             return TextifyVisualIdentity.slate

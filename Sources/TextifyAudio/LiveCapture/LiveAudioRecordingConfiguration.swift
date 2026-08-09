@@ -10,7 +10,7 @@ public struct LiveAudioRecordingConfiguration: Equatable, Sendable {
 
     public init(
         input: LiveAudioInput = .systemDefault,
-        maximumDurationSeconds: Double = 60,
+        maximumDurationSeconds: Double = 300,
         postReleaseGraceMilliseconds: Int = 250
     ) {
         self.input = input

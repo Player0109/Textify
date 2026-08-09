@@ -2,7 +2,7 @@
 
 This document covers the Textify 1.1 local release workflow. It does not add Sparkle,
 notarization secrets, DMG upload automation, appcast hosting, or bundled model
-weights. The signed 42-entry catalog is bundled as the only runtime model list,
+weights. The signed 44-entry catalog is bundled as the only runtime model list,
 alongside the signed sticky-revocation baseline that governs its artifacts.
 Sparkle remains deferred, so users update manually by downloading the next
 GitHub Release DMG.
@@ -73,7 +73,7 @@ bash script/release/validate_release.sh
 This regenerates the Xcode project, runs the Swift test suite, builds the arm64
 release executable, checks the release plist and hardened-runtime audio-input
 entitlement, confirms Sparkle/mock release strings are absent, validates every
-release shell script, verifies the tracked signed 42-entry catalog, and
+release shell script, verifies the tracked signed 44-entry catalog, and
 verifies the SwiftPM release binary is arm64 only. A
 staged or archived app must also contain a valid compiled
 `Contents/Resources/default.metallib`; the artifact verifier rejects a bundle

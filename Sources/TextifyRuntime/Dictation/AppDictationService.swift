@@ -12,7 +12,96 @@ import TextifyTranscription
 @MainActor
 @Observable
 public final class AppDictationService {
+    private struct ModelSelectionKey: Equatable {
+        let transcriptionLanguage: TranscriptionLanguage
+        let modelSelectionScope: ModelSelectionScope
+        let activeModelID: String?
+        let activeVoiceCleaningModelID: String?
+        let artifactOverrides: [String: String]
+
+        init(preferences: AppPreferences) {
+            transcriptionLanguage = preferences.transcriptionLanguage
+            modelSelectionScope = preferences.modelSelectionScope
+            activeModelID = preferences.activeModelID
+            activeVoiceCleaningModelID =
+                preferences.activeVoiceCleaningModelID
+            artifactOverrides =
+                preferences.modelArtifactOverridesByPurposeCheckpoint
+        }
+    }
+
+    private struct PreparedAdmission {
+        var preferences: AppPreferences
+        let selectionKey: ModelSelectionKey
+        let transcriptionModel: RuntimeActiveModel?
+        let transcriptionStorageReadiness: RuntimeModelReadiness
+        let voiceCleaningModel: RuntimeActiveModel?
+    }
+
+    private enum CapturePhase: Equatable {
+        case admitting(sessionID: UUID, activated: Bool)
+        case startingAudio(
+            sessionID: UUID,
+            activated: Bool,
+            finishWhenStarted: Bool
+        )
+        case capturing(sessionID: UUID, activated: Bool)
+        case finishing(sessionID: UUID)
+
+        var sessionID: UUID {
+            switch self {
+            case let .admitting(sessionID, _),
+                 let .startingAudio(sessionID, _, _),
+                 let .capturing(sessionID, _),
+                 let .finishing(sessionID):
+                sessionID
+            }
+        }
+
+        var isActivated: Bool {
+            switch self {
+            case let .admitting(_, activated),
+                 let .startingAudio(_, activated, _),
+                 let .capturing(_, activated):
+                activated
+            case .finishing:
+                true
+            }
+        }
+    }
+
+    private final class CaptureTimingMilestone: @unchecked Sendable {
+        private let lock = NSLock()
+        private var storedValue: Int?
+
+        func recordOnce(_ value: Int) {
+            lock.lock()
+            defer { lock.unlock() }
+            guard storedValue == nil else {
+                return
+            }
+            storedValue = value
+        }
+
+        func value() -> Int? {
+            lock.lock()
+            defer { lock.unlock() }
+            return storedValue
+        }
+    }
+
+    private struct CaptureTiming {
+        let sessionID: UUID
+        let triggerReceivedAtMs: Int
+        var captureRequestedAtMs: Int?
+        let captureStartedAtMs = CaptureTimingMilestone()
+        let firstAudioAtMs = CaptureTimingMilestone()
+        var triggerReleasedAtMs: Int?
+        var shortcutGuardSpeechDetected = false
+    }
+
     public private(set) var status: DictationRuntimeStatus
+    public private(set) var sessionProgress: DictationSessionProgress
     public private(set) var readiness: ReadinessSnapshot
     public private(set) var voiceCleaningStatus: VoiceCleaningRuntimeStatus
     public private(set) var currentSegment: RuntimeCurrentSegment? {
@@ -28,6 +117,11 @@ public final class AppDictationService {
     private var activationTarget: InsertionTargetIdentity?
     private var excludedTriggerIsHeld = false
     private var activeSessionID: UUID?
+    private var capturePhase: CapturePhase?
+    private var pendingAudioStartSessionID: UUID?
+    private var captureTiming: CaptureTiming?
+    private var latestPreferences: AppPreferences?
+    private var preparedAdmission: PreparedAdmission?
     private var activeSessionPreferences:
         (sessionID: UUID, preferences: AppPreferences)?
     private var activeSegmentContext: (
@@ -35,7 +129,10 @@ public final class AppDictationService {
         transcriptionModel: RuntimeActiveModel,
         voiceCleaningModel: RuntimeActiveModel?
     )?
+    private var processingSessionID: UUID?
     private var insertionSessionID: UUID?
+    private var sessionEndReason = DictationSessionEndReason.triggerReleased
+    private var suppressesNextTriggerRelease = false
     private var revokedArtifactIDs: Set<String> = []
     private var modelTransactionInProgress = false
     private var pendingPurposeRuntimeTransactions = 0
@@ -45,6 +142,9 @@ public final class AppDictationService {
     private var modelTransactionWaiters:
         [CheckedContinuation<Void, Never>] = []
     private var currentSegmentWaiters: [CurrentSegmentWaiter] = []
+    private var isShuttingDown = false
+    private var didDiscardAudioForShutdown = false
+    private var shutdownOwnedArtifactID: String?
 
     public init(
         dependencies: RuntimeDependencies,
@@ -53,6 +153,7 @@ public final class AppDictationService {
         self.dependencies = dependencies
         self.triggerStateMachine = triggerStateMachine
         self.status = .idle
+        self.sessionProgress = .inactive
         self.voiceCleaningStatus = .disabled
         self.currentSegment = nil
         self.readiness = ReadinessSnapshot(
@@ -70,8 +171,10 @@ public final class AppDictationService {
     }
 
     public var allowsModelTransactions: Bool {
-        if modelTransactionInProgress
-            || pendingPurposeRuntimeTransactions > 0 {
+        if isShuttingDown
+            || modelTransactionInProgress
+            || pendingPurposeRuntimeTransactions > 0
+            || processingSessionID != nil {
             return false
         }
         if case .processing = status {
@@ -129,6 +232,20 @@ public final class AppDictationService {
         return true
     }
 
+    public func applyPersistedPreferences(_ preferences: AppPreferences) {
+        latestPreferences = preferences
+        guard var preparedAdmission else {
+            return
+        }
+        let selectionKey = ModelSelectionKey(preferences: preferences)
+        guard preparedAdmission.selectionKey == selectionKey else {
+            self.preparedAdmission = nil
+            return
+        }
+        preparedAdmission.preferences = preferences
+        self.preparedAdmission = preparedAdmission
+    }
+
     @discardableResult
     public func prepareActiveModelIfAvailable() async -> ReadinessSnapshot {
         guard allowsModelTransactions else {
@@ -142,53 +259,60 @@ public final class AppDictationService {
     @discardableResult
     public func prepareActiveModelAtPurposeRuntimeBoundary()
         async -> ReadinessSnapshot {
-        guard modelTransactionInProgress else {
+        guard modelTransactionInProgress, !isShuttingDown else {
             return readiness
         }
         let preferences = await dependencies.settings.loadPreferences()
+        applyPersistedPreferences(preferences)
+        let selectionKey = ModelSelectionKey(preferences: preferences)
         let activeModel = await dependencies.models.resolveActiveModel(preferences: preferences)
         let installedReadiness = await dependencies.models.readiness(for: activeModel)
 
         if let activeModel, case .ready = installedReadiness {
-            guard !revokedArtifactIDs.contains(activeModel.id) else {
-                await prepareVoiceCleaner(preferences: preferences)
-                return await refreshReadiness()
-            }
-            let startedAt = dependencies.clock.nowMilliseconds()
-            do {
-                try await dependencies.transcriber.prepare(model: activeModel)
-                await dependencies.diagnostics.log(
-                    .modelLoad(
-                        modelID: activeModel.id,
-                        tier: activeModel.tier,
-                        engine: activeModel.engine.rawValue,
-                        accelerator: activeModel.accelerator.rawValue,
-                        durationMs: max(0, dependencies.clock.nowMilliseconds() - startedAt),
-                        result: "ready"
+            if !revokedArtifactIDs.contains(activeModel.id) {
+                let startedAt = dependencies.clock.nowMilliseconds()
+                do {
+                    try await dependencies.transcriber.prepare(model: activeModel)
+                    await dependencies.diagnostics.log(
+                        .modelLoad(
+                            modelID: activeModel.id,
+                            tier: activeModel.tier,
+                            engine: activeModel.engine.rawValue,
+                            accelerator: activeModel.accelerator.rawValue,
+                            durationMs: max(0, dependencies.clock.nowMilliseconds() - startedAt),
+                            result: "ready"
+                        )
                     )
-                )
-            } catch {
-                await dependencies.diagnostics.log(
-                    .modelLoad(
-                        modelID: activeModel.id,
-                        tier: activeModel.tier,
-                        engine: activeModel.engine.rawValue,
-                        accelerator: activeModel.accelerator.rawValue,
-                        durationMs: max(0, dependencies.clock.nowMilliseconds() - startedAt),
-                        result: "failed"
+                } catch {
+                    await dependencies.diagnostics.log(
+                        .modelLoad(
+                            modelID: activeModel.id,
+                            tier: activeModel.tier,
+                            engine: activeModel.engine.rawValue,
+                            accelerator: activeModel.accelerator.rawValue,
+                            durationMs: max(0, dependencies.clock.nowMilliseconds() - startedAt),
+                            result: "failed"
+                        )
                     )
-                )
-                await logRuntimeFailure(
-                    error,
-                    model: activeModel,
-                    stage: "model_prepare"
-                )
+                    await logRuntimeFailure(
+                        error,
+                        model: activeModel,
+                        stage: "model_prepare"
+                    )
+                }
             }
         }
 
-        await prepareVoiceCleaner(preferences: preferences)
+        let voiceCleaningModel =
+            await prepareVoiceCleaner(preferences: preferences)
 
-        return await refreshReadiness()
+        return await publishPreparedReadiness(
+            preferences: preferences,
+            selectionKey: selectionKey,
+            activeModel: activeModel,
+            installedReadiness: installedReadiness,
+            voiceCleaningModel: voiceCleaningModel
+        )
     }
 
     public func prepareModelSelection(
@@ -213,7 +337,7 @@ public final class AppDictationService {
         purpose: ModelPurpose,
         preferences: AppPreferences
     ) async -> RuntimeModelPreparationResult {
-        guard modelTransactionInProgress else {
+        guard modelTransactionInProgress, !isShuttingDown else {
             return .busy(modelID: modelID)
         }
         guard let model = await resolvedModelSelection(
@@ -322,10 +446,7 @@ public final class AppDictationService {
     public func updateRevokedArtifactIDs(
         _ artifactIDs: Set<String>
     ) async {
-        guard artifactIDs != revokedArtifactIDs else {
-            return
-        }
-        revokedArtifactIDs = artifactIDs
+        replaceRevokedArtifactIDs(artifactIDs)
         let preferences = await dependencies.settings.loadPreferences()
         if let cleanerID = preferences.activeVoiceCleaningModelID,
            artifactIDs.contains(cleanerID),
@@ -336,7 +457,13 @@ public final class AppDictationService {
                 reason: .revoked
             )
         }
-        _ = await refreshReadiness()
+        _ = await refreshReadiness(resolvesVoiceCleaningModel: false)
+    }
+
+    public func replaceRevokedArtifactIDs(
+        _ artifactIDs: Set<String>
+    ) {
+        revokedArtifactIDs = artifactIDs
     }
 
     private func resolvedModelSelection(
@@ -357,10 +484,46 @@ public final class AppDictationService {
 
     @discardableResult
     public func refreshReadiness() async -> ReadinessSnapshot {
+        await refreshReadiness(resolvesVoiceCleaningModel: true)
+    }
+
+    private func refreshReadiness(
+        resolvesVoiceCleaningModel: Bool
+    ) async -> ReadinessSnapshot {
         let preferences = await dependencies.settings.loadPreferences()
-        let permissions = await dependencies.permissions.permissionSnapshot()
+        applyPersistedPreferences(preferences)
+        let selectionKey = ModelSelectionKey(preferences: preferences)
         let activeModel = await dependencies.models.resolveActiveModel(preferences: preferences)
         let installedReadiness = await dependencies.models.readiness(for: activeModel)
+        let voiceCleaningModel: RuntimeActiveModel?
+        if resolvesVoiceCleaningModel {
+            voiceCleaningModel =
+                await resolvePreparedVoiceCleaningModel(
+                    preferences: preferences
+                )
+        } else if let cachedModel = preparedAdmission?.voiceCleaningModel,
+                  !revokedArtifactIDs.contains(cachedModel.id) {
+            voiceCleaningModel = cachedModel
+        } else {
+            voiceCleaningModel = nil
+        }
+        return await publishPreparedReadiness(
+            preferences: preferences,
+            selectionKey: selectionKey,
+            activeModel: activeModel,
+            installedReadiness: installedReadiness,
+            voiceCleaningModel: voiceCleaningModel
+        )
+    }
+
+    private func publishPreparedReadiness(
+        preferences: AppPreferences,
+        selectionKey: ModelSelectionKey,
+        activeModel: RuntimeActiveModel?,
+        installedReadiness: RuntimeModelReadiness,
+        voiceCleaningModel: RuntimeActiveModel?
+    ) async -> ReadinessSnapshot {
+        let permissions = await dependencies.permissions.permissionSnapshot()
         let modelReadiness = await effectiveModelReadiness(
             activeModel: activeModel,
             installedReadiness: installedReadiness
@@ -369,27 +532,63 @@ public final class AppDictationService {
             permissions: permissions,
             model: modelReadiness
         )
+        guard !isShuttingDown,
+              latestPreferences.map({ ModelSelectionKey(preferences: $0) })
+                == selectionKey
+        else {
+            return snapshot
+        }
         readiness = snapshot
+        preparedAdmission = PreparedAdmission(
+            preferences: latestPreferences ?? preferences,
+            selectionKey: selectionKey,
+            transcriptionModel: activeModel,
+            transcriptionStorageReadiness: installedReadiness,
+            voiceCleaningModel: voiceCleaningModel
+        )
         return snapshot
+    }
+
+    private func resolvePreparedVoiceCleaningModel(
+        preferences: AppPreferences
+    ) async -> RuntimeActiveModel? {
+        guard let selectedModelID =
+                preferences.activeVoiceCleaningModelID,
+              !revokedArtifactIDs.contains(selectedModelID),
+              let model =
+                await dependencies.models.resolveActiveVoiceCleaningModel(
+                    preferences: preferences
+                ),
+              !revokedArtifactIDs.contains(model.id),
+              case .ready = await dependencies.models.readiness(for: model)
+        else {
+            return nil
+        }
+        return model
     }
 
     @discardableResult
     public func handleTriggerEvent(_ event: TriggerEvent) async -> TriggerAction {
-        switch event {
-        case .triggerUp, .nonTriggerKeyDown, .escapeKeyDown:
-            targetCaptureToken = nil
-            activationTarget = nil
-        case .triggerDown, .timerFired, .speechDetected:
-            break
+        guard !isShuttingDown else {
+            return .none
         }
-
-        if case .triggerDown = event {
+        if case let .triggerDown(timestampMs) = event {
             guard canStartActivation else {
                 return .none
             }
-            guard await captureTargetAtKeyDown() else {
+            let action = triggerStateMachine.handle(event)
+            guard case let .beginArmedCapture(delayMs) = action else {
                 return .none
             }
+            let beganCapture = await beginArmedCapture(
+                delayMs: delayMs,
+                triggerReceivedAtMs: timestampMs
+            )
+            return beganCapture ? action : .none
+        }
+        if case .triggerUp = event, suppressesNextTriggerRelease {
+            suppressesNextTriggerRelease = false
+            return .none
         }
         if case .triggerUp = event, excludedTriggerIsHeld {
             targetCaptureToken = nil
@@ -400,31 +599,45 @@ public final class AppDictationService {
         }
 
         let action = triggerStateMachine.handle(event)
-        if case .triggerUp = event, action == .none, status == .waitingForActivation {
-            activationTimerToken = nil
-            targetCaptureToken = nil
-            activationTarget = nil
-            resetTriggerStateMachine()
-            status = .idle
+        if action == .finishRecording,
+           capturePhase?.isActivated == false {
+            activateArmedCapture()
         }
-        if case .speechDetected = event,
-           activeSessionID != nil,
-           case .recording = status {
-            status = .recording(speechDetected: true)
+        switch event {
+        case let .triggerUp(timestampMs):
+            if captureTiming?.sessionID == activeSessionID {
+                captureTiming?.triggerReleasedAtMs = timestampMs
+            }
+        case .speechDetected:
+            if captureTiming?.sessionID == activeSessionID {
+                captureTiming?.shortcutGuardSpeechDetected = true
+            }
+            if activeSessionID != nil,
+               case .recording = status {
+                status = .recording(speechDetected: true)
+            }
+        case .triggerDown, .timerFired, .nonTriggerKeyDown,
+             .escapeKeyDown:
+            break
         }
         await handleTriggerAction(action)
         return action
     }
 
     public func handleTriggerAction(_ action: TriggerAction) async {
+        guard !isShuttingDown else {
+            return
+        }
         switch action {
         case .none:
             return
-        case let .startActivationTimer(delayMs):
-            guard canStartActivation else {
-                return
-            }
-            startActivationTimer(delayMs: delayMs)
+        case let .beginArmedCapture(delayMs):
+            _ = await beginArmedCapture(
+                delayMs: delayMs,
+                triggerReceivedAtMs: dependencies.clock.nowMilliseconds()
+            )
+        case .activateRecording:
+            activateArmedCapture()
         case .beginRecording:
             await beginRecording()
         case .cancelAsShortcut:
@@ -432,25 +645,15 @@ public final class AppDictationService {
         case .cancelRecording:
             await cancelActiveSession(reason: .escapeKey)
         case .discardRecording:
-            guard insertionSessionID == nil else {
-                return
-            }
-            activationTimerToken = nil
-            targetCaptureToken = nil
-            activationTarget = nil
-            activeSessionID = nil
-            activeSessionPreferences = nil
-            activeSegmentContext = nil
-            currentSegment = nil
-            resetTriggerStateMachine()
-            await dependencies.audio.discardRecording()
-            status = .cancelled(.noSpeechDetected)
+            await discardArmedCapture()
         case .finishRecording:
             await finishRecording()
         }
     }
 
     public func cancelActiveSession(reason: DictationCancellationReason) async {
+        let timing = captureTiming
+        let retainsProcessingOwnership = processingSessionID != nil
         activationTimerToken = nil
         targetCaptureToken = nil
         activationTarget = nil
@@ -462,11 +665,166 @@ public final class AppDictationService {
 
         activeSessionID = nil
         activeSessionPreferences = nil
-        activeSegmentContext = nil
-        currentSegment = nil
+        if !retainsProcessingOwnership {
+            activeSegmentContext = nil
+            currentSegment = nil
+            capturePhase = nil
+        }
+        captureTiming = nil
         resetTriggerStateMachine()
         await dependencies.audio.discardRecording()
+        sessionProgress = .inactive
         status = .cancelled(reason)
+        if let timing {
+            await logCaptureTiming(
+                timing,
+                outcome: reason == .escapeKey
+                    ? "escape_discarded"
+                    : "shortcut_discarded"
+            )
+        }
+    }
+
+    private func discardArmedCapture() async {
+        guard insertionSessionID == nil else {
+            return
+        }
+        let timing = captureTiming
+        let wasActivated: Bool
+        if let timing,
+           let releasedAtMs = timing.triggerReleasedAtMs,
+           releasedAtMs >= timing.triggerReceivedAtMs {
+            wasActivated = releasedAtMs - timing.triggerReceivedAtMs
+                >= triggerStateMachine.activationDelayMs
+        } else {
+            wasActivated = capturePhase?.isActivated == true
+        }
+        activationTimerToken = nil
+        targetCaptureToken = nil
+        activationTarget = nil
+        activeSessionID = nil
+        activeSessionPreferences = nil
+        activeSegmentContext = nil
+        currentSegment = nil
+        capturePhase = nil
+        captureTiming = nil
+        resetTriggerStateMachine()
+        await dependencies.audio.discardRecording()
+        sessionProgress = .inactive
+        status = .cancelled(
+            wasActivated ? .noSpeechDetected : .releasedBeforeActivation
+        )
+        if let timing {
+            await logCaptureTiming(
+                timing,
+                outcome: wasActivated
+                    ? "empty_capture_discarded"
+                    : "accidental_tap_discarded"
+            )
+        }
+    }
+
+    private func activateArmedCapture() {
+        activationTimerToken = nil
+        guard let capturePhase else {
+            return
+        }
+        switch capturePhase {
+        case let .admitting(sessionID, _):
+            self.capturePhase = .admitting(
+                sessionID: sessionID,
+                activated: true
+            )
+        case let .startingAudio(
+            sessionID,
+            _,
+            finishWhenStarted
+        ):
+            self.capturePhase = .startingAudio(
+                sessionID: sessionID,
+                activated: true,
+                finishWhenStarted: finishWhenStarted
+            )
+        case let .capturing(sessionID, _):
+            self.capturePhase = .capturing(
+                sessionID: sessionID,
+                activated: true
+            )
+            status = .recording(
+                speechDetected: triggerStateMachineSpeechDetected
+            )
+            sessionProgress = recordingSessionProgress()
+        case .finishing:
+            break
+        }
+    }
+
+    private var triggerStateMachineSpeechDetected: Bool {
+        switch triggerStateMachine.state {
+        case let .waitingForActivation(_, speechDetected),
+             let .recording(speechDetected):
+            speechDetected
+        case .idle:
+            false
+        }
+    }
+
+    public func beginShutdown() {
+        guard !isShuttingDown else {
+            return
+        }
+        isShuttingDown = true
+        switch status {
+        case .processing, .inserting:
+            shutdownOwnedArtifactID =
+                currentSegment?.transcriptionArtifactID
+                ?? currentSegment?.voiceCleaningArtifactID
+        case .idle, .waitingForActivation, .recording, .completed,
+             .cancelled, .blocked, .failed:
+            shutdownOwnedArtifactID = nil
+        }
+        activationTimerToken = nil
+        targetCaptureToken = nil
+        activationTarget = nil
+        excludedTriggerIsHeld = false
+        activeSessionID = nil
+        insertionSessionID = nil
+        capturePhase = nil
+        captureTiming = nil
+        resetTriggerStateMachine()
+        sessionProgress = .inactive
+    }
+
+    public func shutdown() async {
+        beginShutdown()
+
+        await discardAudioForShutdown()
+        if shutdownOwnedArtifactID == nil {
+            activeSessionPreferences = nil
+            activeSegmentContext = nil
+            currentSegment = nil
+        }
+        await performPurposeRuntimeTransaction(
+            waitingForCurrentSegmentUsing: shutdownOwnedArtifactID
+        ) {
+            await self.dependencies.transcriber.unload()
+            await self.dependencies.voiceCleaner.unload()
+        }
+        activeSessionPreferences = nil
+        activeSegmentContext = nil
+        currentSegment = nil
+        shutdownOwnedArtifactID = nil
+        voiceCleaningStatus = .disabled
+        status = .idle
+        sessionProgress = .inactive
+    }
+
+    public func discardAudioForShutdown() async {
+        guard isShuttingDown, !didDiscardAudioForShutdown else {
+            return
+        }
+        didDiscardAudioForShutdown = true
+        await dependencies.audio.discardRecording()
     }
 
     public func dismissTerminalStatus() {
@@ -503,125 +861,292 @@ public final class AppDictationService {
         }
     }
 
-    private func beginRecording() async {
-        guard pendingPurposeRuntimeTransactions == 0,
-              !modelTransactionInProgress,
-              !hasActiveDictationWork else {
-            return
+    private func beginArmedCapture(
+        delayMs: Int,
+        triggerReceivedAtMs: Int
+    ) async -> Bool {
+        guard canStartActivation else {
+            return false
         }
-
-        if activationTarget == nil {
-            activationTarget = await dependencies.targetCapturer.currentTargetIdentity()
-        }
-        guard let capturedTarget = activationTarget else {
-            resetTriggerStateMachine()
-            status = .idle
-            return
-        }
-
         let sessionID = UUID()
+        sessionEndReason = .triggerReleased
+        suppressesNextTriggerRelease = false
+        sessionProgress = .inactive
         activeSessionID = sessionID
         activeSessionPreferences = nil
-        activationTimerToken = nil
-        let snapshot = await refreshReadiness()
-        guard activeSessionID == sessionID else {
+        activeSegmentContext = nil
+        capturePhase = .admitting(
+            sessionID: sessionID,
+            activated: false
+        )
+        captureTiming = CaptureTiming(
+            sessionID: sessionID,
+            triggerReceivedAtMs: triggerReceivedAtMs
+        )
+        let nowMs = dependencies.clock.nowMilliseconds()
+        let elapsedMs = nowMs >= triggerReceivedAtMs
+            ? nowMs - triggerReceivedAtMs
+            : 0
+        startActivationTimer(delayMs: max(0, delayMs - elapsedMs))
+        return await admitAndStartCapture(
+            sessionID: sessionID,
+            refreshPreparedAdmission: preparedAdmission == nil
+        )
+    }
+
+    private func beginRecording() async {
+        guard canStartActivation else {
             return
+        }
+        let sessionID = UUID()
+        sessionEndReason = .triggerReleased
+        suppressesNextTriggerRelease = false
+        sessionProgress = .inactive
+        activeSessionID = sessionID
+        activeSessionPreferences = nil
+        activeSegmentContext = nil
+        capturePhase = .admitting(
+            sessionID: sessionID,
+            activated: true
+        )
+        captureTiming = nil
+        _ = await refreshReadiness()
+        guard isCurrentCapture(sessionID) else {
+            return
+        }
+        _ = await admitAndStartCapture(
+            sessionID: sessionID,
+            refreshPreparedAdmission: false,
+            validatesLiveAdmission: false
+        )
+    }
+
+    private func admitAndStartCapture(
+        sessionID: UUID,
+        refreshPreparedAdmission: Bool,
+        validatesLiveAdmission: Bool = true
+    ) async -> Bool {
+        let targetToken = UUID()
+        targetCaptureToken = targetToken
+        let capturedTarget =
+            await dependencies.targetCapturer.currentTargetIdentity()
+        guard isCurrentCapture(sessionID),
+              targetCaptureToken == targetToken
+        else {
+            return false
+        }
+        targetCaptureToken = nil
+        guard let capturedTarget else {
+            failCaptureAdmission(sessionID: sessionID, status: .idle)
+            return false
         }
 
-        if let blocker = snapshot.blockers.first {
-            activeSessionID = nil
-            activationTarget = nil
-            resetTriggerStateMachine()
-            status = .blocked(.readinessBlocked(blocker))
-            return
+        if refreshPreparedAdmission {
+            _ = await refreshReadiness()
+            guard isCurrentCapture(sessionID) else {
+                return false
+            }
+        }
+        guard let initialAdmission = preparedAdmission else {
+            failCaptureAdmission(
+                sessionID: sessionID,
+                status: .blocked(
+                    .readinessBlocked(
+                        readiness.blockers.first ?? .noActiveModel
+                    )
+                )
+            )
+            return false
+        }
+        guard !Self.isExcluded(
+            capturedTarget,
+            by: initialAdmission.preferences
+        ) else {
+            failCaptureAdmission(
+                sessionID: sessionID,
+                status: .blocked(.excludedApp),
+                keepsExcludedTriggerHeld: true
+            )
+            Task { [diagnostics = dependencies.diagnostics] in
+                await diagnostics.log(.dictationBlockedExcludedApp)
+            }
+            return false
         }
 
-        let preferences = await dependencies.settings.loadPreferences()
-        guard activeSessionID == sessionID else {
-            return
+        let liveSnapshot: ReadinessSnapshot
+        if validatesLiveAdmission {
+            let permissions =
+                await dependencies.permissions.permissionSnapshot()
+            guard isCurrentCapture(sessionID) else {
+                return false
+            }
+            let modelReadiness = await effectiveModelReadiness(
+                activeModel: initialAdmission.transcriptionModel,
+                installedReadiness:
+                    initialAdmission.transcriptionStorageReadiness
+            )
+            guard isCurrentCapture(sessionID) else {
+                return false
+            }
+            liveSnapshot = ReadinessSnapshot(
+                permissions: permissions,
+                model: modelReadiness
+            )
+            readiness = liveSnapshot
+        } else {
+            liveSnapshot = readiness
         }
-        if Self.isExcluded(capturedTarget, by: preferences) {
-            activeSessionID = nil
-            self.activationTarget = nil
-            resetTriggerStateMachine()
-            status = .blocked(.excludedApp)
-            return
-        }
-        guard let activeModel = await dependencies.models.resolveActiveModel(preferences: preferences) else {
-            activeSessionID = nil
-            activationTarget = nil
-            resetTriggerStateMachine()
-            status = .blocked(.readinessBlocked(.noActiveModel))
-            return
-        }
-        guard !revokedArtifactIDs.contains(activeModel.id) else {
-            activeSessionID = nil
-            activationTarget = nil
-            resetTriggerStateMachine()
-            status = .blocked(
-                .readinessBlocked(
-                    .activeModelRevoked(modelID: activeModel.id)
+        guard let admission = preparedAdmission,
+              admission.selectionKey == initialAdmission.selectionKey
+        else {
+            failCaptureAdmission(
+                sessionID: sessionID,
+                status: .blocked(
+                    .readinessBlocked(.noActiveModel)
                 )
             )
-            return
+            return false
         }
-        let voiceCleaningModel =
-            await admittedVoiceCleaningModel(preferences: preferences)
+        if let blocker = liveSnapshot.blockers.first {
+            failCaptureAdmission(
+                sessionID: sessionID,
+                status: .blocked(.readinessBlocked(blocker))
+            )
+            return false
+        }
+        guard let activeModel = admission.transcriptionModel else {
+            failCaptureAdmission(
+                sessionID: sessionID,
+                status: .blocked(.readinessBlocked(.noActiveModel))
+            )
+            return false
+        }
+        guard !Self.isExcluded(capturedTarget, by: admission.preferences)
+        else {
+            failCaptureAdmission(
+                sessionID: sessionID,
+                status: .blocked(.excludedApp),
+                keepsExcludedTriggerHeld: true
+            )
+            Task { [diagnostics = dependencies.diagnostics] in
+                await diagnostics.log(.dictationBlockedExcludedApp)
+            }
+            return false
+        }
         guard !revokedArtifactIDs.contains(activeModel.id) else {
-            activeSessionID = nil
-            activationTarget = nil
-            resetTriggerStateMachine()
-            status = .blocked(
-                .readinessBlocked(
-                    .activeModelRevoked(modelID: activeModel.id)
+            failCaptureAdmission(
+                sessionID: sessionID,
+                status: .blocked(
+                    .readinessBlocked(
+                        .activeModelRevoked(modelID: activeModel.id)
+                    )
                 )
             )
-            return
+            return false
         }
-        let admittedVoiceCleaningModel: RuntimeActiveModel?
-        if let voiceCleaningModel,
-           revokedArtifactIDs.contains(voiceCleaningModel.id) {
+
+        let voiceCleaningModel: RuntimeActiveModel?
+        if let preparedCleaner = admission.voiceCleaningModel,
+           revokedArtifactIDs.contains(preparedCleaner.id) {
             voiceCleaningStatus = .warning(
-                modelID: voiceCleaningModel.id,
+                modelID: preparedCleaner.id,
                 reason: .revoked
             )
-            admittedVoiceCleaningModel = nil
+            voiceCleaningModel = nil
         } else {
-            admittedVoiceCleaningModel = voiceCleaningModel
+            voiceCleaningModel = admission.voiceCleaningModel
         }
+
+        // No suspension is allowed between this final revocation check and
+        // claiming Current Segment ownership for the armed capture.
+        guard isCurrentCapture(sessionID) else {
+            return false
+        }
+        guard !modelTransactionInProgress,
+              pendingPurposeRuntimeTransactions == 0
+        else {
+            failCaptureAdmission(sessionID: sessionID, status: .idle)
+            return false
+        }
+        guard !revokedArtifactIDs.contains(activeModel.id) else {
+            failCaptureAdmission(
+                sessionID: sessionID,
+                status: .blocked(
+                    .readinessBlocked(
+                        .activeModelRevoked(modelID: activeModel.id)
+                    )
+                )
+            )
+            return false
+        }
+        activationTarget = capturedTarget
         activeSessionPreferences = (
             sessionID: sessionID,
-            preferences: preferences
+            preferences: admission.preferences
         )
         activeSegmentContext = (
             sessionID: sessionID,
             transcriptionModel: activeModel,
-            voiceCleaningModel: admittedVoiceCleaningModel
+            voiceCleaningModel: voiceCleaningModel
         )
         currentSegment = RuntimeCurrentSegment(
             transcriptionArtifactID: activeModel.id,
-            voiceCleaningArtifactID: admittedVoiceCleaningModel?.id
+            voiceCleaningArtifactID: voiceCleaningModel?.id
         )
+        let activated = capturePhase?.isActivated == true
+        capturePhase = .startingAudio(
+            sessionID: sessionID,
+            activated: activated,
+            finishWhenStarted: false
+        )
+        pendingAudioStartSessionID = sessionID
+        captureTiming?.captureRequestedAtMs =
+            dependencies.clock.nowMilliseconds()
 
+        let clock = dependencies.clock
+        let captureStartedAtMs = captureTiming?.captureStartedAtMs
+        let firstAudioAtMs = captureTiming?.firstAudioAtMs
         do {
             try await dependencies.audio.startRecording(
-                microphone: preferences.microphoneSelection,
-                maximumDurationSeconds: Double(activeModel.runtimeParameters.maxAudioSeconds),
+                microphone: admission.preferences.microphoneSelection,
+                maximumDurationSeconds:
+                    DictationSessionLimits.maximumDurationSeconds,
+                onCaptureStarted: {
+                    captureStartedAtMs?.recordOnce(
+                        clock.nowMilliseconds()
+                    )
+                },
+                onFirstAudio: { firstSampleUptimeMilliseconds in
+                    firstAudioAtMs?.recordOnce(
+                        firstSampleUptimeMilliseconds
+                    )
+                },
                 onSpeechDetected: { [weak self] in
                     Task { @MainActor in
-                        guard let self, self.activeSessionID == sessionID else {
+                        guard let self,
+                              self.activeSessionID == sessionID
+                        else {
                             return
                         }
-
                         _ = await self.handleTriggerEvent(
-                            .speechDetected(timestampMs: self.dependencies.clock.nowMilliseconds())
+                            .speechDetected(
+                                timestampMs:
+                                    self.dependencies.clock.nowMilliseconds()
+                            )
                         )
                     }
                 },
                 onMaximumDurationReached: { [weak self] in
                     Task { @MainActor in
-                        guard let self, self.activeSessionID == sessionID else {
+                        guard let self,
+                              self.activeSessionID == sessionID
+                        else {
                             return
+                        }
+                        self.sessionEndReason = .sessionLimitReached
+                        if self.captureTiming != nil {
+                            self.suppressesNextTriggerRelease = true
+                            self.resetTriggerStateMachine()
                         }
                         await self.handleTriggerAction(.finishRecording)
                     }
@@ -636,23 +1161,102 @@ public final class AppDictationService {
                 }
             )
 
-            guard activeSessionID == sessionID else {
+            guard activeSessionID == sessionID,
+                  let capturePhase,
+                  case let .startingAudio(
+                      phaseSessionID,
+                      activated,
+                      finishWhenStarted
+                  ) = capturePhase,
+                  phaseSessionID == sessionID
+            else {
                 await dependencies.audio.discardRecording()
-                return
+                clearPendingAudioStart(sessionID: sessionID)
+                return false
             }
-            status = .recording(speechDetected: false)
+            clearPendingAudioStart(sessionID: sessionID)
+            self.capturePhase = .capturing(
+                sessionID: sessionID,
+                activated: activated
+            )
+            if activated {
+                status = .recording(
+                    speechDetected: triggerStateMachineSpeechDetected
+                )
+                sessionProgress = recordingSessionProgress()
+            }
+            if finishWhenStarted {
+                await finishRecording()
+            }
+            return true
         } catch {
-            guard activeSessionID == sessionID else {
-                return
+            clearPendingAudioStart(sessionID: sessionID)
+            guard isCurrentCapture(sessionID) else {
+                return false
             }
-            activeSessionID = nil
-            activeSessionPreferences = nil
-            activeSegmentContext = nil
-            currentSegment = nil
-            activationTarget = nil
+            let timing = captureTiming
+            clearCaptureState(sessionID: sessionID)
             resetTriggerStateMachine()
             status = Self.status(forAudioStartError: error)
+            if let timing {
+                await logCaptureTiming(
+                    timing,
+                    outcome: "capture_start_failed"
+                )
+            }
+            return false
         }
+    }
+
+    private func isCurrentCapture(_ sessionID: UUID) -> Bool {
+        !isShuttingDown
+            && activeSessionID == sessionID
+            && capturePhase?.sessionID == sessionID
+    }
+
+    private func clearPendingAudioStart(sessionID: UUID) {
+        if pendingAudioStartSessionID == sessionID {
+            pendingAudioStartSessionID = nil
+        }
+    }
+
+    private func failCaptureAdmission(
+        sessionID: UUID,
+        status: DictationRuntimeStatus,
+        keepsExcludedTriggerHeld: Bool = false
+    ) {
+        guard isCurrentCapture(sessionID) else {
+            return
+        }
+        activationTimerToken = nil
+        targetCaptureToken = nil
+        activationTarget = nil
+        activeSessionID = nil
+        activeSessionPreferences = nil
+        activeSegmentContext = nil
+        currentSegment = nil
+        capturePhase = nil
+        captureTiming = nil
+        excludedTriggerIsHeld = keepsExcludedTriggerHeld
+        resetTriggerStateMachine()
+        sessionProgress = .inactive
+        self.status = status
+    }
+
+    private func clearCaptureState(sessionID: UUID) {
+        guard activeSessionID == sessionID else {
+            return
+        }
+        activationTimerToken = nil
+        targetCaptureToken = nil
+        activationTarget = nil
+        activeSessionID = nil
+        activeSessionPreferences = nil
+        activeSegmentContext = nil
+        currentSegment = nil
+        capturePhase = nil
+        captureTiming = nil
+        sessionProgress = .inactive
     }
 
     private func handleRecordingError(
@@ -670,6 +1274,7 @@ public final class AppDictationService {
             return
         }
 
+        let timing = captureTiming
         activationTimerToken = nil
         targetCaptureToken = nil
         activationTarget = nil
@@ -677,17 +1282,70 @@ public final class AppDictationService {
         activeSessionPreferences = nil
         activeSegmentContext = nil
         currentSegment = nil
+        capturePhase = nil
+        captureTiming = nil
         resetTriggerStateMachine()
+        sessionProgress = .inactive
         status = Self.status(forAudioFinishError: error)
         await dependencies.audio.discardRecording()
+        if let timing {
+            await logCaptureTiming(timing, outcome: "recording_error")
+        }
     }
 
     private func finishRecording() async {
         guard let sessionID = activeSessionID else {
-            status = .idle
             return
         }
-        guard case .recording = status else {
+        if case let .startingAudio(
+            phaseSessionID,
+            true,
+            _
+        ) = capturePhase,
+           phaseSessionID == sessionID {
+            capturePhase = .startingAudio(
+                sessionID: sessionID,
+                activated: true,
+                finishWhenStarted: true
+            )
+            activationTimerToken = nil
+            return
+        }
+        switch status {
+        case .recording:
+            break
+        case .waitingForActivation:
+            let timing = captureTiming
+            clearCaptureState(sessionID: sessionID)
+            resetTriggerStateMachine()
+            await dependencies.audio.discardRecording()
+            status = .cancelled(.noSpeechDetected)
+            if let timing {
+                await logCaptureTiming(
+                    timing,
+                    outcome: "capture_start_failed"
+                )
+            }
+            return
+        case .idle, .processing, .inserting, .completed, .cancelled,
+             .blocked, .failed:
+            return
+        }
+        guard let capturePhase,
+              capturePhase.sessionID == sessionID,
+              case .capturing(_, true) = capturePhase
+        else {
+            let timing = self.captureTiming
+            clearCaptureState(sessionID: sessionID)
+            resetTriggerStateMachine()
+            await dependencies.audio.discardRecording()
+            status = .cancelled(.noSpeechDetected)
+            if let timing {
+                await logCaptureTiming(
+                    timing,
+                    outcome: "capture_start_failed"
+                )
+            }
             return
         }
         if modelTransactionInProgress {
@@ -703,101 +1361,153 @@ public final class AppDictationService {
               let segmentContext = activeSegmentContext,
               segmentContext.sessionID == sessionID
         else {
-            activeSessionID = nil
-            activeSegmentContext = nil
-            currentSegment = nil
-            activationTarget = nil
+            let timing = captureTiming
+            clearCaptureState(sessionID: sessionID)
+            resetTriggerStateMachine()
+            await dependencies.audio.discardRecording()
             status = .failed(.transcriptionFailed)
+            if let timing {
+                await logCaptureTiming(timing, outcome: "recording_error")
+            }
             return
         }
         defer {
             if activeSessionPreferences?.sessionID == sessionID {
                 activeSessionPreferences = nil
             }
+            if self.processingSessionID == sessionID {
+                self.processingSessionID = nil
+            }
             if activeSegmentContext?.sessionID == sessionID {
                 activeSegmentContext = nil
                 currentSegment = nil
+            }
+            if self.capturePhase?.sessionID == sessionID {
+                self.capturePhase = nil
+            }
+            if self.captureTiming?.sessionID == sessionID {
+                self.captureTiming = nil
             }
         }
         let preferences = sessionPreferences.preferences
 
         activationTimerToken = nil
+        self.capturePhase = .finishing(sessionID: sessionID)
+        processingSessionID = sessionID
         status = .processing
+        sessionProgress = .processing(
+            completedWindows: 0,
+            totalWindows: 0,
+            endReason: sessionEndReason
+        )
 
         do {
-            let audio = try await dependencies.audio.finishRecording()
+            let capturedAudio = try await dependencies.audio.finishRecording()
             guard activeSessionID == sessionID else {
                 return
             }
+            let audio = EdgeSilenceTrimmer().trim(capturedAudio)
             guard !audio.isEmpty else {
+                if let timing = captureTiming {
+                    captureTiming = nil
+                    await logCaptureTiming(
+                        timing,
+                        outcome: "empty_capture_discarded"
+                    )
+                }
                 activeSessionID = nil
                 activationTarget = nil
+                sessionProgress = .inactive
                 status = .cancelled(.noSpeechDetected)
                 return
             }
 
+            if let timing = captureTiming {
+                captureTiming = nil
+                await logCaptureTiming(
+                    timing,
+                    outcome: "submitted_to_asr"
+                )
+            }
+
             let activeModel = segmentContext.transcriptionModel
-
+            let processor = RuntimeDictationSessionProcessor(
+                transcriber: dependencies.transcriber,
+                voiceCleaner: dependencies.voiceCleaner,
+                clock: dependencies.clock
+            )
+            let sessionOutcome: RuntimeDictationSessionOutcome
             do {
-                try await dependencies.transcriber.prepare(model: activeModel)
-            } catch {
-                await logRuntimeFailure(
-                    error,
-                    model: activeModel,
-                    stage: "model_prepare"
+                sessionOutcome = try await processor.process(
+                    audio: audio,
+                    transcriptionModel: activeModel,
+                    voiceCleaningModel: segmentContext.voiceCleaningModel,
+                    progress: { [weak self] completedWindows, totalWindows in
+                        await self?.updateSessionProgress(
+                            sessionID: sessionID,
+                            completedWindows: completedWindows,
+                            totalWindows: totalWindows
+                        )
+                    },
+                    shouldContinue: { [weak self] in
+                        guard let self else {
+                            return false
+                        }
+                        return await self.processingMayContinue(
+                            sessionID: sessionID
+                        )
+                    }
                 )
-                throw error
+            } catch let error as RuntimeDictationSessionError {
+                let stage: String
+                switch error.stage {
+                case .transcriberPreparation:
+                    stage = "model_prepare"
+                case .transcription:
+                    stage = "inference"
+                }
+                await logRuntimeFailure(
+                    error.underlyingError,
+                    model: activeModel,
+                    stage: stage
+                )
+                throw error.underlyingError
             }
             guard activeSessionID == sessionID else {
                 return
             }
 
-            let transcriptionAudio = TranscriptionAudioBuffer(
-                sampleRate: audio.sampleRate,
-                channelCount: audio.channelCount,
-                samples: audio.samples
-            )
-            let preparedAudio = await voiceCleanedAudio(
-                transcriptionAudio,
-                model: segmentContext.voiceCleaningModel
-            )
-            let inferenceStartedAt = dependencies.clock.nowMilliseconds()
-            let result: TranscriptionResult
-            do {
-                result = try await dependencies.transcriber.transcribe(preparedAudio)
-            } catch {
-                await logRuntimeFailure(
-                    error,
-                    model: activeModel,
-                    stage: "inference"
-                )
-                throw error
-            }
-            let inferenceDurationMs = max(
-                0,
-                dependencies.clock.nowMilliseconds() - inferenceStartedAt
-            )
-            guard activeSessionID == sessionID else {
-                return
-            }
-            let shouldDiscard = HallucinationFilter().shouldDiscard(
-                text: result.text,
-                noSpeechProbability: result.noSpeechProbability,
-                averageLogProbability: result.averageLogProbability,
-                compressionRatio: result.compressionRatio
-            )
-            if shouldDiscard {
+            let completion: RuntimeDictationSessionCompletion
+            switch sessionOutcome {
+            case let .discarded(discard):
+                await applyVoiceCleaningSummary(discard.voiceCleaning)
+                guard activeSessionID == sessionID else {
+                    return
+                }
                 await dependencies.diagnostics.log(
                     .transcriptionDiscarded(
                         modelID: activeModel.id,
-                        noSpeechProbability: result.noSpeechProbability,
-                        averageLogProbability: result.averageLogProbability,
-                        compressionRatio: result.compressionRatio
+                        noSpeechProbability:
+                            discard.rejectedWindow.noSpeechProbability,
+                        averageLogProbability:
+                            discard.rejectedWindow.averageLogProbability,
+                        compressionRatio:
+                            discard.rejectedWindow.compressionRatio
                     )
                 )
+                guard activeSessionID == sessionID else {
+                    return
+                }
                 activeSessionID = nil
                 activationTarget = nil
+                sessionProgress = .inactive
                 status = .idle
+                return
+            case let .completed(value):
+                completion = value
+            }
+            await applyVoiceCleaningSummary(completion.voiceCleaning)
+            guard activeSessionID == sessionID else {
                 return
             }
             await dependencies.diagnostics.log(
@@ -807,13 +1517,19 @@ public final class AppDictationService {
                     accelerator: activeModel.accelerator.rawValue,
                     backendReadiness: "ready",
                     audioDurationMs: max(0, Int(audio.durationSeconds * 1_000)),
-                    inferenceDurationMs: inferenceDurationMs,
-                    textLengthBucket: Self.textLengthBucket(for: result.text.count)
+                    inferenceDurationMs: completion.inferenceDurationMs,
+                    textLengthBucket:
+                        Self.textLengthBucket(for: completion.text.count),
+                    windowCount: completion.windowCount,
+                    terminationReason: sessionEndReason.rawValue
                 )
             )
+            guard activeSessionID == sessionID else {
+                return
+            }
 
             let processed = await dependencies.postProcessor
-                .process(rawText: result.text, preferences: preferences)
+                .process(rawText: completion.text, preferences: preferences)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             guard activeSessionID == sessionID else {
                 return
@@ -821,6 +1537,7 @@ public final class AppDictationService {
             guard !processed.isEmpty else {
                 activeSessionID = nil
                 activationTarget = nil
+                sessionProgress = .inactive
                 status = .idle
                 return
             }
@@ -848,6 +1565,7 @@ public final class AppDictationService {
             activeSessionID = nil
             insertionSessionID = nil
             self.activationTarget = nil
+            sessionProgress = .inactive
             switch outcome {
             case .pasted, .typed:
                 status = .completed(textLengthBucket: Self.textLengthBucket(for: processed.count))
@@ -858,13 +1576,34 @@ public final class AppDictationService {
             case .notInserted:
                 status = .failed(.insertionFailed)
             }
-        } catch let error as LiveAudioRecorderError {
+        } catch RuntimeDictationSessionInterruption.cancelled {
             guard activeSessionID == sessionID else {
                 return
             }
             activeSessionID = nil
             insertionSessionID = nil
             activationTarget = nil
+            sessionProgress = .inactive
+            if !isShuttingDown {
+                status = .idle
+            }
+        } catch let error as LiveAudioRecorderError {
+            guard activeSessionID == sessionID else {
+                return
+            }
+            if let timing = captureTiming {
+                captureTiming = nil
+                await logCaptureTiming(
+                    timing,
+                    outcome: error == .emptyRecording
+                        ? "empty_capture_discarded"
+                        : "recording_error"
+                )
+            }
+            activeSessionID = nil
+            insertionSessionID = nil
+            activationTarget = nil
+            sessionProgress = .inactive
             status = Self.status(forAudioFinishError: error)
         } catch is WhisperRuntimeError {
             guard activeSessionID == sessionID else {
@@ -873,6 +1612,7 @@ public final class AppDictationService {
             activeSessionID = nil
             insertionSessionID = nil
             activationTarget = nil
+            sessionProgress = .inactive
             status = .failed(.transcriptionFailed)
         } catch {
             guard activeSessionID == sessionID else {
@@ -881,15 +1621,18 @@ public final class AppDictationService {
             activeSessionID = nil
             insertionSessionID = nil
             activationTarget = nil
+            sessionProgress = .inactive
             status = .failed(.transcriptionFailed)
         }
     }
 
-    private func prepareVoiceCleaner(preferences: AppPreferences) async {
+    private func prepareVoiceCleaner(
+        preferences: AppPreferences
+    ) async -> RuntimeActiveModel? {
         guard let selectedModelID = preferences.activeVoiceCleaningModelID else {
             await dependencies.voiceCleaner.unload()
             voiceCleaningStatus = .disabled
-            return
+            return nil
         }
         guard let model = await dependencies.models.resolveActiveVoiceCleaningModel(
             preferences: preferences
@@ -899,7 +1642,7 @@ public final class AppDictationService {
                 modelID: selectedModelID,
                 reason: .modelUnavailable
             )
-            return
+            return nil
         }
         guard !revokedArtifactIDs.contains(model.id) else {
             await dependencies.voiceCleaner.unload()
@@ -907,7 +1650,7 @@ public final class AppDictationService {
                 modelID: model.id,
                 reason: .revoked
             )
-            return
+            return nil
         }
 
         voiceCleaningStatus = .preparing(modelID: model.id)
@@ -932,82 +1675,77 @@ public final class AppDictationService {
                 )
             )
         }
+        return model
     }
 
-    private func voiceCleanedAudio(
-        _ audio: TranscriptionAudioBuffer,
-        model: RuntimeActiveModel?
-    ) async -> TranscriptionAudioBuffer {
-        guard let model else {
+    private func applyVoiceCleaningSummary(
+        _ summary: RuntimeDictationSessionVoiceCleaningSummary
+    ) async {
+        guard let modelID = summary.modelID else {
             if case .warning(_, reason: .revoked) = voiceCleaningStatus {
-                return audio
+                return
             }
             if voiceCleaningStatus != .disabled {
                 await dependencies.voiceCleaner.unload()
                 voiceCleaningStatus = .disabled
             }
-            return audio
+            return
         }
 
-        let startedAt = dependencies.clock.nowMilliseconds()
-        do {
-            try await dependencies.voiceCleaner.prepare(model: model)
-            let cleaned = try await dependencies.voiceCleaner.clean(audio)
-            voiceCleaningStatus = .ready(modelID: model.id)
-            await dependencies.diagnostics.log(
-                .voiceCleaning(
-                    modelID: model.id,
-                    durationMs: max(0, dependencies.clock.nowMilliseconds() - startedAt),
-                    result: "cleaned"
-                )
+        let result: String
+        if summary.usedRawFallback {
+            voiceCleaningStatus = .warning(
+                modelID: modelID,
+                reason: .processingFailed
             )
-            return cleaned
-        } catch {
-            voiceCleaningStatus = .warning(modelID: model.id, reason: .processingFailed)
-            await dependencies.diagnostics.log(
-                .voiceCleaning(
-                    modelID: model.id,
-                    durationMs: max(0, dependencies.clock.nowMilliseconds() - startedAt),
-                    result: "raw_audio_fallback"
-                )
-            )
-            return audio
+            result = "raw_audio_fallback"
+        } else {
+            voiceCleaningStatus = .ready(modelID: modelID)
+            result = "cleaned"
         }
+        await dependencies.diagnostics.log(
+            .voiceCleaning(
+                modelID: modelID,
+                durationMs: summary.durationMs,
+                result: result
+            )
+        )
     }
 
-    private func admittedVoiceCleaningModel(
-        preferences: AppPreferences
-    ) async -> RuntimeActiveModel? {
-        guard let selectedModelID =
-                preferences.activeVoiceCleaningModelID
+    private func updateSessionProgress(
+        sessionID: UUID,
+        completedWindows: Int,
+        totalWindows: Int
+    ) {
+        guard activeSessionID == sessionID,
+              case .processing = status
         else {
-            return nil
+            return
         }
-        guard !revokedArtifactIDs.contains(selectedModelID) else {
-            await dependencies.voiceCleaner.unload()
-            voiceCleaningStatus = .warning(
-                modelID: selectedModelID,
-                reason: .revoked
-            )
-            return nil
-        }
-        guard let model =
-                await dependencies.models.resolveActiveVoiceCleaningModel(
-                    preferences: preferences
-                ),
-              case .ready = await dependencies.models.readiness(for: model)
-        else {
-            return nil
-        }
-        guard !revokedArtifactIDs.contains(model.id) else {
-            await dependencies.voiceCleaner.unload()
-            voiceCleaningStatus = .warning(
-                modelID: model.id,
-                reason: .revoked
-            )
-            return nil
-        }
-        return model
+        sessionProgress = .processing(
+            completedWindows: max(0, completedWindows),
+            totalWindows: max(0, totalWindows),
+            endReason: sessionEndReason
+        )
+    }
+
+    private func processingMayContinue(sessionID: UUID) -> Bool {
+        !isShuttingDown
+            && processingSessionID == sessionID
+            && activeSessionID == sessionID
+    }
+
+    private func recordingSessionProgress() -> DictationSessionProgress {
+        let startedAtMilliseconds =
+            captureTiming?.captureStartedAtMs.value()
+            ?? dependencies.clock.nowMilliseconds()
+        let maximumDurationMilliseconds = Int(
+            DictationSessionLimits.maximumDurationSeconds * 1_000
+        )
+        return .recording(
+            deadlineUptimeMilliseconds:
+                startedAtMilliseconds + maximumDurationMilliseconds
+        )
     }
 
     private func logRuntimeFailure(
@@ -1026,44 +1764,46 @@ public final class AppDictationService {
         )
     }
 
-    private var canStartActivation: Bool {
-        targetCaptureToken == nil
-            && !modelTransactionInProgress
-            && pendingPurposeRuntimeTransactions == 0
-            && !hasActiveDictationWork
-            && status != .waitingForActivation
+    private func logCaptureTiming(
+        _ timing: CaptureTiming,
+        outcome: String
+    ) async {
+        func duration(from timestampMs: Int?) -> Int? {
+            timestampMs.map {
+                max(0, $0 - timing.triggerReceivedAtMs)
+            }
+        }
+
+        await dependencies.diagnostics.log(
+            .dictationCaptureTiming(
+                triggerToCaptureRequestMs: duration(
+                    from: timing.captureRequestedAtMs
+                ),
+                triggerToCaptureStartMs: duration(
+                    from: timing.captureStartedAtMs.value()
+                ),
+                triggerToFirstAudioMs: duration(
+                    from: timing.firstAudioAtMs.value()
+                ),
+                triggerHoldDurationMs: duration(
+                    from: timing.triggerReleasedAtMs
+                ),
+                shortcutGuardSpeechDetected:
+                    timing.shortcutGuardSpeechDetected,
+                preASROutcome: outcome
+            )
+        )
     }
 
-    private func captureTargetAtKeyDown() async -> Bool {
-        let token = UUID()
-        targetCaptureToken = token
-        let target = await dependencies.targetCapturer.currentTargetIdentity()
-        guard targetCaptureToken == token else {
-            return false
-        }
-        guard let target else {
-            targetCaptureToken = nil
-            return false
-        }
-
-        let preferences = await dependencies.settings.loadPreferences()
-        guard targetCaptureToken == token else {
-            return false
-        }
-        targetCaptureToken = nil
-        guard !Self.isExcluded(target, by: preferences) else {
-            activationTarget = nil
-            excludedTriggerIsHeld = true
-            status = .blocked(.excludedApp)
-            Task { [diagnostics = dependencies.diagnostics] in
-                await diagnostics.log(.dictationBlockedExcludedApp)
-            }
-            return false
-        }
-
-        activationTarget = target
-        excludedTriggerIsHeld = false
-        return true
+    private var canStartActivation: Bool {
+        !isShuttingDown
+            && targetCaptureToken == nil
+            && pendingAudioStartSessionID == nil
+            && !modelTransactionInProgress
+            && pendingPurposeRuntimeTransactions == 0
+            && processingSessionID == nil
+            && !hasActiveDictationWork
+            && status != .waitingForActivation
     }
 
     private static func isExcluded(
@@ -1079,7 +1819,9 @@ public final class AppDictationService {
     }
 
     private var hasActiveDictationWork: Bool {
-        if activeSessionID != nil || insertionSessionID != nil {
+        if activeSessionID != nil
+            || processingSessionID != nil
+            || insertionSessionID != nil {
             return true
         }
 

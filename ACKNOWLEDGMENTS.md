@@ -28,6 +28,15 @@ downloads and are licensed under Apache-2.0.
 
 Whisper was developed and released by OpenAI. Canary-Qwen and the English,
 multilingual, and Japanese Parakeet models were released by NVIDIA.
+Nyra Labs and nyra health GmbH developed and released CrisperWhisper 2.0. The
+GGML conversions are published by drbaph. Textify's shim adapts focused decoder
+logic from the MIT-licensed CrisperWhisper.cpp project while continuing to use
+Textify's pinned whisper.cpp/Metal runtime. The standard public model
+repositories retain Nyra's noncommercial terms for the model weights and
+generated outputs, and Textify keeps those terms available offline. Textify's
+release of these catalog entries depends on its separate commercial grant from
+nyra health GmbH; this acknowledgment does not replace or change the public
+upstream terms.
 Paraformer-large Chinese and SenseVoiceSmall come from the FunASR/ModelScope
 ecosystem; Textify retains the SenseVoice name and attribution as required by
 its model license.

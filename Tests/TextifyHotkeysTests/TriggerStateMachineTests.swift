@@ -14,21 +14,44 @@ final class TriggerStateMachineTests: XCTestCase {
         for trigger in TriggerPreference.allCases {
             var machine = TriggerStateMachine(trigger: trigger)
 
-            XCTAssertEqual(machine.handle(.triggerDown(timestampMs: 0)), .startActivationTimer(delayMs: 250))
+            XCTAssertEqual(machine.handle(.triggerDown(timestampMs: 0)), .beginArmedCapture(delayMs: 250))
         }
     }
 
     func testRightCommandHoldActivatesAfterThreshold() {
         var machine = TriggerStateMachine(trigger: .rightCommand)
-        XCTAssertEqual(machine.handle(.triggerDown(timestampMs: 0)), .startActivationTimer(delayMs: 250))
-        XCTAssertEqual(machine.handle(.timerFired(timestampMs: 250)), .beginRecording)
+        XCTAssertEqual(machine.handle(.triggerDown(timestampMs: 0)), .beginArmedCapture(delayMs: 250))
+        XCTAssertEqual(machine.handle(.timerFired(timestampMs: 250)), .activateRecording)
     }
 
-    func testTriggerReleaseBeforeThresholdDoesNothing() {
+    func testTriggerReleaseBeforeThresholdDiscardsArmedCapture() {
         var machine = TriggerStateMachine(trigger: .rightCommand)
         _ = machine.handle(.triggerDown(timestampMs: 0))
 
-        XCTAssertEqual(machine.handle(.triggerUp(timestampMs: 120)), .none)
+        XCTAssertEqual(machine.handle(.triggerUp(timestampMs: 120)), .discardRecording)
+        XCTAssertEqual(machine.state, .idle)
+    }
+
+    func testTriggerReleaseAtThresholdFinishesWhenTimerDeliveryIsLate() {
+        var machine = TriggerStateMachine(trigger: .rightCommand)
+        _ = machine.handle(.triggerDown(timestampMs: 0))
+
+        XCTAssertEqual(
+            machine.handle(.triggerUp(timestampMs: 250)),
+            .finishRecording
+        )
+        XCTAssertEqual(machine.state, .idle)
+    }
+
+    func testEarlyReleaseDiscardsWhenTimerDeliveryArrivesFirst() {
+        var machine = TriggerStateMachine(trigger: .rightCommand)
+        _ = machine.handle(.triggerDown(timestampMs: 0))
+        _ = machine.handle(.timerFired(timestampMs: 250))
+
+        XCTAssertEqual(
+            machine.handle(.triggerUp(timestampMs: 249)),
+            .discardRecording
+        )
         XCTAssertEqual(machine.state, .idle)
     }
 
@@ -36,6 +59,97 @@ final class TriggerStateMachineTests: XCTestCase {
         var machine = TriggerStateMachine(trigger: .rightCommand)
         _ = machine.handle(.triggerDown(timestampMs: 0))
         XCTAssertEqual(machine.handle(.nonTriggerKeyDown(timestampMs: 120, isModifierOnly: false)), .cancelAsShortcut)
+    }
+
+    func testModifierOnlyKeyBeforeThresholdCancelsAsShortcut() {
+        var machine = TriggerStateMachine(trigger: .rightCommand)
+        _ = machine.handle(.triggerDown(timestampMs: 0))
+
+        XCTAssertEqual(
+            machine.handle(.nonTriggerKeyDown(timestampMs: 120, isModifierOnly: true)),
+            .cancelAsShortcut
+        )
+        XCTAssertEqual(machine.state, .idle)
+    }
+
+    func testSpeechDuringArmedCaptureLatchesWithoutBypassingThreshold() {
+        var machine = TriggerStateMachine(trigger: .rightCommand)
+        _ = machine.handle(.triggerDown(timestampMs: 0))
+
+        XCTAssertEqual(machine.handle(.speechDetected(timestampMs: 100)), .none)
+        XCTAssertEqual(
+            machine.state,
+            .waitingForActivation(
+                triggerDownTimestampMs: 0,
+                speechDetected: true
+            )
+        )
+        XCTAssertEqual(machine.handle(.timerFired(timestampMs: 250)), .activateRecording)
+        XCTAssertEqual(machine.state, .recording(speechDetected: true))
+    }
+
+    func testNonTriggerKeyBeforeThresholdCancelsEvenAfterSpeech() {
+        var machine = TriggerStateMachine(trigger: .rightCommand)
+        _ = machine.handle(.triggerDown(timestampMs: 0))
+        _ = machine.handle(.speechDetected(timestampMs: 100))
+
+        XCTAssertEqual(
+            machine.handle(.nonTriggerKeyDown(timestampMs: 120, isModifierOnly: false)),
+            .cancelAsShortcut
+        )
+        XCTAssertEqual(machine.state, .idle)
+    }
+
+    func testLateTimerDoesNotLetPostThresholdKeyCancelLatchedSpeech() {
+        var machine = TriggerStateMachine(trigger: .rightCommand)
+        _ = machine.handle(.triggerDown(timestampMs: 0))
+        _ = machine.handle(.speechDetected(timestampMs: 100))
+
+        XCTAssertEqual(
+            machine.handle(
+                .nonTriggerKeyDown(
+                    timestampMs: 260,
+                    isModifierOnly: false
+                )
+            ),
+            .activateRecording
+        )
+        XCTAssertEqual(machine.state, .recording(speechDetected: true))
+    }
+
+    func testDelayedPreThresholdKeyStillCancelsAfterTimerDelivery() {
+        var machine = TriggerStateMachine(trigger: .rightCommand)
+        _ = machine.handle(.triggerDown(timestampMs: 0))
+        _ = machine.handle(.speechDetected(timestampMs: 100))
+        _ = machine.handle(.timerFired(timestampMs: 250))
+
+        XCTAssertEqual(
+            machine.handle(
+                .nonTriggerKeyDown(
+                    timestampMs: 249,
+                    isModifierOnly: true
+                )
+            ),
+            .cancelAsShortcut
+        )
+        XCTAssertEqual(machine.state, .idle)
+    }
+
+    func testReleaseBeforeThresholdDiscardsEvenAfterSpeech() {
+        var machine = TriggerStateMachine(trigger: .rightCommand)
+        _ = machine.handle(.triggerDown(timestampMs: 0))
+        _ = machine.handle(.speechDetected(timestampMs: 100))
+
+        XCTAssertEqual(machine.handle(.triggerUp(timestampMs: 120)), .discardRecording)
+        XCTAssertEqual(machine.state, .idle)
+    }
+
+    func testEscapeCancelsArmedCaptureBeforeActivation() {
+        var machine = TriggerStateMachine(trigger: .rightCommand)
+        _ = machine.handle(.triggerDown(timestampMs: 0))
+
+        XCTAssertEqual(machine.handle(.escapeKeyDown(timestampMs: 120)), .cancelRecording)
+        XCTAssertEqual(machine.state, .idle)
     }
 
     func testNonTriggerKeyAfterActivationBeforeSpeechCancelsAsShortcut() {
@@ -67,12 +181,12 @@ final class TriggerStateMachineTests: XCTestCase {
         XCTAssertEqual(machine.state, .idle)
     }
 
-    func testReleaseWithoutSpeechDiscardsRecording() {
+    func testReleaseWithoutSpeechFinishesActivatedRecording() {
         var machine = TriggerStateMachine(trigger: .rightCommand)
         _ = machine.handle(.triggerDown(timestampMs: 0))
         _ = machine.handle(.timerFired(timestampMs: 250))
 
-        XCTAssertEqual(machine.handle(.triggerUp(timestampMs: 900)), .discardRecording)
+        XCTAssertEqual(machine.handle(.triggerUp(timestampMs: 900)), .finishRecording)
         XCTAssertEqual(machine.state, .idle)
     }
 

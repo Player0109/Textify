@@ -92,7 +92,10 @@ struct MenuBarRoot: View {
             return "Setup Required"
         }
 
-        return services.dictation.status.menuStatusTitle
+        return MenuBarPresentation.dictationStatusTitle(
+            overlayState: services.overlayState,
+            fallback: services.dictation.status.menuStatusTitle
+        )
     }
 
     private var blockerTitle: String? {
@@ -148,6 +151,14 @@ struct MenuBarRoot: View {
 
 enum MenuBarPresentation {
     static let openTextifyTitle = "Open Textify…"
+
+    static func dictationStatusTitle(
+        overlayState: RecordingOverlayState,
+        fallback: String
+    ) -> String {
+        DictationSessionPresentationCopy.status(for: overlayState)
+            ?? fallback
+    }
 }
 
 extension AppRuntimeIssue {

@@ -92,6 +92,12 @@ enum BundledModelLicenseResourceResolver {
             "OpenMDW-1.1.txt",
         "https://raw.githubusercontent.com/modelscope/FunASR/38e421b0c49963a6f46ae2ebbaa24bc5168cc707/MODEL_LICENSE":
             "FunASR_Model_License_1.1.txt",
+        "https://huggingface.co/nyralabs/CrisperWhisper2.0_large/blob/fe94128aee7cdf1ad43ab59c4b1f7ed6362c1106/LICENSE.md":
+            "CrisperWhisper-2.0-Nyra-License.md",
+        "https://huggingface.co/nyralabs/CrisperWhisper2.0_turbo/blob/16424a0a0dad3d7bcc08927451718da49bce8ce0/LICENSE.md":
+            "CrisperWhisper-2.0-Nyra-License.md",
+        "https://raw.githubusercontent.com/Saganaki22/CrisperWhisper.cpp/13c7b3efdafd8bd20bd6361e7354ce2aa9bec464/LICENSE":
+            "CrisperWhisper.cpp-LICENSE.txt",
     ]
 
     static func resourceName(for licenseTextURL: String) -> String? {

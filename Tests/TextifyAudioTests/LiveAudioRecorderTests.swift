@@ -3,6 +3,33 @@ import AVFoundation
 import XCTest
 
 final class LiveAudioRecorderTests: XCTestCase {
+    func testDefaultConfigurationCapsOneSessionAtFiveMinutes() {
+        XCTAssertEqual(
+            LiveAudioRecordingConfiguration.v1_1Default
+                .maximumDurationSeconds,
+            300
+        )
+    }
+
+    func testPostReleaseGraceIsBoundedBySessionDeadline() {
+        XCTAssertEqual(
+            LiveAudioRecorder.boundedPostReleaseGraceNanoseconds(
+                configuredGraceNanoseconds: 250_000_000,
+                nowUptimeNanoseconds: 1_000_000_000,
+                deadlineUptimeNanoseconds: 1_100_000_000
+            ),
+            100_000_000
+        )
+        XCTAssertEqual(
+            LiveAudioRecorder.boundedPostReleaseGraceNanoseconds(
+                configuredGraceNanoseconds: 250_000_000,
+                nowUptimeNanoseconds: 1_100_000_000,
+                deadlineUptimeNanoseconds: 1_100_000_000
+            ),
+            0
+        )
+    }
+
     func testDeniedMicrophonePermissionPreventsEngineStart() async throws {
         let permission = MicrophonePermissionClient(
             status: { .denied },
@@ -200,6 +227,217 @@ final class LiveAudioRecorderTests: XCTestCase {
         XCTAssertTrue(engine.stopped)
     }
 
+    func testRetainedCanonicalAudioCannotExceedRequestedDuration() async throws {
+        let permission = MicrophonePermissionClient(
+            status: { .granted },
+            requestAccess: { .granted }
+        )
+        let engine = FakeAudioEngineClient()
+        let recorder = LiveAudioRecorder(
+            permissionClient: permission,
+            configuration: LiveAudioRecordingConfiguration(
+                maximumDurationSeconds: 10,
+                postReleaseGraceMilliseconds: 0
+            ),
+            engineClient: engine
+        )
+        let maximumDurationReached = expectation(
+            description: "canonical sample budget reached"
+        )
+
+        try await recorder.startRecording(
+            maximumDurationSeconds: 10,
+            onSpeechDetected: {},
+            onMaximumDurationReached: {
+                maximumDurationReached.fulfill()
+            }
+        )
+        try engine.emit(
+            samples: Array(repeating: 0.1, count: 176_000),
+            sampleRate: 16_000
+        )
+        await fulfillment(of: [maximumDurationReached], timeout: 1)
+
+        let audio = try await recorder.finishRecording()
+
+        XCTAssertEqual(audio.samples.count, 160_000)
+        XCTAssertEqual(audio.durationSeconds, 10)
+    }
+
+    func testCaptureMilestonesFireOnceInOrderWithAbsoluteHostTimestamp() async throws {
+        let permission = MicrophonePermissionClient(
+            status: { .granted },
+            requestAccess: { .granted }
+        )
+        let engine = FakeAudioEngineClient()
+        let milestones = CaptureMilestoneLog()
+        let recorder = LiveAudioRecorder(
+            permissionClient: permission,
+            configuration: LiveAudioRecordingConfiguration(
+                postReleaseGraceMilliseconds: 0
+            ),
+            engineClient: engine
+        )
+        let firstSampleHostTime = AVAudioTime.hostTime(forSeconds: 4_321.25)
+        engine.onStart = {
+            milestones.append("engine_start")
+            try? engine.emit(
+                samples: Array(repeating: 0.1, count: 320),
+                sampleRate: 16_000,
+                audioTime: AVAudioTime(hostTime: firstSampleHostTime)
+            )
+        }
+
+        try await recorder.startRecording(
+            onCaptureStarted: {
+                milestones.append("capture_started")
+            },
+            onFirstAudio: { firstSampleUptimeMilliseconds in
+                milestones.append("first_audio_\(firstSampleUptimeMilliseconds)")
+            },
+            onSpeechDetected: {},
+            onMaximumDurationReached: {}
+        )
+        try engine.emit(
+            samples: Array(repeating: 0.2, count: 320),
+            sampleRate: 16_000,
+            audioTime: AVAudioTime(
+                hostTime: AVAudioTime.hostTime(forSeconds: 5_000)
+            )
+        )
+
+        let audio = try await recorder.finishRecording()
+
+        XCTAssertEqual(
+            milestones.values,
+            ["engine_start", "capture_started", "first_audio_4321250"]
+        )
+        XCTAssertEqual(audio.samples.count, 640)
+    }
+
+    func testFirstAudioFallsBackToTapUptimeMinusCanonicalDuration() async throws {
+        let permission = MicrophonePermissionClient(
+            status: { .granted },
+            requestAccess: { .granted }
+        )
+        let engine = FakeAudioEngineClient()
+        let milestones = CaptureMilestoneLog()
+        let recorder = LiveAudioRecorder(
+            permissionClient: permission,
+            configuration: LiveAudioRecordingConfiguration(
+                postReleaseGraceMilliseconds: 0
+            ),
+            engineClient: engine
+        )
+
+        try await recorder.startRecording(
+            onFirstAudio: { firstSampleUptimeMilliseconds in
+                milestones.append("\(firstSampleUptimeMilliseconds)")
+            },
+            onSpeechDetected: {},
+            onMaximumDurationReached: {}
+        )
+
+        let beforeTapMilliseconds = Int(
+            DispatchTime.now().uptimeNanoseconds / 1_000_000
+        )
+        try engine.emit(
+            samples: Array(repeating: 0.1, count: 320),
+            sampleRate: 16_000
+        )
+        let afterTapMilliseconds = Int(
+            DispatchTime.now().uptimeNanoseconds / 1_000_000
+        )
+        _ = try await recorder.finishRecording()
+
+        let firstSampleUptimeMilliseconds = try XCTUnwrap(
+            milestones.values.first.flatMap(Int.init)
+        )
+        XCTAssertGreaterThanOrEqual(
+            firstSampleUptimeMilliseconds,
+            beforeTapMilliseconds - 20
+        )
+        XCTAssertLessThanOrEqual(
+            firstSampleUptimeMilliseconds,
+            afterTapMilliseconds - 20
+        )
+    }
+
+    func testFirstAudioCallbackDoesNotExecuteOnTapThread() async throws {
+        let permission = MicrophonePermissionClient(
+            status: { .granted },
+            requestAccess: { .granted }
+        )
+        let engine = FakeAudioEngineClient()
+        let milestones = CaptureMilestoneLog()
+        let firstAudio = expectation(description: "first audio")
+        let recorder = LiveAudioRecorder(
+            permissionClient: permission,
+            configuration: LiveAudioRecordingConfiguration(
+                postReleaseGraceMilliseconds: 0
+            ),
+            engineClient: engine
+        )
+
+        try await recorder.startRecording(
+            onFirstAudio: { _ in
+                milestones.append(
+                    engine.isExecutingTapOnCurrentThread ? "tap" : "ingestion"
+                )
+                firstAudio.fulfill()
+            },
+            onSpeechDetected: {},
+            onMaximumDurationReached: {}
+        )
+        try engine.emit(
+            samples: Array(repeating: 0.1, count: 320),
+            sampleRate: 16_000
+        )
+
+        await fulfillment(of: [firstAudio], timeout: 1)
+        await recorder.discardRecording()
+
+        XCTAssertEqual(milestones.values, ["ingestion"])
+    }
+
+    func testCaptureMilestonesDoNotFireWhenEngineStartFails() async throws {
+        let permission = MicrophonePermissionClient(
+            status: { .granted },
+            requestAccess: { .granted }
+        )
+        let engine = FakeAudioEngineClient()
+        engine.startError = .engineStartFailed
+        engine.onStart = {
+            try? engine.emit(
+                samples: Array(repeating: 0.1, count: 320),
+                sampleRate: 16_000
+            )
+        }
+        let milestones = CaptureMilestoneLog()
+        let recorder = LiveAudioRecorder(
+            permissionClient: permission,
+            engineClient: engine
+        )
+
+        do {
+            try await recorder.startRecording(
+                onCaptureStarted: {
+                    milestones.append("capture_started")
+                },
+                onFirstAudio: { firstSampleUptimeMilliseconds in
+                    milestones.append("first_audio_\(firstSampleUptimeMilliseconds)")
+                },
+                onSpeechDetected: {},
+                onMaximumDurationReached: {}
+            )
+            XCTFail("Expected engine start to fail")
+        } catch let error as LiveAudioRecorderError {
+            XCTAssertEqual(error, .engineStartFailed)
+        }
+
+        XCTAssertTrue(milestones.values.isEmpty)
+    }
+
     func testFinishRecordingDrainsOrderedTapBuffersBeforeReturningAudio() async throws {
         let permission = MicrophonePermissionClient(
             status: { .granted },
@@ -323,14 +561,11 @@ final class LiveAudioRecorderTests: XCTestCase {
             onSpeechDetected: {},
             onMaximumDurationReached: { maximumDurationReached.fulfill() }
         )
-        try engine.emit(samples: Array(repeating: 0.1, count: 320), sampleRate: 16_000)
 
         await fulfillment(of: [maximumDurationReached], timeout: 1)
         XCTAssertFalse(engine.tapInstalled)
         XCTAssertTrue(engine.stopped)
-
-        let audio = try await recorder.finishRecording()
-        XCTAssertEqual(audio.samples.count, 320)
+        await recorder.discardRecording()
     }
 
     func testPerRecordingMaximumDurationOverridesLongerConfiguredMaximum() async throws {
@@ -358,7 +593,7 @@ final class LiveAudioRecorderTests: XCTestCase {
 
         await fulfillment(of: [maximumDurationReached], timeout: 1)
         let audio = try await recorder.finishRecording()
-        XCTAssertEqual(audio.samples.count, 320)
+        XCTAssertEqual(audio.samples.count, 160)
     }
 
     func testFinishRecordingSurfacesConversionErrorDuringPostReleaseGrace() async throws {
@@ -493,6 +728,8 @@ final class FakeAudioEngineClient:
 {
     private let lock = NSLock()
     private var state = State()
+    private static let tapThreadMarker =
+        "TextifyAudioTests.FakeAudioEngineClient.tap.\(UUID().uuidString)"
 
     enum Call: Equatable {
         case selectInput
@@ -539,6 +776,10 @@ final class FakeAudioEngineClient:
         withLock { state.callOrder }
     }
 
+    var isExecutingTapOnCurrentThread: Bool {
+        Thread.current.threadDictionary[Self.tapThreadMarker] != nil
+    }
+
     var selectInputError: LiveAudioRecorderError? {
         get {
             withLock { state.selectInputError }
@@ -546,6 +787,17 @@ final class FakeAudioEngineClient:
         set {
             withLock {
                 state.selectInputError = newValue
+            }
+        }
+    }
+
+    var startError: LiveAudioRecorderError? {
+        get {
+            withLock { state.startError }
+        }
+        set {
+            withLock {
+                state.startError = newValue
             }
         }
     }
@@ -572,11 +824,29 @@ final class FakeAudioEngineClient:
         }
     }
 
+    var onStart: (@Sendable () -> Void)? {
+        get {
+            withLock { state.onStart }
+        }
+        set {
+            withLock {
+                state.onStart = newValue
+            }
+        }
+    }
+
     func start() throws {
-        withLock {
-            state.started = true
+        let (hook, startError) = withLock {
             state.startCallCount += 1
             state.callOrder.append(.start)
+            if state.startError == nil {
+                state.started = true
+            }
+            return (state.onStart, state.startError)
+        }
+        hook?()
+        if let startError {
+            throw startError
         }
     }
 
@@ -639,7 +909,11 @@ final class FakeAudioEngineClient:
         handler?()
     }
 
-    func emit(samples: [Float], sampleRate: Double) throws {
+    func emit(
+        samples: [Float],
+        sampleRate: Double,
+        audioTime: AVAudioTime? = nil
+    ) throws {
         let format = try XCTUnwrap(
             AVAudioFormat(
                 commonFormat: .pcmFormatFloat32,
@@ -661,7 +935,12 @@ final class FakeAudioEngineClient:
         }
 
         let handler = withLock { state.tapHandler }
-        handler?(buffer, AVAudioTime(sampleTime: 0, atRate: sampleRate))
+        invokeTapHandler(
+            handler,
+            buffer: buffer,
+            audioTime: audioTime
+                ?? AVAudioTime(sampleTime: 0, atRate: sampleRate)
+        )
     }
 
     func emitRemovedTap(samples: [Float], sampleRate: Double) throws {
@@ -718,6 +997,20 @@ final class FakeAudioEngineClient:
         return buffer
     }
 
+    private func invokeTapHandler(
+        _ handler: (@Sendable (AVAudioPCMBuffer, AVAudioTime) -> Void)?,
+        buffer: AVAudioPCMBuffer,
+        audioTime: AVAudioTime
+    ) {
+        Thread.current.threadDictionary[Self.tapThreadMarker] = true
+        defer {
+            Thread.current.threadDictionary.removeObject(
+                forKey: Self.tapThreadMarker
+            )
+        }
+        handler?(buffer, audioTime)
+    }
+
     private func withLock<T>(_ body: () throws -> T) rethrows -> T {
         lock.lock()
         defer { lock.unlock() }
@@ -733,12 +1026,29 @@ final class FakeAudioEngineClient:
         var resetCallCount = 0
         var selectedInputs: [LiveAudioInput] = []
         var selectInputError: LiveAudioRecorderError?
+        var startError: LiveAudioRecorderError?
         var callOrder: [Call] = []
         var tapHandler: (@Sendable (AVAudioPCMBuffer, AVAudioTime) -> Void)?
         var removedTapHandler: (@Sendable (AVAudioPCMBuffer, AVAudioTime) -> Void)?
         var inputChangeHandler: (@Sendable () -> Void)?
         var onStop: (@Sendable () -> Void)?
         var onSelectInput: (@Sendable () -> Void)?
+        var onStart: (@Sendable () -> Void)?
+    }
+}
+
+private final class CaptureMilestoneLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedValues: [String] = []
+
+    var values: [String] {
+        lock.withLock { storedValues }
+    }
+
+    func append(_ value: String) {
+        lock.withLock {
+            storedValues.append(value)
+        }
     }
 }
 

@@ -11,6 +11,7 @@
 		11FD7F8316A64487858A9CEF /* SwiftNIO.txt in Resources */ = {isa = PBXBuildFile; fileRef = 1CF14F373C1BB3AFACD0BD5B /* SwiftNIO.txt */; };
 		1245A89E25B6AC062D7A70D1 /* transcribe.cpp.txt in Resources */ = {isa = PBXBuildFile; fileRef = 3567D5257D3C4693797A76CC /* transcribe.cpp.txt */; };
 		1283CD9A22A045046747AB2E /* OpenAI-Whisper.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2BCB01FBE6D8E7354FACB47F /* OpenAI-Whisper.txt */; };
+		1524195D0270B6CDFA08CD25 /* CrisperWhisper-2.0-Nyra-License.md in Resources */ = {isa = PBXBuildFile; fileRef = 0B3EDE3DBF4C2F37CAF0589A /* CrisperWhisper-2.0-Nyra-License.md */; };
 		1B7EAFF9974199AFC617F1FA /* ACKNOWLEDGMENTS.md in Resources */ = {isa = PBXBuildFile; fileRef = 1CB78709709A243F50FFFCF0 /* ACKNOWLEDGMENTS.md */; };
 		1D4C90A954214718ED04E602 /* ModelCatalogArtifactInspection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58F5611F5BE94FA64F4648CB /* ModelCatalogArtifactInspection.swift */; };
 		20CC47763A7B676444BE009F /* ModelCatalogVariantComparison.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5FCFD81E2C513F4D4C26431 /* ModelCatalogVariantComparison.swift */; };
@@ -36,6 +37,7 @@
 		540E3CA7AD2B1392BA874392 /* TextifyCore in Frameworks */ = {isa = PBXBuildFile; productRef = B53B43D517933AD130F94821 /* TextifyCore */; };
 		545A09C7EA9374897B657BA6 /* AppPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CF0AB1D69531402DCE40D70 /* AppPaths.swift */; };
 		55134887FB3786EEAC7F8CD4 /* RecordingOverlayWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22DFC5ADE2174CBEA8D692D7 /* RecordingOverlayWindow.swift */; };
+		5636412F924E2726138A4C9D /* CrisperWhisper.cpp-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = D0F7F35613D82F58AFB38E3E /* CrisperWhisper.cpp-LICENSE.txt */; };
 		596E0360F338A0F644669E47 /* SwiftSystem.txt in Resources */ = {isa = PBXBuildFile; fileRef = 32299B3438710241007D7BA9 /* SwiftSystem.txt */; };
 		5CBAAFC507E7F0CFBFD14254 /* SwiftCollections.txt in Resources */ = {isa = PBXBuildFile; fileRef = 571CC5300AD3FA1F34564F0C /* SwiftCollections.txt */; };
 		64BAF0B9382B64D43EF14710 /* SwiftJinja.txt in Resources */ = {isa = PBXBuildFile; fileRef = FA70F155E156CF0333DDB847 /* SwiftJinja.txt */; };
@@ -93,6 +95,7 @@
 		0346CCD4BD9BF273E6EFE3EF /* OpenMDW-1.1.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OpenMDW-1.1.txt"; sourceTree = "<group>"; };
 		0468CB0F07A06511893A98E0 /* ModelCatalogVariantComparisonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogVariantComparisonView.swift; sourceTree = "<group>"; };
 		047F02C7C6B402C590F2375D /* Textify */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Textify; path = .; sourceTree = SOURCE_ROOT; };
+		0B3EDE3DBF4C2F37CAF0589A /* CrisperWhisper-2.0-Nyra-License.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "CrisperWhisper-2.0-Nyra-License.md"; sourceTree = "<group>"; };
 		0DE762BA89473A6795A5D976 /* AppServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServices.swift; sourceTree = "<group>"; };
 		0EFB7B3B702120578207D4FB /* yyjson.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = yyjson.txt; sourceTree = "<group>"; };
 		1670F14D9661CA50ADD326AA /* NVIDIA_Open_Model_License.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = NVIDIA_Open_Model_License.txt; sourceTree = "<group>"; };
@@ -150,6 +153,7 @@
 		B96F34B62CE298F0736DC70F /* SwiftSyntax.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SwiftSyntax.txt; sourceTree = "<group>"; };
 		BBEB3CE60F7CE1D7196F5ED7 /* LICENSE */ = {isa = PBXFileReference; path = LICENSE; sourceTree = "<group>"; };
 		C32C98F05AD92486666F9717 /* MenuBarRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarRoot.swift; sourceTree = "<group>"; };
+		D0F7F35613D82F58AFB38E3E /* CrisperWhisper.cpp-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "CrisperWhisper.cpp-LICENSE.txt"; sourceTree = "<group>"; };
 		D1160F40D4A863F202979D3E /* ONNX_Runtime_ThirdPartyNotices.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = ONNX_Runtime_ThirdPartyNotices.txt; sourceTree = "<group>"; };
 		D15B56AA140711CE36EF8A57 /* FluidAudio-VBx.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "FluidAudio-VBx.txt"; sourceTree = "<group>"; };
 		E0CA80C3364EF2EEF1256D77 /* MicrophoneInputPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicrophoneInputPresentation.swift; sourceTree = "<group>"; };
@@ -307,6 +311,8 @@
 			isa = PBXGroup;
 			children = (
 				19F3C9112A8FB9B7B23EDB20 /* CC-BY-4.0.txt */,
+				0B3EDE3DBF4C2F37CAF0589A /* CrisperWhisper-2.0-Nyra-License.md */,
+				D0F7F35613D82F58AFB38E3E /* CrisperWhisper.cpp-LICENSE.txt */,
 				FCA476E0930186FF787D9C63 /* EventSource.txt */,
 				B47D38C787CDEBF70A5ABDDF /* FluidAudio-fastcluster.txt */,
 				D15B56AA140711CE36EF8A57 /* FluidAudio-VBx.txt */,
@@ -431,6 +437,8 @@
 				1B7EAFF9974199AFC617F1FA /* ACKNOWLEDGMENTS.md in Resources */,
 				E4C0244160BA9CEE6A7445AD /* Assets.xcassets in Resources */,
 				714103EEB527618B39DA750A /* CC-BY-4.0.txt in Resources */,
+				1524195D0270B6CDFA08CD25 /* CrisperWhisper-2.0-Nyra-License.md in Resources */,
+				5636412F924E2726138A4C9D /* CrisperWhisper.cpp-LICENSE.txt in Resources */,
 				6D63DC47C566F31B048CD477 /* EventSource.txt in Resources */,
 				83BF6DB438092B5B83E10025 /* FluidAudio-VBx.txt in Resources */,
 				974C5B469280C3A603C879A1 /* FluidAudio-fastcluster.txt in Resources */,

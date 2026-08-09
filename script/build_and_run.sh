@@ -82,6 +82,8 @@ stage_fast_app() {
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/LiteRT-LM.txt" "$APP_RESOURCES/LiteRT-LM.txt"
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/CC-BY-4.0.txt" "$APP_RESOURCES/CC-BY-4.0.txt"
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/OpenAI-Whisper.txt" "$APP_RESOURCES/OpenAI-Whisper.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/CrisperWhisper-2.0-Nyra-License.md" "$APP_RESOURCES/CrisperWhisper-2.0-Nyra-License.md"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/CrisperWhisper.cpp-LICENSE.txt" "$APP_RESOURCES/CrisperWhisper.cpp-LICENSE.txt"
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/ggml-small.en-q5_1.LICENSES.txt" "$APP_RESOURCES/ggml-small.en-q5_1.LICENSES.txt"
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/NVIDIA_Open_Model_License.txt" "$APP_RESOURCES/NVIDIA_Open_Model_License.txt"
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/OpenMDW-1.1.txt" "$APP_RESOURCES/OpenMDW-1.1.txt"
@@ -146,6 +148,8 @@ verify_staged_app() {
   [[ -s "$APP_RESOURCES/LiteRT-LM.txt" ]]
   [[ -s "$APP_RESOURCES/CC-BY-4.0.txt" ]]
   [[ -s "$APP_RESOURCES/OpenAI-Whisper.txt" ]]
+  [[ -s "$APP_RESOURCES/CrisperWhisper-2.0-Nyra-License.md" ]]
+  [[ -s "$APP_RESOURCES/CrisperWhisper.cpp-LICENSE.txt" ]]
   [[ -s "$APP_RESOURCES/ggml-small.en-q5_1.LICENSES.txt" ]]
   [[ -s "$APP_RESOURCES/NVIDIA_Open_Model_License.txt" ]]
   [[ -s "$APP_RESOURCES/OpenMDW-1.1.txt" ]]
@@ -161,6 +165,12 @@ verify_staged_app() {
   [[ -s "$APP_RESOURCES/transcribe.cpp-miniz.txt" ]]
   [[ -s "$APP_RESOURCES/ONNX_Runtime_ThirdPartyNotices.txt" ]]
   [[ -s "$APP_RESOURCES/LICENSE" ]]
+  printf '%s  %s\n' \
+    '42f43bf4dc72ef422f91f6ca143f4514e21a68b353940d99091c1addcd0aee79' \
+    "$APP_RESOURCES/CrisperWhisper-2.0-Nyra-License.md" \
+    'bccb9e9fa28644216f919d1f80567e49a41990705d3c3b036c334dc03e00dd31' \
+    "$APP_RESOURCES/CrisperWhisper.cpp-LICENSE.txt" \
+    | shasum -a 256 -c -
   [[ "$(lipo -archs "$APP_FRAMEWORKS/libsherpa-onnx-c-api.dylib")" == "arm64" ]]
   [[ "$(lipo -archs "$APP_FRAMEWORKS/libonnxruntime.1.24.4.dylib")" == "arm64" ]]
   [[ "$(lipo -archs "$APP_FRAMEWORKS/libtextify-transcribe.0.1.3.dylib")" == "arm64" ]]

@@ -11,6 +11,131 @@ import XCTest
 
 @MainActor
 final class AppDictationServiceTests: XCTestCase {
+    func testShutdownDiscardsAudioAndUnloadsBothNativePurposes() async {
+        let fakes = RuntimeFakes.ready()
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.shutdown()
+        let discardCount = await fakes.audio.discardCount()
+        let transcriberUnloadCount = await fakes.transcriber.unloadCount()
+        let voiceCleanerUnloadCount = await fakes.voiceCleaner.unloadCount()
+
+        XCTAssertEqual(discardCount, 1)
+        XCTAssertEqual(transcriberUnloadCount, 1)
+        XCTAssertEqual(voiceCleanerUnloadCount, 1)
+        XCTAssertEqual(service.status, .idle)
+        XCTAssertEqual(service.voiceCleaningStatus, .disabled)
+    }
+
+    func testShutdownAudioDiscardCanRunImmediatelyAndIsIdempotent() async {
+        let fakes = RuntimeFakes.ready()
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        await service.handleTriggerAction(.beginRecording)
+
+        service.beginShutdown()
+        await service.discardAudioForShutdown()
+        await service.discardAudioForShutdown()
+        let discardCountBeforeRuntimeUnload = await fakes.audio.discardCount()
+
+        XCTAssertEqual(discardCountBeforeRuntimeUnload, 1)
+
+        await service.shutdown()
+        let finalDiscardCount = await fakes.audio.discardCount()
+        XCTAssertEqual(finalDiscardCount, 1)
+    }
+
+    func testShutdownWaitsForModelPreparationBeforeUnloading() async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.transcriber.setSuspendPrepareUntilReleased(true)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        let preparation = Task {
+            await service.prepareActiveModelIfAvailable()
+        }
+        await waitUntil {
+            await fakes.transcriber.isPrepareSuspended()
+        }
+
+        let shutdown = Task {
+            await service.shutdown()
+        }
+        await settle()
+        let unloadCountWhilePreparing = await fakes.transcriber.unloadCount()
+
+        XCTAssertEqual(unloadCountWhilePreparing, 0)
+
+        await fakes.transcriber.releasePrepare()
+        _ = await preparation.value
+        await shutdown.value
+        let finalUnloadCount = await fakes.transcriber.unloadCount()
+
+        XCTAssertEqual(finalUnloadCount, 1)
+    }
+
+    func testShutdownWaitsForInFlightTranscriptionBeforeUnloading() async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.transcriber.setSuspendUntilReleased(true)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+        let finish = Task {
+            await service.handleTriggerAction(.finishRecording)
+        }
+        await waitUntil { await fakes.transcriber.isSuspended() }
+
+        let shutdown = Task {
+            await service.shutdown()
+        }
+        await settle()
+        let unloadCountWhileTranscribing = await fakes.transcriber.unloadCount()
+
+        XCTAssertEqual(unloadCountWhileTranscribing, 0)
+
+        await fakes.transcriber.release()
+        await finish.value
+        await shutdown.value
+        let finalUnloadCount = await fakes.transcriber.unloadCount()
+        let insertedTexts = await fakes.inserter.insertedTexts()
+
+        XCTAssertEqual(finalUnloadCount, 1)
+        XCTAssertEqual(insertedTexts, [])
+        XCTAssertEqual(service.status, .idle)
+    }
+
+    func testShutdownPreventsLaterPurposeRuntimePreparation() async {
+        let fakes = RuntimeFakes.ready()
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.shutdown()
+        _ = await service.performPurposeRuntimeTransaction {
+            await service.prepareActiveModelAtPurposeRuntimeBoundary()
+        }
+        let prepareCount = await fakes.transcriber.prepareCount()
+        let unloadCount = await fakes.transcriber.unloadCount()
+
+        XCTAssertEqual(prepareCount, 0)
+        XCTAssertEqual(unloadCount, 1)
+        XCTAssertFalse(service.allowsModelTransactions)
+    }
+
+    func testShutdownPreventsSuspendedActivationFromStartingRecordingLater() async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.targetCapturer.setSuspendUntilReleased(true)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        let activation = Task {
+            await service.handleTriggerAction(.beginRecording)
+        }
+        await waitUntil { await fakes.targetCapturer.isSuspended() }
+
+        await service.shutdown()
+        await fakes.targetCapturer.release()
+        await activation.value
+        let startCount = await fakes.audio.startCount()
+
+        XCTAssertEqual(startCount, 0)
+        XCTAssertNil(service.currentSegment)
+        XCTAssertEqual(service.status, .idle)
+    }
+
     func testPreparingCandidateTranscriptionModelDoesNotMutateStoredSelection() async {
         var storedPreferences = AppPreferences.defaults
         storedPreferences.activeModelID = "previous-model"
@@ -215,6 +340,33 @@ final class AppDictationServiceTests: XCTestCase {
         XCTAssertEqual(startCount, 1)
     }
 
+    func testSynchronousRevocationFenceBlocksImmediateAdmission() async {
+        let fakes = RuntimeFakes.ready()
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        _ = await service.prepareActiveModelIfAvailable()
+
+        service.replaceRevokedArtifactIDs([
+            RuntimeActiveModel.fixture.id,
+        ])
+        let action = await service.handleTriggerEvent(
+            .triggerDown(timestampMs: 0)
+        )
+
+        XCTAssertEqual(action, .none)
+        XCTAssertEqual(
+            service.status,
+            .blocked(
+                .readinessBlocked(
+                    .activeModelRevoked(
+                        modelID: RuntimeActiveModel.fixture.id
+                    )
+                )
+            )
+        )
+        let startCount = await fakes.audio.startCount()
+        XCTAssertEqual(startCount, 0)
+    }
+
     func testPurposeRuntimeTransactionWaitsForOwnedCurrentSegment() async {
         let fakes = RuntimeFakes.ready()
         let service = AppDictationService(dependencies: fakes.dependencies)
@@ -258,6 +410,36 @@ final class AppDictationServiceTests: XCTestCase {
 
         await service.handleTriggerAction(.beginRecording)
 
+        XCTAssertNil(service.currentSegment)
+        XCTAssertEqual(service.status, .idle)
+
+        await gate.release()
+        await transaction.value
+    }
+
+    func testPurposeRuntimeTransactionWinningDuringAdmissionCancelsCapture() async {
+        let fakes = RuntimeFakes.ready()
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        _ = await service.prepareActiveModelIfAvailable()
+        await fakes.targetCapturer.setSuspendUntilReleased(true)
+        let admission = Task {
+            await service.handleTriggerEvent(.triggerDown(timestampMs: 0))
+        }
+        await waitUntil { await fakes.targetCapturer.isSuspended() }
+        let gate = PurposeRuntimeBoundaryGate()
+        let transaction = Task { @MainActor in
+            await service.performPurposeRuntimeTransaction {
+                await gate.wait()
+            }
+        }
+        await waitUntil { await gate.isWaiting() }
+
+        await fakes.targetCapturer.release()
+        let action = await admission.value
+        let startCount = await fakes.audio.startCount()
+
+        XCTAssertEqual(action, .none)
+        XCTAssertEqual(startCount, 0)
         XCTAssertNil(service.currentSegment)
         XCTAssertEqual(service.status, .idle)
 
@@ -598,7 +780,7 @@ final class AppDictationServiceTests: XCTestCase {
         XCTAssertEqual(service.status, .recording(speechDetected: false))
     }
 
-    func testBeginRecordingUsesActiveModelMaximumDuration() async {
+    func testBeginRecordingUsesProductSessionLimitInsteadOfModelWindowLimit() async {
         let fakes = RuntimeFakes.ready()
         await fakes.models.setActiveModel(.fixtureWithMaximumAudioSeconds(18))
         let service = AppDictationService(dependencies: fakes.dependencies)
@@ -606,7 +788,416 @@ final class AppDictationServiceTests: XCTestCase {
         await service.handleTriggerAction(.beginRecording)
 
         let maximumDuration = await fakes.audio.lastMaximumDurationSeconds()
-        XCTAssertEqual(maximumDuration, 18)
+        XCTAssertEqual(
+            maximumDuration,
+            DictationSessionLimits.maximumDurationSeconds
+        )
+        XCTAssertEqual(maximumDuration, 300)
+    }
+
+    func testTriggerDownStartsArmedCaptureBeforeThresholdWithoutReloadingAdmission() async {
+        let fakes = RuntimeFakes.ready()
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        _ = await service.prepareActiveModelIfAvailable()
+        let settingsLoadsBefore = await fakes.settings.loadCount()
+        let modelResolutionsBefore = await fakes.models.activeModelResolutionCount()
+        let modelReadinessChecksBefore = await fakes.models.readinessCheckCount()
+        fakes.clock.setNowMilliseconds(1_000)
+
+        let action = await service.handleTriggerEvent(
+            .triggerDown(timestampMs: 1_000)
+        )
+        let startCount = await fakes.audio.startCount()
+        let settingsLoadsAfter = await fakes.settings.loadCount()
+        let modelResolutionsAfter =
+            await fakes.models.activeModelResolutionCount()
+        let modelReadinessChecksAfter =
+            await fakes.models.readinessCheckCount()
+
+        XCTAssertEqual(action, .beginArmedCapture(delayMs: 250))
+        XCTAssertEqual(startCount, 1)
+        XCTAssertEqual(service.status, .waitingForActivation)
+        XCTAssertEqual(fakes.clock.sleepCount(), 1)
+        XCTAssertNotNil(service.currentSegment)
+        XCTAssertEqual(settingsLoadsAfter, settingsLoadsBefore)
+        XCTAssertEqual(modelResolutionsAfter, modelResolutionsBefore)
+        XCTAssertEqual(modelReadinessChecksAfter, modelReadinessChecksBefore)
+    }
+
+    func testReleaseBeforeActivationDiscardsArmedCaptureAndStaleTimerIsInert() async {
+        let fakes = RuntimeFakes.ready()
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        _ = await service.prepareActiveModelIfAvailable()
+        fakes.clock.setNowMilliseconds(1_000)
+        _ = await service.handleTriggerEvent(.triggerDown(timestampMs: 1_000))
+        await waitUntil { fakes.clock.sleepCount() == 1 }
+        fakes.clock.setNowMilliseconds(1_120)
+
+        let action = await service.handleTriggerEvent(
+            .triggerUp(timestampMs: 1_120)
+        )
+        let startCount = await fakes.audio.startCount()
+        let discardCount = await fakes.audio.discardCount()
+        let transcribeCount = await fakes.transcriber.transcribeCount()
+        let timing = await fakes.diagnostics.captureTimings().last
+
+        XCTAssertEqual(action, .discardRecording)
+        XCTAssertEqual(startCount, 1)
+        XCTAssertEqual(discardCount, 1)
+        XCTAssertEqual(transcribeCount, 0)
+        XCTAssertNil(service.currentSegment)
+        XCTAssertEqual(service.status, .cancelled(.releasedBeforeActivation))
+        XCTAssertEqual(timing?.preASROutcome, "accidental_tap_discarded")
+
+        fakes.clock.fireOldestSleep(nowMilliseconds: 1_250)
+        await settle()
+        let startCountAfterTimer = await fakes.audio.startCount()
+        XCTAssertEqual(startCountAfterTimer, 1)
+    }
+
+    func testReleaseAtThresholdFinishesWhenTimerDeliveryIsLate() async {
+        let fakes = RuntimeFakes.ready(
+            transcript: "threshold",
+            processedText: "threshold"
+        )
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        _ = await service.prepareActiveModelIfAvailable()
+        fakes.clock.setNowMilliseconds(1_000)
+        _ = await service.handleTriggerEvent(.triggerDown(timestampMs: 1_000))
+        await waitUntil { fakes.clock.sleepCount() == 1 }
+        fakes.clock.setNowMilliseconds(1_250)
+
+        let action = await service.handleTriggerEvent(
+            .triggerUp(timestampMs: 1_250)
+        )
+        let finishCount = await fakes.audio.finishCount()
+        let transcribeCount = await fakes.transcriber.transcribeCount()
+
+        XCTAssertEqual(action, .finishRecording)
+        XCTAssertEqual(finishCount, 1)
+        XCTAssertEqual(transcribeCount, 1)
+        XCTAssertEqual(
+            service.status,
+            .completed(textLengthBucket: "1-50")
+        )
+
+        fakes.clock.fireOldestSleep(nowMilliseconds: 1_260)
+        await settle()
+        let finishCountAfterTimer = await fakes.audio.finishCount()
+        XCTAssertEqual(finishCountAfterTimer, 1)
+    }
+
+    func testEarlyReleaseDiscardsWhenTimerDeliveryArrivesFirst() async {
+        let fakes = RuntimeFakes.ready()
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        _ = await service.prepareActiveModelIfAvailable()
+        fakes.clock.setNowMilliseconds(1_000)
+        _ = await service.handleTriggerEvent(.triggerDown(timestampMs: 1_000))
+        await waitUntil { fakes.clock.sleepCount() == 1 }
+        fakes.clock.fireOldestSleep(nowMilliseconds: 1_250)
+        await waitUntil {
+            service.status == .recording(speechDetected: false)
+        }
+
+        let action = await service.handleTriggerEvent(
+            .triggerUp(timestampMs: 1_249)
+        )
+        let timing = await fakes.diagnostics.captureTimings().last
+        let transcribeCount = await fakes.transcriber.transcribeCount()
+
+        XCTAssertEqual(action, .discardRecording)
+        XCTAssertEqual(transcribeCount, 0)
+        XCTAssertEqual(
+            service.status,
+            .cancelled(.releasedBeforeActivation)
+        )
+        XCTAssertEqual(timing?.preASROutcome, "accidental_tap_discarded")
+    }
+
+    func testActivationTimerSleepsOnlyForTimeRemainingFromHotkeyEvent() async {
+        let fakes = RuntimeFakes.ready()
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        _ = await service.prepareActiveModelIfAvailable()
+        fakes.clock.setNowMilliseconds(1_100)
+
+        _ = await service.handleTriggerEvent(.triggerDown(timestampMs: 1_000))
+        await waitUntil { fakes.clock.sleepCount() == 1 }
+
+        XCTAssertEqual(fakes.clock.oldestSleepDurationMilliseconds(), 150)
+        _ = await service.handleTriggerEvent(.triggerUp(timestampMs: 1_120))
+    }
+
+    func testActivatedReleaseWithoutSpeechCallbackSubmitsShortCaptureToASR() async {
+        let fakes = RuntimeFakes.ready(
+            transcript: "short",
+            processedText: "short"
+        )
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        _ = await service.prepareActiveModelIfAvailable()
+        fakes.clock.setNowMilliseconds(1_000)
+        _ = await service.handleTriggerEvent(.triggerDown(timestampMs: 1_000))
+        await waitUntil { fakes.clock.sleepCount() == 1 }
+        fakes.clock.fireOldestSleep(nowMilliseconds: 1_250)
+        await waitUntil {
+            service.status == .recording(speechDetected: false)
+        }
+        fakes.clock.setNowMilliseconds(1_320)
+
+        let action = await service.handleTriggerEvent(
+            .triggerUp(timestampMs: 1_320)
+        )
+        let startCount = await fakes.audio.startCount()
+        let finishCount = await fakes.audio.finishCount()
+        let transcribeCount = await fakes.transcriber.transcribeCount()
+        let insertedTexts = await fakes.inserter.insertedTexts()
+        let timing = await fakes.diagnostics.captureTimings().last
+
+        XCTAssertEqual(action, .finishRecording)
+        XCTAssertEqual(startCount, 1)
+        XCTAssertEqual(finishCount, 1)
+        XCTAssertEqual(transcribeCount, 1)
+        XCTAssertEqual(insertedTexts, ["short"])
+        XCTAssertEqual(timing?.preASROutcome, "submitted_to_asr")
+        XCTAssertEqual(timing?.shortcutGuardSpeechDetected, false)
+        XCTAssertEqual(timing?.triggerHoldDurationMs, 320)
+    }
+
+    func testCaptureTimingUsesStartAndFirstRetainedSampleCallbacks() async {
+        let fakes = RuntimeFakes.ready(
+            transcript: "timed",
+            processedText: "timed"
+        )
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        _ = await service.prepareActiveModelIfAvailable()
+        fakes.clock.setNowMilliseconds(2_000)
+        _ = await service.handleTriggerEvent(.triggerDown(timestampMs: 2_000))
+
+        fakes.clock.setNowMilliseconds(2_012)
+        await fakes.audio.emitCaptureStarted(callbackIndex: 0)
+        fakes.clock.setNowMilliseconds(2_060)
+        await fakes.audio.emitFirstAudio(
+            firstSampleUptimeMilliseconds: 2_040,
+            callbackIndex: 0
+        )
+        fakes.clock.fireOldestSleep(nowMilliseconds: 2_250)
+        await waitUntil {
+            service.status == .recording(speechDetected: false)
+        }
+        fakes.clock.setNowMilliseconds(2_300)
+        _ = await service.handleTriggerEvent(.triggerUp(timestampMs: 2_300))
+
+        let timings = await fakes.diagnostics.captureTimings()
+        let timing = try? XCTUnwrap(timings.last)
+        XCTAssertEqual(timing?.triggerToCaptureRequestMs, 0)
+        XCTAssertEqual(timing?.triggerToCaptureStartMs, 12)
+        XCTAssertEqual(timing?.triggerToFirstAudioMs, 40)
+        XCTAssertEqual(timing?.triggerHoldDurationMs, 300)
+    }
+
+    func testCaptureTimingUsesHotkeyEventTimestampAsZeroPoint() async {
+        let fakes = RuntimeFakes.ready(
+            transcript: "timed",
+            processedText: "timed"
+        )
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        _ = await service.prepareActiveModelIfAvailable()
+        fakes.clock.setNowMilliseconds(2_000)
+        _ = await service.handleTriggerEvent(.triggerDown(timestampMs: 1_900))
+
+        fakes.clock.setNowMilliseconds(2_010)
+        await fakes.audio.emitCaptureStarted(callbackIndex: 0)
+        await fakes.audio.emitFirstAudio(
+            firstSampleUptimeMilliseconds: 2_020,
+            callbackIndex: 0
+        )
+        fakes.clock.fireOldestSleep(nowMilliseconds: 2_250)
+        await waitUntil {
+            service.status == .recording(speechDetected: false)
+        }
+        fakes.clock.setNowMilliseconds(2_350)
+        _ = await service.handleTriggerEvent(.triggerUp(timestampMs: 2_300))
+
+        let timing = await fakes.diagnostics.captureTimings().last
+        XCTAssertEqual(timing?.triggerToCaptureRequestMs, 100)
+        XCTAssertEqual(timing?.triggerToCaptureStartMs, 110)
+        XCTAssertEqual(timing?.triggerToFirstAudioMs, 120)
+        XCTAssertEqual(timing?.triggerHoldDurationMs, 400)
+    }
+
+    func testPersistedMicrophoneAndExclusionChangesApplyWithoutAdmissionReload() async {
+        let target = InsertionTargetIdentity.fixture
+        let fakes = RuntimeFakes.ready(target: target)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        _ = await service.prepareActiveModelIfAvailable()
+        let settingsLoadsBefore = await fakes.settings.loadCount()
+        var preferences = AppPreferences.defaults
+        preferences.microphoneSelection = .device(
+            deviceUID: "fixture-input",
+            lastSeenDisplayName: "Fixture Input"
+        )
+        service.applyPersistedPreferences(preferences)
+
+        _ = await service.handleTriggerEvent(.triggerDown(timestampMs: 0))
+        let selectedMicrophone = await fakes.audio.lastMicrophoneSelection()
+        _ = await service.handleTriggerEvent(.triggerUp(timestampMs: 100))
+
+        preferences.excludedApps = [
+            ExcludedApp(
+                bundleIdentifier: target.bundleIdentifier!,
+                displayName: "Fixture"
+            )
+        ]
+        service.applyPersistedPreferences(preferences)
+        let excludedAction = await service.handleTriggerEvent(
+            .triggerDown(timestampMs: 200)
+        )
+        let settingsLoadsAfter = await fakes.settings.loadCount()
+        let startCount = await fakes.audio.startCount()
+
+        XCTAssertEqual(
+            selectedMicrophone,
+            .device(
+                deviceUID: "fixture-input",
+                lastSeenDisplayName: "Fixture Input"
+            )
+        )
+        XCTAssertEqual(excludedAction, .none)
+        XCTAssertEqual(service.status, .blocked(.excludedApp))
+        XCTAssertEqual(startCount, 1)
+        XCTAssertEqual(settingsLoadsAfter, settingsLoadsBefore)
+    }
+
+    func testSuccessfulPhysicalTriggerPreservesKeyDownInsertionTarget() async {
+        let target = InsertionTargetIdentity.fixture
+        let fakes = RuntimeFakes.ready(
+            transcript: "targeted",
+            processedText: "targeted",
+            target: target
+        )
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        _ = await service.prepareActiveModelIfAvailable()
+
+        _ = await service.handleTriggerEvent(.triggerDown(timestampMs: 0))
+        await waitUntil { fakes.clock.sleepCount() == 1 }
+        fakes.clock.fireOldestSleep(nowMilliseconds: 250)
+        await waitUntil {
+            service.status == .recording(speechDetected: false)
+        }
+        _ = await service.handleTriggerEvent(.triggerUp(timestampMs: 300))
+
+        let insertionTargets = await fakes.inserter.insertionTargets()
+        XCTAssertEqual(insertionTargets, [Optional(target)])
+    }
+
+    func testSpeechDuringArmedWindowIsLatchedWhenActivationCommits() async {
+        let fakes = RuntimeFakes.ready()
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        _ = await service.prepareActiveModelIfAvailable()
+
+        _ = await service.handleTriggerEvent(.triggerDown(timestampMs: 0))
+        await fakes.audio.emitSpeech(callbackIndex: 0)
+        await settle()
+        XCTAssertEqual(service.status, .waitingForActivation)
+
+        await waitUntil { fakes.clock.sleepCount() == 1 }
+        fakes.clock.fireOldestSleep(nowMilliseconds: 250)
+        await waitUntil {
+            service.status == .recording(speechDetected: true)
+        }
+        XCTAssertEqual(service.status, .recording(speechDetected: true))
+    }
+
+    func testReleaseWhileAudioStartIsSuspendedCannotLeaveLateCapture() async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.audio.setSuspendStartUntilReleased(true)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        _ = await service.prepareActiveModelIfAvailable()
+        let down = Task {
+            await service.handleTriggerEvent(.triggerDown(timestampMs: 0))
+        }
+        await waitUntil { await fakes.audio.isStartSuspended() }
+
+        let releaseAction = await service.handleTriggerEvent(
+            .triggerUp(timestampMs: 100)
+        )
+        await fakes.audio.releaseStart()
+        _ = await down.value
+        let finishCount = await fakes.audio.finishCount()
+        let transcribeCount = await fakes.transcriber.transcribeCount()
+
+        XCTAssertEqual(releaseAction, .discardRecording)
+        XCTAssertEqual(finishCount, 0)
+        XCTAssertEqual(transcribeCount, 0)
+        XCTAssertNil(service.currentSegment)
+        XCTAssertEqual(
+            service.status,
+            .cancelled(.releasedBeforeActivation)
+        )
+    }
+
+    func testNewCaptureWaitsUntilCancelledAudioStartHasFinishedCleanup() async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.audio.setSuspendStartUntilReleased(true)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        _ = await service.prepareActiveModelIfAvailable()
+        let firstDown = Task {
+            await service.handleTriggerEvent(.triggerDown(timestampMs: 0))
+        }
+        await waitUntil { await fakes.audio.isStartSuspended() }
+
+        _ = await service.handleTriggerEvent(.triggerUp(timestampMs: 100))
+        service.dismissTerminalStatus()
+        let blockedAction = await service.handleTriggerEvent(
+            .triggerDown(timestampMs: 200)
+        )
+        let startCountWhilePending = await fakes.audio.startCount()
+
+        XCTAssertEqual(blockedAction, .none)
+        XCTAssertEqual(startCountWhilePending, 1)
+
+        await fakes.audio.setSuspendStartUntilReleased(false)
+        await fakes.audio.releaseStart()
+        _ = await firstDown.value
+        service.dismissTerminalStatus()
+
+        let nextAction = await service.handleTriggerEvent(
+            .triggerDown(timestampMs: 300)
+        )
+        let startCountAfterCleanup = await fakes.audio.startCount()
+        XCTAssertEqual(nextAction, .beginArmedCapture(delayMs: 250))
+        XCTAssertEqual(startCountAfterCleanup, 2)
+        _ = await service.handleTriggerEvent(.triggerUp(timestampMs: 400))
+    }
+
+    func testActivatedReleaseWhileAudioStartIsSuspendedFinishesWhenStartCompletes() async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.audio.setSuspendStartUntilReleased(true)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        _ = await service.prepareActiveModelIfAvailable()
+        let down = Task {
+            await service.handleTriggerEvent(.triggerDown(timestampMs: 0))
+        }
+        await waitUntil { await fakes.audio.isStartSuspended() }
+        await waitUntil { fakes.clock.sleepCount() == 1 }
+        fakes.clock.fireOldestSleep(nowMilliseconds: 250)
+        await settle()
+
+        let releaseAction = await service.handleTriggerEvent(
+            .triggerUp(timestampMs: 300)
+        )
+        await fakes.audio.releaseStart()
+        _ = await down.value
+        let finishCount = await fakes.audio.finishCount()
+        let transcribeCount = await fakes.transcriber.transcribeCount()
+
+        XCTAssertEqual(releaseAction, .finishRecording)
+        XCTAssertEqual(finishCount, 1)
+        XCTAssertEqual(transcribeCount, 1)
+        XCTAssertNil(service.currentSegment)
+        XCTAssertEqual(
+            service.status,
+            .completed(textLengthBucket: "1-50")
+        )
     }
 
     func testExcludedAppAtKeyDownDoesNotStartActivationOrAudioAndHidesOnRelease() async {
@@ -626,7 +1217,7 @@ final class AppDictationServiceTests: XCTestCase {
 
         XCTAssertEqual(downAction, .none)
         XCTAssertEqual(service.status, .blocked(.excludedApp))
-        XCTAssertEqual(fakes.clock.sleepCount(), 0)
+        XCTAssertEqual(fakes.clock.sleepCount(), 1)
         XCTAssertEqual(startCount, 0)
         await waitUntil { await fakes.diagnostics.excludedAppBlockCount() == 1 }
 
@@ -645,7 +1236,7 @@ final class AppDictationServiceTests: XCTestCase {
 
         XCTAssertEqual(action, .none)
         XCTAssertEqual(service.status, .idle)
-        XCTAssertEqual(fakes.clock.sleepCount(), 0)
+        XCTAssertEqual(fakes.clock.sleepCount(), 1)
         XCTAssertEqual(startCount, 0)
     }
 
@@ -690,11 +1281,37 @@ final class AppDictationServiceTests: XCTestCase {
         let downAction = await downTask.value
         let startCount = await fakes.audio.startCount()
 
-        XCTAssertEqual(upAction, .none)
+        XCTAssertEqual(upAction, .discardRecording)
         XCTAssertEqual(downAction, .none)
-        XCTAssertEqual(fakes.clock.sleepCount(), 0)
+        XCTAssertEqual(fakes.clock.sleepCount(), 1)
         XCTAssertEqual(startCount, 0)
-        XCTAssertEqual(service.status, .idle)
+        XCTAssertEqual(
+            service.status,
+            .cancelled(.releasedBeforeActivation)
+        )
+    }
+
+    func testReleaseAfterThresholdWhileTargetCaptureIsSuspendedDoesNotStartMicrophoneLate() async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.targetCapturer.setSuspendUntilReleased(true)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        let downTask = Task {
+            await service.handleTriggerEvent(.triggerDown(timestampMs: 0))
+        }
+        await waitUntil { await fakes.targetCapturer.isSuspended() }
+
+        let upAction = await service.handleTriggerEvent(
+            .triggerUp(timestampMs: 300)
+        )
+        await fakes.targetCapturer.release()
+        let downAction = await downTask.value
+        let startCount = await fakes.audio.startCount()
+
+        XCTAssertEqual(upAction, .finishRecording)
+        XCTAssertEqual(downAction, .none)
+        XCTAssertEqual(startCount, 0)
+        XCTAssertEqual(service.status, .cancelled(.noSpeechDetected))
     }
 
     func testShortcutWhileTargetCaptureIsSuspendedDoesNotArmActivation() async {
@@ -714,11 +1331,14 @@ final class AppDictationServiceTests: XCTestCase {
         let downAction = await downTask.value
         let startCount = await fakes.audio.startCount()
 
-        XCTAssertEqual(shortcutAction, .none)
+        XCTAssertEqual(shortcutAction, .cancelAsShortcut)
         XCTAssertEqual(downAction, .none)
-        XCTAssertEqual(fakes.clock.sleepCount(), 0)
+        XCTAssertEqual(fakes.clock.sleepCount(), 1)
         XCTAssertEqual(startCount, 0)
-        XCTAssertEqual(service.status, .idle)
+        XCTAssertEqual(
+            service.status,
+            .cancelled(.shortcutUseBeforeSpeech)
+        )
     }
 
     func testReadinessBlockerPreventsAudioStart() async {
@@ -747,6 +1367,72 @@ final class AppDictationServiceTests: XCTestCase {
 
         let insertedTexts = await fakes.inserter.insertedTexts()
         XCTAssertEqual(insertedTexts, [])
+        XCTAssertEqual(service.status, .cancelled(.escapeKey))
+    }
+
+    func testCancellationDuringMultiWindowProcessingRetainsRuntimeFenceUntilProcessorStops() async {
+        let audio = CanonicalAudioBuffer(
+            sampleRate: 100,
+            samples: Array(repeating: 0.25, count: 55 * 100)
+        )
+        let fakes = RuntimeFakes.ready(audio: audio, transcript: "old session")
+        await fakes.models.setActiveModel(
+            .fixtureWithMaximumAudioSeconds(30)
+        )
+        await fakes.transcriber.setSuspendUntilReleased(true)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+        let task = Task { await service.handleTriggerAction(.finishRecording) }
+        await waitUntil { await fakes.transcriber.isSuspended() }
+
+        await service.cancelActiveSession(reason: .escapeKey)
+        guard service.currentSegment != nil,
+              !service.allowsModelTransactions else {
+            await fakes.transcriber.setSuspendUntilReleased(false)
+            await fakes.transcriber.release()
+            await task.value
+            return XCTFail(
+                "Cancellation released runtime ownership before processing stopped"
+            )
+        }
+
+        let startCountBefore = await fakes.audio.startCount()
+        let prepareCountBefore = await fakes.transcriber.prepareCount()
+        await service.handleTriggerAction(.beginRecording)
+        _ = await service.prepareActiveModelIfAvailable()
+        let startCountWhileStopping = await fakes.audio.startCount()
+        let prepareCountWhileStopping = await fakes.transcriber.prepareCount()
+
+        XCTAssertEqual(startCountWhileStopping, startCountBefore)
+        XCTAssertEqual(prepareCountWhileStopping, prepareCountBefore)
+
+        var crossedRuntimeBoundary = false
+        let runtimeBoundary = Task { @MainActor in
+            await service.performPurposeRuntimeTransaction(
+                waitingForCurrentSegmentUsing:
+                    RuntimeActiveModel.fixture.id
+            ) {
+                crossedRuntimeBoundary = true
+            }
+        }
+        await settle()
+        XCTAssertFalse(crossedRuntimeBoundary)
+
+        await fakes.transcriber.setSuspendUntilReleased(false)
+        await fakes.transcriber.release()
+        await task.value
+        await runtimeBoundary.value
+
+        let transcribeCount = await fakes.transcriber.transcribeCount()
+        let insertedTexts = await fakes.inserter.insertedTexts()
+        let runtimeFailures = await fakes.diagnostics.runtimeFailures()
+        XCTAssertEqual(transcribeCount, 1)
+        XCTAssertEqual(insertedTexts, [])
+        XCTAssertTrue(runtimeFailures.isEmpty)
+        XCTAssertTrue(crossedRuntimeBoundary)
+        XCTAssertNil(service.currentSegment)
+        XCTAssertTrue(service.allowsModelTransactions)
         XCTAssertEqual(service.status, .cancelled(.escapeKey))
     }
 
@@ -840,7 +1526,9 @@ final class AppDictationServiceTests: XCTestCase {
         await fakes.transcriber.releasePrepare()
         await task.value
 
+        let runtimeFailures = await fakes.diagnostics.runtimeFailures()
         XCTAssertEqual(service.status, .cancelled(.escapeKey))
+        XCTAssertTrue(runtimeFailures.isEmpty)
     }
 
     func testTranscriptionErrorAfterCancellationKeepsCancellationStatus() async {
@@ -857,7 +1545,9 @@ final class AppDictationServiceTests: XCTestCase {
         await fakes.transcriber.release()
         await task.value
 
+        let runtimeFailures = await fakes.diagnostics.runtimeFailures()
         XCTAssertEqual(service.status, .cancelled(.escapeKey))
+        XCTAssertTrue(runtimeFailures.isEmpty)
     }
 
     func testDuplicateFinishWhileFirstFinishIsSuspendedDoesNotProcessTwice() async {
@@ -898,12 +1588,14 @@ final class AppDictationServiceTests: XCTestCase {
         }
         await settle()
         let startCountAfterStaleTimer = await fakes.audio.startCount()
-        XCTAssertEqual(startCountAfterStaleTimer, 0)
+        XCTAssertEqual(startCountAfterStaleTimer, 2)
 
         if fakes.clock.sleepCount() > 0 {
             fakes.clock.fireOldestSleep(nowMilliseconds: 270)
         }
-        await waitUntil { await fakes.audio.startCount() == 1 }
+        await settle()
+        let finalStartCount = await fakes.audio.startCount()
+        XCTAssertEqual(finalStartCount, 2)
         XCTAssertEqual(service.status, .recording(speechDetected: false))
     }
 
@@ -919,8 +1611,11 @@ final class AppDictationServiceTests: XCTestCase {
         await settle()
 
         let startCount = await fakes.audio.startCount()
-        XCTAssertEqual(service.status, .idle)
-        XCTAssertEqual(startCount, 0)
+        XCTAssertEqual(
+            service.status,
+            .cancelled(.releasedBeforeActivation)
+        )
+        XCTAssertEqual(startCount, 1)
     }
 
     func testCancellationWhileReadinessLoadIsSuspendedPreventsAudioStart() async {
@@ -941,11 +1636,11 @@ final class AppDictationServiceTests: XCTestCase {
 
     func testReleaseWhileSettingsLoadIsSuspendedPreventsAudioStart() async {
         let fakes = RuntimeFakes.ready()
-        await fakes.settings.suspendLoad(callNumber: 2)
+        await fakes.settings.suspendLoad(callNumber: 1)
         let service = AppDictationService(dependencies: fakes.dependencies)
 
         let task = Task { await service.handleTriggerAction(.beginRecording) }
-        await waitUntil { await fakes.settings.suspendedLoadCall() == 2 }
+        await waitUntil { await fakes.settings.suspendedLoadCall() == 1 }
         await service.handleTriggerAction(.discardRecording)
         await fakes.settings.releaseLoad()
         await task.value
@@ -1011,6 +1706,24 @@ final class AppDictationServiceTests: XCTestCase {
         XCTAssertEqual(transcribeCount, 0)
     }
 
+    func testFinishWithFullSilenceCancelsBeforeASR() async {
+        let fakes = RuntimeFakes.ready(
+            audio: CanonicalAudioBuffer(
+                samples: Array(repeating: 0, count: 3_200)
+            )
+        )
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+        await service.handleTriggerAction(.finishRecording)
+
+        XCTAssertEqual(service.status, .cancelled(.noSpeechDetected))
+        let insertedTexts = await fakes.inserter.insertedTexts()
+        let transcribeCount = await fakes.transcriber.transcribeCount()
+        XCTAssertEqual(insertedTexts, [])
+        XCTAssertEqual(transcribeCount, 0)
+    }
+
     func testMaximumDurationAutomaticallyFinishesActiveRecording() async {
         let fakes = RuntimeFakes.ready(processedText: "duration capped")
         let service = AppDictationService(dependencies: fakes.dependencies)
@@ -1023,6 +1736,112 @@ final class AppDictationServiceTests: XCTestCase {
 
         XCTAssertEqual(finishCount, 1)
         XCTAssertEqual(insertedTexts, ["duration capped"])
+    }
+
+    func testRecordingProgressUsesCaptureStartForSessionDeadline() async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.audio.setInvokesCaptureStartedDuringStart(true)
+        fakes.clock.setNowMilliseconds(1_250)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+
+        XCTAssertEqual(
+            service.sessionProgress,
+            .recording(deadlineUptimeMilliseconds: 301_250)
+        )
+    }
+
+    func testMaximumDurationPublishesSessionLimitReasonWhileProcessing() async {
+        let fakes = RuntimeFakes.ready(processedText: "duration capped")
+        await fakes.transcriber.setSuspendUntilReleased(true)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+        await fakes.audio.emitMaximumDuration(callbackIndex: 0)
+        await waitUntil { await fakes.transcriber.isSuspended() }
+
+        guard case let .processing(_, _, endReason) = service.sessionProgress
+        else {
+            return XCTFail("Expected processing session progress")
+        }
+        XCTAssertEqual(endReason, .sessionLimitReached)
+
+        await fakes.transcriber.release()
+        await waitUntil {
+            service.status == .completed(textLengthBucket: "1-50")
+        }
+    }
+
+    func testPhysicalReleaseAfterSessionLimitDoesNotFinishOrInsertTwice() async {
+        let fakes = RuntimeFakes.ready(processedText: "duration capped")
+        await fakes.transcriber.setSuspendUntilReleased(true)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        _ = await service.prepareActiveModelIfAvailable()
+
+        _ = await service.handleTriggerEvent(.triggerDown(timestampMs: 0))
+        await waitUntil { fakes.clock.sleepCount() == 1 }
+        fakes.clock.fireOldestSleep(nowMilliseconds: 250)
+        await waitUntil {
+            service.status == .recording(speechDetected: false)
+        }
+
+        await fakes.audio.emitMaximumDuration(callbackIndex: 0)
+        await waitUntil { await fakes.transcriber.isSuspended() }
+        let releaseAction = await service.handleTriggerEvent(
+            .triggerUp(timestampMs: 300_000)
+        )
+
+        XCTAssertEqual(releaseAction, .none)
+        XCTAssertEqual(service.status, .processing)
+        let finishCountDuringProcessing = await fakes.audio.finishCount()
+        XCTAssertEqual(finishCountDuringProcessing, 1)
+
+        await fakes.transcriber.release()
+        await waitUntil {
+            service.status == .completed(textLengthBucket: "1-50")
+        }
+
+        let finishCount = await fakes.audio.finishCount()
+        let insertedTexts = await fakes.inserter.insertedTexts()
+        let processedRawTexts = await fakes.postProcessor.processedRawTexts()
+        let insertionAttemptCount =
+            await fakes.diagnostics.insertionAttemptCount()
+        XCTAssertEqual(finishCount, 1)
+        XCTAssertEqual(insertedTexts, ["duration capped"])
+        XCTAssertEqual(processedRawTexts.count, 1)
+        XCTAssertEqual(insertionAttemptCount, 1)
+    }
+
+    func testLongSessionUsesModelSafeWindowsAndInsertsOnlyOnce() async {
+        let audio = CanonicalAudioBuffer(
+            sampleRate: 100,
+            samples: Array(repeating: 0.25, count: 55 * 100)
+        )
+        let fakes = RuntimeFakes.ready(
+            audio: audio,
+            processedText: "one final insertion"
+        )
+        await fakes.models.setActiveModel(
+            .fixtureWithMaximumAudioSeconds(30)
+        )
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+        await service.handleTriggerAction(.finishRecording)
+
+        let transcribeCount = await fakes.transcriber.transcribeCount()
+        let processedRawTexts = await fakes.postProcessor.processedRawTexts()
+        let insertedTexts = await fakes.inserter.insertedTexts()
+        let completionDiagnostics =
+            await fakes.diagnostics.transcriptionCompletionCount()
+        let insertionDiagnostics =
+            await fakes.diagnostics.insertionAttemptCount()
+        XCTAssertEqual(transcribeCount, 3)
+        XCTAssertEqual(processedRawTexts.count, 1)
+        XCTAssertEqual(insertedTexts, ["one final insertion"])
+        XCTAssertEqual(completionDiagnostics, 1)
+        XCTAssertEqual(insertionDiagnostics, 1)
     }
 
     func testCurrentSegmentFinishesWhenActiveSelectionDisappears() async {
@@ -1181,6 +2000,37 @@ final class AppDictationServiceTests: XCTestCase {
             XCTAssertEqual(service.status, .idle)
             XCTAssertEqual(diagnosticCount, 1)
         }
+    }
+
+    func testCancellationWhileDiscardDiagnosticIsSuspendedPreservesCancellation() async {
+        let fakes = RuntimeFakes.ready(
+            transcriptionResult: TranscriptionResult(
+                text: "plausible words",
+                noSpeechProbability: 0.61,
+                averageLogProbability: -0.1,
+                compressionRatio: 1.0
+            )
+        )
+        await fakes.diagnostics.setSuspendTranscriptionDiscardUntilReleased(true)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+
+        await service.handleTriggerAction(.beginRecording)
+        let finish = Task {
+            await service.handleTriggerAction(.finishRecording)
+        }
+        await waitUntil {
+            await fakes.diagnostics.isTranscriptionDiscardSuspended()
+        }
+
+        await service.cancelActiveSession(reason: .escapeKey)
+        await fakes.diagnostics.releaseTranscriptionDiscard()
+        await finish.value
+
+        let processedRawTexts = await fakes.postProcessor.processedRawTexts()
+        let insertedTexts = await fakes.inserter.insertedTexts()
+        XCTAssertEqual(processedRawTexts, [])
+        XCTAssertEqual(insertedTexts, [])
+        XCTAssertEqual(service.status, .cancelled(.escapeKey))
     }
 
     func testEmptyProcessedTextDoesNotInsertAndReturnsIdle() async {
@@ -1591,6 +2441,10 @@ private actor FakeRuntimeSettings: RuntimeSettingsProviding {
         self.preferences = preferences
     }
 
+    func loadCount() -> Int {
+        loadCallCount
+    }
+
     func suspendLoad(callNumber: Int) {
         suspendedCallNumbers.insert(callNumber)
     }
@@ -1633,6 +2487,8 @@ private actor FakeRuntimeModels: RuntimeModelResolving {
     private var selectableVoiceCleaningModelsByID:
         [String: RuntimeActiveModel] = [:]
     private var readinessOverride: RuntimeModelReadiness?
+    private var activeModelResolutionCountValue = 0
+    private var readinessCheckCountValue = 0
     private var suspendVoiceCleaningResolution = false
     private var voiceCleaningResolutionContinuation:
         CheckedContinuation<Void, Never>?
@@ -1643,6 +2499,7 @@ private actor FakeRuntimeModels: RuntimeModelResolving {
     }
 
     func resolveActiveModel(preferences: AppPreferences) async -> RuntimeActiveModel? {
+        activeModelResolutionCountValue += 1
         if let modelID = preferences.activeModelID,
            let selectableModel = selectableModelsByID[modelID] {
             return selectableModel
@@ -1651,6 +2508,7 @@ private actor FakeRuntimeModels: RuntimeModelResolving {
     }
 
     func readiness(for model: RuntimeActiveModel?) async -> RuntimeModelReadiness {
+        readinessCheckCountValue += 1
         if let readinessOverride {
             return readinessOverride
         }
@@ -1676,6 +2534,14 @@ private actor FakeRuntimeModels: RuntimeModelResolving {
     func setActiveModel(_ activeModel: RuntimeActiveModel?) {
         self.activeModel = activeModel
         readinessOverride = nil
+    }
+
+    func activeModelResolutionCount() -> Int {
+        activeModelResolutionCountValue
+    }
+
+    func readinessCheckCount() -> Int {
+        readinessCheckCountValue
     }
 
     func setVoiceCleaningModel(_ model: RuntimeActiveModel?) {
@@ -1716,6 +2582,8 @@ private actor FakeRuntimeAudio: RuntimeAudioRecording {
     private var startError: Error?
     private var finishError: Error?
     private var callbacks: [@Sendable () -> Void] = []
+    private var captureStartedCallbacks: [@Sendable () -> Void] = []
+    private var firstAudioCallbacks: [@Sendable (Int) -> Void] = []
     private var maximumDurationCallbacks: [@Sendable () -> Void] = []
     private var recordingErrorCallbacks:
         [@Sendable (LiveAudioRecorderError) -> Void] = []
@@ -1723,7 +2591,9 @@ private actor FakeRuntimeAudio: RuntimeAudioRecording {
     private var finishCountValue = 0
     private var discardCountValue = 0
     private var maximumDurationSecondsValues: [Double] = []
+    private var microphoneSelections: [MicrophoneSelection] = []
     private var suspendStartUntilReleased = false
+    private var invokesCaptureStartedDuringStart = false
     private var startSuspensionContinuation: CheckedContinuation<Void, Never>?
     private var suspendedFinishCallNumbers: Set<Int> = []
     private var suspendedFinishCallValue: Int?
@@ -1745,6 +2615,10 @@ private actor FakeRuntimeAudio: RuntimeAudioRecording {
         maximumDurationSecondsValues.last
     }
 
+    func lastMicrophoneSelection() -> MicrophoneSelection? {
+        microphoneSelections.last
+    }
+
     func isStartSuspended() -> Bool {
         startSuspensionContinuation != nil
     }
@@ -1760,6 +2634,8 @@ private actor FakeRuntimeAudio: RuntimeAudioRecording {
     func startRecording(
         microphone: MicrophoneSelection,
         maximumDurationSeconds: Double,
+        onCaptureStarted: @escaping @Sendable () -> Void,
+        onFirstAudio: @escaping @Sendable (Int) -> Void,
         onSpeechDetected: @escaping @Sendable () -> Void,
         onMaximumDurationReached: @escaping @Sendable () -> Void,
         onRecordingError:
@@ -1767,6 +2643,7 @@ private actor FakeRuntimeAudio: RuntimeAudioRecording {
     ) async throws {
         startCountValue += 1
         maximumDurationSecondsValues.append(maximumDurationSeconds)
+        microphoneSelections.append(microphone)
         if suspendStartUntilReleased {
             await withCheckedContinuation { continuation in
                 startSuspensionContinuation = continuation
@@ -1775,9 +2652,14 @@ private actor FakeRuntimeAudio: RuntimeAudioRecording {
         if let startError {
             throw startError
         }
+        captureStartedCallbacks.append(onCaptureStarted)
+        firstAudioCallbacks.append(onFirstAudio)
         callbacks.append(onSpeechDetected)
         maximumDurationCallbacks.append(onMaximumDurationReached)
         recordingErrorCallbacks.append(onRecordingError)
+        if invokesCaptureStartedDuringStart {
+            onCaptureStarted()
+        }
     }
 
     func finishRecording() async throws -> CanonicalAudioBuffer {
@@ -1811,6 +2693,10 @@ private actor FakeRuntimeAudio: RuntimeAudioRecording {
         self.suspendStartUntilReleased = suspendStartUntilReleased
     }
 
+    func setInvokesCaptureStartedDuringStart(_ value: Bool) {
+        invokesCaptureStartedDuringStart = value
+    }
+
     func suspendFinish(callNumber: Int) {
         suspendedFinishCallNumbers.insert(callNumber)
     }
@@ -1833,6 +2719,23 @@ private actor FakeRuntimeAudio: RuntimeAudioRecording {
             return
         }
         callbacks[callbackIndex]()
+    }
+
+    func emitCaptureStarted(callbackIndex: Int) {
+        guard captureStartedCallbacks.indices.contains(callbackIndex) else {
+            return
+        }
+        captureStartedCallbacks[callbackIndex]()
+    }
+
+    func emitFirstAudio(
+        firstSampleUptimeMilliseconds: Int,
+        callbackIndex: Int
+    ) {
+        guard firstAudioCallbacks.indices.contains(callbackIndex) else {
+            return
+        }
+        firstAudioCallbacks[callbackIndex](firstSampleUptimeMilliseconds)
     }
 
     func emitMaximumDuration(callbackIndex: Int) {
@@ -1859,6 +2762,7 @@ private actor FakeRuntimeTranscriber: RuntimeTranscribing {
     private var prepareCountValue = 0
     private var preparedModelIDValues: [String] = []
     private var transcribeCountValue = 0
+    private var unloadCountValue = 0
     private var prepareError: Error?
     private var transcribeError: Error?
     private var suspendPrepareUntilReleased = false
@@ -1883,6 +2787,10 @@ private actor FakeRuntimeTranscriber: RuntimeTranscribing {
 
     func transcribeCount() -> Int {
         transcribeCountValue
+    }
+
+    func unloadCount() -> Int {
+        unloadCountValue
     }
 
     func isSuspended() -> Bool {
@@ -1937,6 +2845,7 @@ private actor FakeRuntimeTranscriber: RuntimeTranscribing {
     }
 
     func unload() async {
+        unloadCountValue += 1
         readinessValue = .noActiveModel
     }
 
@@ -1988,6 +2897,7 @@ private actor FakeRuntimeVoiceCleaner: RuntimeVoiceCleaning {
     private var preparedModelIDValues: [String] = []
     private var cleanError: Error?
     private var cleanCalls = 0
+    private var unloadCalls = 0
 
     func prepare(model: RuntimeActiveModel) async throws {
         prepareCalls += 1
@@ -2005,7 +2915,13 @@ private actor FakeRuntimeVoiceCleaner: RuntimeVoiceCleaning {
         return output ?? audio
     }
 
-    func unload() async {}
+    func unload() async {
+        unloadCalls += 1
+    }
+
+    func unloadCount() -> Int {
+        unloadCalls
+    }
 
     func setOutput(_ output: TranscriptionAudioBuffer?) {
         self.output = output
@@ -2037,11 +2953,16 @@ private actor FakeInsertionService: InsertionService {
         PasteInsertionReport(pasteboardRestored: true, pasteboardRestoreFailed: false)
     )
     private var insertedTextsValue: [String] = []
+    private var insertionTargetsValue: [InsertionTargetIdentity?] = []
     private var suspendUntilReleased = false
     private var suspensionContinuation: CheckedContinuation<Void, Never>?
 
     func insertedTexts() -> [String] {
         insertedTextsValue
+    }
+
+    func insertionTargets() -> [InsertionTargetIdentity?] {
+        insertionTargetsValue
     }
 
     func isSuspended() -> Bool {
@@ -2050,6 +2971,7 @@ private actor FakeInsertionService: InsertionService {
 
     func insert(_ request: InsertionRequest) async -> InsertionOutcome {
         insertedTextsValue.append(request.text)
+        insertionTargetsValue.append(request.target)
         if suspendUntilReleased {
             await withCheckedContinuation { continuation in
                 suspensionContinuation = continuation
@@ -2073,6 +2995,15 @@ private actor FakeInsertionService: InsertionService {
     }
 }
 
+private struct CaptureTimingRecord: Equatable, Sendable {
+    let triggerToCaptureRequestMs: Int?
+    let triggerToCaptureStartMs: Int?
+    let triggerToFirstAudioMs: Int?
+    let triggerHoldDurationMs: Int?
+    let shortcutGuardSpeechDetected: Bool
+    let preASROutcome: String
+}
+
 private actor FakeRuntimeDiagnostics: RuntimeDiagnosticsLogging {
     private var transcriptionCompletionCountValue = 0
     private var transcriptionDiscardCountValue = 0
@@ -2081,6 +3012,10 @@ private actor FakeRuntimeDiagnostics: RuntimeDiagnosticsLogging {
     private var modelLoadCountValue = 0
     private var voiceCleaningCountValue = 0
     private var runtimeFailureValues: [(stage: String, reasonCode: String)] = []
+    private var captureTimingValues: [CaptureTimingRecord] = []
+    private var suspendsTranscriptionDiscard = false
+    private var transcriptionDiscardContinuation:
+        CheckedContinuation<Void, Never>?
 
     func log(_ event: DiagnosticEvent) async {
         switch event {
@@ -2088,8 +3023,32 @@ private actor FakeRuntimeDiagnostics: RuntimeDiagnosticsLogging {
             transcriptionCompletionCountValue += 1
         case .transcriptionDiscarded:
             transcriptionDiscardCountValue += 1
+            if suspendsTranscriptionDiscard {
+                await withCheckedContinuation { continuation in
+                    transcriptionDiscardContinuation = continuation
+                }
+            }
         case .dictationBlockedExcludedApp:
             excludedAppBlockCountValue += 1
+        case let .dictationCaptureTiming(
+            triggerToCaptureRequestMs,
+            triggerToCaptureStartMs,
+            triggerToFirstAudioMs,
+            triggerHoldDurationMs,
+            shortcutGuardSpeechDetected,
+            preASROutcome
+        ):
+            captureTimingValues.append(
+                CaptureTimingRecord(
+                    triggerToCaptureRequestMs: triggerToCaptureRequestMs,
+                    triggerToCaptureStartMs: triggerToCaptureStartMs,
+                    triggerToFirstAudioMs: triggerToFirstAudioMs,
+                    triggerHoldDurationMs: triggerHoldDurationMs,
+                    shortcutGuardSpeechDetected:
+                        shortcutGuardSpeechDetected,
+                    preASROutcome: preASROutcome
+                )
+            )
         case .insertionAttempt:
             insertionAttemptCountValue += 1
         case .modelLoad:
@@ -2130,6 +3089,25 @@ private actor FakeRuntimeDiagnostics: RuntimeDiagnosticsLogging {
     func runtimeFailures() -> [(stage: String, reasonCode: String)] {
         runtimeFailureValues
     }
+
+    func setSuspendTranscriptionDiscardUntilReleased(_ suspended: Bool) {
+        suspendsTranscriptionDiscard = suspended
+    }
+
+    func isTranscriptionDiscardSuspended() -> Bool {
+        transcriptionDiscardContinuation != nil
+    }
+
+    func releaseTranscriptionDiscard() {
+        suspendsTranscriptionDiscard = false
+        let continuation = transcriptionDiscardContinuation
+        transcriptionDiscardContinuation = nil
+        continuation?.resume()
+    }
+
+    func captureTimings() -> [CaptureTimingRecord] {
+        captureTimingValues
+    }
 }
 
 private actor FakeRuntimePostProcessor: RuntimePostProcessing {
@@ -2152,6 +3130,7 @@ private actor FakeRuntimePostProcessor: RuntimePostProcessing {
 
 private final class FakeRuntimeClock: RuntimeClock, @unchecked Sendable {
     private struct SleepRequest {
+        let durationMilliseconds: Int
         let continuation: CheckedContinuation<Void, Never>
     }
 
@@ -2168,7 +3147,12 @@ private final class FakeRuntimeClock: RuntimeClock, @unchecked Sendable {
     func sleep(milliseconds: Int) async {
         await withCheckedContinuation { continuation in
             lock.lock()
-            sleeps.append(SleepRequest(continuation: continuation))
+            sleeps.append(
+                SleepRequest(
+                    durationMilliseconds: milliseconds,
+                    continuation: continuation
+                )
+            )
             lock.unlock()
         }
     }
@@ -2179,12 +3163,24 @@ private final class FakeRuntimeClock: RuntimeClock, @unchecked Sendable {
         return sleeps.count
     }
 
+    func oldestSleepDurationMilliseconds() -> Int? {
+        lock.lock()
+        defer { lock.unlock() }
+        return sleeps.first?.durationMilliseconds
+    }
+
     func fireOldestSleep(nowMilliseconds: Int) {
         lock.lock()
         nowMillisecondsValue = nowMilliseconds
         let request = sleeps.removeFirst()
         lock.unlock()
         request.continuation.resume()
+    }
+
+    func setNowMilliseconds(_ nowMilliseconds: Int) {
+        lock.lock()
+        nowMillisecondsValue = nowMilliseconds
+        lock.unlock()
     }
 }
 
