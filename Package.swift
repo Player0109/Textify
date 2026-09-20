@@ -108,7 +108,7 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/FluidInference/FluidAudio.git",
-            exact: "0.15.5"
+            exact: "0.15.7"
         ),
         .package(
             url: "https://github.com/ml-explore/mlx-swift.git",
