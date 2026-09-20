@@ -44,6 +44,22 @@ public struct DiagnosticsRedactor: Sendable {
     }
 
     private func redactJSONValue(_ value: Any, forKey key: String) -> Any {
+        if Self.numericMetricKeys.contains(key) {
+            guard let number = value as? NSNumber,
+                  CFGetTypeID(number) != CFBooleanGetTypeID()
+            else {
+                return "unknown"
+            }
+            return number
+        }
+        if Self.booleanMetricKeys.contains(key) {
+            guard let number = value as? NSNumber,
+                  CFGetTypeID(number) == CFBooleanGetTypeID()
+            else {
+                return "unknown"
+            }
+            return number
+        }
         switch value {
         case let string as String:
             return DiagnosticsStringSanitizer.sanitize(string, forKey: key)
@@ -96,10 +112,46 @@ public struct DiagnosticsRedactor: Sendable {
         "statusAfter",
         "statusBefore",
         "succeeded",
+        "shortcutGuardSpeechDetected",
         "targetChanged",
         "textLengthBucket",
         "timestamp",
-        "tier"
+        "tier",
+        "terminationReason",
+        "triggerHoldDurationMs",
+        "triggerToCaptureRequestMs",
+        "triggerToCaptureStartMs",
+        "triggerToFirstAudioMs",
+        "preASROutcome",
+        "windowCount"
+    ]
+
+    private static let numericMetricKeys: Set<String> = [
+        "audioDurationMs",
+        "averageLogProbability",
+        "compressionRatio",
+        "durationMs",
+        "errorCode",
+        "fallbackChunks",
+        "inferenceDurationMs",
+        "noSpeechProbability",
+        "triggerHoldDurationMs",
+        "triggerToCaptureRequestMs",
+        "triggerToCaptureStartMs",
+        "triggerToFirstAudioMs",
+        "windowCount",
+    ]
+
+    private static let booleanMetricKeys: Set<String> = [
+        "fallbackAttempted",
+        "pasteEventPosted",
+        "pasteOutcomeObservable",
+        "pasteboardSnapshotSucceeded",
+        "pasteboardWriteSucceeded",
+        "secureFieldDetected",
+        "shortcutGuardSpeechDetected",
+        "succeeded",
+        "targetChanged",
     ]
 }
 
@@ -130,6 +182,9 @@ enum DiagnosticsStringSanitizer {
             || key == "acceptedRevision"
             || key == "candidateRevision" {
             return sanitizeTimestamp(normalized)
+        }
+        if metricKeys.contains(key) {
+            return unknownValue
         }
 
         if let allowedValues = closedValueAllowlists[key] {
@@ -191,6 +246,31 @@ enum DiagnosticsStringSanitizer {
 
     private static let unknownValue = "unknown"
 
+    private static let metricKeys: Set<String> = [
+        "audioDurationMs",
+        "averageLogProbability",
+        "compressionRatio",
+        "durationMs",
+        "errorCode",
+        "fallbackAttempted",
+        "fallbackChunks",
+        "inferenceDurationMs",
+        "noSpeechProbability",
+        "pasteEventPosted",
+        "pasteOutcomeObservable",
+        "pasteboardSnapshotSucceeded",
+        "pasteboardWriteSucceeded",
+        "secureFieldDetected",
+        "shortcutGuardSpeechDetected",
+        "succeeded",
+        "targetChanged",
+        "triggerHoldDurationMs",
+        "triggerToCaptureRequestMs",
+        "triggerToCaptureStartMs",
+        "triggerToFirstAudioMs",
+        "windowCount"
+    ]
+
     private static let closedValueAllowlists: [String: Set<String>] = [
         "appLocationCategory": [
             "applications",
@@ -224,6 +304,7 @@ enum DiagnosticsStringSanitizer {
             "app_started",
             "catalog_update_rejected",
             "dictation_blocked_excluded_app",
+            "dictation_capture_timing",
             "insertion_attempt",
             "launch_at_login_change",
             "model_load",
@@ -253,6 +334,16 @@ enum DiagnosticsStringSanitizer {
             "bundled",
             "cached",
             "remote",
+            unknownValue
+        ],
+        "preASROutcome": [
+            "accidental_tap_discarded",
+            "capture_start_failed",
+            "empty_capture_discarded",
+            "escape_discarded",
+            "recording_error",
+            "shortcut_discarded",
+            "submitted_to_asr",
             unknownValue
         ],
         "requestedAction": [
@@ -327,6 +418,11 @@ enum DiagnosticsStringSanitizer {
             "51-200",
             "201-500",
             "501+",
+            unknownValue
+        ],
+        "terminationReason": [
+            "session_limit_reached",
+            "trigger_released",
             unknownValue
         ],
         "tier": [

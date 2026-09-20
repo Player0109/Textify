@@ -166,6 +166,7 @@ public enum ProductionModelPolicy {
                      (.fluidAudioParaformer, .coreMLNeuralEngine, .modelDirectory),
                      (.sherpaOnnx, .cpu, .modelDirectory),
                      (.transcribeCpp, .metalGPU, .singleFile),
+                     (.audioCpp, .metalGPU, .singleFile),
                      (.mlxAudio, .metalGPU, .modelDirectory),
                      (.liteRTLM, .metalGPU, .singleFile):
                     break

@@ -65,7 +65,9 @@ final class DiagnosticsTests: XCTestCase {
             backendReadiness: "ready",
             audioDurationMs: 5_000,
             inferenceDurationMs: 1_500,
-            textLengthBucket: "1-50"
+            textLengthBucket: "1-50",
+            windowCount: 3,
+            terminationReason: "trigger_released"
         )
         let data = try JSONEncoder().encode(event)
         let json = String(decoding: data, as: UTF8.self)
@@ -77,6 +79,30 @@ final class DiagnosticsTests: XCTestCase {
         XCTAssertEqual(object["engine"] as? String, "whisper_cpp")
         XCTAssertEqual(object["accelerator"] as? String, "metal_gpu")
         XCTAssertEqual(object["backendReadiness"] as? String, "ready")
+        XCTAssertEqual(object["windowCount"] as? Int, 3)
+        XCTAssertEqual(object["terminationReason"] as? String, "trigger_released")
+    }
+
+    func testTranscriptionCompletedClampsWindowCountAndClosesTerminationReason() throws {
+        let event = DiagnosticEvent.transcriptionCompleted(
+            modelID: "ggml-small.en-q5_1",
+            engine: "whisper_cpp",
+            accelerator: "metal_gpu",
+            backendReadiness: "ready",
+            audioDurationMs: 5_000,
+            inferenceDurationMs: 1_500,
+            textLengthBucket: "1-50",
+            windowCount: -2,
+            terminationReason: "released after transcript=private dictation"
+        )
+
+        let (object, json) = try encodedJSONObject(for: event)
+
+        XCTAssertEqual(object["event"] as? String, "speech_recognition_completed")
+        XCTAssertEqual(object["windowCount"] as? Int, 0)
+        XCTAssertEqual(object["terminationReason"] as? String, "unknown")
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("transcript"))
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("private dictation"))
     }
 
     func testRuntimeFailurePreservesClosedQwenFailureMetadata() throws {
@@ -114,6 +140,86 @@ final class DiagnosticsTests: XCTestCase {
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
         XCTAssertEqual(object["event"] as? String, "dictation_blocked_excluded_app")
         XCTAssertEqual(object.count, 1)
+    }
+
+    func testDictationCaptureTimingEncodesOnlyAggregateTechnicalMetrics() throws {
+        let event = DiagnosticEvent.dictationCaptureTiming(
+            triggerToCaptureRequestMs: 251,
+            triggerToCaptureStartMs: 263,
+            triggerToFirstAudioMs: 279,
+            triggerHoldDurationMs: 842,
+            shortcutGuardSpeechDetected: true,
+            preASROutcome: "submitted_to_asr"
+        )
+
+        let (object, json) = try encodedJSONObject(for: event)
+
+        XCTAssertEqual(object["event"] as? String, "dictation_capture_timing")
+        XCTAssertEqual(object["triggerToCaptureRequestMs"] as? Int, 251)
+        XCTAssertEqual(object["triggerToCaptureStartMs"] as? Int, 263)
+        XCTAssertEqual(object["triggerToFirstAudioMs"] as? Int, 279)
+        XCTAssertEqual(object["triggerHoldDurationMs"] as? Int, 842)
+        XCTAssertEqual(object["shortcutGuardSpeechDetected"] as? Bool, true)
+        XCTAssertEqual(object["preASROutcome"] as? String, "submitted_to_asr")
+        XCTAssertEqual(object.count, 7)
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("transcript"))
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("bundleIdentifier"))
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("microphone"))
+    }
+
+    func testDictationCaptureTimingOmitsMissingMetricsAndClampsNegativeDurations() throws {
+        let event = DiagnosticEvent.dictationCaptureTiming(
+            triggerToCaptureRequestMs: nil,
+            triggerToCaptureStartMs: -2,
+            triggerToFirstAudioMs: nil,
+            triggerHoldDurationMs: -1,
+            shortcutGuardSpeechDetected: false,
+            preASROutcome: "capture_start_failed"
+        )
+
+        let (object, _) = try encodedJSONObject(for: event)
+
+        XCTAssertNil(object["triggerToCaptureRequestMs"])
+        XCTAssertEqual(object["triggerToCaptureStartMs"] as? Int, 0)
+        XCTAssertNil(object["triggerToFirstAudioMs"])
+        XCTAssertEqual(object["triggerHoldDurationMs"] as? Int, 0)
+    }
+
+    func testDictationCaptureTimingUsesClosedPreASROutcomes() throws {
+        let allowedOutcomes = [
+            "accidental_tap_discarded",
+            "capture_start_failed",
+            "empty_capture_discarded",
+            "escape_discarded",
+            "recording_error",
+            "shortcut_discarded",
+            "submitted_to_asr"
+        ]
+
+        for outcome in allowedOutcomes {
+            let event = DiagnosticEvent.dictationCaptureTiming(
+                triggerToCaptureRequestMs: nil,
+                triggerToCaptureStartMs: nil,
+                triggerToFirstAudioMs: nil,
+                triggerHoldDurationMs: nil,
+                shortcutGuardSpeechDetected: false,
+                preASROutcome: outcome
+            )
+            let (object, _) = try encodedJSONObject(for: event)
+            XCTAssertEqual(object["preASROutcome"] as? String, outcome)
+        }
+
+        let unknownEvent = DiagnosticEvent.dictationCaptureTiming(
+            triggerToCaptureRequestMs: nil,
+            triggerToCaptureStartMs: nil,
+            triggerToFirstAudioMs: nil,
+            triggerHoldDurationMs: nil,
+            shortcutGuardSpeechDetected: false,
+            preASROutcome: "failed while recording private dictation"
+        )
+        let (unknownObject, unknownJSON) = try encodedJSONObject(for: unknownEvent)
+        XCTAssertEqual(unknownObject["preASROutcome"] as? String, "unknown")
+        XCTAssertFalse(unknownJSON.localizedCaseInsensitiveContains("private dictation"))
     }
 
     func testLoggerWritesOneJSONEventPerLine() async throws {
@@ -564,6 +670,117 @@ final class DiagnosticsTests: XCTestCase {
         XCTAssertFalse(redacted.contains("/Users/alice"))
         XCTAssertFalse(redacted.localizedCaseInsensitiveContains("target editor"))
         XCTAssertFalse(redacted.localizedCaseInsensitiveContains("approximately one paragraph"))
+    }
+
+    func testRedactorNormalizesStringsInjectedIntoMetricKeys() throws {
+        let line = #"""
+        {"event":"dictation_capture_timing","durationMs":"ordinary free-form value","triggerToCaptureRequestMs":"private timing details","triggerToCaptureStartMs":"12","triggerToFirstAudioMs":"transcript=secret","triggerHoldDurationMs":"842","shortcutGuardSpeechDetected":"true","preASROutcome":"submitted_to_asr"}
+        """#
+
+        let redacted = try XCTUnwrap(DiagnosticsRedactor().redactJSONLine(line))
+        let data = try XCTUnwrap(redacted.data(using: .utf8))
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+
+        for key in [
+            "durationMs",
+            "triggerToCaptureRequestMs",
+            "triggerToCaptureStartMs",
+            "triggerToFirstAudioMs",
+            "triggerHoldDurationMs",
+            "shortcutGuardSpeechDetected"
+        ] {
+            XCTAssertEqual(object[key] as? String, "unknown")
+        }
+        XCTAssertFalse(redacted.localizedCaseInsensitiveContains("free-form"))
+        XCTAssertFalse(redacted.localizedCaseInsensitiveContains("private timing"))
+        XCTAssertFalse(redacted.localizedCaseInsensitiveContains("transcript"))
+    }
+
+    func testRedactorRejectsStructuredOrMismatchedMetricValues() throws {
+        let line = #"""
+        {"event":"dictation_capture_timing","triggerToCaptureRequestMs":[12,13],"triggerToCaptureStartMs":{"value":14},"triggerToFirstAudioMs":true,"triggerHoldDurationMs":842,"shortcutGuardSpeechDetected":1,"preASROutcome":"submitted_to_asr"}
+        """#
+
+        let redacted = try XCTUnwrap(
+            DiagnosticsRedactor().redactJSONLine(line)
+        )
+        let data = try XCTUnwrap(redacted.data(using: .utf8))
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+
+        XCTAssertEqual(object["triggerToCaptureRequestMs"] as? String, "unknown")
+        XCTAssertEqual(object["triggerToCaptureStartMs"] as? String, "unknown")
+        XCTAssertEqual(object["triggerToFirstAudioMs"] as? String, "unknown")
+        XCTAssertEqual(object["triggerHoldDurationMs"] as? Int, 842)
+        XCTAssertEqual(object["shortcutGuardSpeechDetected"] as? String, "unknown")
+    }
+
+    func testRedactorPreservesAggregateSessionFieldsAndRemovesInjectedContent() throws {
+        let line = #"""
+        {"event":"speech_recognition_completed","modelID":"ggml-small.en-q5_1","engine":"whisper_cpp","accelerator":"metal_gpu","backendReadiness":"ready","audioDurationMs":65000,"inferenceDurationMs":3500,"textLengthBucket":"51-200","windowCount":3,"terminationReason":"session_limit_reached","text":"secret transcript","content":"private dictation"}
+        """#
+
+        let redacted = try XCTUnwrap(DiagnosticsRedactor().redactJSONLine(line))
+        let data = try XCTUnwrap(redacted.data(using: .utf8))
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+
+        XCTAssertEqual(object["windowCount"] as? Int, 3)
+        XCTAssertEqual(object["terminationReason"] as? String, "session_limit_reached")
+        XCTAssertNil(object["text"])
+        XCTAssertNil(object["content"])
+        XCTAssertFalse(redacted.localizedCaseInsensitiveContains("secret transcript"))
+        XCTAssertFalse(redacted.localizedCaseInsensitiveContains("private dictation"))
+    }
+
+    func testRedactorRejectsFreeFormAggregateSessionFields() throws {
+        let line = #"""
+        {"event":"speech_recognition_completed","windowCount":"three windows containing transcript=secret","terminationReason":"stopped while dictating private content"}
+        """#
+
+        let redacted = try XCTUnwrap(DiagnosticsRedactor().redactJSONLine(line))
+        let data = try XCTUnwrap(redacted.data(using: .utf8))
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+
+        XCTAssertEqual(object["windowCount"] as? String, "unknown")
+        XCTAssertEqual(object["terminationReason"] as? String, "unknown")
+        XCTAssertFalse(redacted.localizedCaseInsensitiveContains("transcript"))
+        XCTAssertFalse(redacted.localizedCaseInsensitiveContains("private content"))
+    }
+
+    func testExporterPreservesCaptureMetricsAndRemovesInjectedIdentityAndContent() throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try writeFile(
+            "diagnostics-capture.jsonl",
+            contents: #"{"event":"dictation_capture_timing","triggerToCaptureRequestMs":251,"triggerToCaptureStartMs":263,"triggerToFirstAudioMs":279,"triggerHoldDurationMs":842,"shortcutGuardSpeechDetected":true,"preASROutcome":"submitted_to_asr","bundleIdentifier":"com.example.Target","text":"secret transcript"}"# + "\n",
+            in: directory
+        )
+
+        let document = try DiagnosticsExporter().exportRedactedLogs(from: directory)
+        let contents = try XCTUnwrap(document.files.first?.contents)
+        let line = try XCTUnwrap(contents.split(separator: "\n").first)
+        let data = try XCTUnwrap(String(line).data(using: .utf8))
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+
+        XCTAssertEqual(object["triggerToCaptureRequestMs"] as? Int, 251)
+        XCTAssertEqual(object["triggerToCaptureStartMs"] as? Int, 263)
+        XCTAssertEqual(object["triggerToFirstAudioMs"] as? Int, 279)
+        XCTAssertEqual(object["triggerHoldDurationMs"] as? Int, 842)
+        XCTAssertEqual(object["shortcutGuardSpeechDetected"] as? Bool, true)
+        XCTAssertEqual(object["preASROutcome"] as? String, "submitted_to_asr")
+        XCTAssertNil(object["bundleIdentifier"])
+        XCTAssertNil(object["text"])
+        XCTAssertFalse(contents.contains("com.example.Target"))
+        XCTAssertFalse(contents.localizedCaseInsensitiveContains("secret transcript"))
     }
 
     func testExporterSkipsSymlinkedAndNonRegularMatchingLogFiles() throws {

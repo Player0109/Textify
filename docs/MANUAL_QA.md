@@ -31,8 +31,12 @@ clearly labeled unsigned preview follows the separate exception in
   overlay while the trigger is held and starts no microphone capture.
 - [ ] 21. Switching to another app during processing silently prevents
   insertion into the new frontmost app.
-- [ ] 22. Holding dictation to the 60-second cap automatically stops capture
-  and proceeds without waiting for trigger release.
+- [ ] 22. Holding dictation shows `Recording stops in Ns` for the final ten
+  seconds, automatically stops at five minutes, shows the limit-reached
+  processing state, and proceeds without waiting for trigger release.
+- [ ] 22a. A capture longer than the active model's signed audio-window limit
+  transcribes every internal window in order and produces one final insertion;
+  releasing the still-held trigger after the cap does not insert twice.
 - [ ] 23. Each curated fallback trigger can be selected, updates the trigger
   instructions immediately, and passes the trigger test after relaunch.
 - [ ] 24. Interrupting a model install preserves only a validated resumable

@@ -1,5 +1,6 @@
 public actor DictationController {
     public private(set) var state: DictationState
+    private var armedSpeechDetected = false
 
     public let fakeAudio: FakeDictationAudio
     public let fakeTranscriber: FakeDictationTranscriber
@@ -31,18 +32,14 @@ public actor DictationController {
             guard state == .idle else {
                 return
             }
-            state = .armed
+            await beginArmedCapture()
 
         case .activationThresholdPassed:
             guard state == .armed else {
                 return
             }
-            do {
-                try await fakeAudio.startRecording()
-                state = .recording(speechDetected: false)
-            } catch {
-                state = .error(.audioStartFailed)
-            }
+            state = .recording(speechDetected: armedSpeechDetected)
+            armedSpeechDetected = false
 
         case .triggerUp:
             await handleTriggerUp()
@@ -54,7 +51,9 @@ public actor DictationController {
             await cancelActiveHold()
 
         case .speechDetected:
-            if case .recording = state {
+            if state == .armed {
+                armedSpeechDetected = true
+            } else if case .recording = state {
                 state = .recording(speechDetected: true)
             }
         }
@@ -67,18 +66,28 @@ public actor DictationController {
         await handle(.triggerUp(timestampMs: 900))
     }
 
+    private func beginArmedCapture() async {
+        armedSpeechDetected = false
+        state = .armed
+        do {
+            try await fakeAudio.startRecording()
+        } catch {
+            guard state == .armed else {
+                return
+            }
+            state = .error(.audioStartFailed)
+        }
+    }
+
     private func handleTriggerUp() async {
         switch state {
         case .armed:
+            armedSpeechDetected = false
             state = .idle
+            await fakeAudio.discardRecording()
 
-        case let .recording(speechDetected):
-            if speechDetected {
-                await finishRecordingAndInsert()
-            } else {
-                await fakeAudio.discardRecording()
-                state = .idle
-            }
+        case .recording:
+            await finishRecordingAndInsert()
 
         case .idle, .processing, .inserting, .error:
             return
@@ -86,18 +95,16 @@ public actor DictationController {
     }
 
     private func handleNonTriggerKeyDown(isModifierOnly: Bool) async {
-        guard !isModifierOnly else {
-            return
-        }
-
         switch state {
         case .armed:
+            armedSpeechDetected = false
             state = .idle
+            await fakeAudio.discardRecording()
 
         case let .recording(speechDetected):
-            if !speechDetected {
-                await fakeAudio.discardRecording()
+            if !speechDetected, !isModifierOnly {
                 state = .idle
+                await fakeAudio.discardRecording()
             }
 
         case .idle, .processing, .inserting, .error:
@@ -108,11 +115,13 @@ public actor DictationController {
     private func cancelActiveHold() async {
         switch state {
         case .armed:
+            armedSpeechDetected = false
             state = .idle
+            await fakeAudio.discardRecording()
 
         case .recording:
-            await fakeAudio.discardRecording()
             state = .idle
+            await fakeAudio.discardRecording()
 
         case .idle, .processing, .inserting, .error:
             return

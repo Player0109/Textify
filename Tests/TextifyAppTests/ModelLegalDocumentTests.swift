@@ -100,15 +100,33 @@ final class ModelLegalDocumentTests: XCTestCase {
                 "OpenMDW-1.1.txt",
             "https://raw.githubusercontent.com/modelscope/FunASR/38e421b0c49963a6f46ae2ebbaa24bc5168cc707/MODEL_LICENSE":
                 "FunASR_Model_License_1.1.txt",
+            "https://huggingface.co/nyralabs/CrisperWhisper2.0_large/blob/fe94128aee7cdf1ad43ab59c4b1f7ed6362c1106/LICENSE.md":
+                "CrisperWhisper-2.0-Nyra-License.md",
+            "https://huggingface.co/nyralabs/CrisperWhisper2.0_turbo/blob/16424a0a0dad3d7bcc08927451718da49bce8ce0/LICENSE.md":
+                "CrisperWhisper-2.0-Nyra-License.md",
+            "https://raw.githubusercontent.com/Saganaki22/CrisperWhisper.cpp/13c7b3efdafd8bd20bd6361e7354ce2aa9bec464/LICENSE":
+                "CrisperWhisper.cpp-LICENSE.txt",
+            "https://huggingface.co/davidxifeng/Confucius4-R2T2-gguf/raw/a8e6b385d7df7eae9519363e07034a209004797a/LICENSE":
+                "Confucius4-R2T2.txt",
+            "https://raw.githubusercontent.com/0xShug0/audio.cpp/9ba884179826c3b33dd305185b5f94c79175a03d/LICENSE":
+                "audio.cpp.txt",
         ]
     }
 
     private var expectedSHA256ByResource: [String: String] {
         [
+            "Confucius4-R2T2.txt":
+                "1f6b215cd8256efce081df1e46bd6c1b044ebc52dbe1219117873c204d8de86c",
+            "audio.cpp.txt":
+                "18215c981080015bba295552c46aa5e8572be347eef33ad10de09593dc50e544",
             "LICENSE":
                 "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
             "CC-BY-4.0.txt":
                 "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411",
+            "CrisperWhisper-2.0-Nyra-License.md":
+                "42f43bf4dc72ef422f91f6ca143f4514e21a68b353940d99091c1addcd0aee79",
+            "CrisperWhisper.cpp-LICENSE.txt":
+                "bccb9e9fa28644216f919d1f80567e49a41990705d3c3b036c334dc03e00dd31",
             "FluidAudio.txt":
                 "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
             "FunASR_Model_License_1.1.txt":

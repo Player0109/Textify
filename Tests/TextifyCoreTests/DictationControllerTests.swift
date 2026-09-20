@@ -2,15 +2,19 @@ import TextifyCore
 import XCTest
 
 final class DictationControllerTests: XCTestCase {
-    func testTapBeforeThresholdDoesNothing() async {
+    func testTapBeforeThresholdDiscardsCaptureWithoutInsertion() async {
         let controller = DictationController.fakingEverything()
 
         await controller.handle(.triggerDown(timestampMs: 0))
         await controller.handle(.triggerUp(timestampMs: 120))
 
         let state = await controller.state
+        let startedRecordingCount = await controller.fakeAudio.startedRecordingCount
+        let discardedRecordingCount = await controller.fakeAudio.discardedRecordingCount
         let insertedTexts = await controller.fakeInsertion.insertedTexts
         XCTAssertEqual(state, .idle)
+        XCTAssertEqual(startedRecordingCount, 1)
+        XCTAssertEqual(discardedRecordingCount, 1)
         XCTAssertEqual(insertedTexts, [])
     }
 
@@ -24,10 +28,102 @@ final class DictationControllerTests: XCTestCase {
 
         let state = await controller.state
         let startedRecordingCount = await controller.fakeAudio.startedRecordingCount
+        let discardedRecordingCount = await controller.fakeAudio.discardedRecordingCount
         let insertedTexts = await controller.fakeInsertion.insertedTexts
         XCTAssertEqual(state, .idle)
-        XCTAssertEqual(startedRecordingCount, 0)
+        XCTAssertEqual(startedRecordingCount, 1)
+        XCTAssertEqual(discardedRecordingCount, 1)
         XCTAssertEqual(insertedTexts, [])
+    }
+
+    func testSpeechDuringArmedCaptureLatchesWithoutActivatingEarly() async {
+        let controller = DictationController.fakingEverything(transcript: "hello period")
+
+        await controller.handle(.triggerDown(timestampMs: 0))
+        await controller.handle(.speechDetected(timestampMs: 100))
+
+        let armedState = await controller.state
+        let startedRecordingCount = await controller.fakeAudio.startedRecordingCount
+        let earlyFinishedRecordingCount = await controller.fakeAudio.finishedRecordingCount
+        let earlyDiscardedRecordingCount = await controller.fakeAudio.discardedRecordingCount
+        XCTAssertEqual(armedState, .armed)
+        XCTAssertEqual(startedRecordingCount, 1)
+        XCTAssertEqual(earlyFinishedRecordingCount, 0)
+        XCTAssertEqual(earlyDiscardedRecordingCount, 0)
+
+        await controller.handle(.activationThresholdPassed(timestampMs: 250))
+        let activatedState = await controller.state
+        XCTAssertEqual(activatedState, .recording(speechDetected: true))
+
+        await controller.handle(.triggerUp(timestampMs: 900))
+        let insertedTexts = await controller.fakeInsertion.insertedTexts
+        XCTAssertEqual(insertedTexts, ["hello period"])
+    }
+
+    func testShortcutDuringArmedCaptureCancelsEvenAfterSpeech() async {
+        let controller = DictationController.fakingEverything(transcript: "ignored")
+
+        await controller.handle(.triggerDown(timestampMs: 0))
+        await controller.handle(.speechDetected(timestampMs: 100))
+        await controller.handle(
+            .nonTriggerKeyDown(timestampMs: 120, isModifierOnly: false)
+        )
+        await controller.handle(.activationThresholdPassed(timestampMs: 250))
+
+        let state = await controller.state
+        let discardedRecordingCount =
+            await controller.fakeAudio.discardedRecordingCount
+        let transcriptionCount =
+            await controller.fakeTranscriber.transcriptionCount
+        XCTAssertEqual(state, .idle)
+        XCTAssertEqual(discardedRecordingCount, 1)
+        XCTAssertEqual(transcriptionCount, 0)
+    }
+
+    func testModifierDuringArmedCaptureCancelsAsShortcut() async {
+        let controller = DictationController.fakingEverything()
+
+        await controller.handle(.triggerDown(timestampMs: 0))
+        await controller.handle(
+            .nonTriggerKeyDown(timestampMs: 120, isModifierOnly: true)
+        )
+
+        let state = await controller.state
+        let discardedRecordingCount =
+            await controller.fakeAudio.discardedRecordingCount
+        XCTAssertEqual(state, .idle)
+        XCTAssertEqual(discardedRecordingCount, 1)
+    }
+
+    func testReleaseBeforeThresholdDiscardsEvenAfterSpeech() async {
+        let controller = DictationController.fakingEverything(transcript: "ignored")
+
+        await controller.handle(.triggerDown(timestampMs: 0))
+        await controller.handle(.speechDetected(timestampMs: 100))
+        await controller.handle(.triggerUp(timestampMs: 120))
+
+        let state = await controller.state
+        let finishedRecordingCount = await controller.fakeAudio.finishedRecordingCount
+        let discardedRecordingCount = await controller.fakeAudio.discardedRecordingCount
+        let transcriptionCount = await controller.fakeTranscriber.transcriptionCount
+        XCTAssertEqual(state, .idle)
+        XCTAssertEqual(finishedRecordingCount, 0)
+        XCTAssertEqual(discardedRecordingCount, 1)
+        XCTAssertEqual(transcriptionCount, 0)
+    }
+
+    func testEscapeBeforeActivationDiscardsArmedCapture() async {
+        let controller = DictationController.fakingEverything()
+
+        await controller.handle(.triggerDown(timestampMs: 0))
+        await controller.handle(.escapeKeyDown(timestampMs: 120))
+
+        let state = await controller.state
+        let startedRecordingCount = await controller.fakeAudio.startedRecordingCount
+        let discardedRecordingCount = await controller.fakeAudio.discardedRecordingCount
+        XCTAssertEqual(state, .idle)
+        XCTAssertEqual(startedRecordingCount, 1)
+        XCTAssertEqual(discardedRecordingCount, 1)
     }
 
     func testShortcutAfterActivationBeforeSpeechCancels() async {
@@ -95,20 +191,22 @@ final class DictationControllerTests: XCTestCase {
         XCTAssertEqual(insertedTexts, ["hello period"])
     }
 
-    func testReleaseWithNoSpeechSilentlyNoOps() async {
-        let controller = DictationController.fakingEverything(transcript: "ignored")
+    func testReleaseAfterActivationFinishesWithoutSpeechGuard() async {
+        let controller = DictationController.fakingEverything()
 
         await controller.handle(.triggerDown(timestampMs: 0))
         await controller.handle(.activationThresholdPassed(timestampMs: 250))
         await controller.handle(.triggerUp(timestampMs: 900))
 
         let state = await controller.state
+        let finishedRecordingCount = await controller.fakeAudio.finishedRecordingCount
         let discardedRecordingCount = await controller.fakeAudio.discardedRecordingCount
         let transcriptionCount = await controller.fakeTranscriber.transcriptionCount
         let insertedTexts = await controller.fakeInsertion.insertedTexts
         XCTAssertEqual(state, .idle)
-        XCTAssertEqual(discardedRecordingCount, 1)
-        XCTAssertEqual(transcriptionCount, 0)
+        XCTAssertEqual(finishedRecordingCount, 1)
+        XCTAssertEqual(discardedRecordingCount, 0)
+        XCTAssertEqual(transcriptionCount, 1)
         XCTAssertEqual(insertedTexts, [])
     }
 

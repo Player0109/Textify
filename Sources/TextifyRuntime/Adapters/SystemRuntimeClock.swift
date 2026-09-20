@@ -1,10 +1,10 @@
-import Foundation
+import Dispatch
 
 public struct SystemRuntimeClock: RuntimeClock {
     public init() {}
 
     public func nowMilliseconds() -> Int {
-        Int(Date().timeIntervalSince1970 * 1_000)
+        Int(DispatchTime.now().uptimeNanoseconds / 1_000_000)
     }
 
     public func sleep(milliseconds: Int) async {

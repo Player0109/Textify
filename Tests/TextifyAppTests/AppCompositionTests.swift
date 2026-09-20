@@ -89,6 +89,83 @@ final class AppCompositionTests: XCTestCase {
     }
 
     @MainActor
+    func testAppDelegateAwaitsOneShutdownBeforeReplyingToTerminate() async {
+        let previousInstallActivityProvider = AppDelegate.modelInstallActivityProvider
+        let previousTerminationHandler = AppDelegate.terminationHandler
+        defer {
+            AppDelegate.modelInstallActivityProvider = previousInstallActivityProvider
+            AppDelegate.terminationHandler = previousTerminationHandler
+        }
+        let gate = ApplicationTerminationGate()
+        var shutdownCount = 0
+        var replies: [Bool] = []
+        AppDelegate.modelInstallActivityProvider = { false }
+        AppDelegate.terminationHandler = {
+            shutdownCount += 1
+            await gate.wait()
+        }
+        let delegate = AppDelegate { _, shouldTerminate in
+            replies.append(shouldTerminate)
+        }
+
+        XCTAssertEqual(
+            delegate.applicationShouldTerminate(NSApplication.shared),
+            NSApplication.TerminateReply.terminateLater
+        )
+        XCTAssertEqual(
+            delegate.applicationShouldTerminate(NSApplication.shared),
+            NSApplication.TerminateReply.terminateLater
+        )
+        for _ in 0..<100 where !(await gate.isWaiting()) {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(shutdownCount, 1)
+        XCTAssertTrue(replies.isEmpty)
+
+        await gate.release()
+        for _ in 0..<100 where replies.isEmpty {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(replies, [true])
+    }
+
+    @MainActor
+    func testAppDelegateCancelsNestedTerminationIfDownloadFinishesWhileConfirmationIsOpen() async {
+        let previousInstallActivityProvider = AppDelegate.modelInstallActivityProvider
+        let previousConfirmationProvider = AppDelegate.modelInstallTerminationConfirmationProvider
+        let previousTerminationHandler = AppDelegate.terminationHandler
+        defer {
+            AppDelegate.modelInstallActivityProvider = previousInstallActivityProvider
+            AppDelegate.modelInstallTerminationConfirmationProvider = previousConfirmationProvider
+            AppDelegate.terminationHandler = previousTerminationHandler
+        }
+        var nestedReply: NSApplication.TerminateReply?
+        var replies: [Bool] = []
+        var shutdownCount = 0
+        var delegate: AppDelegate!
+        AppDelegate.modelInstallActivityProvider = { true }
+        AppDelegate.modelInstallTerminationConfirmationProvider = {
+            AppDelegate.modelInstallActivityProvider = { false }
+            nestedReply = delegate.applicationShouldTerminate(NSApplication.shared)
+            return false
+        }
+        AppDelegate.terminationHandler = {
+            shutdownCount += 1
+        }
+        delegate = AppDelegate { _, shouldTerminate in
+            replies.append(shouldTerminate)
+        }
+
+        let outerReply = delegate.applicationShouldTerminate(NSApplication.shared)
+        XCTAssertEqual(nestedReply, .terminateCancel)
+        XCTAssertEqual(outerReply, .terminateCancel)
+        XCTAssertEqual(shutdownCount, 0)
+        XCTAssertEqual(replies, [])
+    }
+
+    @MainActor
     func testAppDelegateOpenMainWindowUsesConfiguredPresenter() {
         let previousOpener = AppDelegate.mainWindowOpener
         defer {
@@ -2989,8 +3066,14 @@ final class AppCompositionTests: XCTestCase {
             await Task.yield()
         }
 
-        XCTAssertEqual(services.overlayState, .recording(elapsedSeconds: 0))
-        XCTAssertEqual(overlay.states.last, .recording(elapsedSeconds: 0))
+        XCTAssertEqual(
+            services.overlayState,
+            .recording(remainingSeconds: 300)
+        )
+        XCTAssertEqual(
+            overlay.states.last,
+            .recording(remainingSeconds: 300)
+        )
 
         await services.dictation.cancelActiveSession(reason: .escapeKey)
         for _ in 0..<5 {
@@ -3020,6 +3103,123 @@ final class AppCompositionTests: XCTestCase {
             preferences
         )
         XCTAssertEqual(overlay.preferences.last, preferences)
+    }
+
+    @MainActor
+    func testRecordingOverlayTickerStartsOnceAndDoesNotRestartWhenSpeechIsDetected() async throws {
+        let overlay = OverlayPresenterSpy()
+        let ticks = RecordingOverlayTickGate()
+        let now = RecordingOverlayMonotonicNow(milliseconds: 0)
+        let services = try Self.makeServices(
+            overlayPresenter: overlay,
+            waitBeforeRecordingOverlayTick: { await ticks.wait() },
+            recordingOverlayNowMilliseconds: { now.value() }
+        )
+
+        services.updateSessionProgressOverlay(
+            for: .recording(deadlineUptimeMilliseconds: 300_000)
+        )
+        services.updateOverlay(for: .recording(speechDetected: false))
+        for _ in 0..<20 where await ticks.waitCallCount() == 0 {
+            await Task.yield()
+        }
+
+        let initialWaitCallCount = await ticks.waitCallCount()
+        XCTAssertEqual(initialWaitCallCount, 1)
+        XCTAssertEqual(
+            services.overlayState,
+            .recording(remainingSeconds: 300)
+        )
+
+        now.setValue(290_001)
+        services.updateOverlay(for: .recording(speechDetected: true))
+        await Task.yield()
+
+        let waitCallCountAfterSpeech = await ticks.waitCallCount()
+        XCTAssertEqual(waitCallCountAfterSpeech, 1)
+
+        await ticks.advance()
+        for _ in 0..<20
+        where services.overlayState != .recording(remainingSeconds: 10) {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(
+            services.overlayState,
+            .recording(remainingSeconds: 10)
+        )
+        services.updateOverlay(for: .idle)
+        XCTAssertEqual(services.overlayState, .hidden)
+        await ticks.advance()
+    }
+
+    @MainActor
+    func testRecordingOverlayUsesFreshDeadlineForNextSession() async throws {
+        let ticks = RecordingOverlayTickGate()
+        let now = RecordingOverlayMonotonicNow(milliseconds: 290_001)
+        let services = try Self.makeServices(
+            waitBeforeRecordingOverlayTick: { await ticks.wait() },
+            recordingOverlayNowMilliseconds: { now.value() }
+        )
+
+        services.updateSessionProgressOverlay(
+            for: .recording(deadlineUptimeMilliseconds: 300_000)
+        )
+        services.updateOverlay(for: .recording(speechDetected: false))
+        XCTAssertEqual(
+            services.overlayState,
+            .recording(remainingSeconds: 10)
+        )
+
+        services.updateOverlay(for: .idle)
+        now.setValue(400_000)
+        services.updateSessionProgressOverlay(
+            for: .recording(deadlineUptimeMilliseconds: 700_000)
+        )
+        services.updateOverlay(for: .recording(speechDetected: false))
+
+        XCTAssertEqual(
+            services.overlayState,
+            .recording(remainingSeconds: 300)
+        )
+        services.updateOverlay(for: .idle)
+        await ticks.advance()
+        await ticks.advance()
+    }
+
+    @MainActor
+    func testOverlayApplicationSessionSurvivesHiddenProcessingGateAndFailure() throws {
+        let overlay = OverlayPresenterSpy()
+        let services = try Self.makeServices(
+            overlayPresenter: overlay,
+            waitBeforeProcessingIndicator: {
+                try? await Task.sleep(nanoseconds: 3_600_000_000_000)
+            }
+        )
+
+        services.updateOverlay(for: .recording(speechDetected: false))
+        XCTAssertEqual(overlay.beginSessionCount, 1)
+        XCTAssertEqual(overlay.endSessionCount, 0)
+
+        services.updateOverlay(for: .processing)
+        XCTAssertEqual(services.overlayState, .hidden)
+        services.updateOverlay(for: .failed(.transcriptionFailed))
+
+        XCTAssertEqual(overlay.beginSessionCount, 1)
+        XCTAssertEqual(overlay.endSessionCount, 0)
+        XCTAssertEqual(
+            overlay.states.last,
+            .blocked("Transcription unavailable.")
+        )
+
+        services.updateOverlay(for: .idle)
+        XCTAssertEqual(overlay.endSessionCount, 1)
+
+        services.updateOverlay(for: .blocked(.excludedApp))
+        XCTAssertEqual(overlay.beginSessionCount, 2)
+        XCTAssertEqual(overlay.endSessionCount, 1)
+        services.updateOverlay(for: .idle)
+        XCTAssertEqual(overlay.endSessionCount, 2)
     }
 
     @MainActor
@@ -3067,6 +3267,130 @@ final class AppCompositionTests: XCTestCase {
 
         XCTAssertEqual(services.overlayState, .hidden)
         XCTAssertFalse(overlay.states.contains(.processing))
+    }
+
+    @MainActor
+    func testProcessingProgressDoesNotRestartIndicatorDelay() async throws {
+        let overlay = OverlayPresenterSpy()
+        let delay = OverlayDelayGate()
+        let services = try Self.makeServices(
+            overlayPresenter: overlay,
+            waitBeforeProcessingIndicator: { await delay.wait() }
+        )
+
+        services.updateOverlay(for: .processing)
+        for _ in 0..<20 where await delay.waitCallCount() == 0 {
+            await Task.yield()
+        }
+        services.updateSessionProgressOverlay(
+            for: .processing(
+                completedWindows: 0,
+                totalWindows: 4,
+                endReason: .triggerReleased
+            )
+        )
+
+        let initialDelayWaitCallCount = await delay.waitCallCount()
+        XCTAssertEqual(initialDelayWaitCallCount, 1)
+        XCTAssertEqual(services.overlayState, .hidden)
+
+        await delay.release()
+        for _ in 0..<20 where services.overlayState != .processing {
+            await Task.yield()
+        }
+        services.updateSessionProgressOverlay(
+            for: .processing(
+                completedWindows: 1,
+                totalWindows: 4,
+                endReason: .triggerReleased
+            )
+        )
+
+        XCTAssertEqual(
+            services.overlayState,
+            .processingProgress(completedWindows: 1, totalWindows: 4)
+        )
+        let finalDelayWaitCallCount = await delay.waitCallCount()
+        XCTAssertEqual(finalDelayWaitCallCount, 1)
+    }
+
+    @MainActor
+    func testTerminalProgressObservationDoesNotReviveProcessingOverlay() throws {
+        let services = try Self.makeServices()
+
+        services.updateOverlay(for: .processing)
+        services.updateSessionProgressOverlay(
+            for: .processing(
+                completedWindows: 0,
+                totalWindows: 4,
+                endReason: .sessionLimitReached
+            )
+        )
+        XCTAssertEqual(services.overlayState, .sessionLimitReached)
+
+        services.updateObservedSessionProgressOverlay(
+            for: .inactive,
+            runtimeStatus: .cancelled(.escapeKey)
+        )
+
+        XCTAssertEqual(services.overlayState, .sessionLimitReached)
+        services.updateOverlay(for: .cancelled(.escapeKey))
+        XCTAssertEqual(services.overlayState, .hidden)
+    }
+
+    @MainActor
+    func testSessionLimitBypassesIndicatorDelayThenShowsWindowProgress() async throws {
+        let overlay = OverlayPresenterSpy()
+        let delay = OverlayDelayGate()
+        let services = try Self.makeServices(
+            overlayPresenter: overlay,
+            waitBeforeProcessingIndicator: { await delay.wait() }
+        )
+
+        services.updateOverlay(for: .processing)
+        for _ in 0..<20 where await delay.waitCallCount() == 0 {
+            await Task.yield()
+        }
+        services.updateSessionProgressOverlay(
+            for: .processing(
+                completedWindows: 0,
+                totalWindows: 4,
+                endReason: .sessionLimitReached
+            )
+        )
+
+        XCTAssertEqual(services.overlayState, .sessionLimitReached)
+
+        services.updateSessionProgressOverlay(
+            for: .processing(
+                completedWindows: 0,
+                totalWindows: 4,
+                endReason: .sessionLimitReached
+            )
+        )
+
+        XCTAssertEqual(services.overlayState, .sessionLimitReached)
+
+        services.updateSessionProgressOverlay(
+            for: .processing(
+                completedWindows: 1,
+                totalWindows: 4,
+                endReason: .sessionLimitReached
+            )
+        )
+
+        XCTAssertEqual(
+            services.overlayState,
+            .processingProgress(completedWindows: 1, totalWindows: 4)
+        )
+        await delay.release()
+        for _ in 0..<5 {
+            await Task.yield()
+        }
+        XCTAssertEqual(
+            services.overlayState,
+            .processingProgress(completedWindows: 1, totalWindows: 4)
+        )
     }
 
     @MainActor
@@ -3349,6 +3673,79 @@ final class AppCompositionTests: XCTestCase {
             coordinator.attempt(id: attemptID)?.state.phase,
             .cancelled
         )
+    }
+
+    @MainActor
+    func testModelInstallCoordinatorTerminationInterruptsAndAwaitsActiveDownload() async {
+        let gate = SuspendedModelInstallGate()
+        var stagingRemovalCount = 0
+        let coordinator = ModelInstallCoordinator(
+            installOperation: { _, onStateChange in
+                onStateChange(DownloadState(
+                    modelID: ProductionModelPolicy.requiredModelID,
+                    phase: .downloading,
+                    bytesDownloaded: 512,
+                    totalBytes: 1_024,
+                    message: "Downloading"
+                ))
+                await gate.wait()
+                if Task.isCancelled {
+                    throw ModelInstallCoordinatorError.networkUnavailable
+                }
+            },
+            removeStagingDataOperation: { _ in
+                stagingRemovalCount += 1
+            }
+        )
+        guard let attemptID = coordinator.start() else {
+            return XCTFail("Expected a stable queue-attempt identity.")
+        }
+        for _ in 0..<100
+        where coordinator.attempt(id: attemptID)?.state.phase != .downloading {
+            await Task.yield()
+        }
+
+        var didFinishShutdown = false
+        let shutdown = Task { @MainActor in
+            await coordinator.shutdownForTermination()
+            didFinishShutdown = true
+        }
+        await Task.yield()
+
+        XCTAssertFalse(didFinishShutdown)
+
+        await gate.release()
+        await shutdown.value
+
+        XCTAssertFalse(coordinator.isActive)
+        XCTAssertEqual(
+            coordinator.attempt(id: attemptID)?.state.phase,
+            .downloading
+        )
+        XCTAssertEqual(stagingRemovalCount, 0)
+    }
+
+    @MainActor
+    func testTerminationFenceKeepsMicrophoneMonitoringStopped() async throws {
+        let probe = MicrophoneLevelStreamProbe()
+        let services = try Self.makeServices(
+            microphoneInputClient: probe.client(devices: [])
+        )
+        _ = await services.dictation.refreshReadiness()
+        services.settingsRouter.selectedPane = .dictation
+        services.setMainWindowVisibility(true)
+        for _ in 0..<100 where !services.microphoneInputPresentation.isMonitoring {
+            await Task.yield()
+        }
+
+        XCTAssertTrue(services.microphoneInputPresentation.isMonitoring)
+
+        await services.shutdownForTermination()
+        services.settingsPaneDidChange()
+        await Task.yield()
+
+        XCTAssertFalse(services.microphoneInputPresentation.isMonitoring)
+        XCTAssertEqual(probe.inputs, [.systemDefault])
     }
 
     @MainActor
@@ -3662,6 +4059,10 @@ final class AppCompositionTests: XCTestCase {
         transcriber: any RuntimeTranscribing = FakeRuntimeTranscriber(),
         voiceCleaner: any RuntimeVoiceCleaning = DisabledRuntimeVoiceCleaning(),
         overlayPresenter: (any RecordingOverlayPresenting)? = nil,
+        waitBeforeRecordingOverlayTick: @escaping @Sendable () async -> Void = {
+            try? await Task.sleep(nanoseconds: 3_600_000_000_000)
+        },
+        recordingOverlayNowMilliseconds: @escaping @Sendable () -> Int = { 0 },
         waitBeforeProcessingIndicator: @escaping @Sendable () async -> Void = {},
         modelWorkflowDurabilityObserver:
             ModelWorkflowDurabilityObserver = .none,
@@ -3706,6 +4107,9 @@ final class AppCompositionTests: XCTestCase {
             modelCatalogCompatibilityResolver: modelCatalogCompatibilityResolver,
             microphoneInputClient: microphoneInputClient,
             overlayPresenter: overlayPresenter,
+            waitBeforeRecordingOverlayTick: waitBeforeRecordingOverlayTick,
+            recordingOverlayNowMilliseconds:
+                recordingOverlayNowMilliseconds,
             waitBeforeProcessingIndicator: waitBeforeProcessingIndicator,
             modelWorkflowDurabilityObserver:
                 modelWorkflowDurabilityObserver,
@@ -4204,6 +4608,16 @@ private actor ActivationVoiceCleanerSpy: RuntimeVoiceCleaning {
 private final class OverlayPresenterSpy: RecordingOverlayPresenting {
     private(set) var states: [RecordingOverlayState] = []
     private(set) var preferences: [RecordingOverlayPreferences] = []
+    private(set) var beginSessionCount = 0
+    private(set) var endSessionCount = 0
+
+    func beginSession() {
+        beginSessionCount += 1
+    }
+
+    func endSession() {
+        endSessionCount += 1
+    }
 
     func present(
         _ state: RecordingOverlayState,
@@ -4214,12 +4628,35 @@ private final class OverlayPresenterSpy: RecordingOverlayPresenting {
     }
 }
 
+private final class RecordingOverlayMonotonicNow: @unchecked Sendable {
+    private let lock = NSLock()
+    private var milliseconds: Int
+
+    init(milliseconds: Int) {
+        self.milliseconds = milliseconds
+    }
+
+    func value() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return milliseconds
+    }
+
+    func setValue(_ milliseconds: Int) {
+        lock.lock()
+        self.milliseconds = milliseconds
+        lock.unlock()
+    }
+}
+
 private actor OverlayDelayGate {
     private var continuation: CheckedContinuation<Void, Never>?
     private var waiting = false
     private var released = false
+    private var waitCalls = 0
 
     func wait() async {
+        waitCalls += 1
         guard !released else {
             return
         }
@@ -4233,9 +4670,55 @@ private actor OverlayDelayGate {
         waiting
     }
 
+    func waitCallCount() -> Int {
+        waitCalls
+    }
+
     func release() {
         released = true
         waiting = false
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
+private actor RecordingOverlayTickGate {
+    private var waitCalls = 0
+    private var continuations: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        waitCalls += 1
+        await withCheckedContinuation { continuation in
+            continuations.append(continuation)
+        }
+    }
+
+    func waitCallCount() -> Int {
+        waitCalls
+    }
+
+    func advance() {
+        guard !continuations.isEmpty else {
+            return
+        }
+        continuations.removeFirst().resume()
+    }
+}
+
+private actor ApplicationTerminationGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func isWaiting() -> Bool {
+        continuation != nil
+    }
+
+    func release() {
         continuation?.resume()
         continuation = nil
     }
@@ -4245,6 +4728,9 @@ private actor FakeRuntimeAudioRecorder: RuntimeAudioRecording {
     func startRecording(
         microphone: MicrophoneSelection,
         maximumDurationSeconds: Double,
+        onCaptureStarted: @escaping @Sendable () -> Void,
+        onFirstAudio:
+            @escaping @Sendable (_ firstSampleUptimeMilliseconds: Int) -> Void,
         onSpeechDetected: @escaping @Sendable () -> Void,
         onMaximumDurationReached: @escaping @Sendable () -> Void,
         onRecordingError:

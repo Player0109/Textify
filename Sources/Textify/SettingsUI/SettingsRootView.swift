@@ -7126,6 +7126,7 @@ private struct RuntimeStatusRow: View {
 extension ModelProviderIdentity {
     var logoAssetName: String? {
         switch self {
+        case .nyra: nil
         case .openAI: "VendorOpenAI"
         case .nvidia: "VendorNVIDIA"
         case .cohere: "VendorCohere"
@@ -7146,6 +7147,7 @@ extension ModelProviderIdentity {
 
     var mark: String {
         switch self {
+        case .nyra: "NY"
         case .openAI: "AI"
         case .nvidia: "N"
         case .cohere: "C"
@@ -7169,6 +7171,7 @@ extension ModelProviderIdentity {
 
     var accent: Color {
         switch self {
+        case .nyra: Color(red: 0.125, green: 0.557, blue: 0.596)
         case .openAI: Color(red: 0.063, green: 0.639, blue: 0.498)
         case .nvidia: Color(red: 0.463, green: 0.725, blue: 0.000)
         case .cohere: Color(red: 0.875, green: 0.478, blue: 0.443)

@@ -17,7 +17,7 @@ public enum RuntimeTranscriptionEngineError: Error, Equatable, Sendable {
     case noPreparedEngine
 }
 
-public actor MultiEngineRuntimeTranscribingAdapter: RuntimeTranscribing {
+public actor MultiEngineRuntimeTranscribingAdapter: RuntimeTranscribing, RuntimeLivePreviewing {
     private let whisper: any RuntimeEngineTranscribing
     private let parakeet: any RuntimeEngineTranscribing
     private let paraformer: any RuntimeEngineTranscribing
@@ -25,6 +25,7 @@ public actor MultiEngineRuntimeTranscribingAdapter: RuntimeTranscribing {
     private let transcribeCpp: any RuntimeEngineTranscribing
     private let mlxAudio: any RuntimeEngineTranscribing
     private let liteRTLM: any RuntimeEngineTranscribing
+    private let confucius = ConfuciusRuntimeTranscribingAdapter()
     private var activeEngine: TranscriptionEngine?
 
     public init(
@@ -98,6 +99,7 @@ public actor MultiEngineRuntimeTranscribingAdapter: RuntimeTranscribing {
     }
 
     public func unload() async {
+        await confucius.unload()
         await whisper.unload()
         await parakeet.unload()
         await paraformer.unload()
@@ -108,8 +110,20 @@ public actor MultiEngineRuntimeTranscribingAdapter: RuntimeTranscribing {
         activeEngine = nil
     }
 
+    public var supportsLivePreview: Bool { activeEngine == .audioCpp }
+
+    public func preview(
+        chunks: AsyncStream<TranscriptionAudioBuffer>,
+        onText: @escaping @Sendable (String) async -> Void
+    ) async throws {
+        guard activeEngine == .audioCpp else { throw ConfuciusRuntimeError.unavailable }
+        try await confucius.preview(chunks: chunks, onText: onText)
+    }
+
     private func backend(for engine: TranscriptionEngine) -> any RuntimeEngineTranscribing {
         switch engine {
+        case .audioCpp:
+            return confucius
         case .whisperCpp:
             return whisper
         case .fluidAudioParakeet:

@@ -22,6 +22,9 @@ struct TextifyApp: App {
         AppDelegate.modelStorageRefreshProvider = {
             services.refreshModelStorageInventory()
         }
+        AppDelegate.terminationHandler = {
+            await services.shutdownForTermination()
+        }
         AppDelegate.launchCoordinator = AppLaunchCoordinator(
             services: services,
             showOnboarding: {

@@ -76,12 +76,16 @@ stage_fast_app() {
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/sherpa-onnx.txt" "$APP_RESOURCES/sherpa-onnx.txt"
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/ONNX_Runtime.txt" "$APP_RESOURCES/ONNX_Runtime.txt"
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/FunASR_Model_License_1.1.txt" "$APP_RESOURCES/FunASR_Model_License_1.1.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/Confucius4-R2T2.txt" "$APP_RESOURCES/Confucius4-R2T2.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/audio.cpp.txt" "$APP_RESOURCES/audio.cpp.txt"
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/transcribe.cpp.txt" "$APP_RESOURCES/transcribe.cpp.txt"
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/MLXAudioSwift.txt" "$APP_RESOURCES/MLXAudioSwift.txt"
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/MLXSwift.txt" "$APP_RESOURCES/MLXSwift.txt"
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/LiteRT-LM.txt" "$APP_RESOURCES/LiteRT-LM.txt"
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/CC-BY-4.0.txt" "$APP_RESOURCES/CC-BY-4.0.txt"
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/OpenAI-Whisper.txt" "$APP_RESOURCES/OpenAI-Whisper.txt"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/CrisperWhisper-2.0-Nyra-License.md" "$APP_RESOURCES/CrisperWhisper-2.0-Nyra-License.md"
+  cp "$ROOT_DIR/THIRD_PARTY_LICENSES/CrisperWhisper.cpp-LICENSE.txt" "$APP_RESOURCES/CrisperWhisper.cpp-LICENSE.txt"
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/ggml-small.en-q5_1.LICENSES.txt" "$APP_RESOURCES/ggml-small.en-q5_1.LICENSES.txt"
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/NVIDIA_Open_Model_License.txt" "$APP_RESOURCES/NVIDIA_Open_Model_License.txt"
   cp "$ROOT_DIR/THIRD_PARTY_LICENSES/OpenMDW-1.1.txt" "$APP_RESOURCES/OpenMDW-1.1.txt"
@@ -105,6 +109,7 @@ stage_fast_app() {
   "$ROOT_DIR/script/build_whisper_metallib.sh" "$METAL_LIBRARY"
   "$ROOT_DIR/script/runtime/embed_mlx_metallib.sh" "$MLX_METAL_LIBRARY" -
   "$ROOT_DIR/script/runtime/embed_sherpa_runtime.sh" "$APP_FRAMEWORKS" -
+  "$ROOT_DIR/script/runtime/embed_confucius_runtime.sh" "$APP_FRAMEWORKS" -
   "$ROOT_DIR/script/runtime/embed_transcribe_cpp_runtime.sh" "$APP_FRAMEWORKS" -
   "$ROOT_DIR/script/runtime/embed_litert_lm_runtime.sh" \
     "$BUILD_BIN_DIR/libCLiteRTLM_mac.dylib" "$APP_FRAMEWORKS" -
@@ -146,6 +151,8 @@ verify_staged_app() {
   [[ -s "$APP_RESOURCES/LiteRT-LM.txt" ]]
   [[ -s "$APP_RESOURCES/CC-BY-4.0.txt" ]]
   [[ -s "$APP_RESOURCES/OpenAI-Whisper.txt" ]]
+  [[ -s "$APP_RESOURCES/CrisperWhisper-2.0-Nyra-License.md" ]]
+  [[ -s "$APP_RESOURCES/CrisperWhisper.cpp-LICENSE.txt" ]]
   [[ -s "$APP_RESOURCES/ggml-small.en-q5_1.LICENSES.txt" ]]
   [[ -s "$APP_RESOURCES/NVIDIA_Open_Model_License.txt" ]]
   [[ -s "$APP_RESOURCES/OpenMDW-1.1.txt" ]]
@@ -161,6 +168,16 @@ verify_staged_app() {
   [[ -s "$APP_RESOURCES/transcribe.cpp-miniz.txt" ]]
   [[ -s "$APP_RESOURCES/ONNX_Runtime_ThirdPartyNotices.txt" ]]
   [[ -s "$APP_RESOURCES/LICENSE" ]]
+  printf '%s  %s\n' \
+    '1f6b215cd8256efce081df1e46bd6c1b044ebc52dbe1219117873c204d8de86c' \
+    "$APP_RESOURCES/Confucius4-R2T2.txt" \
+    '18215c981080015bba295552c46aa5e8572be347eef33ad10de09593dc50e544' \
+    "$APP_RESOURCES/audio.cpp.txt" \
+    '42f43bf4dc72ef422f91f6ca143f4514e21a68b353940d99091c1addcd0aee79' \
+    "$APP_RESOURCES/CrisperWhisper-2.0-Nyra-License.md" \
+    'bccb9e9fa28644216f919d1f80567e49a41990705d3c3b036c334dc03e00dd31' \
+    "$APP_RESOURCES/CrisperWhisper.cpp-LICENSE.txt" \
+    | shasum -a 256 -c -
   [[ "$(lipo -archs "$APP_FRAMEWORKS/libsherpa-onnx-c-api.dylib")" == "arm64" ]]
   [[ "$(lipo -archs "$APP_FRAMEWORKS/libonnxruntime.1.24.4.dylib")" == "arm64" ]]
   [[ "$(lipo -archs "$APP_FRAMEWORKS/libtextify-transcribe.0.1.3.dylib")" == "arm64" ]]
@@ -177,6 +194,7 @@ verify_staged_app() {
   codesign --verify --strict "$APP_FRAMEWORKS/libonnxruntime.1.24.4.dylib"
   codesign --verify --strict "$APP_FRAMEWORKS/libtextify-transcribe.0.1.3.dylib"
   codesign --verify --strict "$LITERT_LM_LIBRARY"
+  codesign --verify --strict "$APP_FRAMEWORKS/libtextify-confucius.dylib"
   TEXTIFY_MODEL_MANIFEST_PUBLIC_KEY_BASE64="$MODEL_CATALOG_PUBLIC_KEY_BASE64" \
     TEXTIFY_MODEL_MANIFEST_KEY_ID="$MODEL_CATALOG_KEY_ID" \
     "$ROOT_DIR/script/models/verify_model_manifest.sh" \

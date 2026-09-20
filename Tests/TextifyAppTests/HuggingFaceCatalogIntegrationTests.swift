@@ -591,6 +591,99 @@ final class HuggingFaceCatalogIntegrationTests: XCTestCase {
         await senseVoice.unload()
     }
 
+    func testSignedCatalogDownloadsAndTranscribesWithCrisperWhisperModels() async throws {
+        guard ProcessInfo.processInfo.environment[
+            "TEXTIFY_RUN_CRISPERWHISPER_INTEGRATION_TESTS"
+        ] == "1" else {
+            throw XCTSkip(
+                "Set TEXTIFY_RUN_CRISPERWHISPER_INTEGRATION_TESTS=1 to download and exercise the two CrisperWhisper catalog models."
+            )
+        }
+
+        let repository = Self.repositoryRoot
+        let verifier = ManifestVerifier(trustedKeys: [
+            TrustedModelManifestKey(
+                keyId: "textify-model-manifest-2026-huggingface",
+                publicKeyBase64: "eg6XVGVQ4Kqh1dtN3B8JcFTtK0RSxkxd79W5tfIlfos="
+            ),
+        ])
+        let manifest = try verifier.verify(
+            manifestData: Data(
+                contentsOf: repository.appendingPathComponent("models/manifest.json")
+            ),
+            signatureData: Data(
+                contentsOf: repository.appendingPathComponent("models/manifest.json.sig")
+            )
+        )
+        try ProductionModelPolicy.validateProductionManifest(manifest)
+
+        let installationRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "TextifyCrisperWhisperCatalogIntegration-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        defer { try? FileManager.default.removeItem(at: installationRoot) }
+        let layout = ModelStorageLayout(rootDirectory: installationRoot)
+        let installer = ModelInstaller(
+            layout: layout,
+            transport: URLSessionDownloadTransport(),
+            currentAppVersion: "1.1.0"
+        )
+        let englishAudio = try CanonicalIntegrationAudio.load(
+            from: repository.appendingPathComponent(
+                "Benchmarks/RealtimeASR/.benchmark-data/openslr31/LibriSpeech/dev-clean-2/1272/141231/1272-141231-0000.flac"
+            )
+        )
+        let candidates = [
+            (
+                id: "crisperwhisper-2-large-f16",
+                filename: "ggml-crisperwhisper-large-f16.bin"
+            ),
+            (
+                id: "crisperwhisper-2-turbo-f16",
+                filename: "ggml-crisperwhisper-turbo-f16.bin"
+            ),
+        ]
+
+        XCTAssertEqual(
+            manifest.models.filter { model in
+                candidates.contains { $0.id == model.id }
+            }.map(\.id),
+            candidates.map { $0.id }
+        )
+
+        for candidate in candidates {
+            let record = try await installer.install(
+                modelID: candidate.id,
+                from: manifest
+            )
+            XCTAssertEqual(record.model.files.count, 1)
+            XCTAssertEqual(record.model.runtime.variant, candidate.id)
+            XCTAssertEqual(record.model.runtimeParameters.language, "en")
+            XCTAssertEqual(record.model.runtimeParameters.maxAudioSeconds, 30)
+
+            let modelURL = try layout.installedFileURL(
+                modelID: record.model.id,
+                filename: candidate.filename
+            )
+            let runtime = WhisperRuntime()
+            try await runtime.load(
+                modelID: record.model.id,
+                modelPath: modelURL.path,
+                useGPU: true
+            )
+            let result = try await runtime.transcribe(
+                TranscriptionAudioBuffer(samples: englishAudio.samples),
+                options: .v1_1English
+            )
+            XCTAssertFalse(
+                result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                "Expected \(candidate.id) to transcribe the canonical English fixture in intended mode."
+            )
+            await runtime.unload()
+        }
+    }
+
     private static func downloadSenseVoiceFixture(
         filename: String,
         expectedSize: Int,

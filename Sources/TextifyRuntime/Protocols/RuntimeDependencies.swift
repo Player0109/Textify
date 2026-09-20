@@ -135,9 +135,16 @@ public extension RuntimeModelResolving {
 }
 
 public protocol RuntimeAudioRecording: Sendable {
+    func setSampleHandler(_ handler: @escaping @Sendable (CanonicalAudioBuffer) -> Void) async
+    /// Starts capture and reports the first retained canonical sample at most
+    /// once, after `onCaptureStarted`, as absolute monotonic uptime milliseconds.
+    /// If startup throws, neither capture milestone is invoked.
     func startRecording(
         microphone: MicrophoneSelection,
         maximumDurationSeconds: Double,
+        onCaptureStarted: @escaping @Sendable () -> Void,
+        onFirstAudio:
+            @escaping @Sendable (_ firstSampleUptimeMilliseconds: Int) -> Void,
         onSpeechDetected: @escaping @Sendable () -> Void,
         onMaximumDurationReached: @escaping @Sendable () -> Void,
         onRecordingError:
@@ -145,6 +152,10 @@ public protocol RuntimeAudioRecording: Sendable {
     ) async throws
     func finishRecording() async throws -> CanonicalAudioBuffer
     func discardRecording() async
+}
+
+public extension RuntimeAudioRecording {
+    func setSampleHandler(_ handler: @escaping @Sendable (CanonicalAudioBuffer) -> Void) async {}
 }
 
 public protocol RuntimeTranscribing: Sendable {

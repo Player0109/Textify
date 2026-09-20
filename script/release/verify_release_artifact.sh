@@ -88,6 +88,8 @@ fi
 [[ -s "$APP_PATH/Contents/Resources/LiteRT-LM.txt" ]]
 [[ -s "$APP_PATH/Contents/Resources/CC-BY-4.0.txt" ]]
 [[ -s "$APP_PATH/Contents/Resources/OpenAI-Whisper.txt" ]]
+[[ -s "$APP_PATH/Contents/Resources/CrisperWhisper-2.0-Nyra-License.md" ]]
+[[ -s "$APP_PATH/Contents/Resources/CrisperWhisper.cpp-LICENSE.txt" ]]
 [[ -s "$APP_PATH/Contents/Resources/ggml-small.en-q5_1.LICENSES.txt" ]]
 [[ -s "$APP_PATH/Contents/Resources/NVIDIA_Open_Model_License.txt" ]]
 [[ -s "$APP_PATH/Contents/Resources/OpenMDW-1.1.txt" ]]
@@ -102,10 +104,21 @@ fi
 [[ -s "$APP_PATH/Contents/Resources/transcribe.cpp-ggml.txt" ]]
 [[ -s "$APP_PATH/Contents/Resources/transcribe.cpp-miniz.txt" ]]
 [[ -s "$APP_PATH/Contents/Resources/ONNX_Runtime_ThirdPartyNotices.txt" ]]
+printf '%s  %s\n' \
+  '1f6b215cd8256efce081df1e46bd6c1b044ebc52dbe1219117873c204d8de86c' \
+  "$APP_PATH/Contents/Resources/Confucius4-R2T2.txt" \
+  '18215c981080015bba295552c46aa5e8572be347eef33ad10de09593dc50e544' \
+  "$APP_PATH/Contents/Resources/audio.cpp.txt" \
+  '42f43bf4dc72ef422f91f6ca143f4514e21a68b353940d99091c1addcd0aee79' \
+  "$APP_PATH/Contents/Resources/CrisperWhisper-2.0-Nyra-License.md" \
+  'bccb9e9fa28644216f919d1f80567e49a41990705d3c3b036c334dc03e00dd31' \
+  "$APP_PATH/Contents/Resources/CrisperWhisper.cpp-LICENSE.txt" \
+  | shasum -a 256 -c -
 SHERPA_LIBRARY="$APP_PATH/Contents/Frameworks/libsherpa-onnx-c-api.dylib"
 ONNX_RUNTIME_LIBRARY="$APP_PATH/Contents/Frameworks/libonnxruntime.1.24.4.dylib"
 PINNED_ONNX_RUNTIME_LIBRARY="$REPO_ROOT/Vendor/sherpa-onnx/v1.13.2/lib/libonnxruntime.1.24.4.dylib"
 TRANSCRIBE_CPP_LIBRARY="$APP_PATH/Contents/Frameworks/libtextify-transcribe.0.1.3.dylib"
+CONFUCIUS_LIBRARY="$APP_PATH/Contents/Frameworks/libtextify-confucius.dylib"
 LITERT_LM_LIBRARY="$APP_PATH/Contents/Frameworks/libCLiteRTLM_mac.dylib"
 SWIFT_COMPATIBILITY_LIBRARY="$APP_PATH/Contents/Frameworks/libswiftCompatibilitySpan.dylib"
 MLX_METAL_LIBRARY="$APP_PATH/Contents/MacOS/mlx.metallib"
@@ -177,6 +190,12 @@ grep -Fq "MIT License" "$APP_PATH/Contents/Resources/MLXSwift.txt"
 grep -Fq "Apache License" "$APP_PATH/Contents/Resources/LiteRT-LM.txt"
 grep -Fq "Attribution 4.0 International" "$APP_PATH/Contents/Resources/CC-BY-4.0.txt"
 grep -Fq "Copyright (c) 2022 OpenAI" "$APP_PATH/Contents/Resources/OpenAI-Whisper.txt"
+grep -Fq "NYRA HEALTH NON-COMMERCIAL RESEARCH LICENSE AGREEMENT" \
+  "$APP_PATH/Contents/Resources/CrisperWhisper-2.0-Nyra-License.md"
+grep -Fq "Copyright (c) 2026 drbaph" \
+  "$APP_PATH/Contents/Resources/CrisperWhisper.cpp-LICENSE.txt"
+grep -Fq "CrisperWhisper 2.0 models and CrisperWhisper.cpp" \
+  "$APP_PATH/Contents/Resources/THIRD_PARTY_NOTICES.md"
 grep -Fq "Textify curated model: ggml-small.en-q5_1.bin" "$APP_PATH/Contents/Resources/ggml-small.en-q5_1.LICENSES.txt"
 grep -Fq "NVIDIA Open Model License Agreement" "$APP_PATH/Contents/Resources/NVIDIA_Open_Model_License.txt"
 grep -Fq "OpenMDW License Agreement, version 1.1" "$APP_PATH/Contents/Resources/OpenMDW-1.1.txt"
@@ -205,6 +224,11 @@ otool -l "$ONNX_RUNTIME_LIBRARY" \
   | awk '/LC_BUILD_VERSION/{show=1} show && /minos/{print $2; exit}' \
   | grep -Fxq '14.0'
 [[ "$(otool -D "$TRANSCRIBE_CPP_LIBRARY" | tail -1)" == '@rpath/libtextify-transcribe.0.1.3.dylib' ]]
+[[ "$(otool -D "$CONFUCIUS_LIBRARY" | tail -1)" == '@rpath/libtextify-confucius.dylib' ]]
+[[ "$(dwarfdump --uuid "$CONFUCIUS_LIBRARY" | awk '{print $2}')" == \
+  "$(dwarfdump --uuid "$REPO_ROOT/Vendor/audio.cpp/9ba8841/lib/libtextify-confucius.dylib" | awk '{print $2}')" ]]
+nm -gjU "$CONFUCIUS_LIBRARY" | sort -u \
+  | cmp "$REPO_ROOT/Vendor/audio.cpp/9ba8841/EXPORTED_SYMBOLS" -
 [[ "$(otool -D "$LITERT_LM_LIBRARY" | tail -1)" == '@rpath/libCLiteRTLM_mac.dylib' ]]
 otool -l "$TRANSCRIBE_CPP_LIBRARY" \
   | awk '/LC_BUILD_VERSION/{show=1} show && /minos/{print $2; exit}' \

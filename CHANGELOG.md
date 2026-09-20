@@ -21,7 +21,7 @@ Planned first public app release.
 - Added persistent System Default or exact-device microphone selection,
   visibility-scoped live input metering, and fail-closed handling when a saved
   microphone is unavailable.
-- Added a bundled signed 42-entry model catalog: 39 transcription choices and
+- Added a bundled signed 44-entry model catalog: 41 transcription choices and
   three independently selectable MossFormer2 SE voice-cleaning choices.
 - Added resumable, atomic multi-file model installs; switching; exact-artifact
   deletion; rollback-safe receipts; and verified custom Whisper GGML/GGUF
@@ -32,8 +32,11 @@ Planned first public app release.
   signed byte-size, SHA-256, license, and provenance verification before
   activation.
 - Added accelerator verification that fails closed on silent GPU or Neural
-  Engine fallback, model-specific recording limits, reproducible WER/CER
+  Engine fallback, model-specific ASR-window limits, reproducible WER/CER
   benchmarks, and explicit support-tier guidance.
+- Added uninterrupted dictation sessions up to five minutes with silence-aware
+  model-safe windows, sequential local transcription, one final insertion, a
+  final-ten-second warning, and explicit limit-reached processing progress.
 - Added signed model-revocation enforcement across active dictation, installed
   selections, persistent queues, retained partial data, and restoration
   records.
@@ -50,9 +53,9 @@ Planned first public app release.
 - Added optional MossFormer2 SE FP32, FP16, and 8-bit in-memory voice cleaning
   before every ASR backend, with FP16 auto-enable and raw-audio fallback.
 - Added Fast and Accurate English and Japanese choices, a Chinese Specialist,
-  multilingual SenseVoice, and Experimental Qwen3-ASR, Parakeet, Nemotron,
-  Cohere, Canary-Qwen, Granite Speech, Voxtral, and MOSS Transcribe-Diarize
-  routes.
+  multilingual SenseVoice, and Experimental CrisperWhisper 2.0, Qwen3-ASR,
+  Parakeet, Nemotron, Cohere, Canary-Qwen, Granite Speech, Voxtral, and MOSS
+  Transcribe-Diarize routes.
 - Retired the evaluated Omnilingual ASR route from the shipped catalog and
   added crash-safe cleanup for previously managed copies.
 - Kept all transcription and optional voice cleaning local. Textify has no

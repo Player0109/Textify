@@ -1,5 +1,6 @@
 import AVFoundation
 import CryptoKit
+import Dispatch
 import Foundation
 import TextifyAudio
 import TextifyCore
@@ -18,6 +19,8 @@ private final class RuntimeAdapterAudioEngineSpy:
 {
     private let lock = NSLock()
     private var selectedInputValue: LiveAudioInput?
+    private var tapHandlerValue:
+        (@Sendable (AVAudioPCMBuffer, AVAudioTime) -> Void)?
 
     var selectedInput: LiveAudioInput? {
         lock.withLock { selectedInputValue }
@@ -34,8 +37,63 @@ private final class RuntimeAdapterAudioEngineSpy:
     func reset() {}
     func installTap(
         _ handler: @escaping @Sendable (AVAudioPCMBuffer, AVAudioTime) -> Void
-    ) throws {}
-    func removeTap() {}
+    ) throws {
+        lock.withLock {
+            tapHandlerValue = handler
+        }
+    }
+    func removeTap() {
+        lock.withLock {
+            tapHandlerValue = nil
+        }
+    }
+
+    func emit(
+        samples: [Float],
+        sampleRate: Double,
+        audioTime: AVAudioTime? = nil
+    ) throws {
+        let format = try XCTUnwrap(
+            AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: sampleRate,
+                channels: 1,
+                interleaved: false
+            )
+        )
+        let buffer = try XCTUnwrap(
+            AVAudioPCMBuffer(
+                pcmFormat: format,
+                frameCapacity: AVAudioFrameCount(samples.count)
+            )
+        )
+        buffer.frameLength = AVAudioFrameCount(samples.count)
+        let channelData = try XCTUnwrap(buffer.floatChannelData)
+        for frame in samples.indices {
+            channelData[0][frame] = samples[frame]
+        }
+
+        let handler = lock.withLock { tapHandlerValue }
+        handler?(
+            buffer,
+            audioTime ?? AVAudioTime(sampleTime: 0, atRate: sampleRate)
+        )
+    }
+}
+
+private final class RuntimeAdapterMilestoneLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedValues: [String] = []
+
+    var values: [String] {
+        lock.withLock { storedValues }
+    }
+
+    func append(_ value: String) {
+        lock.withLock {
+            storedValues.append(value)
+        }
+    }
 }
 
 final class RuntimeAdaptersTests: XCTestCase {
@@ -83,6 +141,8 @@ final class RuntimeAdaptersTests: XCTestCase {
                 lastSeenDisplayName: "Fixture Microphone"
             ),
             maximumDurationSeconds: 60,
+            onCaptureStarted: {},
+            onFirstAudio: { _ in },
             onSpeechDetected: {},
             onMaximumDurationReached: {},
             onRecordingError: { _ in }
@@ -90,6 +150,55 @@ final class RuntimeAdaptersTests: XCTestCase {
 
         XCTAssertEqual(engine.selectedInput, .device(deviceUID: "fixture-device-uid"))
         await adapter.discardRecording()
+    }
+
+    func testAudioAdapterForwardsCaptureMilestoneCallbacks() async throws {
+        let permission = MicrophonePermissionClient(
+            status: { .granted },
+            requestAccess: { .granted }
+        )
+        let engine = RuntimeAdapterAudioEngineSpy()
+        let milestones = RuntimeAdapterMilestoneLog()
+        let adapter = RuntimeAudioRecorderAdapter(
+            recorder: LiveAudioRecorder(
+                permissionClient: permission,
+                configuration: LiveAudioRecordingConfiguration(
+                    postReleaseGraceMilliseconds: 0
+                ),
+                engineClient: engine
+            )
+        )
+
+        try await adapter.startRecording(
+            microphone: .systemDefault,
+            maximumDurationSeconds: 60,
+            onCaptureStarted: {
+                milestones.append("capture_started")
+            },
+            onFirstAudio: { firstSampleUptimeMilliseconds in
+                milestones.append("first_audio_\(firstSampleUptimeMilliseconds)")
+            },
+            onSpeechDetected: {},
+            onMaximumDurationReached: {},
+            onRecordingError: { _ in }
+        )
+        try engine.emit(
+            samples: Array(repeating: 0.1, count: 160),
+            sampleRate: 16_000,
+            audioTime: AVAudioTime(
+                hostTime: AVAudioTime.hostTime(forSeconds: 12.5)
+            )
+        )
+        try engine.emit(
+            samples: Array(repeating: 0.2, count: 160),
+            sampleRate: 16_000
+        )
+
+        _ = try await adapter.finishRecording()
+        XCTAssertEqual(
+            milestones.values,
+            ["capture_started", "first_audio_12500"]
+        )
     }
 
     func testWhisperAdapterReportsMissingModelAfterFailedPrepare() async throws {
@@ -1065,10 +1174,15 @@ final class RuntimeAdaptersTests: XCTestCase {
         XCTAssertEqual(snapshot.inputMonitoring, .granted)
     }
 
-    func testSystemRuntimeClockReturnsMillisecondsAndSleepsForNonNegativeDurations() async {
+    func testSystemRuntimeClockUsesMonotonicUptimeMilliseconds() async {
         let clock = SystemRuntimeClock()
+        let before = Int(DispatchTime.now().uptimeNanoseconds / 1_000_000)
+        let actual = clock.nowMilliseconds()
+        let after = Int(DispatchTime.now().uptimeNanoseconds / 1_000_000)
 
-        XCTAssertGreaterThan(clock.nowMilliseconds(), 0)
+        XCTAssertGreaterThanOrEqual(actual, before)
+        XCTAssertLessThanOrEqual(actual, after)
+        XCTAssertLessThan(actual, Int(Date().timeIntervalSince1970 * 1_000))
         await clock.sleep(milliseconds: -10)
         await clock.sleep(milliseconds: 0)
     }

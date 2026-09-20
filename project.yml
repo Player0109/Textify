@@ -141,6 +141,17 @@ targets:
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/libsherpa-onnx-c-api.dylib
           - $(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/libonnxruntime.1.24.4.dylib
+      - name: Embed Confucius Runtime
+        script: |
+          "$SRCROOT/script/runtime/embed_confucius_runtime.sh" \
+            "$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH" \
+            "${EXPANDED_CODE_SIGN_IDENTITY:--}"
+        inputFiles:
+          - $(SRCROOT)/script/runtime/embed_confucius_runtime.sh
+          - $(SRCROOT)/Vendor/audio.cpp/9ba8841/lib/libtextify-confucius.dylib
+          - $(SRCROOT)/Vendor/audio.cpp/9ba8841/EXPORTED_SYMBOLS
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/libtextify-confucius.dylib
       - name: Embed transcribe.cpp Runtime
         script: |
           "$SRCROOT/script/runtime/embed_transcribe_cpp_runtime.sh" \

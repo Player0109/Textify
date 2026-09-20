@@ -2,6 +2,158 @@
 
 This file records cross-agent handoffs during implementation.
 
+## Confucius4-R2T2 Live Dictation Handoff - 2026-09-20
+
+- The product owner requested Confucius4-R2T2 integration and explicitly chose
+  live text in the recording overlay, with one final insertion on release.
+  This supersedes the previous exclusions for live transcript previews within
+  this workstream. Local Apple Silicon inference remains required.
+- This workstream owns the narrow audio chunk callback, optional streaming
+  transcription boundary, Confucius runtime and packaging, model catalog entry
+  and notices, runtime session integration, overlay presentation, their tests,
+  and corresponding specification updates. Preserve the unrelated FlanEC work.
+- Evaluate pinned audio.cpp commit
+  `9ba884179826c3b33dd305185b5f94c79175a03d` and Q8_0 artifact from
+  `davidxifeng/Confucius4-R2T2-gguf` revision
+  `a8e6b385d7df7eae9519363e07034a209004797a`. The public English sample produced
+  incremental and final output through Metal on this M4 Max; this is an initial
+  smoke result, not catalog ratings or completed app integration.
+- Preserve armed capture, cancellation, the five-minute session cap, exact
+  target ownership, optional voice cleaning for final text, post-processing,
+  final silence/hallucination checks, and single insertion. Live audio and text
+  remain in memory and must never enter diagnostics.
+
+Live transcript overflow follow-up:
+
+- The user approved a fixed three-line view that follows the newest words.
+  This slice owns only recording-overlay presentation, its visual verification,
+  and the corresponding specification update.
+- Remove the character suffix cutoff and visible ellipsis truncation. Measure
+  the complete wrapped text and move it upward when it exceeds the three-line
+  viewport, with a short transition and Reduce Motion support. Preserve the
+  complete in-memory transcript and existing final-insertion behavior.
+
+Overflow verification:
+
+- Visually inspected sequential two-, three-, four-, and five-line previews,
+  natural English wrapping, a transcript longer than 1,000 characters, and
+  Chinese text. The newest three lines remain visible without ellipses and
+  the expanded overlay stays 156 points high at default scale.
+- The overlay clears its retained view content when hidden, resetting scroll
+  state for the next session. The full suite passed 1,007 tests, with 15 optional
+  model checks skipped and no failures. The local Release app passed packaging,
+  signature, catalog, and launch checks.
+
+F16 follow-up scope:
+
+- Add the user-requested `confucius4-r2t2-f16` artifact to the same signed
+  checkpoint's version choices; retain Q8_0 as its recommendation. This slice
+  owns the Confucius adapter allowlist, catalog and catalog expectations,
+  focused native adapter verification, and corresponding documentation.
+- Pin `r2t2-f16.gguf` at the existing publisher revision: 4,092,155,264 bytes,
+  SHA-256 `d1b531ceaf5640d98352d3a9180238d99d36d393e160afd4692031077e7bae2c`.
+  Reuse the existing streaming lifecycle, runtime library, and bundled terms.
+
+F16 verification:
+
+- The downloaded F16 file matches the pinned byte count and SHA-256. The full
+  suite passed 1,007 tests with 15 optional fixture tests skipped and no failures.
+- Native fixture tests separately passed using the runtime embedded in the
+  staged app: F16 live preview, final recognition, 25-second preview-window
+  reset, and F16 → Q8_0 → F16 switching through the production adapter with
+  Automatic language detection.
+- Paced English and Chinese F16 fixture checks emitted live text and completed
+  final recognition; public sample output is in `Benchmarks/ConfuciusR2T2`.
+- The local Release app in `dist/Textify.app` passed package, signature, and
+  launch checks with the signed 46-artifact catalog. Both variants appear in
+  the same checkpoint's version choices. No quality or speed ratings were added.
+
+Verification for this workstream:
+
+- The complete Swift test suite passed: 1,005 tests, 14 optional fixture tests
+  skipped, zero failures. The opt-in Confucius Metal tests separately passed
+  with the real pinned Q8_0 model, including preview-window reset, final
+  recognition, and unload. Session tests cover cancellation, stale callbacks,
+  silence, preview failure fallback, and final-only insertion.
+- Public English and Chinese fixtures produced incremental text on M4 Max.
+  Evidence and reproduction instructions are in `Benchmarks/ConfuciusR2T2`.
+  These smoke runs do not establish catalog quality or speed ratings.
+- The expanded recording overlay was rendered and visually inspected. The
+  signed 45-model catalog, pinned runtime exports/checksum, and offline license
+  mappings passed verification. The final local Release app in `dist/Textify.app`
+  passed build, arm64/package validation, code-signature checks, and launch
+  smoke with the bundled native runtime and license texts.
+- Live microphone dictation into a real target app remains a manual smoke
+  check; the integration tests use injected PCM and an insertion spy.
+
+## Armed Capture Latency And Short-Utterance Handoff - 2026-08-08
+
+- This slice owns the narrow hotkey, runtime-dictation, live-audio timing,
+  privacy-safe diagnostics, and focused-test changes needed to remove the
+  Right Command activation blind spot and admit short utterances reliably.
+- Right Command down begins an in-memory armed capture immediately. The
+  existing 250 ms threshold continues to distinguish dictation from a tap or
+  shortcut chord; rejected captures are discarded without transcription or
+  insertion. Once activation is accepted, release finishes the capture even
+  when the live speech guard has not fired, leaving final no-speech and
+  hallucination filtering to the transcription boundary.
+- The press-to-capture path consumes a prepared admission snapshot instead of
+  reloading settings and model readiness after the activation timer. Model
+  activation, revocation, and Voice Cleaning changes remain serialized at the
+  existing Purpose Runtime Boundary and refresh that snapshot there.
+- Diagnostics may record only monotonic durations and closed outcome values
+  for trigger receipt, audio-start request/return, and first captured buffer.
+  They must not record audio, transcript text, application identity, or target
+  identity.
+- Preserve the in-progress clean-termination and CrisperWhisper 2.0 changes in
+  `AppDictationService`, `AppServices`, and their tests. This slice does not
+  change insertion, model runtime behavior, catalog policy, Sparkle,
+  notarization, or unrelated application lifecycle behavior.
+- Because armed capture now owns the microphone before activation, confirmed
+  Quit must discard audio before waiting for model-install cancellation. Keep
+  the existing resumable-download persistence and runtime-unload ordering
+  otherwise unchanged.
+
+## CrisperWhisper 2.0 Model Support Handoff - 2026-08-03
+
+- The product owner confirmed that Textify has written Nyra commercial rights
+  covering curated redistribution and commercial use of the CrisperWhisper 2.0
+  weights and generated transcripts. Release publication still requires the
+  maintainer to retain that agreement as private legal evidence.
+- This slice owns the narrow cross-task changes needed to load immutable GGML
+  FP16 conversions of exact CrisperWhisper 2.0 Large and Turbo checkpoint
+  revisions, supply their required `intended` decoder-token prefix, expose them
+  as a Nyra catalog family, bundle the upstream public license and attribution,
+  and add focused runtime, catalog, legal-document, and production-policy
+  coverage.
+- It may update the existing whisper.cpp native shim, the signed production
+  manifest pair, catalog presentation/provider identity, bundled legal
+  resources, current model documentation, and their focused tests. Historical
+  catalog fixtures and historical release evidence remain frozen.
+- Initial support is English transcription using Textify's existing bounded
+  audio chunks and Crisper's `intended` mode. It does not add a public mode
+  selector, long-form repair, real cross-app insertion, hotkeys, Sparkle,
+  notarization, or unrelated runtime refactors.
+- Preserve the in-progress clean-termination changes already present in the
+  app composition, dictation service, and their tests; they are outside this
+  model-support slice.
+
+## Clean Application Termination Handoff - 2026-08-01
+
+- The normal-Quit crash fix owns the narrow cross-task lifecycle changes needed
+  to stop the Task 11 app shell only after Task 15's native runtime composition
+  has shut down.
+- This slice may update `Sources/Textify/App/`, the minimum
+  `Sources/TextifyRuntime/Dictation/` shutdown seam, and focused app/runtime
+  tests. Quit must retain the existing in-progress-download confirmation and
+  closing the main window must continue to leave Textify running.
+- AppKit termination must wait for audio discard and transcription/voice-cleaning
+  unload before replying that termination may proceed. Confirmed Quit may also
+  stop and await the active model-install task while retaining its persisted
+  pipeline state and valid resumable data for relaunch recovery. It does not
+  change model selection, catalog authority, hotkey behavior, or native runtime
+  implementation.
+
 ## Production Model Fault Injection Handoff - 2026-07-25
 
 - GitHub issue #24 owns the narrow production failpoint seam and forced
@@ -2010,3 +2162,39 @@ Task 1 must merge before parallel Wave 1 work begins.
   Silicon execution. The DMG must remain unsigned and unnotarized, the release
   notes must explain Gatekeeper's manual approval, and no documentation may
   call this artifact a production or trusted Developer ID release.
+
+## Long Dictation Session Handoff - 2026-08-09
+
+- The product owner explicitly authorized the previously deferred long-
+  dictation direction. This handoff supersedes the V1-only hard-cutoff and
+  long-form exclusions only for the files and behavior named below.
+- The implementation may update `Sources/TextifyAudio`,
+  `Sources/TextifyRuntime`, the recording/processing overlay and app
+  composition, privacy-safe diagnostics, their focused tests, and the matching
+  authoritative specification.
+- One physical trigger hold remains one user Dictation Session and one final
+  insertion. The microphone must remain sample-contiguous; model-specific
+  `maxAudioSeconds` becomes an internal ASR-window limit, while a separate
+  finite product-session limit prevents unbounded capture.
+- Preserve armed capture, exact key-down target ownership, model-revocation and
+  Purpose Runtime Boundary semantics, in-memory-only audio, no transcript
+  diagnostics, no partial insertion, and every existing release/signing gate.
+- Apple SpeechAnalyzer, transcript history, file transcription, meeting-
+  workspace UI, and a new toggle hotkey remain outside this implementation.
+
+## FlanEC Post-ASR Correction Prototype Handoff - 2026-08-10
+
+- The product owner authorized a reversible trial of the public FlanEC ASR
+  error-correction model. This slice owns only a standalone tracked prototype
+  under `Benchmarks/FlanEC/` and this coordination note.
+- Pin every Hugging Face artifact to its exact immutable revision. Keep Python,
+  PyTorch, Transformers, Hub downloads, and generated results outside the
+  shipping app, root Swift package, signed model catalog, and release bundle.
+- The prototype must compare Textify's current one-best constraint with real
+  N-best input and include already-correct controls for over-correction. Do not
+  add a production post-processing hook unless the measured output preserves
+  correct text and materially improves the target acronym, homophone, and
+  filename cases.
+- Any later in-app experiment requires a separate handoff before changing
+  `Package.swift`, `TextifyRuntime`, app composition, settings, model purposes,
+  the signed catalog, legal notices, or release packaging.
