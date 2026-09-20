@@ -720,6 +720,18 @@ final class ProductionUITests: XCTestCase {
         )
     }
 
+    func testLiveTranscriptOverlayUsesMoreHeightAndRemainsOnScreen() {
+        let visible = CGRect(x: 0, y: 0, width: 1440, height: 900)
+        let frame = RecordingOverlayGeometry.frame(
+            visibleFrame: visible,
+            preferences: .defaults,
+            hasTranscript: true
+        )
+        XCTAssertEqual(frame.width, 344)
+        XCTAssertEqual(frame.height, 156)
+        XCTAssertTrue(visible.contains(frame))
+    }
+
     func testRecordingOverlayGeometryAppliesOffsetsAndScale() {
         let visibleFrame = CGRect(x: 0, y: 0, width: 1_440, height: 900)
         let preferences = RecordingOverlayPreferences(
@@ -877,6 +889,8 @@ final class ProductionUITests: XCTestCase {
                 "mossformer2-se-fp32",
                 "mossformer2-se-fp16",
                 "mossformer2-se-int8",
+                "confucius4-r2t2-q8_0",
+                "confucius4-r2t2-f16",
             ]
         )
     }

@@ -51,3 +51,11 @@ contain fewer entries than the app runtime can support.
 
 Third-party notices are in `THIRD_PARTY_NOTICES.md`. Copied runtime license
 texts are in `THIRD_PARTY_LICENSES/`.
+
+## Confucius4-R2T2
+
+Confucius4-R2T2 is developed by NetEase Youdao, based on Qwen3-ASR. Textify
+uses davidxifeng's Q8_0 and F16 conversions through the Confucius community model in
+ShugoAI's audio.cpp runtime. The model uses the NetEase Youdao Model Use
+License Agreement; audio.cpp uses Apache-2.0. Exact revisions and checksums
+are recorded in the signed model catalog and `Vendor/audio.cpp/9ba8841/UPSTREAM.md`.

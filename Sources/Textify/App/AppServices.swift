@@ -429,6 +429,7 @@ final class AppServices {
         updateOverlay()
         observeDictationStatus()
         observeDictationSessionProgress()
+        observeLiveTranscript()
         observeDictationReadiness()
         Task { @MainActor [weak self] in
             await self?.refreshManagedModelReadiness()
@@ -587,6 +588,20 @@ final class AppServices {
                     await self.enforceModelRevocations()
                 }
                 self.observeDictationStatus()
+            }
+        }
+    }
+
+    private func observeLiveTranscript() {
+        withObservationTracking {
+            _ = dictation.liveTranscript
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if case .recording = self.dictation.status {
+                    self.overlayPresenter.updateTranscript(self.dictation.liveTranscript)
+                }
+                self.observeLiveTranscript()
             }
         }
     }

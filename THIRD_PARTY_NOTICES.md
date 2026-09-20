@@ -416,3 +416,21 @@ included in the application bundle or this repository snapshot.
   `THIRD_PARTY_LICENSES/FunASR_Model_License_1.1.txt`
 - Every runtime artifact byte size and checksum is pinned by the signed Textify
   model catalog
+
+## Confucius4-R2T2 and audio.cpp
+
+- Original model: https://huggingface.co/netease-youdao/Confucius4-R2T2
+- Q8_0 and F16 conversions: https://huggingface.co/davidxifeng/Confucius4-R2T2-gguf,
+  revision `a8e6b385d7df7eae9519363e07034a209004797a`.
+- Runtime: https://github.com/0xShug0/audio.cpp,
+  commit `9ba884179826c3b33dd305185b5f94c79175a03d`.
+- Model terms, controlling Chinese license, and conversion notice:
+  `THIRD_PARTY_LICENSES/Confucius4-R2T2.txt`.
+- Runtime and compiled dependency licenses:
+  `THIRD_PARTY_LICENSES/audio.cpp.txt` (audio.cpp, ggml, cJSON, libyaml,
+  SentencePiece and its included dependencies).
+
+Any modifications made to the original model in this Derivative Work are not
+endorsed, warranted, or guaranteed by the original right-holder of the original
+model, and the original right-holder disclaims all liability related to this
+Derivative Work.

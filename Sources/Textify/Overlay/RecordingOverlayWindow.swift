@@ -117,6 +117,7 @@ private extension ProductionDictationError {
 
 @MainActor
 protocol RecordingOverlayPresenting: AnyObject {
+    func updateTranscript(_ text: String)
     func beginSession()
     func endSession()
 
@@ -126,26 +127,32 @@ protocol RecordingOverlayPresenting: AnyObject {
     )
 }
 
+extension RecordingOverlayPresenting {
+    func updateTranscript(_ text: String) {}
+}
+
 enum RecordingOverlayGeometry {
     static let baseSize = CGSize(width: 344, height: 88)
     static let bottomInset: CGFloat = 22
 
     static func size(
-        preferences: RecordingOverlayPreferences
+        preferences: RecordingOverlayPreferences,
+        hasTranscript: Bool = false
     ) -> CGSize {
         let scale = CGFloat(preferences.normalized().scale)
         return CGSize(
             width: baseSize.width * scale,
-            height: baseSize.height * scale
+            height: (hasTranscript ? 156 : baseSize.height) * scale
         )
     }
 
     static func frame(
         visibleFrame: CGRect,
-        preferences: RecordingOverlayPreferences
+        preferences: RecordingOverlayPreferences,
+        hasTranscript: Bool = false
     ) -> CGRect {
         let preferences = preferences.normalized()
-        let size = size(preferences: preferences)
+        let size = size(preferences: preferences, hasTranscript: hasTranscript)
         let proposedOrigin = CGPoint(
             x: visibleFrame.midX - size.width / 2
                 + CGFloat(preferences.xOffset),
@@ -209,6 +216,15 @@ private struct WorkspaceRecordingOverlayApplicationProvider: RecordingOverlayApp
 @MainActor
 final class RecordingOverlayPresenter: RecordingOverlayPresenting {
     private var window: RecordingOverlayWindow?
+    private var transcript = ""
+    private var lastPresentation: (RecordingOverlayState, RecordingOverlayPreferences)?
+
+    func updateTranscript(_ text: String) {
+        guard let (state, preferences) = lastPresentation,
+              case .recording = state else { return }
+        transcript = text
+        present(state, preferences: preferences)
+    }
     private var sessionApplication: RecordingOverlayApplication?
     private var sessionID: UUID?
     private var applicationSessionID: UUID?
@@ -219,13 +235,17 @@ final class RecordingOverlayPresenter: RecordingOverlayPresenting {
     }
 
     func beginSession() {
+        transcript = ""
+        lastPresentation = nil
         sessionID = UUID()
         applicationSessionID = nil
         sessionApplication = nil
     }
 
     func endSession() {
-        window?.orderOut(nil)
+        transcript = ""
+        lastPresentation = nil
+        window?.hide()
         sessionID = nil
         applicationSessionID = nil
         sessionApplication = nil
@@ -235,8 +255,10 @@ final class RecordingOverlayPresenter: RecordingOverlayPresenting {
         _ state: RecordingOverlayState,
         preferences: RecordingOverlayPreferences
     ) {
+        lastPresentation = (state, preferences)
+        if case .recording = state {} else { transcript = "" }
         guard state != .hidden else {
-            window?.orderOut(nil)
+            window?.hide()
             return
         }
 
@@ -261,15 +283,17 @@ final class RecordingOverlayPresenter: RecordingOverlayPresenting {
         let window = window ?? RecordingOverlayWindow(
             state: state,
             application: application,
-            preferences: preferences
+            preferences: preferences,
+            transcript: transcript
         )
         self.window = window
         window.update(
             state: state,
             application: application,
-            preferences: preferences
+            preferences: preferences,
+            transcript: transcript
         )
-        window.position(preferences: preferences)
+        window.position(preferences: preferences, hasTranscript: !transcript.isEmpty)
         window.reveal()
     }
 }
@@ -281,16 +305,19 @@ final class RecordingOverlayWindow: NSWindow {
     fileprivate init(
         state: RecordingOverlayState = .recording(remainingSeconds: nil),
         application: RecordingOverlayApplication = .unavailable,
-        preferences: RecordingOverlayPreferences = .defaults
+        preferences: RecordingOverlayPreferences = .defaults,
+        transcript: String = ""
     ) {
         let content = RecordingOverlayContent(
             state: state,
             application: application,
-            preferences: preferences
+            preferences: preferences,
+            transcript: transcript
         )
         self.hostingView = NSHostingView(rootView: content)
         let size = RecordingOverlayGeometry.size(
-            preferences: preferences
+            preferences: preferences,
+            hasTranscript: !transcript.isEmpty
         )
 
         super.init(
@@ -313,16 +340,29 @@ final class RecordingOverlayWindow: NSWindow {
     fileprivate func update(
         state: RecordingOverlayState,
         application: RecordingOverlayApplication,
-        preferences: RecordingOverlayPreferences
+        preferences: RecordingOverlayPreferences,
+        transcript: String
     ) {
         let size = RecordingOverlayGeometry.size(
-            preferences: preferences
+            preferences: preferences,
+            hasTranscript: !transcript.isEmpty
         )
         setContentSize(size)
         hostingView.rootView = RecordingOverlayContent(
             state: state,
             application: application,
-            preferences: preferences
+            preferences: preferences,
+            transcript: transcript
+        )
+    }
+
+    func hide() {
+        orderOut(nil)
+        hostingView.rootView = RecordingOverlayContent(
+            state: .hidden,
+            application: .unavailable,
+            preferences: .defaults,
+            transcript: ""
         )
     }
 
@@ -349,6 +389,7 @@ final class RecordingOverlayWindow: NSWindow {
 
     func position(
         preferences: RecordingOverlayPreferences,
+        hasTranscript: Bool = false,
         screen: NSScreen? = NSScreen.main ?? NSScreen.screens.first
     ) {
         guard let screen else {
@@ -357,7 +398,8 @@ final class RecordingOverlayWindow: NSWindow {
         setFrame(
             RecordingOverlayGeometry.frame(
                 visibleFrame: screen.visibleFrame,
-                preferences: preferences
+                preferences: preferences,
+                hasTranscript: hasTranscript
             ),
             display: false
         )
@@ -368,7 +410,9 @@ private struct RecordingOverlayContent: View {
     let state: RecordingOverlayState
     let application: RecordingOverlayApplication
     let preferences: RecordingOverlayPreferences
+    let transcript: String
 
+    private var height: CGFloat { transcript.isEmpty ? 88 : 156 }
     private let cornerRadius: CGFloat = 21
 
     var body: some View {
@@ -378,22 +422,27 @@ private struct RecordingOverlayContent: View {
             VStack(spacing: 7) {
                 identityRow
                 signalRow
+                if !transcript.isEmpty {
+                    RecordingLiveTranscript(text: transcript)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(height: 60, alignment: .topLeading)
+                }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
         }
-        .frame(width: 328, height: 72)
+        .frame(width: 328, height: height - 16)
         .overlay {
             RecordingSignalGlow(state: state, cornerRadius: cornerRadius)
         }
         .shadow(color: .black.opacity(0.38), radius: 14, y: 7)
         .padding(8)
-        .frame(width: 344, height: 88)
+        .frame(width: 344, height: height)
         .scaleEffect(CGFloat(preferences.scale))
         .frame(
             width: RecordingOverlayGeometry.baseSize.width
                 * CGFloat(preferences.scale),
-            height: RecordingOverlayGeometry.baseSize.height
+            height: height
                 * CGFloat(preferences.scale)
         )
         .preferredColorScheme(.dark)
@@ -556,6 +605,54 @@ private struct RecordingOverlayContent: View {
         case .blocked:
             return .orange
         }
+    }
+}
+
+private struct RecordingLiveTranscript: View {
+    let text: String
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var textHeight: CGFloat = 0
+
+    var body: some View {
+        // Reserve three lines using the same font metrics as the visible text.
+        Text("Ag\nAg\nAg")
+            .hidden()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(alignment: .topLeading) {
+                GeometryReader { viewport in
+                    Text(text)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(width: viewport.size.width, alignment: .leading)
+                        .background {
+                            GeometryReader { content in
+                                Color.clear.preference(
+                                    key: TranscriptHeightPreference.self,
+                                    value: content.size.height
+                                )
+                            }
+                        }
+                        .offset(y: -max(0, textHeight - viewport.size.height))
+                        .animation(
+                            reduceMotion ? nil : .easeOut(duration: 0.14),
+                            value: textHeight
+                        )
+                }
+            }
+            .clipped()
+            .font(.system(size: 14))
+            .foregroundStyle(.white.opacity(0.94))
+            .onPreferenceChange(TranscriptHeightPreference.self) { textHeight = $0 }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Live transcript")
+            .accessibilityValue(text)
+    }
+}
+
+private struct TranscriptHeightPreference: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 

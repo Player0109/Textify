@@ -70,7 +70,8 @@ for release_dependency in \
   "$RELEASE_BIN_DIRECTORY/libCLiteRTLM_mac.dylib" \
   Vendor/sherpa-onnx/v1.13.2/lib/libsherpa-onnx-c-api.dylib \
   Vendor/sherpa-onnx/v1.13.2/lib/libonnxruntime.1.24.4.dylib \
-  Vendor/transcribe.cpp/v0.1.3/lib/libtextify-transcribe.0.1.3.dylib; do
+  Vendor/transcribe.cpp/v0.1.3/lib/libtextify-transcribe.0.1.3.dylib \
+  Vendor/audio.cpp/9ba8841/lib/libtextify-confucius.dylib; do
   assert_macos_14_compatible_macho "$release_dependency"
 done
 plutil -lint Resources/Info.plist
@@ -102,6 +103,10 @@ printf '%s  %s\n' \
   'THIRD_PARTY_LICENSES/CC-BY-4.0.txt' \
   'b5d65a59060e68c4ff940e1eddfa6f94b2d68fdf58ed7f4dd57721c997e35e9d' \
   'THIRD_PARTY_LICENSES/OpenAI-Whisper.txt' \
+  '1f6b215cd8256efce081df1e46bd6c1b044ebc52dbe1219117873c204d8de86c' \
+  "THIRD_PARTY_LICENSES/Confucius4-R2T2.txt" \
+  '18215c981080015bba295552c46aa5e8572be347eef33ad10de09593dc50e544' \
+  "THIRD_PARTY_LICENSES/audio.cpp.txt" \
   '42f43bf4dc72ef422f91f6ca143f4514e21a68b353940d99091c1addcd0aee79' \
   'THIRD_PARTY_LICENSES/CrisperWhisper-2.0-Nyra-License.md' \
   'bccb9e9fa28644216f919d1f80567e49a41990705d3c3b036c334dc03e00dd31' \
@@ -157,6 +162,8 @@ otool -l Vendor/sherpa-onnx/v1.13.2/lib/libonnxruntime.1.24.4.dylib \
   | awk '/LC_BUILD_VERSION/{show=1} show && /minos/{print $2; exit}' \
   | grep -Fxq '14.0'
 printf '%s  %s\n' \
+  '1776894bb69ed08a85aa883c48d799d59381bd4524930a430a25a5aebb4610b1' \
+  'Vendor/audio.cpp/9ba8841/lib/libtextify-confucius.dylib' \
   '543b2d9be14e1f3d834534d9f230e9828184466c653bb940787fdd517e5f7855' \
   'Vendor/transcribe.cpp/v0.1.3/lib/libtextify-transcribe.0.1.3.dylib' \
   '2b7c468b2153ebda9110840945fb83652148f787cb4cb0a4d049d1ee7c65bbda' \

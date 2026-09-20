@@ -187,6 +187,8 @@ enum ModelCatalogVariantTerminology {
             "FluidAudio Paraformer"
         case .sherpaOnnx:
             "sherpa-onnx"
+        case .audioCpp:
+            "audio.cpp"
         case .transcribeCpp:
             "transcribe.cpp"
         case .mlxAudio:

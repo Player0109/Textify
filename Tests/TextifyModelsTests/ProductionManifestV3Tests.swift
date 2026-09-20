@@ -16,10 +16,10 @@ final class ProductionManifestV3Tests: XCTestCase {
 
         XCTAssertEqual(manifest.manifestVersion, 3)
         XCTAssertNoThrow(try ProductionModelPolicy.validateProductionManifest(manifest))
-        XCTAssertEqual(manifest.models.count, 44)
-        XCTAssertEqual(graph.families.count, 14)
-        XCTAssertEqual(graph.checkpoints.count, 24)
-        XCTAssertEqual(graph.artifacts.count, 44)
+        XCTAssertEqual(manifest.models.count, 46)
+        XCTAssertEqual(graph.families.count, 15)
+        XCTAssertEqual(graph.checkpoints.count, 25)
+        XCTAssertEqual(graph.artifacts.count, 46)
         XCTAssertEqual(graph.artifacts.count, manifest.models.count)
         XCTAssertEqual(Set(graph.artifacts.map(\.id)), Set(manifest.models.map(\.id)))
         XCTAssertTrue(
@@ -111,9 +111,29 @@ final class ProductionManifestV3Tests: XCTestCase {
         }
     }
 
+    func testConfuciusF16IsAnAlternativeVersionWithQ8StillRecommended() throws {
+        let manifest = try verifiedProductionManifest()
+        let graph = try XCTUnwrap(manifest.presentationGraph)
+        let checkpoint = try XCTUnwrap(graph.checkpoints.first {
+            $0.id == "checkpoint.netease.confucius4-r2t2"
+        })
+        XCTAssertEqual(checkpoint.artifactIDs, ["confucius4-r2t2-q8_0", "confucius4-r2t2-f16"])
+        XCTAssertEqual(checkpoint.recommendedArtifactID, "confucius4-r2t2-q8_0")
+        let f16 = try artifact("confucius4-r2t2-f16", in: graph)
+        XCTAssertEqual(f16.numericFormat, .f16)
+        XCTAssertEqual(f16.runtime, .audioCpp)
+        XCTAssertEqual(f16.computeRoute, .gpuViaMetal)
+        let entry = try XCTUnwrap(manifest.models.first { $0.id == f16.id })
+        XCTAssertEqual(entry.sizeBytes, 4_092_155_264)
+        XCTAssertEqual(entry.runtime.variant, f16.id)
+        XCTAssertEqual(entry.files.first?.sha256, "d1b531ceaf5640d98352d3a9180238d99d36d393e160afd4692031077e7bae2c")
+    }
+
     func testProductionV3PreservesV2OperationalRecordsExceptSignedPeakStorageAndSelectionCopy() throws {
         let retiredModelID = "omnilingual-asr-300m-ctc-int8"
         let addedModelIDs: Set<String> = [
+            "confucius4-r2t2-q8_0",
+            "confucius4-r2t2-f16",
             "crisperwhisper-2-large-f16",
             "crisperwhisper-2-turbo-f16",
         ]
@@ -152,7 +172,7 @@ final class ProductionManifestV3Tests: XCTestCase {
 
         XCTAssertEqual(v2.manifestVersion, 2)
         XCTAssertEqual(v2.models.count, 43)
-        XCTAssertEqual(v3.models.count, 44)
+        XCTAssertEqual(v3.models.count, 46)
         XCTAssertFalse(v3.models.contains { $0.id == retiredModelID })
         XCTAssertEqual(
             Set(v3.models.filter { addedModelIDs.contains($0.id) }.map(\.id)),

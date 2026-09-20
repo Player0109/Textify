@@ -1,0 +1,15 @@
+load 2.2973378329998013
+offline 之前有顾客自己带酒水，也没加收钱或者不让喝。
+{"seconds": 2.042, "text": "\u4e4b\u524d"}
+{"seconds": 2.334, "text": "\u6709"}
+{"seconds": 2.688, "text": "\u987e\u5ba2\u81ea\u5df1"}
+{"seconds": 2.977, "text": "\u5e26"}
+{"seconds": 3.323, "text": "\u9152"}
+{"seconds": 4.277, "text": "\u6c34"}
+{"seconds": 4.588, "text": "\u4e5f\u6ca1\u52a0"}
+{"seconds": 4.908, "text": "\u6536"}
+{"seconds": 5.564, "text": "\u94b1"}
+{"seconds": 5.872, "text": "\u6216\u8005"}
+{"seconds": 6.183, "text": "\u4e0d\u8ba9\u559d"}
+final 之前有顾客自己带酒水也没加收钱或者不让喝。
+release_to_final 0.15834537500018975

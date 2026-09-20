@@ -2,6 +2,90 @@
 
 This file records cross-agent handoffs during implementation.
 
+## Confucius4-R2T2 Live Dictation Handoff - 2026-09-20
+
+- The product owner requested Confucius4-R2T2 integration and explicitly chose
+  live text in the recording overlay, with one final insertion on release.
+  This supersedes the previous exclusions for live transcript previews within
+  this workstream. Local Apple Silicon inference remains required.
+- This workstream owns the narrow audio chunk callback, optional streaming
+  transcription boundary, Confucius runtime and packaging, model catalog entry
+  and notices, runtime session integration, overlay presentation, their tests,
+  and corresponding specification updates. Preserve the unrelated FlanEC work.
+- Evaluate pinned audio.cpp commit
+  `9ba884179826c3b33dd305185b5f94c79175a03d` and Q8_0 artifact from
+  `davidxifeng/Confucius4-R2T2-gguf` revision
+  `a8e6b385d7df7eae9519363e07034a209004797a`. The public English sample produced
+  incremental and final output through Metal on this M4 Max; this is an initial
+  smoke result, not catalog ratings or completed app integration.
+- Preserve armed capture, cancellation, the five-minute session cap, exact
+  target ownership, optional voice cleaning for final text, post-processing,
+  final silence/hallucination checks, and single insertion. Live audio and text
+  remain in memory and must never enter diagnostics.
+
+Live transcript overflow follow-up:
+
+- The user approved a fixed three-line view that follows the newest words.
+  This slice owns only recording-overlay presentation, its visual verification,
+  and the corresponding specification update.
+- Remove the character suffix cutoff and visible ellipsis truncation. Measure
+  the complete wrapped text and move it upward when it exceeds the three-line
+  viewport, with a short transition and Reduce Motion support. Preserve the
+  complete in-memory transcript and existing final-insertion behavior.
+
+Overflow verification:
+
+- Visually inspected sequential two-, three-, four-, and five-line previews,
+  natural English wrapping, a transcript longer than 1,000 characters, and
+  Chinese text. The newest three lines remain visible without ellipses and
+  the expanded overlay stays 156 points high at default scale.
+- The overlay clears its retained view content when hidden, resetting scroll
+  state for the next session. The full suite passed 1,007 tests, with 15 optional
+  model checks skipped and no failures. The local Release app passed packaging,
+  signature, catalog, and launch checks.
+
+F16 follow-up scope:
+
+- Add the user-requested `confucius4-r2t2-f16` artifact to the same signed
+  checkpoint's version choices; retain Q8_0 as its recommendation. This slice
+  owns the Confucius adapter allowlist, catalog and catalog expectations,
+  focused native adapter verification, and corresponding documentation.
+- Pin `r2t2-f16.gguf` at the existing publisher revision: 4,092,155,264 bytes,
+  SHA-256 `d1b531ceaf5640d98352d3a9180238d99d36d393e160afd4692031077e7bae2c`.
+  Reuse the existing streaming lifecycle, runtime library, and bundled terms.
+
+F16 verification:
+
+- The downloaded F16 file matches the pinned byte count and SHA-256. The full
+  suite passed 1,007 tests with 15 optional fixture tests skipped and no failures.
+- Native fixture tests separately passed using the runtime embedded in the
+  staged app: F16 live preview, final recognition, 25-second preview-window
+  reset, and F16 → Q8_0 → F16 switching through the production adapter with
+  Automatic language detection.
+- Paced English and Chinese F16 fixture checks emitted live text and completed
+  final recognition; public sample output is in `Benchmarks/ConfuciusR2T2`.
+- The local Release app in `dist/Textify.app` passed package, signature, and
+  launch checks with the signed 46-artifact catalog. Both variants appear in
+  the same checkpoint's version choices. No quality or speed ratings were added.
+
+Verification for this workstream:
+
+- The complete Swift test suite passed: 1,005 tests, 14 optional fixture tests
+  skipped, zero failures. The opt-in Confucius Metal tests separately passed
+  with the real pinned Q8_0 model, including preview-window reset, final
+  recognition, and unload. Session tests cover cancellation, stale callbacks,
+  silence, preview failure fallback, and final-only insertion.
+- Public English and Chinese fixtures produced incremental text on M4 Max.
+  Evidence and reproduction instructions are in `Benchmarks/ConfuciusR2T2`.
+  These smoke runs do not establish catalog quality or speed ratings.
+- The expanded recording overlay was rendered and visually inspected. The
+  signed 45-model catalog, pinned runtime exports/checksum, and offline license
+  mappings passed verification. The final local Release app in `dist/Textify.app`
+  passed build, arm64/package validation, code-signature checks, and launch
+  smoke with the bundled native runtime and license texts.
+- Live microphone dictation into a real target app remains a manual smoke
+  check; the integration tests use injected PCM and an insertion spy.
+
 ## Armed Capture Latency And Short-Utterance Handoff - 2026-08-08
 
 - This slice owns the narrow hotkey, runtime-dictation, live-audio timing,
@@ -2097,3 +2181,20 @@ Task 1 must merge before parallel Wave 1 work begins.
   diagnostics, no partial insertion, and every existing release/signing gate.
 - Apple SpeechAnalyzer, transcript history, file transcription, meeting-
   workspace UI, and a new toggle hotkey remain outside this implementation.
+
+## FlanEC Post-ASR Correction Prototype Handoff - 2026-08-10
+
+- The product owner authorized a reversible trial of the public FlanEC ASR
+  error-correction model. This slice owns only a standalone tracked prototype
+  under `Benchmarks/FlanEC/` and this coordination note.
+- Pin every Hugging Face artifact to its exact immutable revision. Keep Python,
+  PyTorch, Transformers, Hub downloads, and generated results outside the
+  shipping app, root Swift package, signed model catalog, and release bundle.
+- The prototype must compare Textify's current one-best constraint with real
+  N-best input and include already-correct controls for over-correction. Do not
+  add a production post-processing hook unless the measured output preserves
+  correct text and materially improves the target acronym, homophone, and
+  filename cases.
+- Any later in-app experiment requires a separate handoff before changing
+  `Package.swift`, `TextifyRuntime`, app composition, settings, model purposes,
+  the signed catalog, legal notices, or release packaging.

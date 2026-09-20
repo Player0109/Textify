@@ -165,6 +165,7 @@ public enum TranscriptionEngine: String, Codable, Equatable, CaseIterable, Senda
     case fluidAudioParaformer = "fluid_audio_paraformer"
     case sherpaOnnx = "sherpa_onnx"
     case transcribeCpp = "transcribe_cpp"
+    case audioCpp = "audio_cpp"
     case mlxAudio = "mlx_audio"
     case liteRTLM = "litert_lm"
 }

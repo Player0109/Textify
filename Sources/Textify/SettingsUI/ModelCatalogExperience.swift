@@ -3736,6 +3736,7 @@ struct ProductionModelPresentation: Equatable, Identifiable {
         case .fluidAudioParakeet: ("Parakeet", "bolt.horizontal.circle")
         case .fluidAudioParaformer: ("Paraformer", "character.waveform")
         case .sherpaOnnx: ("sherpa-onnx", "point.3.connected.trianglepath.dotted")
+        case .audioCpp: ("audio.cpp", "waveform")
         case .transcribeCpp: ("transcribe.cpp", "cpu")
         case .mlxAudio: ("MLX Audio", "sparkles.rectangle.stack")
         case .liteRTLM: ("LiteRT-LM", "cube.transparent")

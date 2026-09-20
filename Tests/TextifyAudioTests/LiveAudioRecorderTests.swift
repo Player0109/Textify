@@ -438,6 +438,28 @@ final class LiveAudioRecorderTests: XCTestCase {
         XCTAssertTrue(milestones.values.isEmpty)
     }
 
+    func testLiveSampleCallbacksMatchRetainedAudioAndIgnoreRemovedTap() async throws {
+        let engine = FakeAudioEngineClient()
+        let recorder = LiveAudioRecorder(
+            permissionClient: MicrophonePermissionClient(status: { .granted }, requestAccess: { .granted }),
+            configuration: LiveAudioRecordingConfiguration(postReleaseGraceMilliseconds: 0),
+            engineClient: engine
+        )
+        let chunks = LiveSampleCollector()
+        try await recorder.startRecording(
+            onSamples: { chunks.append($0.samples) },
+            onSpeechDetected: {}, onMaximumDurationReached: {}
+        )
+        try engine.emit(samples: Array(repeating: 0.1, count: 320), sampleRate: 16_000)
+        try engine.emit(samples: Array(repeating: 0.2, count: 320), sampleRate: 16_000)
+        let audio = try await recorder.finishRecording()
+        XCTAssertEqualSamples(chunks.samples, audio.samples)
+        XCTAssertEqual(chunks.samples.count, 640)
+        try engine.emitRemovedTap(samples: Array(repeating: 0.9, count: 320), sampleRate: 16_000)
+        await recorder.discardRecording()
+        XCTAssertEqual(chunks.samples.count, 640)
+    }
+
     func testFinishRecordingDrainsOrderedTapBuffersBeforeReturningAudio() async throws {
         let permission = MicrophonePermissionClient(
             status: { .granted },
@@ -1165,5 +1187,20 @@ private func XCTAssertEqualSamples(
     XCTAssertEqual(actual.count, expected.count, file: file, line: line)
     for (actualSample, expectedSample) in zip(actual, expected) {
         XCTAssertEqual(actualSample, expectedSample, accuracy: 0.0001, file: file, line: line)
+    }
+}
+
+private final class LiveSampleCollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [Float] = []
+    var samples: [Float] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage
+    }
+    func append(_ samples: [Float]) {
+        lock.lock()
+        defer { lock.unlock() }
+        storage.append(contentsOf: samples)
     }
 }

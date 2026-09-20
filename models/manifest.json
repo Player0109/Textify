@@ -1,6 +1,6 @@
 {
   "manifestVersion": 3,
-  "generatedAt": "2026-08-03T19:28:33Z",
+  "generatedAt": "2026-09-20T06:18:01Z",
   "models": [
     {
       "id": "ggml-small.en-q5_1",
@@ -6860,6 +6860,168 @@
         "finalArtifactBytes": 90089718,
         "peakInstallationBytes": 90089718
       }
+    },
+    {
+      "id": "confucius4-r2t2-q8_0",
+      "displayName": "Experimental - Confucius4-R2T2 Q8_0",
+      "tier": "experimental",
+      "description": "Local English and Chinese dictation with live text in the recording overlay. Final text is processed and inserted on release.",
+      "sizeBytes": 2477512064,
+      "files": [
+        {
+          "filename": "r2t2-q8_0.gguf",
+          "url": "https://huggingface.co/davidxifeng/Confucius4-R2T2-gguf/resolve/a8e6b385d7df7eae9519363e07034a209004797a/r2t2-q8_0.gguf",
+          "sha256": "19f5ccd624484bcb5d44301437de41560b0ecc40c430e8850dfeefefbe82ccf5",
+          "sizeBytes": 2477512064
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "Confucius4-R2T2 weights and GGUF derivative",
+          "spdxId": "LicenseRef-NetEase-Youdao",
+          "name": "NetEase Youdao Model Use License Agreement",
+          "licenseTextUrl": "https://huggingface.co/davidxifeng/Confucius4-R2T2-gguf/raw/a8e6b385d7df7eae9519363e07034a209004797a/LICENSE"
+        },
+        {
+          "scope": "audio.cpp native runtime",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://raw.githubusercontent.com/0xShug0/audio.cpp/9ba884179826c3b33dd305185b5f94c79175a03d/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "davidxifeng/Confucius4-R2T2-gguf",
+        "sourceUrl": "https://huggingface.co/davidxifeng/Confucius4-R2T2-gguf",
+        "sourceRevision": "a8e6b385d7df7eae9519363e07034a209004797a",
+        "sourceFile": "r2t2-q8_0.gguf",
+        "originalModelName": "NetEase Youdao Confucius4-R2T2",
+        "originalModelUrl": "https://huggingface.co/netease-youdao/Confucius4-R2T2",
+        "mirroredBy": "davidxifeng",
+        "mirroredAt": "2026-09-20"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 30
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "audio_cpp",
+        "variant": "confucius4-r2t2-q8_0",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "en",
+          "zh"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "Live preview while recording; final recognition and cleanup run on release.",
+        "accuracyTradeoff": "Experimental Q8_0 community runtime; Textify quality and speed ratings are not yet available.",
+        "requirements": "Apple Silicon with Metal, at least 16 GB memory, and 2.48 GB model storage. Voice cleaning applies to the final transcript."
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 2477512064,
+        "peakInstallationBytes": 2477512064
+      }
+    },
+    {
+      "id": "confucius4-r2t2-f16",
+      "displayName": "Experimental - Confucius4-R2T2 F16",
+      "tier": "experimental",
+      "description": "Local English and Chinese dictation with live text in the recording overlay. Final text is processed and inserted on release.",
+      "sizeBytes": 4092155264,
+      "files": [
+        {
+          "filename": "r2t2-f16.gguf",
+          "url": "https://huggingface.co/davidxifeng/Confucius4-R2T2-gguf/resolve/a8e6b385d7df7eae9519363e07034a209004797a/r2t2-f16.gguf",
+          "sha256": "d1b531ceaf5640d98352d3a9180238d99d36d393e160afd4692031077e7bae2c",
+          "sizeBytes": 4092155264
+        }
+      ],
+      "licenses": [
+        {
+          "scope": "Confucius4-R2T2 weights and GGUF derivative",
+          "spdxId": "LicenseRef-NetEase-Youdao",
+          "name": "NetEase Youdao Model Use License Agreement",
+          "licenseTextUrl": "https://huggingface.co/davidxifeng/Confucius4-R2T2-gguf/raw/a8e6b385d7df7eae9519363e07034a209004797a/LICENSE"
+        },
+        {
+          "scope": "audio.cpp native runtime",
+          "spdxId": "Apache-2.0",
+          "name": "Apache License 2.0",
+          "licenseTextUrl": "https://raw.githubusercontent.com/0xShug0/audio.cpp/9ba884179826c3b33dd305185b5f94c79175a03d/LICENSE"
+        }
+      ],
+      "provenance": {
+        "sourceName": "davidxifeng/Confucius4-R2T2-gguf",
+        "sourceUrl": "https://huggingface.co/davidxifeng/Confucius4-R2T2-gguf",
+        "sourceRevision": "a8e6b385d7df7eae9519363e07034a209004797a",
+        "sourceFile": "r2t2-f16.gguf",
+        "originalModelName": "NetEase Youdao Confucius4-R2T2",
+        "originalModelUrl": "https://huggingface.co/netease-youdao/Confucius4-R2T2",
+        "mirroredBy": "davidxifeng",
+        "mirroredAt": "2026-09-20"
+      },
+      "runtimeParameters": {
+        "language": "auto",
+        "detectLanguage": true,
+        "translate": false,
+        "strategy": "greedy",
+        "beamSize": 1,
+        "bestOf": 1,
+        "temperature": 0,
+        "temperatureFallback": [],
+        "noContext": true,
+        "tokenTimestamps": false,
+        "maxAudioSeconds": 30
+      },
+      "hallucinationThresholds": {
+        "noSpeechProbabilityMax": 0.6,
+        "avgLogProbabilityMin": -1,
+        "compressionRatioMax": 2.4
+      },
+      "minAppVersion": "1.1.0",
+      "runtime": {
+        "engine": "audio_cpp",
+        "variant": "confucius4-r2t2-f16",
+        "accelerator": "metal_gpu",
+        "artifactLayout": "single_file"
+      },
+      "capabilities": {
+        "languages": [
+          "en",
+          "zh"
+        ],
+        "supportsTranslation": false,
+        "supportsCustomVocabulary": false
+      },
+      "presentation": {
+        "expectedFinalization": "Live preview while recording; final recognition and cleanup run on release.",
+        "accuracyTradeoff": "Experimental F16 community runtime with a larger download than Q8_0; Textify quality and speed ratings are not yet available.",
+        "requirements": "Apple Silicon with Metal, at least 16 GB memory, and 4.09 GB model storage. Voice cleaning applies to the final transcript."
+      },
+      "installationStorage": {
+        "finalArtifactBytes": 4092155264,
+        "peakInstallationBytes": 4092155264
+      }
     }
   ],
   "presentationGraph": {
@@ -7096,6 +7258,22 @@
             "displayName": "Alibaba Speech Lab"
           },
           "curatedRank": 130
+        }
+      },
+      {
+        "id": "family.netease.confucius4-r2t2",
+        "purpose": "transcription",
+        "checkpointIDs": [
+          "checkpoint.netease.confucius4-r2t2"
+        ],
+        "presentation": {
+          "displayName": "Confucius4-R2T2",
+          "description": "NetEase Youdao speech recognition with live transcript previews.",
+          "provider": {
+            "id": "netease-youdao",
+            "displayName": "NetEase Youdao"
+          },
+          "curatedRank": 200
         }
       }
     ],
@@ -7480,6 +7658,21 @@
         "presentation": {
           "displayName": "MossFormer2 SE 48K",
           "description": "Speech enhancement checkpoint for local noise suppression.",
+          "curatedRank": 0
+        }
+      },
+      {
+        "id": "checkpoint.netease.confucius4-r2t2",
+        "purpose": "transcription",
+        "artifactIDs": [
+          "confucius4-r2t2-q8_0",
+          "confucius4-r2t2-f16"
+        ],
+        "recommendedArtifactID": "confucius4-r2t2-q8_0",
+        "fallbackArtifactIDs": [],
+        "presentation": {
+          "displayName": "Confucius4-R2T2 1.7B",
+          "description": "Live English and Chinese previews with final insertion on release.",
           "curatedRank": 0
         }
       }
@@ -8352,6 +8545,46 @@
         "presentation": {
           "displayName": "MLX INT8",
           "curatedRank": 20
+        }
+      },
+      {
+        "id": "confucius4-r2t2-q8_0",
+        "purpose": "transcription",
+        "artifactFormat": "gguf",
+        "numericFormat": "Q8_0",
+        "runtime": "audio_cpp",
+        "computeRoute": "gpu_via_metal",
+        "compatibility": {
+          "minimumAppVersion": "1.1.0",
+          "minimumMacOSVersion": "14.0.0",
+          "supportedArchitectures": [
+            "arm64"
+          ],
+          "minimumMemoryBytes": 17179869184
+        },
+        "presentation": {
+          "displayName": "GGUF Q8_0",
+          "curatedRank": 0
+        }
+      },
+      {
+        "id": "confucius4-r2t2-f16",
+        "purpose": "transcription",
+        "artifactFormat": "gguf",
+        "numericFormat": "F16",
+        "runtime": "audio_cpp",
+        "computeRoute": "gpu_via_metal",
+        "compatibility": {
+          "minimumAppVersion": "1.1.0",
+          "minimumMacOSVersion": "14.0.0",
+          "supportedArchitectures": [
+            "arm64"
+          ],
+          "minimumMemoryBytes": 17179869184
+        },
+        "presentation": {
+          "displayName": "GGUF F16",
+          "curatedRank": 10
         }
       }
     ]

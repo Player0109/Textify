@@ -1,0 +1,25 @@
+load 2.7968130839999503
+offline Some call me nature, others call me mother nature. I've been here for over 4.5 billion years, 22,500 times longer than you.
+{"seconds": 1.696, "text": "Some call"}
+{"seconds": 2.368, "text": " me nature"}
+{"seconds": 3.652, "text": ";"}
+{"seconds": 4.275, "text": " others"}
+{"seconds": 4.591, "text": " call"}
+{"seconds": 4.916, "text": " me"}
+{"seconds": 5.237, "text": " mother nature"}
+{"seconds": 6.519, "text": ". I"}
+{"seconds": 6.832, "text": "'ve"}
+{"seconds": 7.153, "text": " been here"}
+{"seconds": 7.486, "text": " for"}
+{"seconds": 8.474, "text": " over 4"}
+{"seconds": 8.778, "text": "."}
+{"seconds": 9.42, "text": "5"}
+{"seconds": 9.743, "text": " billion years"}
+{"seconds": 11.354, "text": ". 2"}
+{"seconds": 12.342, "text": "2,"}
+{"seconds": 12.654, "text": "50"}
+{"seconds": 13.297, "text": "0"}
+{"seconds": 13.603, "text": " times"}
+{"seconds": 13.958, "text": " longer"}
+final Some call me nature; others call me mother nature. I've been here for over 4.5 billion years. 22,500 times longer than you.
+release_to_final 0.178309415999923

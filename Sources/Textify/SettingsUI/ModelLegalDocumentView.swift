@@ -98,6 +98,10 @@ enum BundledModelLicenseResourceResolver {
             "CrisperWhisper-2.0-Nyra-License.md",
         "https://raw.githubusercontent.com/Saganaki22/CrisperWhisper.cpp/13c7b3efdafd8bd20bd6361e7354ce2aa9bec464/LICENSE":
             "CrisperWhisper.cpp-LICENSE.txt",
+        "https://huggingface.co/davidxifeng/Confucius4-R2T2-gguf/raw/a8e6b385d7df7eae9519363e07034a209004797a/LICENSE":
+            "Confucius4-R2T2.txt",
+        "https://raw.githubusercontent.com/0xShug0/audio.cpp/9ba884179826c3b33dd305185b5f94c79175a03d/LICENSE":
+            "audio.cpp.txt",
     ]
 
     static func resourceName(for licenseTextURL: String) -> String? {

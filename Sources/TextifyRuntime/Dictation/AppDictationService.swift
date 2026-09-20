@@ -101,6 +101,10 @@ public final class AppDictationService {
     }
 
     public private(set) var status: DictationRuntimeStatus
+    public private(set) var liveTranscript = ""
+    private var livePreviewTask: Task<Void, Never>?
+    private var liveAudioContinuation: AsyncStream<TranscriptionAudioBuffer>.Continuation?
+
     public private(set) var sessionProgress: DictationSessionProgress
     public private(set) var readiness: ReadinessSnapshot
     public private(set) var voiceCleaningStatus: VoiceCleaningRuntimeStatus
@@ -116,7 +120,11 @@ public final class AppDictationService {
     private var targetCaptureToken: UUID?
     private var activationTarget: InsertionTargetIdentity?
     private var excludedTriggerIsHeld = false
-    private var activeSessionID: UUID?
+    private var activeSessionID: UUID? {
+        didSet {
+            if oldValue != activeSessionID { stopLivePreview() }
+        }
+    }
     private var capturePhase: CapturePhase?
     private var pendingAudioStartSessionID: UUID?
     private var captureTiming: CaptureTiming?
@@ -1107,6 +1115,11 @@ public final class AppDictationService {
         let captureStartedAtMs = captureTiming?.captureStartedAtMs
         let firstAudioAtMs = captureTiming?.firstAudioAtMs
         do {
+            await beginLivePreview(sessionID: sessionID)
+            guard isCurrentCapture(sessionID) else {
+                clearPendingAudioStart(sessionID: sessionID)
+                return false
+            }
             try await dependencies.audio.startRecording(
                 microphone: admission.preferences.microphoneSelection,
                 maximumDurationSeconds:
@@ -1206,6 +1219,55 @@ public final class AppDictationService {
             }
             return false
         }
+    }
+
+    private func beginLivePreview(sessionID: UUID) async {
+        stopLivePreview()
+        guard let previewer = dependencies.transcriber as? any RuntimeLivePreviewing,
+              await previewer.supportsLivePreview,
+              isCurrentCapture(sessionID) else {
+            await dependencies.audio.setSampleHandler { _ in }
+            return
+        }
+        // Capture is capped at five minutes, which also bounds queued PCM.
+        let (stream, continuation) = AsyncStream<TranscriptionAudioBuffer>.makeStream()
+        liveAudioContinuation = continuation
+        livePreviewTask = Task { [weak self] in
+            do {
+                try await previewer.preview(chunks: stream) { [weak self] text in
+                    await self?.receiveLiveText(text, sessionID: sessionID)
+                }
+            } catch {
+                // Preview failure never inserts a partial transcript. Final
+                // inference still uses the complete retained audio.
+                guard let self, self.activeSessionID == sessionID else { return }
+                self.liveTranscript = ""
+            }
+        }
+        await dependencies.audio.setSampleHandler { audio in
+            continuation.yield(TranscriptionAudioBuffer(
+                sampleRate: audio.sampleRate,
+                channelCount: audio.channelCount,
+                samples: audio.samples
+            ))
+        }
+    }
+
+    private func receiveLiveText(_ text: String, sessionID: UUID) {
+        guard activeSessionID == sessionID,
+              case .recording(speechDetected: true) = status else { return }
+        liveTranscript = text
+    }
+
+    @discardableResult
+    private func stopLivePreview() -> Task<Void, Never>? {
+        liveAudioContinuation?.finish()
+        liveAudioContinuation = nil
+        let task = livePreviewTask
+        task?.cancel()
+        livePreviewTask = nil
+        liveTranscript = ""
+        return task
     }
 
     private func isCurrentCapture(_ sessionID: UUID) -> Bool {
@@ -1402,7 +1464,9 @@ public final class AppDictationService {
         )
 
         do {
+            let previewTask = stopLivePreview()
             let capturedAudio = try await dependencies.audio.finishRecording()
+            await previewTask?.value
             guard activeSessionID == sessionID else {
                 return
             }

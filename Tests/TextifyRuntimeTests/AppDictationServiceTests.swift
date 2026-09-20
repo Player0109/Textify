@@ -11,6 +11,73 @@ import XCTest
 
 @MainActor
 final class AppDictationServiceTests: XCTestCase {
+    func testLivePreviewAppearsDuringSpeechAndOnlyFinalTextIsInserted() async {
+        let fakes = RuntimeFakes.ready(transcript: "final words")
+        await fakes.transcriber.enablePreview()
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        await service.handleTriggerAction(.beginRecording)
+        _ = await service.handleTriggerEvent(.speechDetected(timestampMs: 400))
+        await fakes.audio.emitSamples()
+        await waitUntil { service.liveTranscript == "preliminary words" }
+        let beforeRelease = await fakes.inserter.insertedTexts()
+        XCTAssertEqual(beforeRelease, [])
+
+        await service.handleTriggerAction(.finishRecording)
+        XCTAssertEqual(service.liveTranscript, "")
+        let afterRelease = await fakes.inserter.insertedTexts()
+        XCTAssertEqual(afterRelease, ["final words"])
+        await fakes.transcriber.sendLatePreview("stale text")
+        XCTAssertEqual(service.liveTranscript, "")
+    }
+
+    func testPreviewFailureClearsPartialTextAndStillInsertsFinalText() async {
+        let fakes = RuntimeFakes.ready(transcript: "final words")
+        await fakes.transcriber.enablePreview(failAfterUpdate: true)
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        await service.handleTriggerAction(.beginRecording)
+        _ = await service.handleTriggerEvent(.speechDetected(timestampMs: 400))
+        await fakes.audio.emitSamples()
+        await waitUntil { await fakes.transcriber.didFailPreview }
+        await waitUntil { service.liveTranscript.isEmpty }
+        let beforeRelease = await fakes.inserter.insertedTexts()
+        XCTAssertEqual(beforeRelease, [])
+        await service.handleTriggerAction(.finishRecording)
+        let afterRelease = await fakes.inserter.insertedTexts()
+        XCTAssertEqual(afterRelease, ["final words"])
+    }
+
+    func testCancelledPreviewCannotAppearInNextSessionOrInsert() async {
+        let fakes = RuntimeFakes.ready()
+        await fakes.transcriber.enablePreview()
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        await service.handleTriggerAction(.beginRecording)
+        _ = await service.handleTriggerEvent(.speechDetected(timestampMs: 400))
+        await fakes.audio.emitSamples()
+        await waitUntil { service.liveTranscript == "preliminary words" }
+        await service.handleTriggerAction(.cancelRecording)
+        XCTAssertEqual(service.liveTranscript, "")
+        await service.handleTriggerAction(.beginRecording)
+        _ = await service.handleTriggerEvent(.speechDetected(timestampMs: 400))
+        await fakes.transcriber.sendLatePreview("stale text")
+        XCTAssertEqual(service.liveTranscript, "")
+        let inserted = await fakes.inserter.insertedTexts()
+        XCTAssertEqual(inserted, [])
+        await service.shutdown()
+    }
+
+    func testLivePreviewStaysHiddenUntilSpeechAndSilenceNeverInserts() async {
+        let fakes = RuntimeFakes.ready(audio: CanonicalAudioBuffer(samples: Array(repeating: 0, count: 16_000)))
+        await fakes.transcriber.enablePreview()
+        let service = AppDictationService(dependencies: fakes.dependencies)
+        await service.handleTriggerAction(.beginRecording)
+        await fakes.audio.emitSamples()
+        await waitUntil { await fakes.transcriber.previewChunkCount() == 1 }
+        XCTAssertEqual(service.liveTranscript, "")
+        await service.handleTriggerAction(.finishRecording)
+        let inserted = await fakes.inserter.insertedTexts()
+        XCTAssertEqual(inserted, [])
+    }
+
     func testShutdownDiscardsAudioAndUnloadsBothNativePurposes() async {
         let fakes = RuntimeFakes.ready()
         let service = AppDictationService(dependencies: fakes.dependencies)
@@ -2578,6 +2645,12 @@ private actor FakeRuntimeModels: RuntimeModelResolving {
 }
 
 private actor FakeRuntimeAudio: RuntimeAudioRecording {
+    private var sampleHandler: @Sendable (CanonicalAudioBuffer) -> Void = { _ in }
+    func setSampleHandler(_ handler: @escaping @Sendable (CanonicalAudioBuffer) -> Void) {
+        sampleHandler = handler
+    }
+    func emitSamples() { sampleHandler(audio) }
+
     private var audio: CanonicalAudioBuffer
     private var startError: Error?
     private var finishError: Error?
@@ -2756,7 +2829,37 @@ private actor FakeRuntimeAudio: RuntimeAudioRecording {
     }
 }
 
-private actor FakeRuntimeTranscriber: RuntimeTranscribing {
+private actor FakeRuntimeTranscriber: RuntimeTranscribing, RuntimeLivePreviewing {
+    var supportsLivePreview = false
+    private var previewCallbacks: [@Sendable (String) async -> Void] = []
+    private var previewChunks: [TranscriptionAudioBuffer] = []
+
+    private(set) var didFailPreview = false
+    private var failPreviewAfterUpdate = false
+
+    func enablePreview(failAfterUpdate: Bool = false) {
+        supportsLivePreview = true
+        failPreviewAfterUpdate = failAfterUpdate
+    }
+    func previewChunkCount() -> Int { previewChunks.count }
+    func sendLatePreview(_ text: String) async { await previewCallbacks.first?(text) }
+
+    func preview(
+        chunks: AsyncStream<TranscriptionAudioBuffer>,
+        onText: @escaping @Sendable (String) async -> Void
+    ) async throws {
+        previewCallbacks.append(onText)
+        for await chunk in chunks {
+            try Task.checkCancellation()
+            previewChunks.append(chunk)
+            await onText("preliminary words")
+            if failPreviewAfterUpdate {
+                didFailPreview = true
+                throw ConfuciusRuntimeError.inferenceFailed
+            }
+        }
+    }
+
     private let result: TranscriptionResult
     private var readinessValue: RuntimeModelReadiness
     private var prepareCountValue = 0

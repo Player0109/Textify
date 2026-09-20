@@ -50,6 +50,7 @@ public actor LiveAudioRecorder {
         onCaptureStarted: @escaping @Sendable () -> Void = {},
         onFirstAudio:
             @escaping @Sendable (_ firstSampleUptimeMilliseconds: Int) -> Void = { _ in },
+        onSamples: @escaping @Sendable (CanonicalAudioBuffer) -> Void = { _ in },
         onSpeechDetected: @escaping @Sendable () -> Void,
         onMaximumDurationReached: @escaping @Sendable () -> Void,
         onRecordingError:
@@ -79,6 +80,7 @@ public actor LiveAudioRecorder {
                 await self?.handleIngestionEvent(
                     event,
                     onFirstAudio: onFirstAudio,
+                    onSamples: onSamples,
                     onSpeechDetected: onSpeechDetected,
                     onMaximumDurationReached: onMaximumDurationReached,
                     onRecordingError: onRecordingError
@@ -197,6 +199,7 @@ public actor LiveAudioRecorder {
         _ event: LiveAudioIngestionEvent,
         onFirstAudio:
             @escaping @Sendable (_ firstSampleUptimeMilliseconds: Int) -> Void,
+        onSamples: @escaping @Sendable (CanonicalAudioBuffer) -> Void,
         onSpeechDetected: @escaping @Sendable () -> Void,
         onMaximumDurationReached: @escaping @Sendable () -> Void,
         onRecordingError:
@@ -221,6 +224,7 @@ public actor LiveAudioRecorder {
             if ingest(
                 canonical,
                 for: sessionID,
+                onSamples: onSamples,
                 onSpeechDetected: onSpeechDetected
             ) {
                 maximumDurationReached(
@@ -239,6 +243,7 @@ public actor LiveAudioRecorder {
     private func ingest(
         _ canonical: CanonicalAudioBuffer,
         for sessionID: RecordingSessionID,
+        onSamples: @escaping @Sendable (CanonicalAudioBuffer) -> Void,
         onSpeechDetected: @escaping @Sendable () -> Void
     ) -> Bool {
         guard lifecycle.acceptsAudio(for: sessionID) else {
@@ -267,6 +272,9 @@ public actor LiveAudioRecorder {
         }
 
         capturedSamples.append(contentsOf: retainedSamples)
+        if !retainedSamples.isEmpty {
+            onSamples(CanonicalAudioBuffer(samples: Array(retainedSamples)))
+        }
         if !speechDetected,
            rmsEmitter.ingest(
                samples: Array(retainedSamples),

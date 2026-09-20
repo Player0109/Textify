@@ -1,6 +1,6 @@
 # Textify V1 Spec
 
-Snapshot date: 2026-08-09
+Snapshot date: 2026-09-20
 
 This document captures the Textify V1 product and technical decisions from the
 original product-discovery sequence through Q350. It is a current-state
@@ -20,9 +20,9 @@ catalog, multiple installed models, safe switching/deletion, verified custom
 Whisper import, several local Apple Silicon runtimes, multilingual model
 routing with a persisted Dictation Language selector, vocabulary and
 replacement pairs, and optional MossFormer2 speech enhancement before ASR.
-It still omits Sparkle, transcript history, per-app profiles, cloud ASR, and
-live partial transcription. One uninterrupted trigger hold may capture up to
-five minutes; Textify processes longer captures as internal model-safe ASR
+It still omits Sparkle, transcript history, per-app profiles, and cloud ASR.
+Confucius4-R2T2 adds an in-memory live transcript preview to the recording
+overlay. One uninterrupted trigger hold may capture up to five minutes; Textify processes longer captures as internal model-safe ASR
 windows and still produces one final insertion. The trigger is user-selectable from the four
 curated choices, with Right Command as the default. A runtime is not a public
 model promise until its exact artifacts and metadata are published in the
@@ -1178,7 +1178,15 @@ Overlay:
 - User-configurable X offset, Y offset, and scale from Settings -> Dictation.
 - Compact waveform/level pulse.
 - Optional elapsed seconds after a few seconds.
-- No transcript preview.
+- Confucius4-R2T2 shows live raw recognition in the recording overlay while
+  speech is detected. A fixed three-line viewport scrolls upward to keep the
+  newest wrapped line visible, without ellipses or a character-count cutoff.
+  Only line wrapping moves the text; the short transition respects Reduce
+  Motion. The complete transcript remains in memory for final insertion.
+  The overlay does not retain transcript history or accept keyboard focus.
+- Other engines retain the compact recording indicator.
+- Preview text is discarded on cancellation, failure, release, and shutdown.
+  Late updates from an earlier session cannot appear in a new session.
 - No success toast.
 - No normal completion message.
 
@@ -1422,7 +1430,28 @@ Result includes:
 - compression ratio
 - processing metadata needed by diagnostics/filtering
 
-No streaming partials in V1.
+Confucius4-R2T2 local streaming extension:
+
+- Uses the pinned audio.cpp community implementation through an isolated C ABI
+  library on Metal. The signed Q8_0 artifact is a 2.48 GB download; F16 is a
+  separate 4.09 GB version of the same checkpoint. Both require at least 16 GB
+  memory in the catalog. Q8_0 remains the recommended version. English,
+  Chinese, and an Automatic language choice are available for both.
+- The native runtime loads and warms both streaming and final recognition
+  paths before recording admission. Blocking inference runs on a dedicated
+  serial queue.
+- Canonical audio chunks feed the preview in sample order while the recorder
+  retains the complete capture. Streaming uses 320 ms chunks, zero unfixed
+  leading chunks, and a one-token rollback. The microphone never waits for
+  inference. Preview windows reset at about 25 seconds to stay below the
+  upstream positional limit.
+- Live text is a raw preview. On release, cancel and drain preview work, apply
+  final edge VAD and optional voice cleaning to captured audio, run final
+  recognition through existing model-safe windows, post-process once, and
+  insert once. Final text can differ from the preview.
+- Preview failure clears the preview; final recognition still uses the complete
+  captured audio. A final recognition failure inserts nothing.
+- No raw audio, partial text, or final text is logged or saved.
 
 No transcription cancel after release in V1.
 
@@ -2769,7 +2798,7 @@ These are not V1 commitments:
 - arbitrary hotkey capture
 - Fn/Globe trigger
 - toggle recording mode
-- streaming partial transcription
+- streaming partial transcription for engines other than Confucius4-R2T2
 - long-form transcription workspace
 - file transcription
 - per-app profiles

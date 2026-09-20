@@ -30,6 +30,8 @@ final class BenchmarkModelCatalogTests: XCTestCase {
                 "moss-transcribe-diarize-0.9b-q5-k-m",
                 "crisperwhisper-2-large-f16",
                 "crisperwhisper-2-turbo-f16",
+                "confucius4-r2t2-q8_0",
+                "confucius4-r2t2-f16",
             ]
         )
 

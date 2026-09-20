@@ -175,6 +175,7 @@ let package = Package(
             path: "Sources/TextifySherpaShim",
             publicHeadersPath: "include"
         ),
+        .target(name: "TextifyConfuciusShim", publicHeadersPath: "include"),
         .target(
             name: "TextifyTranscribeCppShim",
             path: "Sources/TextifyTranscribeCppShim",
@@ -189,6 +190,7 @@ let package = Package(
                 "TextifyWhisperShim",
                 "TextifySherpaShim",
                 "TextifyTranscribeCppShim",
+                "TextifyConfuciusShim",
                 .product(name: "FluidAudio", package: "FluidAudio"),
                 .product(name: "MLX", package: "mlx-swift"),
                 .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),

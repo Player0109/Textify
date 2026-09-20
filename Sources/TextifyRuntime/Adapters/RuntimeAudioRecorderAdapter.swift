@@ -3,6 +3,11 @@ import TextifySettings
 
 public actor RuntimeAudioRecorderAdapter: RuntimeAudioRecording {
     private let recorder: LiveAudioRecorder
+    private var sampleHandler: @Sendable (CanonicalAudioBuffer) -> Void = { _ in }
+
+    public func setSampleHandler(_ handler: @escaping @Sendable (CanonicalAudioBuffer) -> Void) {
+        sampleHandler = handler
+    }
 
     public init(recorder: LiveAudioRecorder = LiveAudioRecorder()) {
         self.recorder = recorder
@@ -32,6 +37,7 @@ public actor RuntimeAudioRecorderAdapter: RuntimeAudioRecording {
             maximumDurationSeconds: maximumDurationSeconds,
             onCaptureStarted: onCaptureStarted,
             onFirstAudio: onFirstAudio,
+            onSamples: sampleHandler,
             onSpeechDetected: onSpeechDetected,
             onMaximumDurationReached: onMaximumDurationReached,
             onRecordingError: onRecordingError
