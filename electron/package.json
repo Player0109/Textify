@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Offline desktop dictation for macOS, Windows and Linux",
+  "homepage": "https://github.com/Player0109/Textify",
   "author": "Textify contributors",
   "license": "Apache-2.0",
   "main": "dist/main.cjs",
