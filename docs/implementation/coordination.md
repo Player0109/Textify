@@ -2,6 +2,46 @@
 
 This file records cross-agent handoffs during implementation.
 
+## Electron Cross-Platform Remake Handoff - 2026-09-22
+
+Follow-up scope: the owner approved the complete next-stage plan: three-OS CI
+with real transcription, desktop QA, additional models/languages, vocabulary,
+exclusions, launch-at-login, settings migration, download recovery, persistent
+revocations, and installers. This retains the Electron workstream's ownership
+and explicitly includes preview packaging and platform test harnesses. The
+owner will perform Windows desktop QA and selected unsigned preview installers
+while signing credentials are unavailable. Production signing/notarization and
+public release publication remain deferred. Linux physical-desktop QA is not
+yet assigned. Work on a dedicated Electron branch; CI pushes are part of the
+authorized validation work.
+
+- The product owner approved an Electron remake alongside the existing Swift
+  app, targeting macOS, Windows, and Linux in its first release. On Wayland
+  desktops without safe automatic insertion, the owner explicitly selected
+  Copy followed by a user-initiated paste.
+- This workstream owns `electron/`, its isolated build/test/package workflow,
+  `.github/workflows/electron.yml`, and
+  `docs/implementation/electron-migration.md`. It may update this coordination
+  record. Existing Swift sources, packaging, settings, models, and signed
+  catalogs remain owned by their existing workstreams.
+- The active milestone explicitly owns real global triggers, in-memory audio,
+  a portable whisper.cpp worker, platform insertion, and their tests. Its
+  implementation supersedes the historical mock-only and native-Apple-only
+  restrictions for the new Electron directory only. Release signing,
+  publication, notarization, and automatic updates are not part of this
+  milestone. Local macOS preview packages use an ad-hoc signature.
+- First prove one complete dictation path before migrating every model and
+  setting. The existing signed catalog remains the source of artifact bytes;
+  Apple runtime requirements and benchmark results must not be presented as
+  verified Windows/Linux compatibility or performance.
+- Implemented the first offline English dictation path and the Copy workflow.
+  Local validation: 47 tests, TypeScript/build, native fixture recognition,
+  fixture MediaStream through capture/recognition/Copy, packaged Mac launch,
+  and macOS signature verification. The three-OS CI workflow is added but has
+  not been run remotely. Windows/Linux desktop checks and full feature parity
+  remain outstanding; see the migration record.
+
+
 ## Confucius4-R2T2 Live Dictation Handoff - 2026-09-20
 
 - The product owner requested Confucius4-R2T2 integration and explicitly chose

@@ -1,0 +1,85 @@
+name: Electron
+
+on:
+  push:
+    paths: ['electron/**', 'models/**', '.github/workflows/electron.yml']
+  pull_request:
+    paths: ['electron/**', 'models/**', '.github/workflows/electron.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: electron-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-26, windows-2025, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: electron
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: electron/package-lock.json
+      - name: Linux desktop libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev libxt-dev libxtst-dev libxinerama-dev libxrandr-dev libasound2t64 libgbm1 xvfb
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: npm ci
+      - run: npm run native:prepare
+      - run: npm run native:build
+      - run: npm run check
+      - name: Prepare verified transcription fixture
+        run: node scripts/prepare-smoke.mjs
+      - name: Native speech recognition
+        shell: bash
+        run: node scripts/native-smoke.mjs "$TEXTIFY_MODEL_FIXTURE"
+      - name: Electron smoke
+        if: runner.os != 'Linux'
+        run: npm run smoke
+      - name: Electron smoke under Xvfb
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum npm run smoke
+      - run: npm run package
+      - name: Packaged macOS smoke
+        if: runner.os == 'macOS'
+        run: node scripts/packaged-smoke.mjs 'release/mac-arm64/Textify Electron.app/Contents/MacOS/Textify Electron'
+      - name: Packaged Windows smoke
+        if: runner.os == 'Windows'
+        run: node scripts/packaged-smoke.mjs 'release/win-unpacked/Textify Electron.exe'
+      - name: Packaged Linux smoke
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum node scripts/packaged-smoke.mjs 'release/linux-unpacked/textify-electron'
+      - name: Build preview installers
+        run: npm run dist -- --publish never
+      - name: Upload unsigned preview installers
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: textify-electron-${{ matrix.os }}
+          path: |
+            electron/release/*.dmg
+            electron/release/*.exe
+            electron/release/*.AppImage
+            electron/release/*.deb
+            electron/release/*.blockmap
+          retention-days: 7
+      - name: Upload test screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: electron-checks-${{ matrix.os }}
+          path: electron/artifacts/
+          retention-days: 7
