@@ -78,21 +78,63 @@ https://github.com/Player0109/Textify/actions/runs/35684967292
 | Fixture MediaStream through AudioWorklet, worker and Copy | Passed baseline CI; repeated locally for expanded code |
 | Renderer isolation, settings, close-to-tray and packaged launch | Passed baseline CI |
 | DMG, NSIS, AppImage and Debian package creation | Passed baseline CI |
-| Expanded behavior/integrity/recovery/migration suite | 66 tests passed locally |
+| Expanded behavior/integrity/recovery/migration suite | 66 tests passed on all three CI runners |
 | macOS owned-window insertion, clipboard restoration, target mismatch and password field | Passed native integration test |
 | Physical microphone and actual application matrix | Pending |
 | Installed Linux GNOME/KDE Wayland shortcut consent | Pending |
 | Production signing/notarization | Deferred by owner; unsigned previews authorized |
 
-The expanded workflow repeats builds/tests and adds actual NSIS/Debian
-installation, extracted AppImage launch, mounted DMG launch and Windows native
-insertion checks. Its final run and artifacts will be recorded here after the
-checks finish. Outputs are CI artifacts with seven-day retention; no GitHub
-Release is published. The Electron branch is `codex/electron-cross-platform`.
+Download the unsigned preview ZIP for your platform:
+
+- [Windows x64 installer](https://github.com/Player0109/Textify/actions/runs/35687215578/artifacts/10676674220)
+- [macOS ARM64 DMG](https://github.com/Player0109/Textify/actions/runs/35687215578/artifacts/10676953997)
+- [Linux x64 AppImage and Debian package](https://github.com/Player0109/Textify/actions/runs/35687215578/artifacts/10676589444)
+
+The expanded preview at commit `4c18c95` passed every job in run
+[35687215578](https://github.com/Player0109/Textify/actions/runs/35687215578):
+macOS ARM64, Windows x64 and Linux x64. Each job compiled the native workers,
+ran the expanded checks and fixture recording flow, built the app/installer,
+and launched the packaged output. Additional checks passed:
+
+- Windows: native paste into an owned test window, original clipboard
+  restoration, mismatched-target rejection, password-field rejection, silent
+  NSIS installation and launch of the installed app.
+- Linux: Debian installation and launch plus extracted AppImage launch under
+  Xvfb. Normal FUSE mounting and installed Wayland portals still need desktop QA.
+- macOS: read-only DMG mount and app launch from the disk image. Locally, the
+  ad-hoc app also passed deep/strict signature verification.
+
+The first expanded run passed macOS/Linux but its Windows test compared the
+launcher PID with the browser PID. The corrected test compares the native target
+with the Electron main-process PID; the subsequent Windows insertion test passed.
+No production target validation was weakened.
+
+Artifacts include `SHA256SUMS.txt` and installation notes. They are retained for
+seven days; no GitHub Release was published. All four downloaded installer
+checksums matched their CI manifests. Local downloaded copies are in
+`electron/artifacts/preview-0.2/`. The branch is `codex/electron-cross-platform`.
 
 Build output, sources downloaded for compilation, model fixtures, and screenshots
 are excluded from Git. Runtime third-party notices and hook source are included
 in the app resources. Existing Swift settings/models/sources remain untouched.
+
+## Model fixture coverage
+
+On the local Apple Silicon host, exact signed artifacts passed worker startup
+with a custom-word prompt and public fixture recognition:
+
+| Profile | Language and fixture | Result |
+| --- | --- | --- |
+| small.en Q5_1 | English, JFK sample through the capture/worker/Copy flow | Passed locally and on all three CI OSes |
+| large-v2 Q5_0 | English, JFK sample | Passed locally |
+| large-v3 Q5_0 | English, JFK sample | Passed locally |
+| large-v3-turbo Q5_0 | English, JFK sample; Hindi, synthetic Lekha speech | Both passed locally |
+
+Large-v2 was downloaded with the preview's real transfer implementation and
+verified against the signed artifact size/hash. The Hindi test used synthetic
+public text, not a physical microphone or natural-speech accuracy benchmark.
+The large models still need Windows/Linux performance and real microphone QA.
+No recognized text was retained in logs or written to transcript files.
 
 ## Remaining desktop checks
 

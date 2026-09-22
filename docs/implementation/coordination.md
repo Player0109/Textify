@@ -42,10 +42,13 @@ authorized validation work.
   packaged launch and unsigned installers. Expanded `0.2.0-preview.1` adds four
   Whisper profiles, English/Hindi routing, vocabulary, exclusions, settings
   import, startup/indicator settings, download recovery and persistent trust.
-  Local expanded verification: 66 tests, capture/Copy fixture, large-v3/turbo
-  runtime checks and native macOS owned-window insertion safeguards. Installer
-  testing and current CI evidence are recorded in the migration document.
-  Physical desktop checks and full native runtime parity remain outstanding.
+  Final preview commit `4c18c95` passed all three jobs in run `35687215578`:
+  66 tests per OS, capture/Copy fixture, native builds, packaged launch and
+  installer checks. Windows and local macOS owned-window tests verified paste,
+  clipboard restoration, target mismatch and password rejection. Checksums for
+  all four downloaded installers matched. Current artifacts and model runtime
+  evidence are recorded in the migration document. Physical desktop checks and
+  full native runtime parity remain outstanding.
 
 
 ## Confucius4-R2T2 Live Dictation Handoff - 2026-09-20
