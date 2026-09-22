@@ -313,3 +313,25 @@ installer creation and platform installation checks. Hosted-runner checks do not
 replace the separate local M4 Max recognition evidence above or the pending
 physical microphone and insertion check. The subsequent documentation commit
 does not change the installed or tested implementation.
+
+## Dock visibility correction — 2026-09-22
+
+The earlier Finder pin did not fix running-app visibility. The recording overlay
+called `setVisibleOnAllWorkspaces` with `visibleOnFullScreen: true`, which invokes
+`DockHide` in the pinned Electron runtime and changes the entire app to accessory
+mode. The installed process reported activation policy `1`, and a new launch
+assertion reproduced `app.dock.isVisible() === false`.
+
+The Mac overlay now uses a nonactivating panel and skips the process-type
+transformation. This preserves its all-Spaces/fullscreen collection behavior
+without hiding the application's Dock icon. See the
+[pinned Electron implementation](https://github.com/electron/electron/blob/v44.4.3/shell/browser/native_window_mac.mm#L1339).
+
+Verified startup Dock visibility, visibility with the main window closed and the
+overlay shown, and reopening the same window through the Dock activation event.
+The Qwen 0.6B fixture capture-to-Copy path, packaged launch, TypeScript and signed
+microphone capability checks pass. The installed process now reports normal
+activation policy `0`; the owner confirmed the blue T is visible in the bottom
+Dock. The corrected application is pinned to `/Applications/Textify Electron.app`.
+The existing Accessibility grant was refreshed, and the app reports GPU ready
+and Hold Right Command after the update.

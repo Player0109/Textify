@@ -61,6 +61,12 @@ try {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.getByRole("heading", { name: "Dictation", exact: true }).waitFor();
+  if (process.platform === "darwin")
+    assert.equal(
+      await app.evaluate(({ app }) => app.dock.isVisible()),
+      true,
+      "Creating the recording overlay must not hide Textify from the Dock",
+    );
   await waitSnapshot((state) =>
     state.models.some((model) => model.id === "ggml-small.en-q5_1"),
   );
@@ -277,6 +283,31 @@ try {
     ),
     3,
   );
+  if (process.platform === "darwin") {
+    assert.equal(
+      await app.evaluate(({ app, BrowserWindow }) => {
+        const overlay = BrowserWindow.getAllWindows().find((window) =>
+          window.webContents.getURL().includes("mode=overlay"),
+        );
+        overlay.showInactive();
+        const visible = app.dock.isVisible();
+        overlay.hide();
+        return visible;
+      }),
+      true,
+      "The Dock must stay visible with the main window closed and overlay shown",
+    );
+    assert.equal(
+      await app.evaluate(({ app, BrowserWindow }) => {
+        app.emit("activate");
+        return BrowserWindow.getAllWindows()
+          .find((window) => !window.webContents.getURL().includes("mode="))
+          .isVisible();
+      }),
+      true,
+      "Dock activation must reopen the same main window",
+    );
+  }
   console.log(
     "Electron launch, isolated renderer, navigation, settings persistence, and close-to-tray checks passed.",
   );

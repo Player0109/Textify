@@ -528,6 +528,7 @@ else {
       });
       audio = createWindow({ show: false, width: 1, height: 1 });
       overlay = createWindow({
+        type: process.platform === "darwin" ? "panel" : undefined,
         width: 390,
         height: 96,
         frame: false,
@@ -538,7 +539,12 @@ else {
         resizable: false,
         show: false,
       });
-      overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+      // A nonactivating Mac panel can join fullscreen Spaces without turning
+      // the whole application into a menu-bar-only process and hiding its Dock icon.
+      overlay.setVisibleOnAllWorkspaces(true, {
+        visibleOnFullScreen: true,
+        skipTransformProcessType: true,
+      });
       capture = new Capture(audio);
       dictation = new Dictation(
         {

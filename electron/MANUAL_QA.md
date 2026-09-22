@@ -114,3 +114,12 @@ Confucius live previews are claimed for this Electron build.
 Implementation `87bc05c` passed all three OS jobs, including packaged launch and
 installer checks: https://github.com/Player0109/Textify/actions/runs/35698952276
 This automated evidence does not mark the pending physical-desktop checks passed.
+
+## Dock visibility correction (September 22)
+
+- [x] Reproduced hidden Dock state caused by fullscreen-overlay process transformation.
+- [x] Regression checks: visible after launch, stays visible with settings closed
+  and overlay shown, Dock activation reopens the same settings window.
+- [x] Corrected packaged application installed; process activation policy is regular.
+- [x] Owner confirmed the new blue T icon is visible in the bottom Dock.
+- [x] Qwen 0.6B fixture capture-to-Copy still passes; Right Command reports ready.

@@ -27,6 +27,12 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   await page.getByRole("heading", { name: "Dictation", exact: true }).waitFor();
+  if (process.platform === "darwin")
+    assert.equal(
+      await application.evaluate(({ app }) => app.dock.isVisible()),
+      true,
+      "The packaged app must remain visible in the macOS Dock",
+    );
   const deadline = Date.now() + 30000;
   while (
     (await page.evaluate(() => window.textify.snapshot())).models.length < 4
