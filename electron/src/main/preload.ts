@@ -4,6 +4,9 @@ const bridge: TextifyBridge = {
   snapshot: () => ipcRenderer.invoke("snapshot"),
   action: (action) => ipcRenderer.invoke("action", action),
   preferences: (value) => ipcRenderer.invoke("preferences", value),
+  model: (command) => ipcRenderer.invoke("model", command),
+  apps: () => ipcRenderer.invoke("apps"),
+  importSettings: () => ipcRenderer.invoke("import-settings"),
   devices: () => ipcRenderer.invoke("devices"),
   subscribe(callback) {
     const listener = (_event: unknown, state: Parameters<typeof callback>[0]) =>

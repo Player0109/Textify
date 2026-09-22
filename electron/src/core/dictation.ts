@@ -12,6 +12,9 @@ import { processText } from "./text";
 export interface Target {
   target: string;
   secure: boolean;
+  appID?: string;
+  appName?: string;
+  excluded?: boolean;
 }
 export interface DictationPorts {
   target(): Promise<Target | null>;
@@ -45,6 +48,7 @@ export class Dictation {
   level = 0;
   pending = "";
   private serial = 0;
+  private copying = false;
   private session?: Session;
   private processingTask?: Promise<void>;
   private activation?: ReturnType<typeof setTimeout>;
@@ -53,9 +57,10 @@ export class Dictation {
     private ports: DictationPorts,
     private replacements: () => Replacement[],
     private now = () => Date.now(),
+    private language = () => "en",
   ) {}
   get busy() {
-    return !["idle", "error", "copy"].includes(this.phase);
+    return this.copying || !["idle", "error", "copy"].includes(this.phase);
   }
   get elapsed() {
     return this.session
@@ -95,7 +100,7 @@ export class Dictation {
       try {
         s.target = manual ? null : await this.ports.target();
         if (s.cancelled) return;
-        if (s.target?.secure) {
+        if (s.target?.secure || s.target?.excluded) {
           s.cancelled = true;
           return;
         }
@@ -239,7 +244,7 @@ export class Dictation {
         }
         text = stitch(text, chunk);
       }
-      text = processText(text, this.replacements());
+      text = processText(text, this.replacements(), this.language());
       if (!text.trim() || s.cancelled) {
         this.update("idle");
         return;
@@ -274,7 +279,20 @@ export class Dictation {
       this.ports.changed();
     }
   }
+  async copy(write: (text: string) => Promise<void>) {
+    if (this.busy || !this.pending) return;
+    this.copying = true;
+    try {
+      await write(this.pending);
+      this.pending = "";
+      this.update("idle");
+    } finally {
+      this.copying = false;
+      this.ports.changed();
+    }
+  }
   dismiss() {
+    if (this.copying) return;
     this.pending = "";
     if (!this.busy) this.update("idle");
   }

@@ -43,7 +43,9 @@ try {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.getByRole("heading", { name: "Dictation", exact: true }).waitFor();
-  await waitSnapshot((state) => state.models.length === 1);
+  await waitSnapshot((state) =>
+    state.models.some((model) => model.id === "ggml-small.en-q5_1"),
+  );
   assert.equal(await page.evaluate(() => typeof window.require), "undefined");
   assert.equal(await page.evaluate(() => typeof window.process), "undefined");
   const hiddenAudio = app
@@ -123,6 +125,28 @@ try {
       .replacements.length,
     1,
   );
+  await page.getByLabel("Custom word").fill("Textify");
+  await page.getByRole("button", { name: "Add word", exact: true }).click();
+  await waitSnapshot(
+    (state) =>
+      state.preferences.customWords.includes("Textify") && !state.modelBusy,
+  );
+  await page
+    .getByRole("button", { name: "Remove word", exact: true })
+    .waitFor();
+  const persisted = JSON.parse(
+    await readFile(join(data, "settings.json"), "utf8"),
+  );
+  assert.deepEqual(persisted.customWords, ["Textify"]);
+  await page.screenshot({ path: "artifacts/vocabulary.png" });
+  await page.getByRole("button", { name: "General", exact: true }).click();
+  assert.equal(await page.getByLabel("Launch at login").isDisabled(), true);
+  await page.getByLabel("Horizontal offset").fill("30");
+  await page.getByLabel("Horizontal offset").press("Tab");
+  await waitSnapshot((state) => state.preferences.overlay.x === 30);
+  await page.getByRole("button", { name: "Reset indicator" }).click();
+  await waitSnapshot((state) => state.preferences.overlay.x === 0);
+  await page.screenshot({ path: "artifacts/general.png" });
   await page.getByRole("button", { name: "Privacy", exact: true }).click();
   await page
     .getByRole("heading", { name: "Your speech stays here." })
@@ -158,7 +182,7 @@ try {
     }, sample);
     await page.getByRole("button", { name: "Dictation", exact: true }).click();
     await app.evaluate(({ clipboard }) => {
-      clipboard.writeText = (text) => {
+      clipboard.writeText = async (text) => {
         globalThis.__testCopy = text;
       };
     });
@@ -172,10 +196,7 @@ try {
       await app.evaluate(() => /fellow Americans/i.test(globalThis.__testCopy)),
       true,
     );
-    assert.equal(
-      await page.evaluate(async () => (await window.textify.snapshot()).phase),
-      "idle",
-    );
+    await waitSnapshot((state) => state.phase === "idle");
     console.log(
       "Fixture MediaStream → AudioWorklet → native recognition → explicit Copy passed without touching the microphone or system clipboard.",
     );

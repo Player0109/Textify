@@ -27,7 +27,9 @@ const normalize = (s: string) =>
 export function processText(
   raw: string,
   replacements: Replacement[] = [],
+  language = "en",
 ): string {
+  if (language !== "en") return raw.trim();
   const words = raw.trim().split(/\s+/);
   let text = "",
     joined = false;

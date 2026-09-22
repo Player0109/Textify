@@ -32,6 +32,34 @@ function harness(overrides: Partial<DictationPorts> = {}) {
 describe("dictation lifecycle", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
+  it("keeps Copy available after clipboard failure and waits for a successful write", async () => {
+    const h = harness();
+    h.app.press(true);
+    await vi.advanceTimersByTimeAsync(300);
+    h.speech();
+    await h.app.release();
+    await expect(
+      h.app.copy(async () => {
+        throw new Error("clipboard unavailable");
+      }),
+    ).rejects.toThrow();
+    expect(h.app.pending).toBe("Hello, world");
+    expect(h.app.phase).toBe("copy");
+    const write = deferred<void>();
+    const copying = h.app.copy(() => write.promise);
+    h.app.press();
+    h.app.dismiss();
+    const duplicate = vi.fn(async () => {});
+    await h.app.copy(duplicate);
+    expect(duplicate).not.toHaveBeenCalled();
+    expect(h.ports.start).toHaveBeenCalledOnce();
+    expect(h.app.pending).toBe("Hello, world");
+    write.resolve();
+    await copying;
+    expect(h.app.phase).toBe("idle");
+    expect(h.app.pending).toBe("");
+    expect(h.app.busy).toBe(false);
+  });
   it("records immediately but discards an accidental tap", async () => {
     const h = harness();
     h.app.press();

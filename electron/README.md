@@ -23,10 +23,11 @@ npm start
 archive. Compilation does not download source. JavaScript dependencies are
 locked in `package-lock.json`.
 
-Open **Models** and either download the English model or choose **Use existing
-model file**. The exact artifact is `ggml-small.en-q5_1.bin` from the signed
-catalog. Import copies the file into this app's own storage and verifies its
-size and SHA-256. It never moves or changes a model used by the Swift app.
+Open **Models** to download or import an exact signed model artifact. This
+preview supports Whisper small.en, large-v2, large-v3, and large-v3-turbo.
+The first three expose English; turbo exposes English and Hindi according to
+the bundled signed catalog. Import copies into this app's own storage and
+checks size and SHA-256. It never changes a model used by the Swift app.
 
 Hold the microphone button to record and release it to transcribe. Choose
 **Copy dictation**, then paste into your app. Microphone permission is requested
@@ -53,15 +54,23 @@ After a paste event has been sent, Textify does not retry an uncertain result.
 It restores the previous clipboard only when the clipboard has not changed.
 Explicit Copy replaces the clipboard normally.
 
-The preview includes one English whisper.cpp model, replacement pairs, spoken
-punctuation, a five-minute recording limit, tray/menu-bar operation, and a
-recording indicator. Audio and pending dictation stay in memory. There is no
-transcript history, telemetry, or speech upload. Downloads occur only after an
-explicit model download action.
+The preview includes custom words, replacement pairs, English spoken
+punctuation, a five-minute recording limit, tray/menu-bar operation, adjustable
+recording indicator, language selection, model switching/deletion, resumable
+downloads, and persistent signed revocation rules. Non-English dictation skips
+English text rewriting. Restored model artifacts require explicit verification.
 
-The application identity and data directory are **Textify Electron**, separate
-from the Swift app. Model files and preferences are stored there. This preview
-does not automatically migrate native-app settings.
+**General** offers launch at login after installation and a reviewed import of
+supported native settings. **Privacy** offers app exclusions on macOS, Windows,
+and X11; Wayland cannot reliably identify foreground apps and shows exclusions
+as unavailable. On any desktop, the in-app microphone button is an explicit
+Copy workflow and does not inspect another app.
+
+Audio and pending dictation stay in memory. There is no transcript history,
+telemetry, or speech upload. Model downloads require an explicit action.
+Custom words, preferences, model files and trust records use the separate
+**Textify Electron** data directory. Settings import leaves the source intact;
+unsupported runtimes are not silently imported as working models.
 
 ## Verify and package
 
@@ -74,8 +83,9 @@ npm run package
 `package` creates a local application directory under `release/`. `dist` creates
 the configured DMG, NSIS, or AppImage/deb distribution for the current OS.
 Packaging refuses native helpers built for a different OS or architecture.
-The macOS preview uses an ad-hoc signature; release signing and notarization
-are still required for public distribution.
+The owner selected unsigned preview installers: macOS uses an ad-hoc app
+signature without Developer ID/notarization; Windows installers are unsigned.
+No public release is published by the workflow (`--publish never`).
 
 To exercise actual offline recognition with the public speech fixture without
 using your microphone or system clipboard:
@@ -93,26 +103,26 @@ to the ignored `artifacts/` directory.
 
 ## Current verification and remaining work
 
-Verified locally on Apple Silicon: 47 automated tests, TypeScript/build checks,
-real fixture transcription through the native worker and audio capture path,
-renderer isolation, settings persistence, and close-to-tray behavior.
-The packaged Mac app also passes launch/catalog/navigation checks and
-`codesign --verify --deep --strict`. To repeat the packaged launch check:
+The baseline passed native builds, 47 tests, real fixture transcription,
+Electron smoke, packaged launch and installer creation on all three CI runners:
+[baseline run](https://github.com/Player0109/Textify/actions/runs/35684967292).
+The expanded preview passes 66 tests locally; its workflow repeats those checks
+and adds installation/launch checks for NSIS, Debian, extracted AppImage and DMG.
+See the [migration record](../docs/implementation/electron-migration.md) for the
+latest run, tested revision and downloadable artifacts.
 
-```sh
-node scripts/packaged-smoke.mjs 'release/mac-arm64/Textify Electron.app/Contents/MacOS/Textify Electron'
-```
+On macOS, `node scripts/insertion-smoke.mjs` verified native insertion into an
+owned test window, original clipboard restoration, target mismatch rejection,
+and password-field rejection. The script uses public test text and no microphone;
+Windows CI also runs it. Physical microphone, real app, login startup and Linux
+GNOME/KDE Wayland checks remain in [MANUAL_QA.md](MANUAL_QA.md). The owner can test
+Windows; a Linux desktop tester is still needed. Xvfb is not a Wayland desktop.
 
-This read-only launch check uses the packaged app's normal data directory;
-it does not request recording, download a model, or paste text.
+The portable preview does not yet include the Swift app's other inference
+engines, speech enhancement, live transcription, or diagnostics export. No full
+native-app parity or production readiness is claimed.
 
-The CI workflow builds/tests/packages macOS ARM64, Windows x64, and Linux x64.
-The workflow has not been run remotely during this implementation. Actual
-Windows/Linux behavior, physical microphones, global keys, cross-app insertion,
-clipboard restoration, and installed Wayland portal consent remain release
-gates. Local macOS checks do not establish those results.
-
-Full model-catalog and runtime parity, language selection, custom words,
-exclusions, launch-at-login, download resume, persistent revocations,
-diagnostics, updates, and distribution signing remain to be migrated. See
-`../docs/implementation/electron-migration.md` for the migration scope.
+For additional local model checks, `scripts/runtime-smoke.mjs` verifies the signed
+model hash and exercises language and custom-word configuration with public test
+audio. It accepts `MODEL [en|hi] [mono-16khz-f32-file]`; English defaults to the
+public JFK sample. No recognized text is logged or saved.

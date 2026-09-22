@@ -13,7 +13,7 @@ import {
   shell,
 } from "electron";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
-import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rename, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { Dictation } from "../core/dictation";
@@ -22,8 +22,13 @@ import { WhisperWorker } from "./worker";
 import { Platform, nativeTrigger } from "./platform";
 import { waylandTrigger } from "./wayland";
 import { Capture } from "./capture";
-import { validatePreferences } from "./preferences";
-import type { Action, Preferences, Snapshot } from "../shared";
+import {
+  defaults,
+  validatePreferences,
+  migrateNativeSettings,
+} from "./preferences";
+import { linuxStartup, linuxStartupEnabled } from "./startup";
+import type { Action, Preferences, Snapshot, ModelCommand } from "../shared";
 
 app.setName("Textify Electron");
 const smoke = !app.isPackaged && process.argv.includes("--smoke");
@@ -57,16 +62,7 @@ const wayland =
   Boolean(
     process.env.WAYLAND_DISPLAY || process.env.XDG_SESSION_TYPE === "wayland",
   );
-let preferences: Preferences = {
-  microphone: "default",
-  trigger:
-    process.platform === "darwin"
-      ? "right-command"
-      : wayland
-        ? "control-space"
-        : "right-control",
-  replacements: [],
-};
+let preferences: Preferences = defaults(process.platform, wayland);
 const platform = new Platform(resources);
 let models: Models,
   worker: WhisperWorker,
@@ -89,20 +85,19 @@ function snapshot(): Snapshot {
             : "Linux · X11",
     insertion: platform.insertion,
     triggerStatus,
-    ready: Boolean(initialized && worker?.ready),
+    ready: Boolean(
+      initialized &&
+      worker?.ready &&
+      models?.installed &&
+      models.selected?.languages.includes(preferences.language),
+    ),
     modelBusy: modelBusy || Boolean(models?.busy),
     download: models?.progress ?? null,
     preferences,
-    models: models?.file
-      ? [
-          {
-            id: models.id,
-            name: models.name,
-            bytes: models.file.sizeBytes,
-            installed: models.installed,
-          },
-        ]
-      : [],
+    models: models?.views() ?? [],
+    downloadModelID: models?.progressID ?? null,
+    exclusionsAvailable: platform.exclusionsAvailable,
+    startupAvailable: app.isPackaged,
   };
 }
 function changed() {
@@ -124,9 +119,35 @@ function changed() {
       const area = screen.getDisplayNearestPoint(
         screen.getCursorScreenPoint(),
       ).workArea;
+      overlay.setSize(
+        Math.round(390 * preferences.overlay.scale),
+        Math.round(96 * preferences.overlay.scale),
+      );
+      overlay.webContents.setZoomFactor(preferences.overlay.scale);
       overlay.setPosition(
-        Math.round(area.x + (area.width - 390) / 2),
-        Math.round(area.y + area.height - 125),
+        Math.round(
+          Math.min(
+            area.x + area.width - 390 * preferences.overlay.scale,
+            Math.max(
+              area.x,
+              area.x +
+                (area.width - 390 * preferences.overlay.scale) / 2 +
+                preferences.overlay.x,
+            ),
+          ),
+        ),
+        Math.round(
+          Math.min(
+            area.y + area.height - 96 * preferences.overlay.scale,
+            Math.max(
+              area.y,
+              area.y +
+                area.height -
+                125 * preferences.overlay.scale +
+                preferences.overlay.y,
+            ),
+          ),
+        ),
       );
       overlay.setFocusable(state.phase === "copy" || state.phase === "error");
       if (!overlay.isVisible()) overlay.showInactive();
@@ -175,7 +196,12 @@ async function enableTrigger() {
   stopTrigger = undefined;
   const events = {
     press: () => {
-      if (worker.ready && !modelBusy && !models.busy) {
+      if (
+        snapshot().ready &&
+        !modelBusy &&
+        !models.busy &&
+        !savingPreferences
+      ) {
         notice = "";
         dictation.press(main?.isFocused() ?? false);
       } else {
@@ -207,7 +233,7 @@ async function enableTrigger() {
       triggerStatus = `Hold ${trigger.description}`;
     } else {
       stopTrigger = await nativeTrigger(preferences.trigger, events);
-      triggerStatus = `Hold ${preferences.trigger === "right-command" ? "Right Command" : preferences.trigger === "right-control" ? "Right Control" : "Control + Space"}`;
+      triggerStatus = `Hold ${preferences.trigger === "right-command" ? "Right Command" : preferences.trigger === "right-option" ? "Right Option" : preferences.trigger === "right-control" ? "Right Control" : "Control + Space"}`;
     }
   } catch {
     triggerStatus =
@@ -221,7 +247,20 @@ async function loadModel() {
   modelBusy = true;
   changed();
   try {
-    await worker.load(models.path);
+    worker.stop();
+    if (
+      !models.installed ||
+      !models.selected?.languages.includes(preferences.language)
+    ) {
+      notice =
+        "Choose an installed model that supports the selected dictation language.";
+      return;
+    }
+    await worker.load(
+      models.path,
+      preferences.language,
+      preferences.customWords,
+    );
     notice = "";
   } catch {
     notice =
@@ -235,7 +274,12 @@ async function action(action: Action) {
   const active = dictation.busy;
   switch (action) {
     case "press":
-      if (worker.ready && !modelBusy && !models.busy) {
+      if (
+        snapshot().ready &&
+        !modelBusy &&
+        !models.busy &&
+        !savingPreferences
+      ) {
         notice = "";
         dictation.press(true);
       }
@@ -248,10 +292,7 @@ async function action(action: Action) {
         await dictation.cancel();
       break;
     case "copy":
-      if (!active && dictation.pending) {
-        clipboard.writeText(dictation.pending);
-        dictation.dismiss();
-      }
+      await dictation.copy((text) => clipboard.writeText(text));
       break;
     case "dismiss":
       if (!active) {
@@ -281,30 +322,147 @@ async function action(action: Action) {
       models.cancel();
       break;
     case "download":
-    case "import": {
-      if (active || modelBusy || models.busy || !initialized) return;
-      let source: string | undefined;
-      if (action === "import") {
-        const chosen = await dialog.showOpenDialog(main, {
-          title: "Choose the catalog Whisper small.en model",
-          properties: ["openFile"],
-          filters: [{ name: "Whisper model", extensions: ["bin"] }],
-        });
-        if (chosen.canceled) return;
-        if (dictation.busy || modelBusy || models.busy) return;
-        source = chosen.filePaths[0];
-      }
-      try {
-        await models.install(source);
-        await loadModel();
-      } catch {
-        notice =
-          "Model installation stopped. Use the exact catalog model or retry the download.";
-      }
+    case "import":
+      await modelAction({ action, id: preferences.activeModelID });
       break;
-    }
     default:
       throw new Error("unsupported_action");
+  }
+  changed();
+}
+
+async function setStartup(enabled: boolean) {
+  if (!app.isPackaged) throw new Error("startup_requires_installation");
+  if (process.platform === "linux")
+    await linuxStartup(
+      app.getPath("appData"),
+      process.env.APPIMAGE || process.execPath,
+      enabled,
+    );
+  else
+    app.setLoginItemSettings({
+      openAtLogin: enabled,
+      path: process.execPath,
+      args: ["--background"],
+    });
+}
+async function savePreferences(value: unknown) {
+  if (dictation.busy || modelBusy || models.busy || savingPreferences)
+    throw new Error("preferences_busy");
+  const next = validatePreferences(value),
+    previous = preferences;
+  const changedModel =
+    next.activeModelID !== previous.activeModelID ||
+    next.language !== previous.language ||
+    JSON.stringify(next.customWords) !== JSON.stringify(previous.customWords);
+  if (
+    next.language !== previous.language &&
+    !models.get(next.activeModelID).languages.includes(next.language)
+  )
+    throw new Error("language_incompatible");
+  savingPreferences = true;
+  try {
+    await writeFile(
+      join(app.getPath("userData"), "settings.tmp"),
+      JSON.stringify(next),
+      { mode: 0o600 },
+    );
+    const startupChanged = next.launchAtLogin !== previous.launchAtLogin;
+    if (startupChanged) await setStartup(next.launchAtLogin);
+    try {
+      await rename(
+        join(app.getPath("userData"), "settings.tmp"),
+        join(app.getPath("userData"), "settings.json"),
+      );
+    } catch (error) {
+      if (startupChanged) await setStartup(previous.launchAtLogin);
+      throw error;
+    }
+    preferences = next;
+    notice = "";
+    models.id = next.activeModelID;
+    if (changedModel) {
+      worker.stop();
+      if (models.installed) await loadModel();
+    }
+    if (next.trigger !== previous.trigger && stopTrigger) await enableTrigger();
+    changed();
+  } finally {
+    savingPreferences = false;
+  }
+}
+async function modelAction(command: ModelCommand) {
+  if (
+    dictation.busy ||
+    modelBusy ||
+    models.busy ||
+    savingPreferences ||
+    !initialized
+  )
+    throw new Error("model_busy");
+  if (
+    !command ||
+    !["download", "import", "use", "verify", "remove"].includes(
+      command.action,
+    ) ||
+    typeof command.id !== "string"
+  )
+    throw new Error("model_command");
+  const model = models.get(command.id);
+  if (command.action === "remove") {
+    const answer = await dialog.showMessageBox(main, {
+      type: "question",
+      message: `Remove ${model.name} from this device?`,
+      detail:
+        "The downloaded model and its partial download will be removed. Your settings and vocabulary are kept.",
+      buttons: ["Cancel", "Remove model"],
+      cancelId: 0,
+      defaultId: 0,
+    });
+    if (answer.response !== 1 || dictation.busy || modelBusy || models.busy)
+      return;
+    if (models.id === command.id) worker.stop();
+    await models.remove(command.id);
+  } else if (command.action === "use") {
+    if (model.status !== "installed") throw new Error("model_not_ready");
+    let language = preferences.language;
+    if (!model.languages.includes(language)) {
+      const answer = await dialog.showMessageBox(main, {
+        type: "question",
+        message: `Use ${model.name} in ${model.languages[0] === "en" ? "English" : model.languages[0]}?`,
+        detail:
+          "This model does not support the currently selected language in this preview.",
+        buttons: ["Cancel", "Change language and use"],
+        cancelId: 0,
+        defaultId: 0,
+      });
+      if (answer.response !== 1) return;
+      language = model.languages[0];
+    }
+    await models.verify(command.id);
+    await savePreferences({
+      ...preferences,
+      activeModelID: command.id,
+      language,
+    });
+    if (!worker.ready) await loadModel();
+  } else if (command.action === "verify") {
+    await models.verify(command.id);
+    if (models.id === command.id) await loadModel();
+  } else {
+    let source: string | undefined;
+    if (command.action === "import") {
+      const choice = await dialog.showOpenDialog(main, {
+        title: `Choose the exact ${model.name} model`,
+        properties: ["openFile"],
+        filters: [{ name: "Whisper model", extensions: ["bin"] }],
+      });
+      if (choice.canceled || dictation.busy || modelBusy || models.busy) return;
+      source = choice.filePaths[0];
+    }
+    if (models.id === command.id) worker.stop();
+    await models.install(source, command.id);
+    if (models.id === command.id) await loadModel();
   }
   changed();
 }
@@ -329,6 +487,14 @@ else {
       } catch {
         /* Fresh install uses defaults. */
       }
+      if (app.isPackaged)
+        preferences.launchAtLogin =
+          process.platform === "linux"
+            ? await linuxStartupEnabled(app.getPath("appData"))
+            : app.getLoginItemSettings({
+                path: process.execPath,
+                args: ["--background"],
+              }).openAtLogin;
       models = new Models(
         resources,
         join(app.getPath("userData"), "models"),
@@ -366,7 +532,23 @@ else {
       capture = new Capture(audio);
       dictation = new Dictation(
         {
-          target: () => platform.target(),
+          target: async () => {
+            const target = await platform.target();
+            if (
+              preferences.exclusions.length &&
+              platform.exclusionsAvailable &&
+              !target?.appID
+            )
+              throw new Error("target_unavailable");
+            return target
+              ? {
+                  ...target,
+                  excluded: preferences.exclusions.some(
+                    (entry) => entry.id === target.appID,
+                  ),
+                }
+              : null;
+          },
           start: (id, samples, failed) =>
             capture.start(id, preferences.microphone, samples, failed),
           stop: (id, discard) => capture.stop(id, discard),
@@ -375,6 +557,8 @@ else {
           changed,
         },
         () => preferences.replacements,
+        () => Date.now(),
+        () => preferences.language,
       );
       const trustedAudio = (contents: WebContents | null) =>
         contents === audio.webContents;
@@ -430,28 +614,39 @@ else {
           changed();
         }
       });
-      ipcMain.handle("preferences", async (event, value: unknown) => {
-        if (!allowed(event, [main]) || dictation.busy || savingPreferences)
-          throw new Error("preferences_busy");
-        const next = validatePreferences(value),
-          triggerChanged = next.trigger !== preferences.trigger;
-        savingPreferences = true;
+      ipcMain.handle("preferences", async (event, value) => {
+        if (!allowed(event, [main])) throw new Error("unauthorized");
+        await savePreferences(value);
+        event.sender.send("snapshot", snapshot());
+      });
+      ipcMain.handle("model", async (event, command) => {
+        if (!allowed(event, [main])) throw new Error("unauthorized");
         try {
-          await writeFile(
-            join(app.getPath("userData"), "settings.tmp"),
-            JSON.stringify(next),
-            { mode: 0o600 },
-          );
-          await rename(
-            join(app.getPath("userData"), "settings.tmp"),
-            join(app.getPath("userData"), "settings.json"),
-          );
-          preferences = next;
-          if (triggerChanged && stopTrigger) await enableTrigger();
+          await modelAction(command);
+        } catch {
+          notice =
+            "The model action could not finish. Check the model, language, and available storage. Interrupted downloads can be resumed.";
           changed();
-        } finally {
-          savingPreferences = false;
+          throw new Error("model_action_failed");
         }
+      });
+      ipcMain.handle("apps", async (event) => {
+        if (!allowed(event, [main])) throw new Error("unauthorized");
+        return platform.apps();
+      });
+      ipcMain.handle("import-settings", async (event) => {
+        if (!allowed(event, [main]) || dictation.busy)
+          throw new Error("unauthorized");
+        const chosen = await dialog.showOpenDialog(main, {
+          title: "Import Textify settings",
+          properties: ["openFile"],
+          filters: [{ name: "Textify settings", extensions: ["json"] }],
+        });
+        if (chosen.canceled) return null;
+        if ((await stat(chosen.filePaths[0])).size > 1024 * 1024)
+          throw new Error("settings_too_large");
+        const raw = JSON.parse(await readFile(chosen.filePaths[0], "utf8"));
+        return migrateNativeSettings(raw, preferences);
       });
       ipcMain.on("audio-reply", (event, reply) => {
         if (
@@ -509,9 +704,9 @@ else {
         audio.loadFile(page, { query: { mode: "audio" } }),
         overlay.loadFile(page, { query: { mode: "overlay" } }),
       ]);
-      main.show();
+      if (!process.argv.includes("--background")) main.show();
       try {
-        await models.init();
+        await models.init(preferences.activeModelID);
         initialized = true;
         if (models.installed) await loadModel();
       } catch {

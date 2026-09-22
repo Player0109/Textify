@@ -18,12 +18,26 @@ async function fixture() {
   directories.push(directory);
   const bytes = Buffer.from("catalog-authorized-fixture");
   const model = new Models("", directory, () => {});
-  model.file = {
+  const file = {
     filename: "fixture.bin",
     url: "https://example.invalid/fixture",
     sha256: createHash("sha256").update(bytes).digest("hex"),
     sizeBytes: bytes.length,
   };
+  model.entries = [
+    {
+      id: model.id,
+      name: "Test",
+      file,
+      bytes: file.sizeBytes,
+      installed: false,
+      status: "not-installed",
+      languages: ["en"],
+      resumable: false,
+      storedBytes: 0,
+      restorations: [],
+    },
+  ];
   return { directory, model, bytes };
 }
 describe("verified model storage", () => {

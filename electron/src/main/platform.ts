@@ -29,7 +29,7 @@ export function nativeRequest(
     }, 5000);
     child.stdout.on("data", (data) => {
       output += data;
-      if (output.length > 1024) {
+      if (output.length > (args[0] === "apps" ? 262144 : 16384)) {
         child.kill();
         finish(new Error("native_protocol"));
       }
@@ -50,6 +50,12 @@ export function nativeRequest(
 }
 export class Platform {
   readonly insertion = process.platform === "linux" ? "copy" : "automatic";
+  readonly exclusionsAvailable = !(
+    process.platform === "linux" &&
+    Boolean(
+      process.env.WAYLAND_DISPLAY || process.env.XDG_SESSION_TYPE === "wayland",
+    )
+  );
   private binary: string;
   constructor(resources: string) {
     this.binary = join(
@@ -58,7 +64,7 @@ export class Platform {
     );
   }
   async target(): Promise<Target | null> {
-    if (this.insertion === "copy") return null;
+    if (!this.exclusionsAvailable) return null;
     const result = await nativeRequest(this.binary, ["target"]);
     if (
       typeof result.target !== "string" ||
@@ -68,10 +74,28 @@ export class Platform {
       throw new Error("native_protocol");
     return result;
   }
+  async apps(): Promise<{ id: string; name: string }[]> {
+    if (!this.exclusionsAvailable) return [];
+    const result = await nativeRequest(this.binary, ["apps"]);
+    if (
+      !Array.isArray(result) ||
+      result.length > 200 ||
+      result.some(
+        (entry) =>
+          typeof entry?.id !== "string" ||
+          typeof entry?.name !== "string" ||
+          entry.id.length > 4096 ||
+          entry.name.length > 256,
+      )
+    )
+      throw new Error("native_protocol");
+    return result;
+  }
   async insert(
     text: string,
     target: Target,
   ): Promise<"sent" | "skipped" | "unavailable"> {
+    if (this.insertion === "copy") return "unavailable";
     try {
       const result = await nativeRequest(
         this.binary,
@@ -114,7 +138,11 @@ export async function nativeTrigger(
     trigger === "control-space"
       ? e.keycode === key.Space && e.ctrlKey
       : e.keycode ===
-        (trigger === "right-command" ? key.MetaRight : key.CtrlRight);
+        (trigger === "right-command"
+          ? key.MetaRight
+          : trigger === "right-option"
+            ? key.AltRight
+            : key.CtrlRight);
   const down = (e: { keycode: number; ctrlKey: boolean }) => {
     if (e.keycode === key.Escape) {
       events.cancel();

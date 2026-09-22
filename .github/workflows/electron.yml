@@ -53,6 +53,9 @@ jobs:
       - name: Electron smoke under Xvfb
         if: runner.os == 'Linux'
         run: xvfb-run --auto-servernum npm run smoke
+      - name: Windows native insertion and clipboard checks
+        if: runner.os == 'Windows'
+        run: node scripts/insertion-smoke.mjs
       - run: npm run package
       - name: Packaged macOS smoke
         if: runner.os == 'macOS'
@@ -65,6 +68,38 @@ jobs:
         run: xvfb-run --auto-servernum node scripts/packaged-smoke.mjs 'release/linux-unpacked/textify-electron'
       - name: Build preview installers
         run: npm run dist -- --publish never
+      - name: Test Windows installation
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = (Get-ChildItem release -Filter '*win-x64.exe' | Select-Object -First 1).FullName
+          $installDirectory = Join-Path $env:RUNNER_TEMP 'TextifyInstall'
+          $install = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$installDirectory") -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw 'Windows installation failed' }
+          node scripts/packaged-smoke.mjs (Join-Path $installDirectory 'Textify Electron.exe')
+          if ($LASTEXITCODE -ne 0) { throw 'Installed Windows app failed' }
+          $uninstaller = (Get-ChildItem $installDirectory -Filter 'Uninstall*.exe' | Select-Object -First 1).FullName
+          Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait
+      - name: Test Debian installation and AppImage extraction
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get install -y "$PWD"/release/*.deb
+          xvfb-run --auto-servernum node scripts/packaged-smoke.mjs "$(command -v textify-electron)"
+          mkdir -p .native/appimage-check
+          image=$(realpath release/*.AppImage)
+          chmod +x "$image"
+          (cd .native/appimage-check && "$image" --appimage-extract > /dev/null)
+          xvfb-run --auto-servernum node scripts/packaged-smoke.mjs .native/appimage-check/squashfs-root/textify-electron
+          sudo apt-get remove -y textify-electron
+      - name: Test macOS disk image
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          mkdir -p .native/mounted-dmg
+          hdiutil attach release/*.dmg -readonly -nobrowse -mountpoint .native/mounted-dmg
+          trap 'hdiutil detach .native/mounted-dmg' EXIT
+          node scripts/packaged-smoke.mjs '.native/mounted-dmg/Textify Electron.app/Contents/MacOS/Textify Electron'
       - name: Upload unsigned preview installers
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

@@ -37,9 +37,15 @@ authorized validation work.
 - Implemented the first offline English dictation path and the Copy workflow.
   Local validation: 47 tests, TypeScript/build, native fixture recognition,
   fixture MediaStream through capture/recognition/Copy, packaged Mac launch,
-  and macOS signature verification. The three-OS CI workflow is added but has
-  not been run remotely. Windows/Linux desktop checks and full feature parity
-  remain outstanding; see the migration record.
+  and macOS signature verification. Baseline `e3095ad` subsequently passed the
+  three-OS CI workflow (run `35684967292`), including real fixture recognition,
+  packaged launch and unsigned installers. Expanded `0.2.0-preview.1` adds four
+  Whisper profiles, English/Hindi routing, vocabulary, exclusions, settings
+  import, startup/indicator settings, download recovery and persistent trust.
+  Local expanded verification: 66 tests, capture/Copy fixture, large-v3/turbo
+  runtime checks and native macOS owned-window insertion safeguards. Installer
+  testing and current CI evidence are recorded in the migration document.
+  Physical desktop checks and full native runtime parity remain outstanding.
 
 
 ## Confucius4-R2T2 Live Dictation Handoff - 2026-09-20

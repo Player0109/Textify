@@ -46,46 +46,59 @@ Tokens: background `#f6f8fc`, surface `#ffffff`, text `#172541`, secondary text
 `#596983`, blue action `#285ddd`, divider `#dce3ef`. Model and permission states
 are factual; no invented speed ratings or decorative dashboard statistics.
 
-## Release gates and later migration
+## Expanded unsigned preview
 
-Verify microphone revocation/disconnection, global hold/release, cancellation,
-focus changes during recognition, password fields, rich clipboard restoration,
-and quitting during capture/inference on actual target desktops. Exercise
-GNOME and KDE Wayland plus X11; portal support varies by desktop/version.
-Package identity and portal consent must be tested after installation.
+The owner approved the next stage and chose unsigned installers. Version
+`0.2.0-preview.1` adds four portable Whisper profiles, English/Hindi selection
+according to signed capabilities, custom words, app exclusions, launch at login,
+indicator placement/scale, reviewed native settings import, resumable verified
+downloads, sticky revocations and explicit post-restoration verification. The
+worker receives custom words over stdin, not process arguments. Non-English text
+is preserved without English command rewriting.
 
-Port the remaining catalog runtimes, full vocabulary/custom-word behavior,
-language choices, exclusions, launch-at-login, overlay placement, diagnostics,
-download resume, revocation persistence, and model lifecycle parity only after
-the first path is stable. No full native-app parity or production readiness is
-claimed by this milestone. macOS signing/notarization and Windows signing are
-separate release work.
+Exclusions use bundle identifiers on macOS, executable paths on Windows and X11.
+Wayland exposes their unavailability. Both Linux modes retain explicit Copy.
+The asynchronous Copy operation keeps pending text on failure and blocks a
+second capture or duplicate Copy while the clipboard write is pending.
+
+Supported portable models: small.en Q5_1, large-v2 Q5_0, large-v3 Q5_0 and
+large-v3-turbo Q5_0. Apple-specific runtimes, Crisper conversion/runtime profiles,
+other inference engines, speech enhancement, live transcription and diagnostics
+export remain outside this preview. No full native-app parity is claimed.
 
 ## Verification on 2026-09-22
 
+Baseline commit `e3095ad` passed the complete three-OS workflow:
+https://github.com/Player0109/Textify/actions/runs/35684967292
+
 | Check | Result |
 | --- | --- |
-| TypeScript, production renderer/main build | Passed on macOS ARM64 |
-| Automated behavior/integrity/lifecycle/portal tests | 47 passed |
-| Native whisper.cpp worker, public JFK fixture | Passed, PCM and output held in memory |
-| Fixture MediaStream → AudioWorklet → native worker → explicit Copy | Passed; microphone and system clipboard were not used |
-| Renderer isolation and IPC authorization | Passed in Electron smoke |
-| Settings persistence and duplicate rejection | Passed in Electron smoke |
-| Window close leaves tray utility running | Passed in Electron smoke |
-| Packaged Mac app launch, catalog verification, navigation | Passed |
-| Mac package ad-hoc signature, deep/strict verification | Passed |
-| Native worker macOS deployment target | 14.0 |
-| Production npm dependency audit | No vulnerabilities reported |
-| Windows/Linux native builds and desktop behavior | Not run locally |
-| GitHub Actions three-OS workflow | Configured; not run remotely |
+| Native builds on macOS ARM64, Windows x64, Linux x64 | Passed baseline CI |
+| Offline JFK recognition on all three platforms | Passed baseline CI |
+| Fixture MediaStream through AudioWorklet, worker and Copy | Passed baseline CI; repeated locally for expanded code |
+| Renderer isolation, settings, close-to-tray and packaged launch | Passed baseline CI |
+| DMG, NSIS, AppImage and Debian package creation | Passed baseline CI |
+| Expanded behavior/integrity/recovery/migration suite | 66 tests passed locally |
+| macOS owned-window insertion, clipboard restoration, target mismatch and password field | Passed native integration test |
+| Physical microphone and actual application matrix | Pending |
+| Installed Linux GNOME/KDE Wayland shortcut consent | Pending |
+| Production signing/notarization | Deferred by owner; unsigned previews authorized |
 
-The local app is `electron/release/mac-arm64/Textify Electron.app`.
-Build output, downloaded sources, models used as test fixtures, and screenshots
+The expanded workflow repeats builds/tests and adds actual NSIS/Debian
+installation, extracted AppImage launch, mounted DMG launch and Windows native
+insertion checks. Its final run and artifacts will be recorded here after the
+checks finish. Outputs are CI artifacts with seven-day retention; no GitHub
+Release is published. The Electron branch is `codex/electron-cross-platform`.
+
+Build output, sources downloaded for compilation, model fixtures, and screenshots
 are excluded from Git. Runtime third-party notices and hook source are included
-in the application resources.
+in the app resources. Existing Swift settings/models/sources remain untouched.
 
-The preview implements automatic insertion helpers for macOS and Windows, but
-those helpers still require real cross-app testing. No physical microphone,
-password-field, focus-switch, clipboard restoration, or installed Wayland
-desktop test is claimed. Linux X11 and Wayland both use explicit Copy in this
-milestone, including when global shortcuts are available.
+## Remaining desktop checks
+
+The owner will test Windows using `electron/MANUAL_QA.md`. Linux physical QA is
+unassigned. Exercise GNOME and KDE Wayland plus X11: real microphone permissions,
+global hold/release, cancellation, focus changes, password fields, rich clipboard,
+quitting during capture/inference, tray behavior, multi-monitor indicator position
+and launch at login. CI fixture and owned-window tests establish only their stated
+conditions. No physical microphone or installed Wayland consent test is claimed.

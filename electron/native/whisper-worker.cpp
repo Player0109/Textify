@@ -27,11 +27,21 @@ static std::string json_string(const std::string &value) {
     }
     return out + '"';
 }
-static int run(const std::string &model_path) {
+static int run(const std::string &model_path, const std::string &language, bool configured) {
 #ifdef _WIN32
     _setmode(_fileno(stdin), _O_BINARY);
     _setmode(_fileno(stdout), _O_BINARY);
 #endif
+    std::string prompt;
+    if (configured) {
+        unsigned char header[4];
+        if (!std::cin.read(reinterpret_cast<char *>(header), 4)) return 2;
+        const uint32_t size = uint32_t(header[0]) | uint32_t(header[1]) << 8 | uint32_t(header[2]) << 16 | uint32_t(header[3]) << 24;
+        if (size > 8192) return 2;
+        prompt.resize(size);
+        if (size && !std::cin.read(prompt.data(), size)) return 2;
+    }
+    if (whisper_lang_id(language.c_str()) < 0) return 2;
     whisper_log_set(quiet, nullptr);
     ggml_log_set(quiet, nullptr);
     auto config = whisper_context_default_params();
@@ -42,6 +52,7 @@ static int run(const std::string &model_path) {
 #endif
     auto *context = whisper_init_from_file_with_params(model_path.c_str(), config);
     if (!context) { std::cout << "{\"error\":\"model_load\"}\n" << std::flush; return 1; }
+    if (language != "en" && !whisper_is_multilingual(context)) { whisper_free(context); std::cout << "{\"error\":\"model_language\"}\n" << std::flush; return 1; }
     std::cout << "{\"ready\":true}\n" << std::flush;
     unsigned char header[4];
     while (std::cin.read(reinterpret_cast<char *>(header), 4)) {
@@ -54,7 +65,8 @@ static int run(const std::string &model_path) {
         if (!valid) break;
         auto params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
         params.n_threads = std::max(1u, std::min(8u, std::thread::hardware_concurrency()));
-        params.language = "en";
+        params.language = language.c_str();
+        params.initial_prompt = prompt.empty() ? nullptr : prompt.c_str();
         params.translate = false;
         params.no_context = true;
         params.temperature = 0.0f;
@@ -87,14 +99,16 @@ static int run(const std::string &model_path) {
 }
 #ifdef _WIN32
 int wmain(int argc, wchar_t **argv) {
-    if (argc != 2) return 2;
+    if (argc != 2 && argc != 3) return 2;
     int size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, argv[1], -1, nullptr, 0, nullptr, nullptr);
     if (size <= 1) return 2;
     std::string path(size, '\0');
     WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, argv[1], -1, path.data(), size, nullptr, nullptr);
     path.pop_back();
-    return run(path);
+    std::string language = "en";
+    if (argc == 3) { language.clear(); for (const wchar_t *ch = argv[2]; *ch; ++ch) { if (*ch < 'a' || *ch > 'z') return 2; language += char(*ch); } }
+    return run(path, language, argc == 3);
 }
 #else
-int main(int argc, char **argv) { return argc == 2 ? run(argv[1]) : 2; }
+int main(int argc, char **argv) { return (argc == 2 || argc == 3) ? run(argv[1], argc == 3 ? argv[2] : "en", argc == 3) : 2; }
 #endif

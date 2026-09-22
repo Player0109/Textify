@@ -1,8 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import type { Action, Snapshot } from "../shared";
+import type { Action, Snapshot, ModelCommand } from "../shared";
 import { startAudioRenderer } from "./audio";
 import "./style.css";
+import { LANGUAGES } from "../shared";
+import { ModelsPane } from "./ModelsPane";
+import { GeneralPane } from "./GeneralPane";
+import { CustomWords } from "./CustomWords";
+import { Exclusions } from "./Exclusions";
 
 const mode = new URLSearchParams(location.search).get("mode");
 function Microphone() {
@@ -85,7 +90,13 @@ function Overlay() {
     </div>
   );
 }
-const panes = ["Dictation", "Models", "Vocabulary", "Privacy"] as const;
+const panes = [
+  "Dictation",
+  "Models",
+  "Vocabulary",
+  "Privacy",
+  "General",
+] as const;
 function App() {
   const state = useSnapshot();
   const [pane, setPane] = useState<(typeof panes)[number]>("Dictation");
@@ -109,9 +120,7 @@ function App() {
     };
   }, []);
   if (!state) return <main className="loading">Opening Textify…</main>;
-  const working = ["armed", "recording", "processing", "inserting"].includes(
-    state.phase,
-  );
+  const working = state.modelBusy || ["armed", "recording", "processing", "inserting"].includes(state.phase);
   async function run(action: Action) {
     setBusy(true);
     setError("");
@@ -132,13 +141,29 @@ function App() {
       return true;
     } catch {
       setError(
-        "Settings could not be saved. Check for empty or duplicate replacement phrases.",
+        "Settings could not be saved. Check for invalid or duplicate values, and finish any active dictation first.",
       );
       return false;
     } finally {
       setBusy(false);
     }
   }
+  async function runModel(command: ModelCommand) {
+    setBusy(true);
+    setError("");
+    try {
+      await window.textify.model(command);
+    } catch {
+      setError(
+        "The model action could not finish. Check the model status, available storage, and selected language.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  const activeModel = state.models.find(
+    (model) => model.id === state.preferences.activeModelID,
+  );
   const status =
     state.phase === "recording"
       ? "Listening to you"
@@ -163,7 +188,7 @@ function App() {
               aria-current={pane === name ? "page" : undefined}
               onClick={() => setPane(name)}
             >
-              <span aria-hidden="true">{["◉", "▦", "Aa", "◇"][i]}</span>
+              <span aria-hidden="true">{["◉", "▦", "Aa", "◇", "≡"][i]}</span>
               {name}
             </button>
           ))}
@@ -173,7 +198,7 @@ function App() {
           <p>
             {state.platform}
             <br />
-            Electron preview 0.1
+            Electron preview 0.2
           </p>
         </div>
       </aside>
@@ -188,7 +213,9 @@ function App() {
                   ? "Speech recognition that stays on your device."
                   : pane === "Vocabulary"
                     ? "Keep names and phrases the way you write them."
-                    : "A small footprint on your private information."}
+                    : pane === "General"
+                      ? "Startup, recording indicator, and settings import."
+                      : "A small footprint on your private information."}
             </p>
           </div>
           <span className="offline-tag">Offline after setup</span>
@@ -273,7 +300,7 @@ function App() {
                   <h3>Speech model</h3>
                   <p>
                     {state.ready
-                      ? "Whisper small.en · English"
+                      ? `${activeModel?.name} · ${LANGUAGES[state.preferences.language] ?? state.preferences.language}`
                       : state.modelBusy
                         ? "Preparing the model…"
                         : "One model is required to dictate."}
@@ -282,6 +309,40 @@ function App() {
                 <button className="secondary" onClick={() => setPane("Models")}>
                   {state.ready ? "View model" : "Choose model"}
                 </button>
+              </div>
+              <div className="setting-row">
+                <div>
+                  <h3>Dictation language</h3>
+                  <p>
+                    Only languages supported by the selected model are
+                    available.
+                  </p>
+                </div>
+                <select
+                  aria-label="Dictation language"
+                  disabled={working || busy || state.modelBusy}
+                  value={state.preferences.language}
+                  onChange={(event) =>
+                    void save({
+                      ...state.preferences,
+                      language: event.target.value,
+                    })
+                  }
+                >
+                  {(activeModel?.languages ?? ["en"]).map((code) => (
+                    <option key={code} value={code}>
+                      {LANGUAGES[code] ?? code}
+                    </option>
+                  ))}
+                  {!activeModel?.languages.includes(
+                    state.preferences.language,
+                  ) && (
+                    <option value={state.preferences.language}>
+                      {LANGUAGES[state.preferences.language]} · choose a
+                      compatible model
+                    </option>
+                  )}
+                </select>
               </div>
               <div className="setting-row">
                 <div>
@@ -350,7 +411,10 @@ function App() {
                     }
                   >
                     {state.platform === "macOS" && (
-                      <option value="right-command">Right Command</option>
+                      <>
+                        <option value="right-command">Right Command</option>
+                        <option value="right-option">Right Option</option>
+                      </>
                     )}
                     <option value="right-control">Right Control</option>
                     <option value="control-space">Control + Space</option>
@@ -389,89 +453,21 @@ function App() {
           </>
         )}
         {pane === "Models" && (
-          <>
-            <section className="model-card">
-              <div className="model-top">
-                <span className="model-symbol">
-                  <Wave />
-                </span>
-                <div>
-                  <h2>Whisper small.en</h2>
-                  <p>English speech recognition</p>
-                </div>
-                <span className="model-state">
-                  {state.ready
-                    ? "Ready"
-                    : state.models[0]?.installed
-                      ? "Installed"
-                      : "Not installed"}
-                </span>
-              </div>
-              <p className="model-description">
-                A compact model for everyday English dictation. Download it once
-                and use it offline.
-              </p>
-              <dl>
-                <div>
-                  <dt>Download</dt>
-                  <dd>190 MB</dd>
-                </div>
-                <div>
-                  <dt>Language</dt>
-                  <dd>English</dd>
-                </div>
-                <div>
-                  <dt>License</dt>
-                  <dd>MIT</dd>
-                </div>
-                <div>
-                  <dt>Publisher</dt>
-                  <dd>OpenAI</dd>
-                </div>
-              </dl>
-              {state.download !== null && (
-                <div className="download">
-                  <progress value={state.download} max={1} />
-                  <span>{Math.round(state.download * 100)}%</span>
-                </div>
-              )}
-              <div className="model-actions">
-                <button
-                  disabled={busy || working || state.modelBusy || state.ready}
-                  onClick={() => void run("download")}
-                >
-                  {state.modelBusy
-                    ? "Preparing…"
-                    : state.ready
-                      ? "Model ready"
-                      : "Download model"}
-                </button>
-                {state.download !== null ? (
-                  <button
-                    className="secondary"
-                    onClick={() =>
-                      void window.textify.action("cancel-download")
-                    }
-                  >
-                    Cancel download
-                  </button>
-                ) : (
-                  <button
-                    className="secondary"
-                    disabled={busy || working || state.modelBusy}
-                    onClick={() => void run("import")}
-                  >
-                    Use existing model file
-                  </button>
-                )}
-              </div>
-            </section>
-            <p className="footnote">
-              Downloads and imports are checked against the bundled signed
-              catalog. Existing files must match the exact Whisper small.en
-              model. Additional models will be migrated separately.
-            </p>
-          </>
+          <ModelsPane state={state} busy={working || busy} run={runModel} />
+        )}
+        {pane === "General" && (
+          <GeneralPane
+            state={state}
+            busy={working || busy || state.modelBusy}
+            save={save}
+          />
+        )}
+        {pane === "Vocabulary" && (
+          <CustomWords
+            preferences={state.preferences}
+            busy={working || busy || state.modelBusy}
+            save={save}
+          />
         )}
         {pane === "Vocabulary" && (
           <section className="vocabulary">
@@ -610,6 +606,7 @@ function App() {
                 </div>
               </div>
             </div>
+            <Exclusions state={state} busy={working || busy} save={save} />
             <p className="footnote">
               Network access is used only when you choose to download a model.
               Model hosts receive normal download request information.

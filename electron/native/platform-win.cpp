@@ -9,6 +9,29 @@
 #include <vector>
 #include <cstdint>
 #include <cstring>
+#include <set>
+#include "platform-json.h"
+
+static std::string executable(HWND window) {
+    DWORD pid = 0; GetWindowThreadProcessId(window, &pid);
+    HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (!process) return "";
+    wchar_t path[32768]; DWORD length = 32768;
+    const bool valid = QueryFullProcessImageNameW(process, 0, path, &length); CloseHandle(process);
+    if (!valid) return "";
+    CharLowerBuffW(path, length);
+    int size = WideCharToMultiByte(CP_UTF8, 0, path, length, nullptr, 0, nullptr, nullptr);
+    std::string result(size, '\0'); WideCharToMultiByte(CP_UTF8, 0, path, length, result.data(), size, nullptr, nullptr); return result;
+}
+static std::string name(const std::string &path) { return path.substr(path.find_last_of("\\/") + 1); }
+struct AppList { std::set<std::string> ids; std::string json = "["; };
+static BOOL CALLBACK listWindow(HWND window, LPARAM data) {
+    auto &apps = *reinterpret_cast<AppList *>(data);
+    if (!IsWindowVisible(window) || apps.ids.size() >= 200) return TRUE;
+    const auto path = executable(window);
+    if (!path.empty() && apps.ids.insert(path).second) { if (apps.json.size() > 1) apps.json += ','; apps.json += "{\"id\":" + jsonString(path) + ",\"name\":" + jsonString(name(path)) + '}'; }
+    return TRUE;
+}
 
 static std::string target() {
     HWND window = GetForegroundWindow();
@@ -33,8 +56,10 @@ struct Format { UINT id; HGLOBAL data; };
 static void release(std::vector<Format> &items) { for (auto &item : items) if (item.data) GlobalFree(item.data); }
 int main(int argc, char **argv) {
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    if (argc == 2 && std::string(argv[1]) == "apps") { AppList apps; EnumWindows(listWindow, reinterpret_cast<LPARAM>(&apps)); std::cout << apps.json << "]\n"; CoUninitialize(); return 0; }
     if (argc == 2 && std::string(argv[1]) == "target") {
-        std::cout << "{\"target\":\"" << target() << "\",\"secure\":" << (secure() ? "true" : "false") << "}\n";
+        const auto path = executable(GetForegroundWindow());
+        std::cout << "{\"target\":\"" << target() << "\",\"secure\":" << (secure() ? "true" : "false") << ",\"appID\":" << jsonString(path) << ",\"appName\":" << jsonString(name(path)) << "}\n";
         return 0;
     }
     if (argc != 3 || std::string(argv[1]) != "paste") return 2;

@@ -25,10 +25,20 @@ static bool secure(pid_t pid) {
 }
 int main(int argc, char **argv) {
     @autoreleasepool {
+        auto json = [](id object) { NSData *data = [NSJSONSerialization dataWithJSONObject:object options:0 error:nullptr]; if (!data) return 2; std::cout.write((const char *)data.bytes, data.length); std::cout << "\n"; return 0; };
+        if (argc == 2 && std::string(argv[1]) == "apps") {
+            NSMutableArray *apps = [NSMutableArray array];
+            NSMutableSet *seen = [NSMutableSet set];
+            for (NSRunningApplication *app in NSWorkspace.sharedWorkspace.runningApplications) {
+                if (!app.bundleIdentifier || !app.localizedName || app.activationPolicy != NSApplicationActivationPolicyRegular || [seen containsObject:app.bundleIdentifier]) continue;
+                [seen addObject:app.bundleIdentifier]; [apps addObject:@{@"id":app.bundleIdentifier, @"name":app.localizedName}];
+            }
+            return json(apps);
+        }
         if (argc == 2 && std::string(argv[1]) == "target") {
             const auto pid = target();
-            std::cout << "{\"target\":\"" << identity() << "\",\"secure\":" << (secure(pid) ? "true" : "false") << "}\n";
-            return 0;
+            NSRunningApplication *app = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
+            return json(@{@"target": [NSString stringWithUTF8String:identity().c_str()], @"secure": @(secure(pid)), @"appID":app.bundleIdentifier ?: @"", @"appName":app.localizedName ?: @""});
         }
         if (argc != 3 || std::string(argv[1]) != "paste") return 2;
         std::string input((std::istreambuf_iterator<char>(std::cin)), {});

@@ -22,10 +22,10 @@ export class WhisperWorker {
       this.pending = { resolve, reject, timer };
     });
   }
-  async load(path: string) {
+  async load(path: string, language = "en", customWords: string[] = []) {
     this.stop();
     const result = this.response(120000);
-    const child = (this.child = spawn(this.binary, [path], {
+    const child = (this.child = spawn(this.binary, [path, language], {
       stdio: "pipe",
       windowsHide: true,
       shell: false,
@@ -61,6 +61,11 @@ export class WhisperWorker {
     child.stdin.on("error", () => {
       if (this.child === child) this.stop();
     });
+    const prompt = Buffer.from(customWords.join(", "));
+    const header = Buffer.alloc(4);
+    header.writeUInt32LE(prompt.length);
+    child.stdin.write(header);
+    child.stdin.write(prompt, () => prompt.fill(0));
     const value = await result;
     if (value.ready !== true || this.child !== child)
       throw new Error("worker_load");

@@ -29,7 +29,7 @@ try {
   await page.getByRole("heading", { name: "Dictation", exact: true }).waitFor();
   const deadline = Date.now() + 30000;
   while (
-    (await page.evaluate(() => window.textify.snapshot())).models.length !== 1
+    (await page.evaluate(() => window.textify.snapshot())).models.length < 4
   ) {
     if (Date.now() > deadline)
       throw new Error("Packaged catalog failed to initialize");

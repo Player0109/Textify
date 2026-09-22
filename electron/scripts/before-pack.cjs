@@ -21,6 +21,5 @@ module.exports = async (context) => {
     );
   const suffix = native.platform === "win32" ? ".exe" : "";
   await access(join(resources, `textify-whisper${suffix}`));
-  if (native.platform !== "linux")
-    await access(join(resources, `textify-platform${suffix}`));
+  await access(join(resources, `textify-platform${suffix}`));
 };

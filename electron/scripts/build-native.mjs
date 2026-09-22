@@ -21,7 +21,6 @@ await mkdir("resources", { recursive: true });
 const suffix = process.platform === "win32" ? ".exe" : "";
 const subdir = process.platform === "win32" ? "Release/" : "";
 for (const name of ["textify-whisper", "textify-platform"]) {
-  if (name === "textify-platform" && process.platform === "linux") continue;
   await cp(
     `.native/build/${subdir}${name}${suffix}`,
     `resources/${name}${suffix}`,
