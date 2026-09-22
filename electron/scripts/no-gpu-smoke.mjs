@@ -1,7 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import assert from "node:assert/strict";
-// Hide all Vulkan devices, exercising the real shipping worker, not a CPU mode.
+// Hide Vulkan devices. Hosted Mac's paravirtual Metal device lacks Apple7
+// compute support. Both must be refused by the real shipping worker.
 const result = spawnSync(
   resolve(
     `resources/textify-whisper${process.platform === "win32" ? ".exe" : ""}`,

@@ -142,10 +142,13 @@ Vulkan devices are rejected. Audio preprocessing, token sampling, memory
 transfers and graph bookkeeping still use the CPU. The native build runs a
 regression test that attempts a CPU matrix graph and requires refusal.
 
-On hosted Windows/Linux CI, no-GPU startup and disabled recording are tested.
+On all hosted CI runners, no-GPU startup and disabled recording are tested.
+The hosted Mac exposes a paravirtual Metal device without Apple7 compute features.
 These checks are not evidence of NVIDIA/AMD/Intel GPU recognition or performance;
-those require a real GPU. The Mac fixture uses real Metal.
+those require a real GPU. The local Mac fixture uses real Metal.
 
 Accepted holds that yield no frames, no audible speech, rejected recognition,
 or unconfirmed insertion now show a specific error instead of silently hiding.
-The reported Mac microphone failure is still under investigation.
+The Mac package now explicitly includes the Audio Input entitlement on the app
+and helpers. `mac-signature-smoke.mjs` verifies the signed output; the earlier
+unsigned package lacked this capability even though it declared a usage string.

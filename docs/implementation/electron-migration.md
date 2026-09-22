@@ -158,10 +158,33 @@ sampling remain; they are not a CPU recognition fallback.
 Local evidence: 73 tests pass, TypeScript/build passes, the native CPU-graph
 refusal test passes, and both small.en and large-v3 recognize the public JFK
 fixture on Apple M4 Max Metal. The installed Mac preview visibly reports that
-GPU. Windows/Linux CI and real NVIDIA recognition are pending for this revision.
+GPU. All four model profiles, plus turbo Hindi, pass on local Metal. Real NVIDIA recognition remains pending.
 
 The Mac symptom reproduced in an empty TextEdit document and also in the manual
 Copy route, narrowing it to capture/recognition rather than only paste. The new
 preview distinguishes missing PCM, silence, rejected recognition, and uncertain
 insertion without recording audio or transcripts in diagnostics. The physical
 microphone retest remains pending; do not call the original bug fixed yet.
+
+The next physical test displayed “No speech detected.” System Settings showed
+the built-in microphone selected at full input volume with a nonzero meter, but
+Textify Electron was absent from the microphone privacy list. `codesign` revealed
+that both the installed app and its helper lacked `com.apple.security.device.audio-input`.
+The new package explicitly signs the app and helpers with this capability. A
+package regression check failed against the installed build before the fix.
+Physical microphone and insertion confirmation are still required after install.
+
+Hosted macOS identifies “Apple Paravirtual device”; it lacks the Apple7 SIMD
+features required by the pinned Metal kernels. It previously relied on CPU
+fallback. The worker now checks Apple7 capability before declaring readiness.
+All hosted runners check GPU refusal; local M4 Max fixtures provide GPU evidence.
+
+The corrected bundle was installed into `/Applications/Textify Electron.app`
+on 2026-09-22. The installed app and all Electron helpers pass the signed Audio
+Input entitlement check and deep/strict code-signature verification. The former
+bundle is retained under `electron/.native/installed-backups/`. System Settings
+now lists Textify Electron with Microphone enabled, and Check microphone reports
+permission available. The new ad-hoc signature requires refreshing the existing
+Accessibility grant. Physical speech, Copy and TextEdit insertion remain pending.
+The local rerun passes 73 tests, TypeScript/build, the native GPU policy test and
+the public English fixture on Metal.

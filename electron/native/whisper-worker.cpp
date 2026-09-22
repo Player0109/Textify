@@ -8,6 +8,9 @@
 #include <thread>
 #include <vector>
 #include <cstring>
+#ifdef __APPLE__
+#import <Metal/Metal.h>
+#endif
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -38,6 +41,12 @@ static ggml_backend_dev_t gpu() {
     if (!LoadLibraryExW(L"vulkan-1.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32)) return nullptr;
 #endif
 #ifdef __APPLE__
+    // The pinned kernels need Apple7 SIMD-group support (M1 or newer).
+    // A paravirtual Metal device can exist without these compute features.
+    @autoreleasepool {
+        id<MTLDevice> metal = MTLCreateSystemDefaultDevice();
+        if (!metal || ![metal supportsFamily:MTLGPUFamilyApple7]) return nullptr;
+    }
     const char *required = "Metal";
 #else
     const char *required = "Vulkan";

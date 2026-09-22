@@ -23,7 +23,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     env:
-      TEXTIFY_EXPECT_NO_GPU: ${{ matrix.os != 'macos-26' && '1' || '0' }}
+      # Hosted macOS exposes a paravirtual device without required SIMD support.
+      # Physical GPU recognition is a separate device check on every platform.
+      TEXTIFY_EXPECT_NO_GPU: '1'
     defaults:
       run:
         working-directory: electron
@@ -59,12 +61,7 @@ jobs:
       - run: npm run check
       - name: Prepare verified transcription fixture
         run: node scripts/prepare-smoke.mjs
-      - name: Native speech recognition
-        if: runner.os == 'macOS'
-        shell: bash
-        run: node scripts/native-smoke.mjs "$TEXTIFY_MODEL_FIXTURE"
       - name: Refuse CPU fallback on GPU-less runners
-        if: runner.os != 'macOS'
         run: node scripts/no-gpu-smoke.mjs
       - name: Electron smoke
         if: runner.os != 'Linux'
@@ -76,6 +73,9 @@ jobs:
         if: runner.os == 'Windows'
         run: node scripts/insertion-smoke.mjs
       - run: npm run package
+      - name: Verify signed microphone capability
+        if: runner.os == 'macOS'
+        run: node scripts/mac-signature-smoke.mjs 'release/mac-arm64/Textify Electron.app'
       - name: Packaged macOS smoke
         if: runner.os == 'macOS'
         run: node scripts/packaged-smoke.mjs 'release/mac-arm64/Textify Electron.app/Contents/MacOS/Textify Electron'

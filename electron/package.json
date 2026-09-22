@@ -68,6 +68,8 @@
       "minimumSystemVersion": "14.0",
       "category": "public.app-category.productivity",
       "identity": "-",
+      "entitlements": "native/entitlements.mac.plist",
+      "entitlementsInherit": "native/entitlements.mac.plist",
       "extendInfo": {
         "NSMicrophoneUsageDescription": "Textify records your voice while you dictate and transcribes it on this device."
       }

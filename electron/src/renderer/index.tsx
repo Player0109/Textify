@@ -626,6 +626,7 @@ function App() {
 }
 if (mode === "audio") startAudioRenderer();
 else {
+  document.documentElement.classList.toggle("overlay-page", mode === "overlay");
   document.body.classList.toggle("overlay-page", mode === "overlay");
   createRoot(document.getElementById("root")!).render(
     mode === "overlay" ? <Overlay /> : <App />,

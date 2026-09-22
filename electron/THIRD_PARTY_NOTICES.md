@@ -24,3 +24,11 @@ for the target platform. Changes to a macOS bundle require re-signing it.
 
 Whisper weights are downloaded or imported separately, verified against
 the signed catalog, and are not included in the application package.
+
+Windows/Linux builds use Vulkan-Headers and Vulkan-Hpp (Khronos Group),
+Apache-2.0; the license is included in `textify/licenses/Vulkan.txt`. Vulkan
+drivers and the system Vulkan loader are external dependencies, not bundled.
+The Vulkan SDK/glslc is used at build time; end users do not need the SDK.
+The pinned whisper source is modified by `native/require-gpu.mjs` to refuse
+CPU graph execution, require GPU weights/backends and reject software Vulkan
+devices.
