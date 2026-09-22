@@ -46,7 +46,7 @@ for (const name of ["src", "libuiohook", "binding.gyp", "package.json"]) {
   );
 }
 await cp(
-  "../Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-512.png",
+  "assets/textify-icon.png",
   "resources/icon.png",
 );
 await Promise.all([

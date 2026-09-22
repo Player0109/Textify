@@ -2275,3 +2275,17 @@ Task 1 must merge before parallel Wave 1 work begins.
   MLX/CoreML variants through a worker that cannot execute them. Existing Windows
   and Linux Whisper support remains available. Native benchmark scores are not
   measurements of these new Electron runtime builds.
+
+## Electron Logo Selection - 2026-09-22
+
+- The owner selected concept A, the blue T with cyan waveform bars, from the
+  generated logo comparison sheet. This slice owns the Electron icon asset,
+  sidebar branding and packaging references; the native Swift app remains unchanged.
+- Use the same transparent source image for the installed application, Dock,
+  tray and Electron sidebar. Preserve the existing Dock pin and dictation settings.
+- Verified TypeScript, packaging, packaged launch, renderer appearance, signed
+  microphone entitlements and deep/strict signature validation. Installed the
+  updated bundle; confirmed its native icon contains the selected artwork and
+  the Dock pin still targets Applications. Restored the existing Accessibility
+  grant after the ad-hoc signature changed, relaunched, and confirmed GPU ready,
+  Hold Right Command and microphone permission available.

@@ -8,6 +8,7 @@ import { ModelsPane } from "./ModelsPane";
 import { GeneralPane } from "./GeneralPane";
 import { CustomWords } from "./CustomWords";
 import { Exclusions } from "./Exclusions";
+import textifyIcon from "../../assets/textify-icon.png";
 
 const mode = new URLSearchParams(location.search).get("mode");
 function Microphone() {
@@ -222,9 +223,7 @@ function App() {
     <div className="app-shell">
       <aside>
         <div className="brand">
-          <span className="brand-mark">
-            <Wave />
-          </span>
+          <img className="brand-mark" src={textifyIcon} alt="" />
           <div className="brand-copy">
             <strong>Textify</strong>
             <small>ON-DEVICE DICTATION</small>
