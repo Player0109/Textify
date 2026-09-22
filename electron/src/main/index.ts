@@ -747,7 +747,9 @@ else {
       overlay?.destroy();
       tray?.destroy();
       cleaned = true;
-      app.quit();
+      // A native Cmd+Q can drain this promise before before-quit returns.
+      // Let Electron finish cancelling that request before starting another.
+      setImmediate(() => app.quit());
     })();
   });
 }

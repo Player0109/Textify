@@ -28,6 +28,7 @@ automated Linux checks use Xvfb and do not establish GNOME/KDE Wayland behavior.
 | Escape during recording | Capture ends, no insertion | Pending |
 | Microphone button, then Copy | Clipboard changes only after Copy | Pending |
 | Close settings window | Tray utility remains; reopening works | Pending |
+| macOS Cmd+Q while idle | Main process and helpers exit; next launch opens normally | Passed locally on 2026-09-22 after native quit timing fix |
 | Quit during recording or recognition | Mic stops; no delayed insertion | Pending |
 | Five-minute cap | Recording stops and produces at most one result | Pending |
 

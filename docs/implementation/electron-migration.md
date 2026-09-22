@@ -188,3 +188,30 @@ permission available. The new ad-hoc signature requires refreshing the existing
 Accessibility grant. Physical speech, Copy and TextEdit insertion remain pending.
 The local rerun passes 73 tests, TypeScript/build, the native GPU policy test and
 the public English fixture on Metal.
+
+### macOS native Quit correction
+
+Cmd+Q reproducibly closed the installed settings window but left its main
+process running, including with the global trigger disabled. A process sample
+showed the main thread idle, not blocked in hook shutdown. An isolated JavaScript
+`app.quit()` probe exited successfully and did not reproduce the native path.
+
+The `before-quit` cleanup now resumes `app.quit()` with `setImmediate` after
+cleanup completes. This lets the cancelled native quit callback return before
+starting another quit. Electron's `Browser::Quit` assigns its quitting state
+after `HandleBeforeQuit` returns; reentering it from a promise continuation in
+that callback can otherwise have the new state overwritten by the cancelled
+outer request. See the pinned [Electron implementation](https://github.com/electron/electron/blob/v44.4.3/shell/browser/browser.cc).
+
+The rebuilt installed bundle passes Cmd+Q through the real macOS UI: the main
+process and all helpers exit, verified by PID without reopening the app to
+inspect it. This verifies idle native Quit; quitting during physical recording
+still belongs to manual QA. A JavaScript-only quit smoke does not cover this
+native callback timing. The 73 tests and TypeScript/build pass after the change.
+The fixture capture-to-Copy smoke also passed during this continuation, without
+touching the physical microphone or system clipboard.
+
+The microphone/GPU correction at `5ed3143` passed all three jobs in
+[run 35693514454](https://github.com/Player0109/Textify/actions/runs/35693514454),
+including macOS signature/DMG checks and Windows/Linux installation checks.
+That run precedes the native Quit timing follow-up above.
