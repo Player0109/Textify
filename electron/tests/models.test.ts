@@ -50,3 +50,60 @@ describe("catalog trust", () => {
     ).toEqual([]);
   });
 });
+
+describe("runtime admission", () => {
+  it("admits the four new GGUF checkpoint families on Apple Silicon", async () => {
+    const { catalogModels } = await import("../src/main/models");
+    const models = catalogModels(
+      verifyCatalog(bytes, signature),
+      "darwin",
+      "arm64",
+    );
+    expect(models).toHaveLength(15);
+    expect(new Set(models.map((m) => m.checkpointID)).size).toBe(8);
+    const qwen = models.find((m) => m.id === "qwen3-asr-1.7b-bf16")!;
+    expect(qwen).toMatchObject({
+      engine: "transcribe_cpp",
+      provider: "Qwen",
+      variant: "GGUF BF16",
+      vocabulary: false,
+    });
+    expect(qwen.languages).toContain("hi");
+    expect(qwen.languages).toContain("auto");
+    const confucius = models.find((m) => m.id === "confucius4-r2t2-f16")!;
+    expect(confucius.languages).toEqual(["en", "zh"]);
+    expect(confucius.license).toContain("NetEase");
+    expect(models.some((m) => /mlx|coreml/.test(m.id))).toBe(false);
+  });
+  it.each([
+    ["win32", "x64"],
+    ["linux", "x64"],
+    ["darwin", "x64"],
+  ] as const)(
+    "keeps unavailable engines out of %s/%s",
+    async (platform, arch) => {
+      const { catalogModels } = await import("../src/main/models");
+      expect(
+        catalogModels(verifyCatalog(bytes, signature), platform, arch).map(
+          (m) => m.engine,
+        ),
+      ).toEqual(Array(4).fill("whisper_cpp"));
+    },
+  );
+  it("rejects engine mismatches and unsafe GGUF paths", async () => {
+    const { catalogModels } = await import("../src/main/models");
+    const catalog = verifyCatalog(bytes, signature);
+    const model = catalog.models.find(
+      (m: any) => m.id === "qwen3-asr-0.6b-q8-0",
+    );
+    model.runtime.engine = "audio_cpp";
+    expect(() => catalogModels(catalog, "darwin", "arm64")).toThrow(
+      "catalog_model",
+    );
+    model.runtime.engine = "transcribe_cpp";
+    model.files[0].filename = "../outside.gguf";
+    expect(() => catalogModels(catalog, "darwin", "arm64")).toThrow(
+      "catalog_artifact",
+    );
+  });
+});

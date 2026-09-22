@@ -29,7 +29,7 @@ function Microphone() {
 function Wave({ level = 0 }: { level?: number }) {
   return (
     <span className="wave" aria-hidden="true">
-      {[0.3, 0.65, 1, 0.5, 0.85, 0.4, 0.7].map((n, i) => (
+      {[0.38, 0.68, 1, 0.58, 0.32].map((n, i) => (
         <i key={i} style={{ height: `${7 + n * (10 + level * 30)}px` }} />
       ))}
     </span>
@@ -88,6 +88,48 @@ function Overlay() {
         </button>
       )}
     </div>
+  );
+}
+function NavIcon({ name }: { name: string }) {
+  return (
+    <svg
+      width="17"
+      height="17"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.65"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {name === "Dictation" ? (
+        <>
+          <rect x="9" y="3" width="6" height="12" rx="3" />
+          <path d="M5 11a7 7 0 0 0 14 0M12 18v3m-3 0h6" />
+        </>
+      ) : name === "Models" ? (
+        <>
+          <rect x="5" y="5" width="14" height="14" rx="3" />
+          <path d="M9 9h6v6H9zM9 2v3m6-3v3M9 19v3m6-3v3M2 9h3m-3 6h3m14-6h3m-3 6h3" />
+        </>
+      ) : name === "Vocabulary" ? (
+        <>
+          <path d="M3 18 8 5l5 13M5 13h6M16 11c6-4 7 9 0 6-3-2 2-4 5-3" />
+        </>
+      ) : name === "Privacy" ? (
+        <>
+          <path d="M12 2 4 6v6c0 5 8 10 8 10s8-5 8-10V6z" />
+          <path d="m8 12 3 3 5-6" />
+        </>
+      ) : (
+        <>
+          <path d="M4 6h16M4 12h16M4 18h16" />
+          <circle cx="9" cy="6" r="2" fill="#0d1118" />
+          <circle cx="15" cy="12" r="2" fill="#0d1118" />
+          <circle cx="8" cy="18" r="2" fill="#0d1118" />
+        </>
+      )}
+    </svg>
   );
 }
 const panes = [
@@ -179,20 +221,31 @@ function App() {
       <aside>
         <div className="brand">
           <span className="brand-mark">
-            <Microphone />
+            <Wave />
           </span>
-          <strong>Textify</strong>
+          <div className="brand-copy">
+            <strong>Textify</strong>
+            <small>ON-DEVICE DICTATION</small>
+          </div>
         </div>
         <nav aria-label="Settings">
           {panes.map((name, i) => (
-            <button
-              key={name}
-              aria-current={pane === name ? "page" : undefined}
-              onClick={() => setPane(name)}
-            >
-              <span aria-hidden="true">{["◉", "▦", "Aa", "◇", "≡"][i]}</span>
-              {name}
-            </button>
+            <React.Fragment key={name}>
+              {(i === 0 || i === 3) && (
+                <div className="nav-section">
+                  {i === 0 ? "SETUP" : "SYSTEM"}
+                </div>
+              )}
+              <button
+                aria-current={pane === name ? "page" : undefined}
+                onClick={() => setPane(name)}
+              >
+                <span aria-hidden="true">
+                  <NavIcon name={name} />
+                </span>
+                {name === "Models" ? "Transcription models" : name}
+              </button>
+            </React.Fragment>
           ))}
         </nav>
         <div className="sidebar-note">
@@ -207,7 +260,7 @@ function App() {
       <main>
         <header>
           <div>
-            <h1>{pane}</h1>
+            <h1>{pane === "Models" ? "Transcription models" : pane}</h1>
             <p>
               {pane === "Dictation"
                 ? "Your voice, ready for wherever you write."
@@ -468,6 +521,12 @@ function App() {
             busy={working || busy || state.modelBusy}
             save={save}
           />
+        )}
+        {pane === "Vocabulary" && !activeModel?.vocabulary && (
+          <div className="notice">
+            Custom words apply to Whisper models. Replacement pairs work with
+            every model.
+          </div>
         )}
         {pane === "Vocabulary" && (
           <CustomWords

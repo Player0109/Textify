@@ -28,6 +28,14 @@ async function fixture() {
     {
       id: model.id,
       name: "Test",
+      engine: "whisper_cpp",
+      checkpointID: "test",
+      description: "Test",
+      variant: "GGML",
+      provider: "Test",
+      license: "MIT",
+      source: "https://example.invalid",
+      vocabulary: true,
       file,
       bytes: file.sizeBytes,
       installed: false,
@@ -41,6 +49,20 @@ async function fixture() {
   return { directory, model, bytes };
 }
 describe("verified model storage", () => {
+  it("retains the GGUF extension required by the audio.cpp loader", async () => {
+    const h = await fixture();
+    h.model.entries[0].engine = "audio_cpp";
+    h.model.entries[0].file.filename = "fixture.gguf";
+    const source = join(h.directory, "source.gguf");
+    await writeFile(source, h.bytes);
+    await h.model.install(source);
+    expect(h.model.path).toBe(join(h.directory, `${h.model.id}.gguf`));
+    expect(h.model.installed).toBe(true);
+    expect(h.model.entries[0].storedBytes).toBe(h.bytes.length);
+    await h.model.remove(h.model.id);
+    expect(h.model.entries[0].storedBytes).toBe(0);
+    expect(await readFile(source)).toEqual(h.bytes);
+  });
   it("imports only matching bytes and preserves the source", async () => {
     const h = await fixture(),
       source = join(h.directory, "source.bin");

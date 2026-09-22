@@ -134,6 +134,12 @@ export function migrateNativeSettings(
   raw: any,
   current: Preferences,
   platform = process.platform,
+  supportedModels = [
+    "ggml-small.en-q5_1",
+    "whisper-large-v2-q5_0",
+    "whisper-large-v3-q5_0",
+    "whisper-large-v3-turbo-q5_0",
+  ],
 ): { preferences: Preferences; notes: string[] } {
   if (
     !raw ||
@@ -175,14 +181,7 @@ export function migrateNativeSettings(
     notes.push(
       "The saved language was not imported because it is unsupported.",
     );
-  if (
-    [
-      "ggml-small.en-q5_1",
-      "whisper-large-v2-q5_0",
-      "whisper-large-v3-q5_0",
-      "whisper-large-v3-turbo-q5_0",
-    ].includes(raw.activeModelID)
-  )
+  if (supportedModels.includes(raw.activeModelID))
     next.activeModelID = raw.activeModelID;
   else if (raw.activeModelID)
     notes.push(

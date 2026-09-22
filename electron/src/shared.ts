@@ -26,7 +26,16 @@ export interface Preferences {
   exclusions: { id: string; name: string }[];
   overlay: { x: number; y: number; scale: number };
 }
+export type ModelEngine = "whisper_cpp" | "transcribe_cpp" | "audio_cpp";
 export interface ModelView {
+  engine: ModelEngine;
+  checkpointID: string;
+  description: string;
+  variant: string;
+  provider: string;
+  license: string;
+  source: string;
+  vocabulary: boolean;
   id: string;
   name: string;
   bytes: number;
@@ -103,6 +112,15 @@ declare global {
 }
 
 export const LANGUAGES: Record<string, string> = {
+  auto: "Auto-detect language",
+  id: "Indonesian",
+  th: "Thai",
+  vi: "Vietnamese",
+  tr: "Turkish",
+  ms: "Malay",
+  fil: "Filipino",
+  fa: "Persian",
+  mk: "Macedonian",
   en: "English",
   hi: "Hindi",
   es: "Spanish",

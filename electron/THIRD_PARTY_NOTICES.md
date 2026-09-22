@@ -32,3 +32,19 @@ The Vulkan SDK/glslc is used at build time; end users do not need the SDK.
 The pinned whisper source is modified by `native/require-gpu.mjs` to refuse
 CPU graph execution, require GPU weights/backends and reject software Vulkan
 devices.
+
+Apple Silicon builds also contain isolated, statically linked Metal workers:
+
+- transcribe.cpp 0.1.3, MIT, commit `5a5a49664a8ea1f0e5b3be1dfc544730d1b62561`:
+  https://github.com/handy-computer/transcribe.cpp
+- audio.cpp, Apache-2.0, commit `9ba884179826c3b33dd305185b5f94c79175a03d`:
+  https://github.com/0xShug0/audio.cpp
+
+The checksum-pinned source archives include their exact ggml and tokenizer
+sources. `native/prepare-extra.mjs` adds CPU graph refusal and moves Parakeet
+TDT's predictor/joint graphs to the GPU. The audio.cpp C ABI is linked statically
+into its worker so its ggml symbols do not collide with other runtimes.
+Bundled `transcribe.cpp.txt` and `audio.cpp.txt` include dependency notices.
+Qwen3-ASR, Parakeet TDT and Confucius4-R2T2 weights are downloaded or imported
+separately and remain subject to the licenses shown in the signed catalog.
+Confucius uses the NetEase Youdao Model Use License Agreement; it is not MIT.

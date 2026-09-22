@@ -83,3 +83,16 @@ describe("settings and language migration", () => {
     expect(() => desktopEntry("/path\nExec=malicious")).toThrow();
   });
 });
+
+it("imports a native model only when the running catalog admits its runtime", () => {
+  const current = defaults("darwin");
+  const raw = {
+    activeModelID: "qwen3-asr-1.7b-bf16",
+    transcriptionLanguage: "hi",
+  };
+  const result = migrateNativeSettings(raw, current, "darwin", [
+    "qwen3-asr-1.7b-bf16",
+  ]);
+  expect(result.preferences.activeModelID).toBe(raw.activeModelID);
+  expect(result.preferences.language).toBe("hi");
+});

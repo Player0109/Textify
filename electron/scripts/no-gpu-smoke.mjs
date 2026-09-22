@@ -20,3 +20,24 @@ assert.deepEqual(JSON.parse(result.stdout), { error: "gpu_unavailable" });
 console.log(
   "Shipping worker refused startup without a GPU before attempting model load.",
 );
+
+if (process.platform === "darwin") {
+  for (const name of ["transcribe", "audio"]) {
+    const result = spawnSync(
+      resolve(`resources/textify-${name}`),
+      ["must-not-load.gguf", "en"],
+      {
+        input: Buffer.alloc(4),
+        timeout: 15000,
+      },
+    );
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, 1);
+    assert.deepEqual(JSON.parse(result.stdout.toString()), {
+      error: "gpu_unavailable",
+    });
+  }
+  console.log(
+    "Additional Metal workers also refused the unsupported virtual GPU.",
+  );
+}

@@ -2262,3 +2262,16 @@ Task 1 must merge before parallel Wave 1 work begins.
   preprocessing and token sampling still require ordinary CPU work.
 - GPU-less CI must assert refusal. Real GPU transcription, microphone, and
   cross-app insertion evidence must be reported separately from installer checks.
+
+## Electron Native UI and Additional Models Handoff - 2026-09-22
+
+- The product owner requested the native Textify visual design and the Confucius4-R2T2,
+  Parakeet TDT 0.6B V3, and Qwen3-ASR 0.6B/1.7B model families in Electron.
+- This slice owns Electron renderer, catalog adapter, isolated native workers,
+  dependency preparation, packaging, tests and Electron documentation. Swift sources,
+  vendored Swift runtimes, and the signed catalog remain read-only references.
+- Implement the existing signed GGUF artifacts on Apple Silicon first. Preserve
+  mandatory GPU execution, including Parakeet's decoder; do not expose native
+  MLX/CoreML variants through a worker that cannot execute them. Existing Windows
+  and Linux Whisper support remains available. Native benchmark scores are not
+  measurements of these new Electron runtime builds.

@@ -35,3 +35,5 @@ const result = spawnSync(
 if (result.status !== 0) process.exit(result.status ?? 1);
 await requireGPU(".native/whisper");
 console.log(`Verified whisper.cpp ${revision}. Native builds now run offline.`);
+const { prepareExtra } = await import("../native/prepare-extra.mjs");
+await prepareExtra();

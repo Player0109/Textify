@@ -1,7 +1,7 @@
 {
   "name": "textify-electron",
   "productName": "Textify Electron",
-  "version": "0.2.0-preview.2",
+  "version": "0.2.0-preview.3",
   "private": true,
   "description": "Offline desktop dictation for macOS, Windows and Linux",
   "homepage": "https://github.com/Player0109/Textify",

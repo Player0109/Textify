@@ -17,7 +17,13 @@ await cp("../Vendor/whisper.cpp/LICENSE", "resources/WHISPER-LICENSE");
 await mkdir("resources/licenses", { recursive: true });
 await cp("THIRD_PARTY_NOTICES.md", "resources/THIRD_PARTY_NOTICES.md");
 await cp("licenses", "resources/licenses", { recursive: true });
-for (const name of ["OpenAI-Whisper.txt", "ggml-small.en-q5_1.LICENSES.txt"]) {
+for (const name of [
+  "OpenAI-Whisper.txt",
+  "ggml-small.en-q5_1.LICENSES.txt",
+  "transcribe.cpp.txt",
+  "audio.cpp.txt",
+  "Confucius4-R2T2.txt",
+]) {
   await cp(`../THIRD_PARTY_LICENSES/${name}`, `resources/licenses/${name}`);
 }
 for (const name of [

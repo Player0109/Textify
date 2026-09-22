@@ -263,6 +263,7 @@ async function loadModel() {
       models.path,
       preferences.language,
       preferences.customWords,
+      models.selected.engine,
     );
     notice = "";
   } catch (error) {
@@ -459,7 +460,12 @@ async function modelAction(command: ModelCommand) {
       const choice = await dialog.showOpenDialog(main, {
         title: `Choose the exact ${model.name} model`,
         properties: ["openFile"],
-        filters: [{ name: "Whisper model", extensions: ["bin"] }],
+        filters: [
+          {
+            name: model.variant,
+            extensions: [model.engine === "whisper_cpp" ? "bin" : "gguf"],
+          },
+        ],
       });
       if (choice.canceled || dictation.busy || modelBusy || models.busy) return;
       source = choice.filePaths[0];
@@ -512,12 +518,12 @@ else {
         changed,
       );
       main = createWindow({
-        width: 1000,
-        height: 740,
+        width: 1120,
+        height: 780,
         minWidth: 780,
         minHeight: 600,
         title: "Textify Electron",
-        backgroundColor: "#f6f8fc",
+        backgroundColor: "#11151c",
         show: false,
       });
       audio = createWindow({ show: false, width: 1, height: 1 });
@@ -650,7 +656,12 @@ else {
         if ((await stat(chosen.filePaths[0])).size > 1024 * 1024)
           throw new Error("settings_too_large");
         const raw = JSON.parse(await readFile(chosen.filePaths[0], "utf8"));
-        return migrateNativeSettings(raw, preferences);
+        return migrateNativeSettings(
+          raw,
+          preferences,
+          process.platform,
+          models.entries.map((model) => model.id),
+        );
       });
       ipcMain.on("audio-reply", (event, reply) => {
         if (

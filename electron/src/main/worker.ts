@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
 import { deflateSync } from "node:zlib";
-import type { Snapshot } from "../shared";
+import type { ModelEngine, Snapshot } from "../shared";
 import { engineError } from "../core/engine-error";
 export class WhisperWorker {
   private child?: ChildProcessWithoutNullStreams;
@@ -10,6 +10,7 @@ export class WhisperWorker {
     reject: (reason: Error) => void;
     timer: ReturnType<typeof setTimeout>;
   };
+  private engine: ModelEngine = "whisper_cpp";
   ready = false;
   gpu: Snapshot["gpu"] = null;
   failure?: Error;
@@ -26,10 +27,25 @@ export class WhisperWorker {
       this.pending = { resolve, reject, timer };
     });
   }
-  async load(path: string, language = "en", customWords: string[] = []) {
+  async load(
+    path: string,
+    language = "en",
+    customWords: string[] = [],
+    engine: ModelEngine = "whisper_cpp",
+  ) {
     this.stop();
+    this.engine = engine;
+    const binary =
+      engine === "whisper_cpp"
+        ? this.binary
+        : this.binary.replace(
+            /textify-whisper(?=\.exe$|$)/,
+            engine === "transcribe_cpp"
+              ? "textify-transcribe"
+              : "textify-audio",
+          );
     const result = this.response(120000);
-    const child = (this.child = spawn(this.binary, [path, language], {
+    const child = (this.child = spawn(binary, [path, language], {
       stdio: "pipe",
       windowsHide: true,
       shell: false,
@@ -73,7 +89,9 @@ export class WhisperWorker {
       if (this.child === child)
         this.stop(new Error(this.ready ? "gpu_inference" : "gpu_init"));
     });
-    const prompt = Buffer.from(customWords.join(", "));
+    const prompt = Buffer.from(
+      engine === "whisper_cpp" ? customWords.join(", ") : "",
+    );
     const header = Buffer.alloc(4);
     header.writeUInt32LE(prompt.length);
     child.stdin.write(header);
@@ -115,15 +133,17 @@ export class WhisperWorker {
     const value = await result;
     if (
       typeof value.text !== "string" ||
-      !Number.isFinite(value.noSpeechProbability) ||
-      !Number.isFinite(value.averageLogProbability)
+      (this.engine === "whisper_cpp" &&
+        (!Number.isFinite(value.noSpeechProbability) ||
+          !Number.isFinite(value.averageLogProbability)))
     )
       throw new Error("worker_protocol");
     const bytes = Buffer.from(value.text);
     const ratio = bytes.length / Math.max(1, deflateSync(bytes).length);
     if (
-      value.noSpeechProbability > 0.6 ||
-      value.averageLogProbability < -1 ||
+      (this.engine === "whisper_cpp" &&
+        (value.noSpeechProbability > 0.6 ||
+          value.averageLogProbability < -1)) ||
       ratio > 2.4 ||
       /thanks for watching/i.test(value.text)
     )

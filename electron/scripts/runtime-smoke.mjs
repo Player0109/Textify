@@ -32,7 +32,8 @@ const models = catalogModels(
 const model = models.find(
   (model) =>
     model.file.filename === basename(path) ||
-    `${model.id}.bin` === basename(path),
+    `${model.id}.${model.engine === "whisper_cpp" ? "bin" : "gguf"}` ===
+      basename(path),
 );
 assert.ok(
   model?.languages.includes(language),
@@ -70,7 +71,7 @@ const worker = new WhisperWorker(
   () => {},
 );
 try {
-  await worker.load(resolve(path), language, ["Textify"]);
+  await worker.load(resolve(path), language, ["Textify"], model.engine);
   assert.ok(worker.gpu?.device);
   console.log(`GPU: ${worker.gpu.device} (${worker.gpu.backend})`);
   const text = await worker.transcribe(samples);
@@ -82,7 +83,7 @@ try {
     "Fixture recognition failed",
   );
   console.log(
-    `${model.name} (${language}): verified artifact, worker startup with custom vocabulary, and fixture recognition passed. Output was not saved.`,
+    `${model.name} (${language}): verified artifact, GPU worker startup and fixture recognition passed. Output was not saved.`,
   );
 } finally {
   samples.fill(0);

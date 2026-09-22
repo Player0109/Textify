@@ -32,6 +32,8 @@ for (const name of ["textify-whisper", "textify-platform"]) {
     `resources/${name}${suffix}`,
   );
 }
+const { buildExtra } = await import("./build-extra.mjs");
+await buildExtra();
 await writeFile(
   "resources/native-build.json",
   JSON.stringify({
@@ -39,6 +41,7 @@ await writeFile(
     arch: process.arch,
     whisperRevision: "a8d002cfd879315632a579e73f0148d06959de36",
     gpuRequired: true,
+    extraMetalWorkers: process.platform === "darwin",
     backend: process.platform === "darwin" ? "Metal" : "Vulkan",
   }),
 );

@@ -38,8 +38,10 @@ try {
   assert.equal(await page.evaluate(() => typeof window.require), "undefined");
   await mkdir("artifacts", { recursive: true });
   await page.screenshot({ path: "artifacts/packaged-dictation.png" });
-  await page.getByRole("button", { name: "Models", exact: true }).click();
-  await page.getByRole("heading", { name: "Whisper small.en" }).waitFor();
+  await page
+    .getByRole("button", { name: "Transcription models", exact: true })
+    .click();
+  await page.locator(".checkpoint-detail h2").waitFor();
   console.log(
     "Packaged app launch, verified catalog, isolated renderer, and navigation passed. No recording or paste was requested.",
   );

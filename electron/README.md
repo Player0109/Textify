@@ -23,11 +23,33 @@ npm start
 archive. Compilation does not download source. JavaScript dependencies are
 locked in `package-lock.json`.
 
-Open **Models** to download or import an exact signed model artifact. This
-preview supports Whisper small.en, large-v2, large-v3, and large-v3-turbo.
+Open **Transcription models** to search, download or import an exact signed
+model artifact. The native Textify dark design includes checkpoint details,
+language filtering, installed filtering and per-version actions.
+All platforms support Whisper small.en, large-v2, large-v3, and large-v3-turbo.
 The first three expose English; turbo exposes English and Hindi according to
 the bundled signed catalog. Import copies into this app's own storage and
 checks size and SHA-256. It never changes a model used by the Swift app.
+
+Apple Silicon also supports these GPU-only GGUF versions:
+
+| Checkpoint | Versions | Runtime |
+| --- | --- | --- |
+| Parakeet TDT 0.6B V3 | F16, Q8_0, Q5_K_M | transcribe.cpp |
+| Qwen3-ASR 0.6B | BF16, Q8_0, Q5_K_M | transcribe.cpp |
+| Qwen3-ASR 1.7B | BF16, Q8_0, Q5_K_M | transcribe.cpp |
+| Confucius4-R2T2 1.7B | Q8_0, F16 | audio.cpp |
+
+These are final-on-release dictation engines; Confucius live previews and native
+MLX/CoreML variants are not included. Qwen and Parakeet offer automatic language
+detection. Confucius offers English or Chinese. Custom vocabulary prompts apply
+to Whisper; replacement pairs apply to every engine. New family support on
+Windows/Linux is deferred. Native app ratings are not claimed for Electron.
+
+The extra source archives are checksum-pinned. They build offline as separate
+executables with embedded Metal shaders and no non-system dylibs. Parakeet's
+predictor/joint graphs are moved to Metal, and each ggml copy rejects CPU graph
+execution. GPU-less Mac CI also checks both additional workers refuse startup.
 
 Hold the microphone button to record and release it to transcribe. Choose
 **Copy dictation**, then paste into your app. Microphone permission is requested

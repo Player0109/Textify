@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import assert from "node:assert/strict";
 const data = await mkdtemp(join(tmpdir(), "textify-electron-smoke-"));
 const env = { ...process.env, TEXTIFY_ELECTRON_TEST_DATA: data };
+const fixtureID = process.env.TEXTIFY_MODEL_ID ?? "ggml-small.en-q5_1";
 const noGPU = process.env.TEXTIFY_EXPECT_NO_GPU === "1";
 if (noGPU) env.GGML_VK_VISIBLE_DEVICES = "";
 delete env.ELECTRON_RUN_AS_NODE;
@@ -15,7 +16,10 @@ try {
     await mkdir(join(data, "models"));
     await copyFile(
       process.env.TEXTIFY_MODEL_FIXTURE,
-      join(data, "models/ggml-small.en-q5_1.bin"),
+      join(
+        data,
+        `models/${fixtureID}.${fixtureID.startsWith("confucius") || fixtureID.startsWith("qwen") || fixtureID.startsWith("parakeet") ? "gguf" : "bin"}`,
+      ),
     );
     args.push("--autoplay-policy=no-user-gesture-required");
   }
@@ -42,6 +46,18 @@ try {
     }
     throw new Error("Timed out waiting for app state");
   };
+  if (process.env.TEXTIFY_MODEL_FIXTURE && fixtureID !== "ggml-small.en-q5_1") {
+    await waitSnapshot(
+      (state) => state.models.length > 4 && !state.modelBusy,
+      120000,
+    );
+    const state = await page.evaluate(() => window.textify.snapshot());
+    await page.evaluate(
+      (preferences) => window.textify.preferences(preferences),
+      { ...state.preferences, activeModelID: fixtureID },
+    );
+    await waitSnapshot((state) => state.ready, 120000);
+  }
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.getByRole("heading", { name: "Dictation", exact: true }).waitFor();
@@ -93,9 +109,32 @@ try {
   );
   await mkdir("artifacts", { recursive: true });
   await page.screenshot({ path: "artifacts/dictation.png" });
-  await page.getByRole("button", { name: "Models", exact: true }).click();
-  await page.getByRole("heading", { name: "Whisper small.en" }).waitFor();
+  await page
+    .getByRole("button", { name: "Transcription models", exact: true })
+    .click();
+  await page.locator(".checkpoint-detail h2").waitFor();
   await page.screenshot({ path: "artifacts/models.png" });
+  if (process.platform === "darwin" && process.arch === "arm64") {
+    await page.getByLabel("Search models", { exact: true }).fill("Qwen3");
+    assert.equal(await page.locator(".checkpoint-row").count(), 2);
+    await page.getByRole("button", { name: /Qwen3-ASR 1.7B/ }).click();
+    await page
+      .getByRole("heading", { name: "Qwen3-ASR 1.7B", exact: true })
+      .waitFor();
+    assert.equal(await page.locator(".variant").count(), 3);
+    await page.screenshot({ path: "artifacts/qwen-models.png" });
+    await page.getByLabel("Search models", { exact: true }).fill("Confucius");
+    await page
+      .getByRole("heading", { name: "Confucius4-R2T2 1.7B", exact: true })
+      .waitFor();
+    assert.equal(await page.locator(".variant").count(), 2);
+    await page.screenshot({ path: "artifacts/confucius-models.png" });
+    await page
+      .getByLabel("Search models", { exact: true })
+      .fill("no-such-model");
+    assert.equal(await page.locator(".checkpoint-row").count(), 0);
+    await page.getByLabel("Search models", { exact: true }).fill("");
+  }
   await page.getByRole("button", { name: "Vocabulary", exact: true }).click();
   await page.getByLabel("When I say").fill("text if eye");
   await page.getByLabel("Replace with").fill("Textify");

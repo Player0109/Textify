@@ -7,7 +7,7 @@ import {
   writeFile,
   readdir,
 } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { verifyCatalog } from "./trust";
 import { Revocations } from "./revocations";
 import { hashFile, validFile, transfer, type ModelFile } from "./transfer";
@@ -25,13 +25,39 @@ export interface Model extends ModelView {
   file: ModelFile;
   restorations: string[];
 }
-export function catalogModels(catalog: any): Model[] {
-  return Object.entries(supported).map(([id, name]) => {
+const macArtifacts: Record<string, string> = {
+  ...Object.fromEntries(
+    ["bf16", "q8-0", "q5-k-m"].flatMap((quant) => [
+      [`qwen3-asr-0.6b-${quant}`, "transcribe_cpp"],
+      [`qwen3-asr-1.7b-${quant}`, "transcribe_cpp"],
+    ]),
+  ),
+  ...Object.fromEntries(
+    ["f16", "q8-0", "q5-k-m"].map((quant) => [
+      `parakeet-tdt-0.6b-v3-${quant}`,
+      "transcribe_cpp",
+    ]),
+  ),
+  "confucius4-r2t2-q8_0": "audio_cpp",
+  "confucius4-r2t2-f16": "audio_cpp",
+};
+export function catalogModels(
+  catalog: any,
+  platform = process.platform,
+  arch = process.arch,
+): Model[] {
+  const engines = {
+    ...Object.fromEntries(
+      Object.keys(supported).map((id) => [id, "whisper_cpp"]),
+    ),
+    ...(platform === "darwin" && arch === "arm64" ? macArtifacts : {}),
+  };
+  return Object.entries(engines).map(([id, engine]) => {
     const entry = catalog.models.find((item: any) => item.id === id);
     if (
       !entry ||
       entry.files?.length !== 1 ||
-      entry.runtime?.engine !== "whisper_cpp" ||
+      entry.runtime?.engine !== engine ||
       entry.runtime?.artifactLayout !== "single_file"
     )
       throw new Error("catalog_model");
@@ -40,7 +66,7 @@ export function catalogModels(catalog: any): Model[] {
       !/^[a-f0-9]{64}$/.test(file.sha256) ||
       !Number.isSafeInteger(file.sizeBytes) ||
       file.sizeBytes <= 0 ||
-      !/^[a-zA-Z0-9._-]+\.bin$/.test(file.filename) ||
+      !/^[a-zA-Z0-9._-]+\.(bin|gguf)$/.test(file.filename) ||
       !/^https:\/\/(github\.com\/Player0109\/Textify\/releases\/download\/[^/]+\/[^/]+|huggingface\.co\/[^/]+\/[^/]+\/resolve\/[a-f0-9]{40}\/[^?#]+)$/.test(
         file.url,
       )
@@ -56,13 +82,43 @@ export function catalogModels(catalog: any): Model[] {
       )
     )
       throw new Error("catalog_language");
+    const checkpoint = catalog.presentationGraph?.checkpoints?.find(
+      (item: any) => item.artifactIDs?.includes(id),
+    );
+    const artifact = catalog.presentationGraph?.artifacts?.find(
+      (item: any) => item.id === id,
+    );
+    const family = catalog.presentationGraph?.families?.find((item: any) =>
+      item.checkpointIDs?.includes(checkpoint?.id),
+    );
+    if (
+      !checkpoint?.presentation?.displayName ||
+      !artifact?.presentation?.displayName ||
+      !family?.presentation?.provider?.displayName
+    )
+      throw new Error("catalog_presentation");
     return {
       id,
-      name,
+      engine: engine as ModelView["engine"],
+      name: checkpoint.presentation.displayName,
+      checkpointID: checkpoint.id,
+      description:
+        engine === "audio_cpp"
+          ? "English and Chinese dictation, with final text on release."
+          : checkpoint.presentation.description,
+      variant: artifact.presentation.displayName,
+      provider: family.presentation.provider.displayName,
+      license: entry.licenses[0].name,
+      source: entry.provenance.originalModelUrl,
+      vocabulary: engine === "whisper_cpp",
+
       bytes: file.sizeBytes,
       installed: false,
       status: "not-installed",
-      languages,
+      languages:
+        engine === "transcribe_cpp" && entry.runtimeParameters?.detectLanguage
+          ? ["auto", ...languages]
+          : languages,
       resumable: false,
       storedBytes: 0,
       file,
@@ -101,8 +157,11 @@ export class Models {
     return this.pathFor(this.id);
   }
   pathFor(id: string) {
-    this.get(id);
-    return join(this.storage, `${id}.bin`);
+    const model = this.get(id);
+    return join(
+      this.storage,
+      `${id}.${model.engine === "whisper_cpp" ? "bin" : "gguf"}`,
+    );
   }
   get(id: string): Model {
     const model = this.entries.find((entry) => entry.id === id);
@@ -150,9 +209,9 @@ export class Models {
     model.storedBytes = 0;
     for (const name of await readdir(this.storage))
       if (
-        name === `${model.id}.bin` ||
-        name === `${model.id}.bin.partial` ||
-        name.startsWith(`${model.id}.bin.retained-`)
+        name === basename(this.pathFor(model.id)) ||
+        name === `${basename(this.pathFor(model.id))}.partial` ||
+        name.startsWith(`${basename(this.pathFor(model.id))}.retained-`)
       )
         model.storedBytes += (await stat(join(this.storage, name))).size;
     let receipt: string[] = [];
@@ -257,7 +316,7 @@ export class Models {
       for (const suffix of ["", ".partial", ".partial.json", ".receipt.json"])
         await rm(`${this.pathFor(id)}${suffix}`, { force: true });
       for (const name of await readdir(this.storage))
-        if (name.startsWith(`${id}.bin.retained-`))
+        if (name.startsWith(`${basename(this.pathFor(id))}.retained-`))
           await rm(join(this.storage, name), { force: true });
       await this.refresh(model);
     } finally {
