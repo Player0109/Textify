@@ -29,7 +29,11 @@ const models = catalogModels(
     await readFile("resources/manifest.json.sig"),
   ),
 );
-const model = models.find((model) => model.file.filename === basename(path));
+const model = models.find(
+  (model) =>
+    model.file.filename === basename(path) ||
+    `${model.id}.bin` === basename(path),
+);
 assert.ok(
   model?.languages.includes(language),
   "The signed catalog must support the requested model and language",

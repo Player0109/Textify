@@ -81,7 +81,7 @@ try {
   const pid = target.target.split(":")[process.platform === "win32" ? 1 : 0];
   assert.equal(
     Number(pid),
-    application.process().pid,
+    await application.evaluate(() => process.pid),
     "Only the owned test app may receive paste",
   );
   assert.equal(target.secure, false);

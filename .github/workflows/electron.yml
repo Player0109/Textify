@@ -100,6 +100,8 @@ jobs:
           hdiutil attach release/*.dmg -readonly -nobrowse -mountpoint .native/mounted-dmg
           trap 'hdiutil detach .native/mounted-dmg' EXIT
           node scripts/packaged-smoke.mjs '.native/mounted-dmg/Textify Electron.app/Contents/MacOS/Textify Electron'
+      - name: Add checksums and installation notes
+        run: node scripts/checksums.mjs
       - name: Upload unsigned preview installers
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -110,6 +112,8 @@ jobs:
             electron/release/*.AppImage
             electron/release/*.deb
             electron/release/*.blockmap
+            electron/release/SHA256SUMS.txt
+            electron/release/PREVIEW_INSTALL.md
           retention-days: 7
       - name: Upload test screenshots
         if: always()

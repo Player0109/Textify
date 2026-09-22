@@ -704,7 +704,10 @@ else {
         audio.loadFile(page, { query: { mode: "audio" } }),
         overlay.loadFile(page, { query: { mode: "overlay" } }),
       ]);
-      if (!process.argv.includes("--background")) main.show();
+      const openedAtLogin =
+        process.platform === "darwin" &&
+        app.getLoginItemSettings().wasOpenedAtLogin;
+      if (!process.argv.includes("--background") && !openedAtLogin) main.show();
       try {
         await models.init(preferences.activeModelID);
         initialized = true;
