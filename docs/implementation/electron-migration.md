@@ -185,7 +185,11 @@ Input entitlement check and deep/strict code-signature verification. The former
 bundle is retained under `electron/.native/installed-backups/`. System Settings
 now lists Textify Electron with Microphone enabled, and Check microphone reports
 permission available. The new ad-hoc signature requires refreshing the existing
-Accessibility grant. Physical speech, Copy and TextEdit insertion remain pending.
+Accessibility grant. This was completed by removing the stale Textify Electron
+entry and adding `/Applications/Textify Electron.app` again; toggling the stale
+entry alone was insufficient. The installed app now reports Hold Right Command
+and Apple M4 Max / Metal readiness. Physical speech, Copy and TextEdit insertion
+remain pending.
 The local rerun passes 73 tests, TypeScript/build, the native GPU policy test and
 the public English fixture on Metal.
 
@@ -215,3 +219,28 @@ The microphone/GPU correction at `5ed3143` passed all three jobs in
 [run 35693514454](https://github.com/Player0109/Textify/actions/runs/35693514454),
 including macOS signature/DMG checks and Windows/Linux installation checks.
 That run precedes the native Quit timing follow-up above.
+
+### Final continuation build and installers
+
+Implementation commit `b8aa3f0` passed all macOS ARM64, Windows x64 and Linux x64
+jobs in [run 35694007925](https://github.com/Player0109/Textify/actions/runs/35694007925).
+This includes 73 tests per OS, GPU refusal on the hosted runners, packaged launch,
+the macOS Audio Input signature check, installer creation and installation checks.
+Local M4 Max Metal recognition and fixture capture/Copy are separate real-GPU
+evidence. Actual NVIDIA and Linux hardware/Wayland tests remain pending.
+
+Final unsigned preview downloads (the artifacts expire after seven days):
+
+- [macOS ARM64 DMG](https://github.com/Player0109/Textify/actions/runs/35694007925/artifacts/10679493339)
+- [Windows x64 installer for NVIDIA testing](https://github.com/Player0109/Textify/actions/runs/35694007925/artifacts/10680320520)
+- [Linux AppImage and Debian package](https://github.com/Player0109/Textify/actions/runs/35694007925/artifacts/10679935877)
+
+All four downloaded installer SHA-256 values match their CI checksum manifests.
+Local copies are under `electron/artifacts/gpu-preview-b8aa3f0/`. No public release
+was published. The locally rebuilt app is installed in Applications, retains
+the user's existing Electron settings/models, and passes deep/strict signature
+verification. Its `app.asar` SHA-256 is
+`80a96c47e5338ac760d9295505a57409ec4206b61e6d7a82b328943f9a04c340`.
+The microphone and Accessibility grants are present and Right Command is enabled.
+The empty disposable TextEdit document is focused for the owner's spoken test;
+no live speech or real-app insertion pass is claimed until that test returns.
