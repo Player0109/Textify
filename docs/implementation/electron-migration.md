@@ -144,3 +144,24 @@ global hold/release, cancellation, focus changes, password fields, rich clipboar
 quitting during capture/inference, tray behavior, multi-monitor indicator position
 and launch at login. CI fixture and owned-window tests establish only their stated
 conditions. No physical microphone or installed Wayland consent test is claimed.
+
+## GPU-required correction (0.2.0-preview.2)
+
+The owner requires GPU recognition on all three platforms and reports that the
+Mac Right Command overlay disappears without inserting text. This supersedes
+the previous CPU implementation on Windows/Linux. The updated worker uses Metal
+or hardware Vulkan, rejects missing/unsupported GPUs, prevents CPU model graph
+execution, and shows the GPU name or a bounded, actionable failure. The app
+disables recording until the GPU model is ready. CPU audio preparation and token
+sampling remain; they are not a CPU recognition fallback.
+
+Local evidence: 73 tests pass, TypeScript/build passes, the native CPU-graph
+refusal test passes, and both small.en and large-v3 recognize the public JFK
+fixture on Apple M4 Max Metal. The installed Mac preview visibly reports that
+GPU. Windows/Linux CI and real NVIDIA recognition are pending for this revision.
+
+The Mac symptom reproduced in an empty TextEdit document and also in the manual
+Copy route, narrowing it to capture/recognition rather than only paste. The new
+preview distinguishes missing PCM, silence, rejected recognition, and uncertain
+insertion without recording audio or transcripts in diagnostics. The physical
+microphone retest remains pending; do not call the original bug fixed yet.

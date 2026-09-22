@@ -22,6 +22,8 @@ jobs:
         os: [macos-26, windows-2025, ubuntu-24.04]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
+    env:
+      TEXTIFY_EXPECT_NO_GPU: ${{ matrix.os != 'macos-26' && '1' || '0' }}
     defaults:
       run:
         working-directory: electron
@@ -36,8 +38,21 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libx11-dev libxt-dev libxtst-dev libxinerama-dev libxrandr-dev libasound2t64 libgbm1 xvfb
+          sudo apt-get install -y libx11-dev libxt-dev libxtst-dev libxinerama-dev libxrandr-dev libasound2t64 libgbm1 xvfb libvulkan-dev glslc mesa-vulkan-drivers
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Verified Windows Vulkan SDK
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $sdkVersion = '1.4.357.0'
+          $sdkInstaller = Join-Path $env:RUNNER_TEMP 'vulkan-sdk.exe'
+          Invoke-WebRequest "https://sdk.lunarg.com/sdk/download/$sdkVersion/windows/vulkansdk-windows-X64-$sdkVersion.exe" -OutFile $sdkInstaller
+          if ((Get-FileHash $sdkInstaller -Algorithm SHA256).Hash.ToLower() -ne '81f474711e9042f4cd22b31b2f7a8870db2e428b21586fb43dd80150be97310d') { throw 'Vulkan SDK checksum mismatch' }
+          $sdkRoot = Join-Path $env:RUNNER_TEMP 'VulkanSDK'
+          $install = Start-Process $sdkInstaller -ArgumentList @('--root', $sdkRoot, '--accept-licenses', '--default-answer', '--confirm-command', 'install', 'copy_only=1') -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw 'Vulkan SDK installation failed' }
+          "VULKAN_SDK=$sdkRoot" | Out-File $env:GITHUB_ENV -Append
+          (Join-Path $sdkRoot 'Bin') | Out-File $env:GITHUB_PATH -Append
       - run: npm ci
       - run: npm run native:prepare
       - run: npm run native:build
@@ -45,8 +60,12 @@ jobs:
       - name: Prepare verified transcription fixture
         run: node scripts/prepare-smoke.mjs
       - name: Native speech recognition
+        if: runner.os == 'macOS'
         shell: bash
         run: node scripts/native-smoke.mjs "$TEXTIFY_MODEL_FIXTURE"
+      - name: Refuse CPU fallback on GPU-less runners
+        if: runner.os != 'macOS'
+        run: node scripts/no-gpu-smoke.mjs
       - name: Electron smoke
         if: runner.os != 'Linux'
         run: npm run smoke

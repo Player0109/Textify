@@ -84,3 +84,14 @@ https://github.com/Player0109/Textify/actions/runs/35684967292
 
 This does not mark any pending physical-desktop row above as passed. Later
 feature builds must repeat CI and record their commit and artifact versions.
+
+## GPU-required preview regression checks
+
+- [ ] Windows NVIDIA: GPU name is shown after loading the model; public phrase
+  is recognized on Vulkan with acceptable latency. Repeat each supported model.
+- [ ] Linux hardware Vulkan: confirm GPU name and recognition; software-only
+  Vulkan and missing drivers must refuse dictation.
+- [ ] Insufficient GPU memory or unsupported GPU operations show an error;
+  no CPU inference and no automatic model downgrade occur.
+- [ ] Mac real microphone: hold Right Command in TextEdit, dictate a public
+  phrase, release, and verify insertion. Record any displayed failure reason.

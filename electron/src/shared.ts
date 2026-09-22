@@ -45,6 +45,7 @@ export interface Snapshot {
   triggerStatus: string;
   insertion: "automatic" | "copy";
   ready: boolean;
+  gpu: { backend: "Metal" | "Vulkan"; device: string } | null;
   modelBusy: boolean;
   download: number | null;
   downloadModelID: string | null;

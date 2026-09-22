@@ -1,6 +1,8 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
 import { deflateSync } from "node:zlib";
+import type { Snapshot } from "../shared";
+import { engineError } from "../core/engine-error";
 export class WhisperWorker {
   private child?: ChildProcessWithoutNullStreams;
   private pending?: {
@@ -9,6 +11,8 @@ export class WhisperWorker {
     timer: ReturnType<typeof setTimeout>;
   };
   ready = false;
+  gpu: Snapshot["gpu"] = null;
+  failure?: Error;
   constructor(
     private binary: string,
     private changed: () => void,
@@ -17,7 +21,7 @@ export class WhisperWorker {
     if (this.pending) throw new Error("worker_busy");
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
-        this.stop();
+        this.stop(new Error(this.ready ? "gpu_inference" : "gpu_init"));
       }, timeout);
       this.pending = { resolve, reject, timer };
     });
@@ -43,23 +47,31 @@ export class WhisperWorker {
       try {
         if (line.length > 65536) throw new Error("worker_protocol");
         const value = JSON.parse(line);
-        if (value.error) throw new Error("worker_failure");
+        if (value.error) {
+          const error = new Error(String(value.error));
+          throw engineError(error) ? error : new Error("worker_failure");
+        }
         pending.resolve(value);
-      } catch {
-        pending.reject(new Error("worker_protocol"));
-        this.stop();
+      } catch (reason) {
+        const error = engineError(reason)
+          ? (reason as Error)
+          : new Error("worker_protocol");
+        pending.reject(error);
+        this.stop(error);
       }
     });
     child.stderr.resume(); // Native diagnostics are never forwarded or retained.
     child.on("error", () => {
-      if (this.child === child) this.stop();
+      if (this.child === child) this.stop(new Error("gpu_init"));
     });
     child.on("exit", () => {
-      if (this.child === child) this.stop();
+      if (this.child === child)
+        this.stop(new Error(this.ready ? "gpu_inference" : "gpu_init"));
       lines.close();
     });
     child.stdin.on("error", () => {
-      if (this.child === child) this.stop();
+      if (this.child === child)
+        this.stop(new Error(this.ready ? "gpu_inference" : "gpu_init"));
     });
     const prompt = Buffer.from(customWords.join(", "));
     const header = Buffer.alloc(4);
@@ -69,6 +81,18 @@ export class WhisperWorker {
     const value = await result;
     if (value.ready !== true || this.child !== child)
       throw new Error("worker_load");
+    if (
+      !value.gpu ||
+      !["Metal", "Vulkan"].includes(value.gpu.backend) ||
+      typeof value.gpu.device !== "string" ||
+      !value.gpu.device.trim() ||
+      value.gpu.device.length > 256
+    ) {
+      const error = new Error("gpu_unavailable");
+      this.stop(error);
+      throw error;
+    }
+    this.gpu = { backend: value.gpu.backend, device: value.gpu.device };
     this.ready = true;
     this.changed();
   }
@@ -106,13 +130,15 @@ export class WhisperWorker {
       return null;
     return value.text;
   }
-  stop() {
+  stop(error?: Error) {
     const child = this.child;
     this.child = undefined;
     this.ready = false;
+    this.gpu = null;
+    this.failure = error;
     if (this.pending) {
       clearTimeout(this.pending.timer);
-      this.pending.reject(new Error("worker_stopped"));
+      this.pending.reject(error ?? new Error("worker_stopped"));
       this.pending = undefined;
     }
     child?.stdin.destroy();

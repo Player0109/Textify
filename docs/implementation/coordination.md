@@ -2247,3 +2247,18 @@ Task 1 must merge before parallel Wave 1 work begins.
 - Any later in-app experiment requires a separate handoff before changing
   `Package.swift`, `TextifyRuntime`, app composition, settings, model purposes,
   the signed catalog, legal notices, or release packaging.
+
+## Electron GPU Requirement and Mac Dictation Handoff - 2026-09-22
+
+- The product owner reports that Right Command shows the Mac overlay but no text
+  is inserted after release, and requires GPU inference on macOS, Windows, and
+  Linux. CPU-only inference and silent CPU fallback are no longer permitted.
+- This slice owns `electron/`, `.github/workflows/electron.yml`, and the Electron
+  migration notes. It may patch the pinned Electron whisper dependency to enforce
+  GPU execution, update native packaging, and fix the demonstrated insertion
+  failure. Swift sources and the signed model catalog remain outside this slice.
+- Use Metal on macOS and hardware Vulkan on Windows/Linux (including NVIDIA).
+  Report missing/incompatible GPU or driver and prevent dictation; audio capture,
+  preprocessing and token sampling still require ordinary CPU work.
+- GPU-less CI must assert refusal. Real GPU transcription, microphone, and
+  cross-app insertion evidence must be reported separately from installer checks.

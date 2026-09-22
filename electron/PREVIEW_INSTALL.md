@@ -1,6 +1,14 @@
 # Textify Electron unsigned preview
 
-Version 0.2.0-preview.1. This is a testing build, separate from native Textify.
+Textify requires a hardware GPU for speech recognition: Metal on Apple Silicon,
+or Vulkan on Windows/Linux (including NVIDIA). Install a current driver from
+your GPU vendor. The Vulkan SDK is only needed to build Textify, not to use it.
+The app shows the selected GPU once a model loads. With no compatible GPU, or
+if GPU initialization/memory allocation fails, dictation stays unavailable.
+There is no CPU inference mode or fallback. Audio preparation and token sampling
+still perform ordinary CPU work.
+
+Version 0.2.0-preview.2. This is a testing build, separate from native Textify.
 No speech models are bundled. After installation, choose Models to download or
 import a verified model. Use the microphone button, release, then Copy and paste
 for the first test. Audio is processed locally.

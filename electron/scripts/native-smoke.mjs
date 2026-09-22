@@ -40,6 +40,12 @@ try {
   for await (const line of createInterface({ input: worker.stdout })) {
     const message = JSON.parse(line);
     if (message.ready) {
+      assert.ok(message.gpu?.device);
+      assert.equal(
+        message.gpu.backend,
+        process.platform === "darwin" ? "Metal" : "Vulkan",
+      );
+      console.log(`GPU: ${message.gpu.device} (${message.gpu.backend})`);
       ready = true;
       const count = pcm.length / 2,
         data = Buffer.alloc(4 + count * 4);

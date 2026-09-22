@@ -8,6 +8,7 @@ import {
   windows,
 } from "./audio";
 import { processText } from "./text";
+import { engineError } from "./engine-error";
 
 export interface Target {
   target: string;
@@ -220,6 +221,13 @@ export class Dictation {
     try {
       await this.ports.stop(s.id, false);
       if (s.cancelled) return;
+      if (!s.count) {
+        this.update(
+          "error",
+          "No microphone audio was received. Check the selected input and reopen Textify.",
+        );
+        return;
+      }
       const all = new Float32Array(s.count);
       let offset = 0;
       for (const frame of s.frames) {
@@ -231,7 +239,10 @@ export class Dictation {
       pcm = trimSilence(all);
       all.fill(0);
       if (!pcm.length) {
-        this.update("idle");
+        this.update(
+          "error",
+          "No speech detected. Check the selected microphone and its input level, then try again.",
+        );
         return;
       }
       let text = "";
@@ -239,14 +250,21 @@ export class Dictation {
         const chunk = await this.ports.transcribe(audio);
         if (s.cancelled) return;
         if (chunk === null) {
-          this.update("idle");
+          this.update(
+            "error",
+            "Textify could not recognize clear speech. Check the microphone and dictation language, then try again.",
+          );
           return;
         }
         text = stitch(text, chunk);
       }
       text = processText(text, this.replacements(), this.language());
       if (!text.trim() || s.cancelled) {
-        this.update("idle");
+        if (!s.cancelled)
+          this.update(
+            "error",
+            "Textify could not recognize clear speech. Check the microphone and dictation language, then try again.",
+          );
         return;
       }
       if (!s.target) {
@@ -266,12 +284,18 @@ export class Dictation {
           "copy",
           "Automatic insertion is unavailable here. Copy your dictation to paste it.",
         );
+      } else if (result === "skipped") {
+        this.update(
+          "error",
+          "Textify could not confirm delivery to the original app. Check that text field before dictating again.",
+        );
       } else this.update("idle");
-    } catch {
+    } catch (error) {
       if (!s.cancelled)
         this.update(
           "error",
-          "Dictation could not finish. Check the model and microphone, then try again.",
+          engineError(error) ??
+            "Dictation could not finish. Check the model and microphone, then try again.",
         );
     } finally {
       pcm.fill(0);

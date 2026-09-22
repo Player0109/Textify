@@ -126,3 +126,26 @@ For additional local model checks, `scripts/runtime-smoke.mjs` verifies the sign
 model hash and exercises language and custom-word configuration with public test
 audio. It accepts `MODEL [en|hi] [mono-16khz-f32-file]`; English defaults to the
 public JFK sample. No recognized text is logged or saved.
+
+## GPU-required preview
+
+`0.2.0-preview.2` supersedes the CPU-based Windows/Linux preview. Metal is
+required on macOS; Windows and Linux build with `GGML_VULKAN=ON`. For Windows
+builds install the Vulkan SDK (headers, libraries and glslc); Ubuntu builds need
+`libvulkan-dev glslc`. End users need their hardware vendor's GPU driver, not
+the SDK. Linux also requires the system Vulkan loader (`libvulkan1`).
+
+`native/require-gpu.mjs` applies exact edits to the checksum-pinned whisper
+source: GPU backend initialization must succeed, model weights must use GPU
+buffers, and the graph scheduler refuses CPU computation. Software/virtual
+Vulkan devices are rejected. Audio preprocessing, token sampling, memory
+transfers and graph bookkeeping still use the CPU. The native build runs a
+regression test that attempts a CPU matrix graph and requires refusal.
+
+On hosted Windows/Linux CI, no-GPU startup and disabled recording are tested.
+These checks are not evidence of NVIDIA/AMD/Intel GPU recognition or performance;
+those require a real GPU. The Mac fixture uses real Metal.
+
+Accepted holds that yield no frames, no audible speech, rejected recognition,
+or unconfirmed insertion now show a specific error instead of silently hiding.
+The reported Mac microphone failure is still under investigation.

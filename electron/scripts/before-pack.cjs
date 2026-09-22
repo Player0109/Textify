@@ -14,7 +14,9 @@ module.exports = async (context) => {
   }[context.arch];
   if (
     native.platform !== context.electronPlatformName ||
-    native.arch !== architecture
+    native.arch !== architecture ||
+    native.gpuRequired !== true ||
+    native.backend !== (native.platform === "darwin" ? "Metal" : "Vulkan")
   )
     throw new Error(
       "Build native helpers on the target OS/architecture before packaging. Cross-packaging host binaries is prohibited.",

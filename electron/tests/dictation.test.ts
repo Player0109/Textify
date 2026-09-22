@@ -133,6 +133,7 @@ describe("dictation lifecycle", () => {
     h.samples(new Float32Array(320));
     await h.app.release();
     expect(h.ports.transcribe).not.toHaveBeenCalled();
+    expect(h.app.message).toMatch(/No speech detected/);
     h.app.press();
     await vi.advanceTimersByTimeAsync(300);
     h.speech();
@@ -140,6 +141,15 @@ describe("dictation lifecycle", () => {
     h.speech();
     await h.app.release();
     expect(h.ports.insert).not.toHaveBeenCalled();
+  });
+  it("reports an accepted hold that received no audio frames", async () => {
+    const h = harness();
+    h.app.press();
+    await vi.advanceTimersByTimeAsync(300);
+    await h.app.release();
+    expect(h.app.phase).toBe("error");
+    expect(h.app.message).toMatch(/No microphone audio/);
+    expect(h.ports.transcribe).not.toHaveBeenCalled();
   });
   it("does not record in a positively detected password field", async () => {
     const h = harness({ target: async () => ({ target: "42", secure: true }) });
@@ -168,7 +178,8 @@ describe("dictation lifecycle", () => {
     h.speech();
     await h.app.release();
     expect(h.app.pending).toBe("");
-    expect(h.app.phase).toBe("idle");
+    expect(h.app.phase).toBe("error");
+    expect(h.app.message).toMatch(/could not confirm/);
   });
   it("offers explicit Copy when insertion is unavailable before paste", async () => {
     const h = harness({ insert: async () => "unavailable" });
@@ -186,7 +197,8 @@ describe("dictation lifecycle", () => {
     h.speech();
     await h.app.release();
     expect(h.ports.insert).not.toHaveBeenCalled();
-    expect(h.app.phase).toBe("idle");
+    expect(h.app.phase).toBe("error");
+    expect(h.app.message).toMatch(/could not recognize/);
   });
   it("waits for cancelled recognition and ignores late results", async () => {
     const recognition = deferred<string>();

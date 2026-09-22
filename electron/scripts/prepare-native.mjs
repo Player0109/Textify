@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile, writeFile, mkdir, rm } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
+import { requireGPU } from "../native/require-gpu.mjs";
 const revision = "a8d002cfd879315632a579e73f0148d06959de36";
 const expected =
   "7b17da903114ed45d82f48c030e3be6a5a8a279f884b2f733706dbb4e832fb6b";
@@ -32,4 +33,5 @@ const result = spawnSync(
   { stdio: "inherit" },
 );
 if (result.status !== 0) process.exit(result.status ?? 1);
+await requireGPU(".native/whisper");
 console.log(`Verified whisper.cpp ${revision}. Native builds now run offline.`);

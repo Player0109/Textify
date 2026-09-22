@@ -5,6 +5,8 @@ import { join, resolve } from "node:path";
 import assert from "node:assert/strict";
 const data = await mkdtemp(join(tmpdir(), "textify-electron-smoke-"));
 const env = { ...process.env, TEXTIFY_ELECTRON_TEST_DATA: data };
+const noGPU = process.env.TEXTIFY_EXPECT_NO_GPU === "1";
+if (noGPU) env.GGML_VK_VISIBLE_DEVICES = "";
 delete env.ELECTRON_RUN_AS_NODE;
 let app;
 try {
@@ -151,8 +153,29 @@ try {
   await page
     .getByRole("heading", { name: "Your speech stays here." })
     .waitFor();
-  if (process.env.TEXTIFY_MODEL_FIXTURE) {
-    await waitSnapshot((state) => state.ready);
+  if (process.env.TEXTIFY_MODEL_FIXTURE && noGPU) {
+    const state = await waitSnapshot(
+      (state) => !state.modelBusy && state.message.includes("No supported GPU"),
+    );
+    assert.equal(state.ready, false);
+    assert.equal(state.gpu, null);
+    await page.getByRole("button", { name: "Dictation", exact: true }).click();
+    assert.equal(
+      await page.getByRole("button", { name: "Hold to dictate" }).isDisabled(),
+      true,
+    );
+    await page.evaluate(() => window.textify.action("press"));
+    assert.equal(
+      (await page.evaluate(() => window.textify.snapshot())).phase,
+      "idle",
+    );
+    await page.screenshot({ path: "artifacts/gpu-unavailable.png" });
+    console.log(
+      "No-GPU error is visible and recording is disabled; no CPU inference was attempted.",
+    );
+  } else if (process.env.TEXTIFY_MODEL_FIXTURE) {
+    const state = await waitSnapshot((state) => state.ready);
+    assert.ok(state.gpu?.device);
     const audioPage = app
       .windows()
       .find((page) => page.url().includes("mode=audio"));

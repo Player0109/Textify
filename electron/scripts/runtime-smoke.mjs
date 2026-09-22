@@ -71,6 +71,8 @@ const worker = new WhisperWorker(
 );
 try {
   await worker.load(resolve(path), language, ["Textify"]);
+  assert.ok(worker.gpu?.device);
+  console.log(`GPU: ${worker.gpu.device} (${worker.gpu.backend})`);
   const text = await worker.transcribe(samples);
   assert.ok(
     text &&

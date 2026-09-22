@@ -1,7 +1,7 @@
 {
   "name": "textify-electron",
   "productName": "Textify Electron",
-  "version": "0.2.0-preview.1",
+  "version": "0.2.0-preview.2",
   "private": true,
   "description": "Offline desktop dictation for macOS, Windows and Linux",
   "homepage": "https://github.com/Player0109/Textify",
@@ -91,6 +91,20 @@
       },
       "maintainer": "Textify contributors <Player0109@users.noreply.github.com>"
     },
-    "artifactName": "Textify-Electron-${version}-${os}-${arch}.${ext}"
+    "artifactName": "Textify-Electron-${version}-${os}-${arch}.${ext}",
+    "deb": {
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libuuid1",
+        "libsecret-1-0",
+        "libvulkan1"
+      ]
+    }
   }
 }

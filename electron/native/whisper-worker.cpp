@@ -1,4 +1,5 @@
 #include "whisper.h"
+#include "ggml-backend.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -6,6 +7,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <cstring>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -27,6 +29,26 @@ static std::string json_string(const std::string &value) {
     }
     return out + '"';
 }
+static int failure(const char *code) {
+    std::cout << "{\"error\":" << json_string(code) << "}\n" << std::flush;
+    return 1;
+}
+static ggml_backend_dev_t gpu() {
+#ifdef _WIN32
+    if (!LoadLibraryExW(L"vulkan-1.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32)) return nullptr;
+#endif
+#ifdef __APPLE__
+    const char *required = "Metal";
+#else
+    const char *required = "Vulkan";
+#endif
+    for (size_t i = 0; i < ggml_backend_dev_count(); ++i) {
+        auto dev = ggml_backend_dev_get(i);
+        if (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_GPU &&
+            std::strcmp(ggml_backend_reg_name(ggml_backend_dev_backend_reg(dev)), required) == 0) return dev;
+    }
+    return nullptr;
+}
 static int run(const std::string &model_path, const std::string &language, bool configured) {
 #ifdef _WIN32
     _setmode(_fileno(stdin), _O_BINARY);
@@ -44,16 +66,19 @@ static int run(const std::string &model_path, const std::string &language, bool 
     if (whisper_lang_id(language.c_str()) < 0) return 2;
     whisper_log_set(quiet, nullptr);
     ggml_log_set(quiet, nullptr);
+    ggml_backend_dev_t device;
+    try { device = gpu(); } catch (...) { return failure("gpu_init"); }
+    if (!device) return failure("gpu_unavailable");
+    const std::string info = "{\"backend\":" + json_string(ggml_backend_reg_name(ggml_backend_dev_backend_reg(device))) +
+        ",\"device\":" + json_string(ggml_backend_dev_description(device)) + "}";
     auto config = whisper_context_default_params();
-#ifdef __APPLE__
     config.use_gpu = true;
-#else
-    config.use_gpu = false;
-#endif
-    auto *context = whisper_init_from_file_with_params(model_path.c_str(), config);
-    if (!context) { std::cout << "{\"error\":\"model_load\"}\n" << std::flush; return 1; }
+    whisper_context *context;
+    try { context = whisper_init_from_file_with_params(model_path.c_str(), config); }
+    catch (...) { return failure("gpu_model_load"); }
+    if (!context) return failure("gpu_model_load");
     if (language != "en" && !whisper_is_multilingual(context)) { whisper_free(context); std::cout << "{\"error\":\"model_language\"}\n" << std::flush; return 1; }
-    std::cout << "{\"ready\":true}\n" << std::flush;
+    std::cout << "{\"ready\":true,\"gpu\":" << info << "}\n" << std::flush;
     unsigned char header[4];
     while (std::cin.read(reinterpret_cast<char *>(header), 4)) {
         const uint32_t count = uint32_t(header[0]) | uint32_t(header[1]) << 8 |
@@ -73,8 +98,9 @@ static int run(const std::string &model_path, const std::string &language, bool 
         params.temperature_inc = 0.0f;
         params.print_progress = params.print_realtime = params.print_timestamps = params.print_special = false;
         if (whisper_full(context, params, samples.data(), int(count)) != 0) {
-            std::cout << "{\"error\":\"inference\"}\n" << std::flush;
-            continue;
+            std::fill(samples.begin(), samples.end(), 0);
+            whisper_free(context);
+            return failure("gpu_inference");
         }
         std::string text;
         double log_probability = 0, no_speech = 0;

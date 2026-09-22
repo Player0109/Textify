@@ -120,7 +120,9 @@ function App() {
     };
   }, []);
   if (!state) return <main className="loading">Opening Textify…</main>;
-  const working = state.modelBusy || ["armed", "recording", "processing", "inserting"].includes(state.phase);
+  const working =
+    state.modelBusy ||
+    ["armed", "recording", "processing", "inserting"].includes(state.phase);
   async function run(action: Action) {
     setBusy(true);
     setError("");
@@ -231,14 +233,19 @@ function App() {
               <div className="stage-copy">
                 <div className="ready-label">
                   <span className={state.ready ? "ready-dot" : "waiting-dot"} />
-                  {state.ready ? "Model ready" : "Model needed"}
+                  {state.ready ? "GPU ready" : "Dictation unavailable"}
                 </div>
                 <h2>{status}</h2>
                 <p>
                   {state.ready
                     ? state.triggerStatus
-                    : "Install a speech model, then allow microphone access to get started."}
+                    : "Dictation requires a supported GPU and an installed speech model."}
                 </p>
+                {state.gpu && (
+                  <p>
+                    {state.gpu.device} · {state.gpu.backend}
+                  </p>
+                )}
                 <div className="level-row">
                   <Wave level={state.level} />
                   <span>

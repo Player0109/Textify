@@ -17,6 +17,7 @@ import { readFile, writeFile, mkdir, rename, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { Dictation } from "../core/dictation";
+import { engineError } from "../core/engine-error";
 import { Models } from "./models";
 import { WhisperWorker } from "./worker";
 import { Platform, nativeTrigger } from "./platform";
@@ -72,7 +73,7 @@ let broadcastTimer: ReturnType<typeof setTimeout> | undefined;
 function snapshot(): Snapshot {
   return {
     phase: dictation?.phase ?? "idle",
-    message: notice || dictation?.message || "",
+    message: engineError(worker?.failure) || notice || dictation?.message || "",
     level: dictation?.level ?? 0,
     elapsed: dictation?.elapsed ?? 0,
     platform:
@@ -87,10 +88,11 @@ function snapshot(): Snapshot {
     triggerStatus,
     ready: Boolean(
       initialized &&
-      worker?.ready &&
-      models?.installed &&
-      models.selected?.languages.includes(preferences.language),
+        worker?.ready &&
+        models?.installed &&
+        models.selected?.languages.includes(preferences.language),
     ),
+    gpu: worker?.gpu ?? null,
     modelBusy: modelBusy || Boolean(models?.busy),
     download: models?.progress ?? null,
     preferences,
@@ -116,12 +118,13 @@ function changed() {
       "error",
     ].includes(state.phase);
     if (visible) {
+      const height = state.phase === "error" ? 160 : 96;
       const area = screen.getDisplayNearestPoint(
         screen.getCursorScreenPoint(),
       ).workArea;
       overlay.setSize(
         Math.round(390 * preferences.overlay.scale),
-        Math.round(96 * preferences.overlay.scale),
+        Math.round(height * preferences.overlay.scale),
       );
       overlay.webContents.setZoomFactor(preferences.overlay.scale);
       overlay.setPosition(
@@ -138,12 +141,12 @@ function changed() {
         ),
         Math.round(
           Math.min(
-            area.y + area.height - 96 * preferences.overlay.scale,
+            area.y + area.height - height * preferences.overlay.scale,
             Math.max(
               area.y,
               area.y +
                 area.height -
-                125 * preferences.overlay.scale +
+                (height + 29) * preferences.overlay.scale +
                 preferences.overlay.y,
             ),
           ),
@@ -262,8 +265,9 @@ async function loadModel() {
       preferences.customWords,
     );
     notice = "";
-  } catch {
+  } catch (error) {
     notice =
+      engineError(error) ??
       "The speech engine could not load. Reopen Textify or reinstall this preview.";
   } finally {
     modelBusy = false;

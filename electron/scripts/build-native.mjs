@@ -17,6 +17,12 @@ run([
     : []),
 ]);
 run(["--build", ".native/build", "--config", "Release", "--parallel", "4"]);
+const checks = spawnSync(
+  "ctest",
+  ["--test-dir", ".native/build", "-C", "Release", "--output-on-failure"],
+  { stdio: "inherit", shell: false },
+);
+if (checks.status !== 0) process.exit(checks.status ?? 1);
 await mkdir("resources", { recursive: true });
 const suffix = process.platform === "win32" ? ".exe" : "";
 const subdir = process.platform === "win32" ? "Release/" : "";
@@ -32,5 +38,7 @@ await writeFile(
     platform: process.platform,
     arch: process.arch,
     whisperRevision: "a8d002cfd879315632a579e73f0148d06959de36",
+    gpuRequired: true,
+    backend: process.platform === "darwin" ? "Metal" : "Vulkan",
   }),
 );
