@@ -38,8 +38,10 @@ int main(int argc, char **argv) {
         std::fill(samples.begin(), samples.end(), 0);
         if (request) audiocpp_request_free(request);
         const char *text = nullptr;
-        if (ok && result) ok = audiocpp_result_text(result, &text, nullptr) == AUDIOCPP_OK;
-        else ok = false;
+        if (ok && result) {
+            const auto status = audiocpp_result_text(result, &text, nullptr);
+            ok = status == AUDIOCPP_OK || status == AUDIOCPP_ERR_NOT_AVAILABLE;
+        } else ok = false;
         if (ok) std::cout << "{\"text\":" << textify::json(text ? text : "") << "}\n" << std::flush;
         if (result) audiocpp_result_free(result);
         if (!ok) { cleanup(); return textify::failure("gpu_inference"); }

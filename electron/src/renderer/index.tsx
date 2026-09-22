@@ -213,9 +213,11 @@ function App() {
       ? "Listening to you"
       : state.phase === "processing"
         ? "Transcribing locally"
-        : state.ready
-          ? "Ready when you are"
-          : "Set up your first dictation";
+        : state.modelBusy
+          ? "Preparing your model"
+          : state.ready
+            ? "Ready when you are"
+            : "Set up your first dictation";
   return (
     <div className="app-shell">
       <aside>
@@ -257,7 +259,7 @@ function App() {
           </p>
         </div>
       </aside>
-      <main>
+      <main className={pane === "Models" ? "models-main" : undefined}>
         <header>
           <div>
             <h1>{pane === "Models" ? "Transcription models" : pane}</h1>

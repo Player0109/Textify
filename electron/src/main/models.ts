@@ -105,7 +105,13 @@ export function catalogModels(
       description:
         engine === "audio_cpp"
           ? "English and Chinese dictation, with final text on release."
-          : checkpoint.presentation.description,
+          : engine === "whisper_cpp"
+            ? id.includes("turbo")
+              ? "Fast Whisper dictation for English and Hindi."
+              : id === "ggml-small.en-q5_1"
+                ? "Compact Whisper model for everyday English dictation."
+                : "Higher-capacity Whisper model for English dictation."
+            : checkpoint.presentation.description,
       variant: artifact.presentation.displayName,
       provider: family.presentation.provider.displayName,
       license: entry.licenses[0].name,

@@ -44,3 +44,36 @@ it("accepts a confirmed GPU and clears it when stopped", async () => {
   worker.stop();
   expect(worker.gpu).toBeNull();
 });
+
+it.each(["transcribe_cpp", "audio_cpp"] as const)(
+  "accepts %s text without inventing Whisper confidence scores",
+  async (engine) => {
+    const dir = await mkdtemp(join(tmpdir(), "textify-worker-protocol-"));
+    const script = join(dir, "worker.cjs");
+    await writeFile(
+      script,
+      `
+    let input = Buffer.alloc(0), configured = false;
+    process.stdin.on("data", chunk => {
+      input = Buffer.concat([input, chunk]);
+      while (input.length >= 4) {
+        const size = input.readUInt32LE(0) * (configured ? 4 : 1);
+        if (input.length < size + 4) return;
+        input = input.subarray(size + 4);
+        console.log(JSON.stringify(configured ? {text: "A valid sentence."} : {ready: true, gpu: {backend: "Metal", device: "Test GPU"}}));
+        configured = true;
+      }
+    });
+  `,
+    );
+    const worker = new WhisperWorker(process.execPath, () => {});
+    cleanup.push(async () => {
+      worker.stop();
+      await rm(dir, { recursive: true });
+    });
+    await worker.load(script, "en", [], engine);
+    expect(await worker.transcribe(new Float32Array(16000))).toBe(
+      "A valid sentence.",
+    );
+  },
+);

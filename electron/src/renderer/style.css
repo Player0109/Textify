@@ -800,6 +800,8 @@ select {
   border-color: #0a84ff66;
 }
 .catalog-layout {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: minmax(220px, 0.82fr) minmax(300px, 1.25fr);
   align-items: start;
@@ -809,6 +811,8 @@ select {
   overflow: hidden;
 }
 .checkpoint-list {
+  height: 100%;
+  overflow-y: auto;
   min-width: 0;
   padding: 12px 9px;
 }
@@ -868,7 +872,9 @@ select {
   background: linear-gradient(140deg, #1d222c, #181e27);
   border-left: 1px solid #ffffff18;
   padding: 24px;
-  min-height: 640px;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
 }
 .section-caption {
   font:
@@ -996,16 +1002,48 @@ select {
   }
   .catalog-layout {
     grid-template-columns: 1fr;
+    height: auto;
   }
   .checkpoint-list {
     max-height: 250px;
     overflow-y: auto;
   }
   .checkpoint-detail {
+    height: auto;
+    max-height: 550px;
     border-left: 0;
     border-top: 1px solid #ffffff18;
   }
   .catalog-toolbar {
     flex-wrap: wrap;
+  }
+}
+
+.app-shell > main.models-main {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+.models-main > header,
+.models-main > .notice {
+  flex-shrink: 0;
+}
+.models-main .model-browser {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.models-main .catalog-toolbar,
+.models-main .model-browser > .footnote {
+  flex-shrink: 0;
+}
+@media (max-width: 820px) {
+  .models-main .catalog-layout {
+    overflow-y: auto;
+    display: block;
+  }
+  .models-main .checkpoint-list {
+    height: auto;
   }
 }
