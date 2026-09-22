@@ -76,6 +76,22 @@ export async function prepareExtra() {
     return backend->iface.graph_plan_compute(backend, plan);`,
     );
     if (runtime.name === "transcribe") {
+      // Direct depthwise convolution is not supported by this pinned Metal
+      // backend. Use its existing im2col/matmul graphs, including inside blocks.
+      // This also avoids the upstream Metal-name check missing the name "MTL".
+      await edit(
+        "src/arch/parakeet/encoder.cpp",
+        'return conf::resolve_conv_direct("TRANSCRIBE_CONV_DIRECT_DW", "TRANSCRIBE_CONV_NO_DIRECT_DW",\n                                     /*backend_default=*/true);',
+        "return false; // Textify: keep depthwise convolution on Metal.",
+      );
+      await edit(
+        "src/arch/parakeet/encoder.cpp",
+        `    const bool is_metal =
+        backend != nullptr && (std::strstr(backend, "Metal") != nullptr || std::strstr(backend, "metal") != nullptr);
+    return conf::resolve_conv_direct("TRANSCRIBE_CONV_DIRECT_DW", "TRANSCRIBE_CONV_NO_DIRECT_DW",
+                                     /*backend_default=*/!is_metal);`,
+        "    (void) backend;\n    return false; // Textify: keep depthwise convolution on Metal.",
+      );
       // Upstream uses ggml graphs for the entire TDT decoder, but explicitly
       // allocates three CPU backends. Keep those same graphs on the Metal GPU.
       await edit(

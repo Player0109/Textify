@@ -174,3 +174,17 @@ or unconfirmed insertion now show a specific error instead of silently hiding.
 The Mac package now explicitly includes the Audio Input entitlement on the app
 and helpers. `mac-signature-smoke.mjs` verifies the signed output; the earlier
 unsigned package lacked this capability even though it declared a usage string.
+
+Parakeet GPU regression check (Apple Silicon, exact signed Q8_0 file):
+
+```sh
+node scripts/runtime-smoke.mjs /path/to/parakeet-tdt-0.6b-v3-Q8_0.gguf
+TEXTIFY_MODEL_ID=parakeet-tdt-0.6b-v3-q8-0 TEXTIFY_MODEL_FIXTURE=/path/to/parakeet-tdt-0.6b-v3-Q8_0.gguf npm run smoke
+```
+
+The pinned Parakeet encoder otherwise selects `CONV_2D_DW`, unsupported by its
+Metal backend, and silently schedules it on CPU upstream. The preparation patch
+selects the existing im2col/matmul implementation for both depthwise sites;
+Textify's CPU refusal remains enabled. This is separate from moving its TDT
+decoder graphs onto the GPU. Recognition is tested with the public JFK fixture,
+without saving the transcript.
