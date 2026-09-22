@@ -244,3 +244,72 @@ verification. Its `app.asar` SHA-256 is
 The microphone and Accessibility grants are present and Right Command is enabled.
 The empty disposable TextEdit document is focused for the owner's spoken test;
 no live speech or real-app insertion pass is claimed until that test returns.
+
+## Native UI and additional Metal models — 2026-09-22
+
+`0.2.0-preview.3` adopts the native Textify charcoal surfaces, blue selection,
+waveform brand, typography and sidebar groups. The model browser groups the
+signed artifacts into eight checkpoints with search, language/installed filters,
+independently scrolling list and inspector, exact version actions, provenance
+and license details. It does not display the Swift app's benchmark scores as
+Electron measurements.
+
+Apple Silicon adds eleven GGUF artifacts across Parakeet TDT 0.6B V3,
+Qwen3-ASR 0.6B/1.7B and Confucius4-R2T2 1.7B. Existing Windows/Linux Whisper
+support is retained. MLX/CoreML and Confucius live previews are outside this
+slice; all four new families return final text on release. Qwen and Parakeet
+support automatic language detection; Confucius exposes English and Chinese.
+Replacement pairs work with all engines, while custom vocabulary prompts remain
+Whisper-only.
+
+Two checksum-pinned source builds produce separate static Metal executables,
+with embedded shaders and only Apple system dynamic dependencies. Parakeet's
+upstream CPU predictor/joint graph backends are changed to GPU backends. Its
+encoder also uses the existing im2col/matmul depthwise path: the pinned Metal
+backend cannot execute `CONV_2D_DW`, and the original runtime silently sent it
+to CPU. A real fixture reproduced the refusal before this patch. Both
+new ggml copies refuse direct, planned and scheduled CPU graph computation;
+focused native tests exercise all three paths. Unsupported virtual Metal GPUs
+are rejected before loading weights. The existing Whisper GPU policy remains.
+Signed catalog and revocation checks still apply to every artifact. GGUF storage
+retains `.gguf`, required by audio.cpp; Whisper's existing `.bin` paths remain
+compatible. Regression coverage includes import/removal and source preservation.
+
+Verified locally on the M4 Max:
+
+- TypeScript, renderer build and all 82 unit tests pass.
+- Qwen 0.6B Q8_0 and Qwen 1.7B BF16 recognize the public JFK speech fixture.
+- Qwen 1.7B BF16 also recognizes the existing Hindi fixture.
+- Confucius Q8_0 and F16 recognize the public JFK fixture.
+- Parakeet Q8_0 recognizes the public JFK fixture, including a separate check
+  using the signed worker inside the final installed application and imported model.
+- Qwen 0.6B, Parakeet Q8_0 and Confucius Q8_0 pass the full fixture MediaStream → AudioWorklet →
+  native GPU worker → explicit Copy path, without accessing the physical
+  microphone or changing the system clipboard.
+- Packaged app launches; microphone entitlements and deep/strict signature
+  verification pass. All original preview settings and model files are preserved.
+- The installed app reports microphone permission available. Its stale ad-hoc
+  Accessibility entry was removed and the updated app re-added through System
+  Settings; enabling the global trigger again reports “Hold Right Command”.
+
+Five GGUF artifacts are verified and installed in Electron storage: Qwen 0.6B
+Q8_0, Qwen 1.7B BF16, Parakeet Q8_0 and Confucius Q8_0/F16. The existing Swift
+artifacts were copied without changing the originals; Qwen 0.6B and Parakeet
+were downloaded from their signed catalog sources. The original Whisper model
+is preserved. Qwen 0.6B Q8_0 is selected with English and Right Command enabled.
+The previous installed app is retained under
+`electron/.native/installed-backups/Textify Electron-before-model-ui-20260922T070400Z.app`.
+The installed `app.asar` SHA-256 is
+`5f9d4e9feb8028aafe88acc49e107d3c7c23d87398007ca9bca1e4bb49d60c2e`.
+The installed transcribe worker SHA-256 is
+`9ee8a297cec01f7bf3ba69608fe3368dcc1afc78aaca867a3dc7649bf2acd3cc`.
+The owner was asked to try a physical Right Command dictation; no live insertion
+pass is claimed without their result.
+
+Implementation commit `87bc05c` passed all macOS ARM64, Windows x64 and Linux x64
+jobs in [run 35698952276](https://github.com/Player0109/Textify/actions/runs/35698952276).
+The run includes the 82 unit tests, CPU-fallback refusal checks, packaged launch,
+installer creation and platform installation checks. Hosted-runner checks do not
+replace the separate local M4 Max recognition evidence above or the pending
+physical microphone and insertion check. The subsequent documentation commit
+does not change the installed or tested implementation.

@@ -96,3 +96,21 @@ feature builds must repeat CI and record their commit and artifact versions.
   no CPU inference and no automatic model downgrade occur.
 - [ ] Mac real microphone: hold Right Command in TextEdit, dictate a public
   phrase, release, and verify insertion. Record any displayed failure reason.
+
+## Additional models and native visual design (September 22)
+
+- [x] Native-style dark sidebar, checkpoint browser and inspector reviewed in screenshots.
+- [x] Installed app selects and loads Qwen3-ASR 0.6B Q8_0 on Metal through the UI.
+- [x] Installed microphone permission check succeeds after upgrade.
+- [x] Re-added the updated app's Accessibility entry; global trigger reports Hold Right Command.
+- [x] Public fixture recognition: Qwen 0.6B Q8_0, Qwen 1.7B BF16 (English/Hindi), Parakeet Q8_0, Confucius Q8_0/F16.
+- [x] Fixture capture-to-copy pipeline: Qwen 0.6B, Parakeet Q8_0 and Confucius Q8_0.
+- [x] Final installed, signed Parakeet worker recognizes the public fixture using the imported model.
+- [ ] Owner's physical speech and insertion check with the updated model selection.
+
+New families currently use Metal on Apple Silicon. No MLX/CoreML variants or
+Confucius live previews are claimed for this Electron build.
+
+Implementation `87bc05c` passed all three OS jobs, including packaged launch and
+installer checks: https://github.com/Player0109/Textify/actions/runs/35698952276
+This automated evidence does not mark the pending physical-desktop checks passed.
