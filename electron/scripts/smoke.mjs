@@ -358,7 +358,9 @@ try {
   await page
     .getByRole("heading", { name: "Your speech stays here." })
     .waitFor();
-  await page.locator(".privacy .accessibility-heading img").evaluate((img) => img.decode());
+  const accessibilityIcon = page.locator(".privacy .accessibility-heading img");
+  if (await accessibilityIcon.count())
+    await accessibilityIcon.evaluate((img) => img.decode());
   await page.screenshot({ path: "artifacts/privacy.png" });
   if (process.env.TEXTIFY_MODEL_FIXTURE && noGPU) {
     const state = await waitSnapshot(

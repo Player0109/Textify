@@ -2508,3 +2508,10 @@ Task 1 must merge before parallel Wave 1 work begins.
 - The `0.2.0-preview.22` Mac preview passes TypeScript, 101 tests, build,
   Electron smoke, and DMG checksum verification. Both no-credential and
   no-Developer-ID production packaging paths stop before making an artifact.
+- The first PR run passed macOS packaging and CodeQL. Windows exposed checkout
+  line-ending conversion of the supplemental signed manifest and a directory
+  `stat().size` assumption in resume state; Linux exposed a macOS-only icon
+  selector in UI smoke. The signed manifest is now byte-preserved in Git,
+  directory resume checks its entries, and smoke decodes the Accessibility icon
+  only where present. Local TypeScript, 101 tests, build, and Electron smoke
+  passed again; the cross-platform rerun is pending.

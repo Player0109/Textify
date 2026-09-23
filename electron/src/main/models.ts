@@ -272,9 +272,14 @@ export class Models {
     const protection = this.revocations.status(model.id, model.files);
     model.restorations = protection.restorations;
     model.installed = await this.valid(model);
-    model.resumable = await stat(`${this.pathFor(model.id)}.partial`)
-      .then((value) => value.size > 0)
-      .catch(() => false);
+    const partial = `${this.pathFor(model.id)}.partial`;
+    model.resumable = model.directory
+      ? await readdir(partial)
+          .then((names) => names.length > 0)
+          .catch(() => false)
+      : await stat(partial)
+          .then((value) => value.size > 0)
+          .catch(() => false);
     model.storedBytes = 0;
     for (const name of await readdir(this.storage))
       if (
