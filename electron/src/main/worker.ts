@@ -12,6 +12,7 @@ export class WhisperWorker {
   };
   private engine: ModelEngine = "whisper_cpp";
   ready = false;
+  streaming = false;
   gpu: Snapshot["gpu"] = null;
   failure?: Error;
   constructor(
@@ -111,26 +112,71 @@ export class WhisperWorker {
       throw error;
     }
     this.gpu = { backend: value.gpu.backend, device: value.gpu.device };
+    this.streaming = engine === "audio_cpp" && value.streaming === true;
     this.ready = true;
     this.changed();
   }
-  async transcribe(samples: Float32Array): Promise<string | null> {
+  private async audio(samples: Float32Array, streaming = false) {
     if (
       !this.ready ||
       !this.child ||
       !samples.length ||
-      samples.length > 480000
+      samples.length > 480000 ||
+      (streaming && !this.streaming)
     )
       throw new Error("worker_not_ready");
     const result = this.response(300000);
     const header = Buffer.alloc(4);
-    header.writeUInt32LE(samples.length);
+    header.writeUInt32LE(samples.length + (streaming ? 0x80000000 : 0));
     const audio = Buffer.alloc(samples.length * 4);
     for (let i = 0; i < samples.length; i++)
       audio.writeFloatLE(samples[i], i * 4);
     this.child.stdin.write(header);
     this.child.stdin.write(audio, () => audio.fill(0));
+    return result;
+  }
+  private async streamCommand(command: number, expected: string) {
+    if (!this.ready || !this.child || !this.streaming)
+      throw new Error("worker_not_ready");
+    const result = this.response(300000);
+    const header = Buffer.alloc(4);
+    header.writeUInt32LE(command);
+    this.child.stdin.write(header);
+    if ((await result).stream !== expected) {
+      this.stop(new Error("worker_protocol"));
+      throw new Error("worker_protocol");
+    }
+  }
+  beginStream() {
+    return this.streamCommand(0xffffffff, "started");
+  }
+  resetStream() {
+    return this.streamCommand(0xfffffffe, "reset");
+  }
+  async finishStream(): Promise<string> {
+    if (!this.ready || !this.child || !this.streaming)
+      throw new Error("worker_not_ready");
+    const result = this.response(300000);
+    const header = Buffer.alloc(4);
+    header.writeUInt32LE(0xfffffffd);
+    this.child.stdin.write(header);
     const value = await result;
+    if (typeof value.text !== "string") {
+      this.stop(new Error("worker_protocol"));
+      throw new Error("worker_protocol");
+    }
+    return value.text;
+  }
+  async pushStream(samples: Float32Array): Promise<string> {
+    const value = await this.audio(samples, true);
+    if (typeof value.text !== "string") {
+      this.stop(new Error("worker_protocol"));
+      throw new Error("worker_protocol");
+    }
+    return value.text;
+  }
+  async transcribe(samples: Float32Array): Promise<string | null> {
+    const value = await this.audio(samples);
     if (
       typeof value.text !== "string" ||
       (this.engine === "whisper_cpp" &&
@@ -154,6 +200,7 @@ export class WhisperWorker {
     const child = this.child;
     this.child = undefined;
     this.ready = false;
+    this.streaming = false;
     this.gpu = null;
     this.failure = error;
     if (this.pending) {

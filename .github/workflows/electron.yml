@@ -1,4 +1,4 @@
-name: Electron
+name: Textify desktop
 
 on:
   push:
@@ -72,21 +72,21 @@ jobs:
       - name: Windows native insertion and clipboard checks
         if: runner.os == 'Windows'
         run: node scripts/insertion-smoke.mjs
-      - run: npm run package
+      - run: npm run package:preview
       - name: Verify signed microphone capability
         if: runner.os == 'macOS'
-        run: node scripts/mac-signature-smoke.mjs 'release/mac-arm64/Textify Electron.app'
+        run: node scripts/mac-signature-smoke.mjs 'release/mac-arm64/Textify.app'
       - name: Packaged macOS smoke
         if: runner.os == 'macOS'
-        run: node scripts/packaged-smoke.mjs 'release/mac-arm64/Textify Electron.app/Contents/MacOS/Textify Electron'
+        run: node scripts/packaged-smoke.mjs 'release/mac-arm64/Textify.app/Contents/MacOS/Textify'
       - name: Packaged Windows smoke
         if: runner.os == 'Windows'
-        run: node scripts/packaged-smoke.mjs 'release/win-unpacked/Textify Electron.exe'
+        run: node scripts/packaged-smoke.mjs 'release/win-unpacked/Textify.exe'
       - name: Packaged Linux smoke
         if: runner.os == 'Linux'
         run: xvfb-run --auto-servernum node scripts/packaged-smoke.mjs 'release/linux-unpacked/textify-electron'
       - name: Build preview installers
-        run: npm run dist -- --publish never
+        run: npm run dist:preview -- --publish never
       - name: Test Windows installation
         if: runner.os == 'Windows'
         shell: pwsh
@@ -95,7 +95,7 @@ jobs:
           $installDirectory = Join-Path $env:RUNNER_TEMP 'TextifyInstall'
           $install = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$installDirectory") -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw 'Windows installation failed' }
-          node scripts/packaged-smoke.mjs (Join-Path $installDirectory 'Textify Electron.exe')
+          node scripts/packaged-smoke.mjs (Join-Path $installDirectory 'Textify.exe')
           if ($LASTEXITCODE -ne 0) { throw 'Installed Windows app failed' }
           $uninstaller = (Get-ChildItem $installDirectory -Filter 'Uninstall*.exe' | Select-Object -First 1).FullName
           Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait
@@ -118,13 +118,13 @@ jobs:
           mkdir -p .native/mounted-dmg
           hdiutil attach release/*.dmg -readonly -nobrowse -mountpoint .native/mounted-dmg
           trap 'hdiutil detach .native/mounted-dmg' EXIT
-          node scripts/packaged-smoke.mjs '.native/mounted-dmg/Textify Electron.app/Contents/MacOS/Textify Electron'
+          node scripts/packaged-smoke.mjs '.native/mounted-dmg/Textify.app/Contents/MacOS/Textify'
       - name: Add checksums and installation notes
         run: node scripts/checksums.mjs
       - name: Upload unsigned preview installers
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: textify-electron-${{ matrix.os }}
+          name: textify-desktop-${{ matrix.os }}
           path: |
             electron/release/*.dmg
             electron/release/*.exe

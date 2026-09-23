@@ -6,7 +6,6 @@ const bridge: TextifyBridge = {
   preferences: (value) => ipcRenderer.invoke("preferences", value),
   model: (command) => ipcRenderer.invoke("model", command),
   apps: () => ipcRenderer.invoke("apps"),
-  importSettings: () => ipcRenderer.invoke("import-settings"),
   devices: () => ipcRenderer.invoke("devices"),
   subscribe(callback) {
     const listener = (_event: unknown, state: Parameters<typeof callback>[0]) =>
@@ -23,5 +22,6 @@ const bridge: TextifyBridge = {
     return () => ipcRenderer.off("audio-command", listener);
   },
   audioReply: (reply) => ipcRenderer.send("audio-reply", reply),
+  accessibilityHelp: (command) => ipcRenderer.send("accessibility-help", command),
 };
 contextBridge.exposeInMainWorld("textify", bridge);

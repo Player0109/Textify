@@ -9,12 +9,14 @@ import {
 } from "./audio";
 import { processText } from "./text";
 import { engineError } from "./engine-error";
+import { LivePreview, type StreamingPorts } from "./live-preview";
 
 export interface Target {
   target: string;
   secure: boolean;
   appID?: string;
   appName?: string;
+  appIcon?: string;
   excluded?: boolean;
 }
 export interface DictationPorts {
@@ -26,6 +28,7 @@ export interface DictationPorts {
   ): Promise<void>;
   stop(id: number, discard: boolean): Promise<void>;
   transcribe(samples: Float32Array): Promise<string | null>;
+  streaming?(): StreamingPorts | undefined;
   insert(
     text: string,
     target: Target,
@@ -42,12 +45,16 @@ type Session = {
   count: number;
   guard: SpeechGuard;
   startTask: Promise<void>;
+  preview?: LivePreview;
 };
 export class Dictation {
   phase: Phase = "idle";
   message = "";
   level = 0;
   pending = "";
+  preview = "";
+  application = "Textify";
+  applicationIcon = "";
   private serial = 0;
   private copying = false;
   private session?: Session;
@@ -80,6 +87,9 @@ export class Dictation {
   press(manual = false) {
     if (this.busy) return;
     this.pending = "";
+    this.preview = "";
+    this.application = "Textify";
+    this.applicationIcon = "";
     const s: Session = {
       id: ++this.serial,
       started: this.now(),
@@ -105,6 +115,20 @@ export class Dictation {
           s.cancelled = true;
           return;
         }
+        this.application = s.target?.appName || "Textify";
+        this.applicationIcon = s.target?.appIcon || "";
+        const streaming = this.ports.streaming?.();
+        if (streaming)
+          s.preview = new LivePreview(streaming, (text) => {
+            if (
+              !s.cancelled &&
+              this.session === s &&
+              this.phase === "recording"
+            ) {
+              this.preview = text;
+              this.ports.changed();
+            }
+          });
         await this.ports.start(
           s.id,
           (data) => this.samples(s, data),
@@ -128,6 +152,7 @@ export class Dictation {
       } finally {
         if (s.cancelled) {
           if (s.ready) await this.ports.stop(s.id, true).catch(() => {});
+          await s.preview?.stop().catch(() => {});
           this.clear(s);
           this.update(this.message ? "error" : "idle", this.message);
         }
@@ -150,6 +175,7 @@ export class Dictation {
     s.frames.push(frame);
     s.count += frame.length;
     s.guard.accept(frame);
+    s.preview?.push(frame);
     this.level = Math.min(1, rms(frame) * 8);
     this.ports.changed();
     if (s.count >= MAX_SAMPLES) void this.finish(s);
@@ -181,6 +207,7 @@ export class Dictation {
     await s.startTask;
     if (this.processingTask) await this.processingTask;
     else if (s.ready) await this.ports.stop(s.id, true).catch(() => {});
+    await s.preview?.stop().catch(() => {});
     this.clear(s);
     this.update(message ? "error" : "idle", message);
   }
@@ -191,6 +218,7 @@ export class Dictation {
     if (this.session === s) {
       this.session = undefined;
       this.level = 0;
+      this.preview = "";
       this.timers();
     }
   }
@@ -220,6 +248,7 @@ export class Dictation {
     let pcm: Float32Array = new Float32Array();
     try {
       await this.ports.stop(s.id, false);
+      await s.preview?.stop();
       if (s.cancelled) return;
       if (!s.count) {
         this.update(
@@ -239,10 +268,7 @@ export class Dictation {
       pcm = trimSilence(all);
       all.fill(0);
       if (!pcm.length) {
-        this.update(
-          "error",
-          "No speech detected. Check the selected microphone and its input level, then try again.",
-        );
+        this.update("idle");
         return;
       }
       let text = "";
@@ -250,21 +276,14 @@ export class Dictation {
         const chunk = await this.ports.transcribe(audio);
         if (s.cancelled) return;
         if (chunk === null) {
-          this.update(
-            "error",
-            "Textify could not recognize clear speech. Check the microphone and dictation language, then try again.",
-          );
+          this.update("idle");
           return;
         }
         text = stitch(text, chunk);
       }
       text = processText(text, this.replacements(), this.language());
       if (!text.trim() || s.cancelled) {
-        if (!s.cancelled)
-          this.update(
-            "error",
-            "Textify could not recognize clear speech. Check the microphone and dictation language, then try again.",
-          );
+        if (!s.cancelled) this.update("idle");
         return;
       }
       if (!s.target) {
@@ -298,6 +317,7 @@ export class Dictation {
             "Dictation could not finish. Check the model and microphone, then try again.",
         );
     } finally {
+      await s.preview?.stop().catch(() => {});
       pcm.fill(0);
       this.clear(s);
       this.ports.changed();

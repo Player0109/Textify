@@ -1,7 +1,7 @@
 {
   "name": "textify-electron",
-  "productName": "Textify Electron",
-  "version": "0.2.0-preview.3",
+  "productName": "Textify",
+  "version": "0.2.0-preview.22",
   "private": true,
   "description": "Offline desktop dictation for macOS, Windows and Linux",
   "homepage": "https://github.com/Player0109/Textify",
@@ -17,8 +17,10 @@
     "native:prepare": "node scripts/prepare-native.mjs",
     "native:build": "node scripts/build-native.mjs",
     "check": "npm run typecheck && npm test && npm run build",
-    "package": "npm run build && electron-builder --dir",
-    "dist": "npm run build && electron-builder",
+    "package": "npm run build && node scripts/package.mjs --dir",
+    "package:preview": "npm run build && node scripts/package.mjs --dir --preview",
+    "dist": "npm run build && node scripts/package.mjs",
+    "dist:preview": "npm run build && node scripts/package.mjs --preview",
     "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
@@ -67,7 +69,6 @@
       ],
       "minimumSystemVersion": "14.0",
       "category": "public.app-category.productivity",
-      "identity": "-",
       "entitlements": "native/entitlements.mac.plist",
       "entitlementsInherit": "native/entitlements.mac.plist",
       "extendInfo": {
@@ -93,7 +94,7 @@
       },
       "maintainer": "Textify contributors <Player0109@users.noreply.github.com>"
     },
-    "artifactName": "Textify-Electron-${version}-${os}-${arch}.${ext}",
+    "artifactName": "Textify-${version}-${os}-${arch}.${ext}",
     "deb": {
       "depends": [
         "libgtk-3-0",

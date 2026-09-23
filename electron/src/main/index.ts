@@ -13,25 +13,23 @@ import {
   shell,
 } from "electron";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
-import { readFile, writeFile, mkdir, rename, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { Dictation } from "../core/dictation";
 import { engineError } from "../core/engine-error";
+import { overlayBounds } from "../core/overlay-geometry";
 import { Models } from "./models";
 import { WhisperWorker } from "./worker";
 import { Platform, nativeTrigger } from "./platform";
 import { waylandTrigger } from "./wayland";
 import { Capture } from "./capture";
-import {
-  defaults,
-  validatePreferences,
-  migrateNativeSettings,
-} from "./preferences";
+import { AccessibilitySetup } from "./accessibility";
+import { defaults, validatePreferences } from "./preferences";
 import { linuxStartup, linuxStartupEnabled } from "./startup";
 import type { Action, Preferences, Snapshot, ModelCommand } from "../shared";
 
-app.setName("Textify Electron");
+app.setName("Textify");
 const smoke = !app.isPackaged && process.argv.includes("--smoke");
 app.setPath(
   "userData",
@@ -49,6 +47,7 @@ let main: BrowserWindow,
   audio: BrowserWindow,
   overlay: BrowserWindow,
   tray: Tray;
+let accessibilityHelp: BrowserWindow | undefined;
 let quitting = false,
   cleaned = false,
   modelBusy = false,
@@ -70,12 +69,35 @@ let models: Models,
   capture: Capture,
   dictation: Dictation;
 let broadcastTimer: ReturnType<typeof setTimeout> | undefined;
+const appBundle = dirname(dirname(dirname(process.execPath)));
+const accessibility = process.platform === "darwin"
+  ? new AccessibilitySetup(
+      (prompt) => systemPreferences.isTrustedAccessibilityClient(prompt),
+      (granted) => {
+        if (granted) {
+          accessibilityHelp?.hide();
+          if (initialized && !quitting && !smoke && !stopTrigger && !enabling)
+            void enableTrigger();
+        } else {
+          stopTrigger?.();
+          stopTrigger = undefined;
+          triggerStatus = "Enable Accessibility to use the global shortcut.";
+          if (["armed", "recording"].includes(dictation?.phase))
+            void dictation.cancel();
+        }
+        changed();
+      },
+    )
+  : null;
 function snapshot(): Snapshot {
   return {
     phase: dictation?.phase ?? "idle",
     message: engineError(worker?.failure) || notice || dictation?.message || "",
     level: dictation?.level ?? 0,
     elapsed: dictation?.elapsed ?? 0,
+    preview: dictation?.preview ?? "",
+    application: dictation?.application ?? "Textify",
+    applicationIcon: dictation?.applicationIcon ?? "",
     platform:
       process.platform === "darwin"
         ? "macOS"
@@ -86,6 +108,12 @@ function snapshot(): Snapshot {
             : "Linux · X11",
     insertion: platform.insertion,
     triggerStatus,
+    triggerEnabled: Boolean(stopTrigger),
+    accessibility: accessibility ? {
+      status: accessibility.status,
+      appName: basename(appBundle, ".app"),
+      appPath: appBundle,
+    } : null,
     ready: Boolean(
       initialized &&
         worker?.ready &&
@@ -118,40 +146,16 @@ function changed() {
       "error",
     ].includes(state.phase);
     if (visible) {
-      const height = state.phase === "error" ? 160 : 96;
       const area = screen.getDisplayNearestPoint(
         screen.getCursorScreenPoint(),
       ).workArea;
-      overlay.setSize(
-        Math.round(390 * preferences.overlay.scale),
-        Math.round(height * preferences.overlay.scale),
+      const { scale, ...bounds } = overlayBounds(
+        area,
+        preferences.overlay,
+        state.phase === "error" || Boolean(state.preview),
       );
-      overlay.webContents.setZoomFactor(preferences.overlay.scale);
-      overlay.setPosition(
-        Math.round(
-          Math.min(
-            area.x + area.width - 390 * preferences.overlay.scale,
-            Math.max(
-              area.x,
-              area.x +
-                (area.width - 390 * preferences.overlay.scale) / 2 +
-                preferences.overlay.x,
-            ),
-          ),
-        ),
-        Math.round(
-          Math.min(
-            area.y + area.height - height * preferences.overlay.scale,
-            Math.max(
-              area.y,
-              area.y +
-                area.height -
-                (height + 29) * preferences.overlay.scale +
-                preferences.overlay.y,
-            ),
-          ),
-        ),
-      );
+      overlay.setBounds(bounds);
+      overlay.webContents.setZoomFactor(scale);
       overlay.setFocusable(state.phase === "copy" || state.phase === "error");
       if (!overlay.isVisible()) overlay.showInactive();
     } else overlay.hide();
@@ -162,6 +166,17 @@ function showMain() {
     main.show();
     main.focus();
   }
+}
+function showAccessibilityHelp() {
+  if (!accessibilityHelp || accessibilityHelp.isDestroyed()) return;
+  const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  accessibilityHelp.setBounds({
+    x: area.x + area.width - 376,
+    y: area.y + 56,
+    width: 352,
+    height: 184,
+  });
+  accessibilityHelp.showInactive();
 }
 function allowed(event: IpcMainInvokeEvent, windows: BrowserWindow[]) {
   return windows.some(
@@ -223,11 +238,10 @@ async function enableTrigger() {
   };
   try {
     if (
-      process.platform === "darwin" &&
-      !systemPreferences.isTrustedAccessibilityClient(false)
+      accessibility && !accessibility.refresh()
     ) {
       triggerStatus =
-        "Enable Accessibility permission, then enable the trigger.";
+        "Enable Accessibility to use the global shortcut.";
       return;
     }
     if (wayland) {
@@ -236,6 +250,11 @@ async function enableTrigger() {
       triggerStatus = `Hold ${trigger.description}`;
     } else {
       stopTrigger = await nativeTrigger(preferences.trigger, events);
+      if (quitting || (accessibility && !accessibility.refresh())) {
+        stopTrigger?.();
+        stopTrigger = undefined;
+        return;
+      }
       triggerStatus = `Hold ${preferences.trigger === "right-command" ? "Right Command" : preferences.trigger === "right-option" ? "Right Option" : preferences.trigger === "right-control" ? "Right Control" : "Control + Space"}`;
     }
   } catch {
@@ -312,13 +331,20 @@ async function action(action: Action) {
       }
       break;
     case "permissions":
-      if (process.platform === "darwin") {
-        systemPreferences.isTrustedAccessibilityClient(true);
+    case "permission-settings":
+      if (active) break;
+      if (accessibility) {
+        if (accessibility.refresh()) break;
+        accessibility.request(action === "permissions");
         await shell.openExternal(
           "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
         );
+        if (!accessibility.refresh()) showAccessibilityHelp();
       } else
         notice = "Use your system privacy settings to allow microphone access.";
+      break;
+    case "reveal-app":
+      if (accessibility) shell.showItemInFolder(appBundle);
       break;
     case "enable-trigger":
       if (!active) await enableTrigger();
@@ -397,6 +423,13 @@ async function savePreferences(value: unknown) {
   }
 }
 async function modelAction(command: ModelCommand) {
+  if (command?.action === "source" && typeof command.id === "string") {
+    const source = new URL(models.get(command.id).source);
+    if (source.protocol !== "https:" || source.username || source.password)
+      throw new Error("model_source");
+    await shell.openExternal(source.href);
+    return;
+  }
   if (
     dictation.busy ||
     modelBusy ||
@@ -459,13 +492,15 @@ async function modelAction(command: ModelCommand) {
     if (command.action === "import") {
       const choice = await dialog.showOpenDialog(main, {
         title: `Choose the exact ${model.name} model`,
-        properties: ["openFile"],
-        filters: [
-          {
-            name: model.variant,
-            extensions: [model.engine === "whisper_cpp" ? "bin" : "gguf"],
-          },
-        ],
+        properties: [model.directory ? "openDirectory" : "openFile"],
+        filters: model.directory
+          ? []
+          : [
+              {
+                name: model.variant,
+                extensions: [model.engine === "whisper_cpp" ? "bin" : "gguf"],
+              },
+            ],
       });
       if (choice.canceled || dictation.busy || modelBusy || models.busy) return;
       source = choice.filePaths[0];
@@ -522,15 +557,17 @@ else {
         height: 780,
         minWidth: 780,
         minHeight: 600,
-        title: "Textify Electron",
+        title: "Textify",
         backgroundColor: "#11151c",
         show: false,
       });
+      main.on("focus", () => accessibility?.refresh());
+      accessibility?.refresh();
       audio = createWindow({ show: false, width: 1, height: 1 });
       overlay = createWindow({
         type: process.platform === "darwin" ? "panel" : undefined,
-        width: 390,
-        height: 96,
+        width: 344,
+        height: 88,
         frame: false,
         transparent: true,
         alwaysOnTop: true,
@@ -545,6 +582,18 @@ else {
         visibleOnFullScreen: true,
         skipTransformProcessType: true,
       });
+      if (accessibility) {
+        accessibilityHelp = createWindow({
+          width: 352,
+          height: 184,
+          frame: false,
+          transparent: true,
+          alwaysOnTop: true,
+          skipTaskbar: true,
+          resizable: false,
+          show: false,
+        });
+      }
       capture = new Capture(audio);
       dictation = new Dictation(
         {
@@ -569,6 +618,7 @@ else {
             capture.start(id, preferences.microphone, samples, failed),
           stop: (id, discard) => capture.stop(id, discard),
           transcribe: (samples) => worker.transcribe(samples),
+          streaming: () => (worker.streaming ? worker : undefined),
           insert: (text, target) => platform.insert(text, target),
           changed,
         },
@@ -641,7 +691,9 @@ else {
           await modelAction(command);
         } catch {
           notice =
-            "The model action could not finish. Check the model, language, and available storage. Interrupted downloads can be resumed.";
+            command?.action === "source"
+              ? "The model page could not open. Try the link again."
+              : "The model action could not finish. Check the model, language, and available storage. Interrupted downloads can be resumed.";
           changed();
           throw new Error("model_action_failed");
         }
@@ -650,24 +702,20 @@ else {
         if (!allowed(event, [main])) throw new Error("unauthorized");
         return platform.apps();
       });
-      ipcMain.handle("import-settings", async (event) => {
-        if (!allowed(event, [main]) || dictation.busy)
-          throw new Error("unauthorized");
-        const chosen = await dialog.showOpenDialog(main, {
-          title: "Import Textify settings",
-          properties: ["openFile"],
-          filters: [{ name: "Textify settings", extensions: ["json"] }],
-        });
-        if (chosen.canceled) return null;
-        if ((await stat(chosen.filePaths[0])).size > 1024 * 1024)
-          throw new Error("settings_too_large");
-        const raw = JSON.parse(await readFile(chosen.filePaths[0], "utf8"));
-        return migrateNativeSettings(
-          raw,
-          preferences,
-          process.platform,
-          models.entries.map((model) => model.id),
-        );
+      ipcMain.on("accessibility-help", (event, command) => {
+        if (
+          !accessibilityHelp ||
+          !allowed(event, [accessibilityHelp]) ||
+          !accessibility ||
+          accessibility.refresh()
+        ) return;
+        if (command === "drag" && appBundle.endsWith(".app")) {
+          event.sender.startDrag({
+            file: appBundle,
+            icon: nativeImage.createFromPath(join(resources, "icon.png")).resize({ width: 64, height: 64 }),
+          });
+        } else if (command === "dismiss") accessibilityHelp.hide();
+        else if (command === "reveal") shell.showItemInFolder(appBundle);
       });
       ipcMain.on("audio-reply", (event, reply) => {
         if (
@@ -724,6 +772,9 @@ else {
         main.loadFile(page),
         audio.loadFile(page, { query: { mode: "audio" } }),
         overlay.loadFile(page, { query: { mode: "overlay" } }),
+        ...(accessibilityHelp
+          ? [accessibilityHelp.loadFile(page, { query: { mode: "accessibility-help" } })]
+          : []),
       ]);
       const openedAtLogin =
         process.platform === "darwin" &&
@@ -754,6 +805,7 @@ else {
     if (quitting) return;
     quitting = true;
     clearTimeout(broadcastTimer);
+    accessibility?.stop();
     stopTrigger?.();
     models?.cancel();
     worker?.stop();
@@ -762,6 +814,7 @@ else {
     void (async () => {
       await dictation?.cancel();
       overlay?.destroy();
+      accessibilityHelp?.destroy();
       tray?.destroy();
       cleaned = true;
       // A native Cmd+Q can drain this promise before before-quit returns.

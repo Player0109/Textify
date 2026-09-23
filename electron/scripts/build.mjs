@@ -4,6 +4,7 @@ import { cp, mkdir, access } from "node:fs/promises";
 import { resolve } from "node:path";
 
 await mkdir("resources", { recursive: true });
+await cp("models", "resources/extra-models", { recursive: true });
 for (const name of [
   "manifest.json",
   "manifest.json.sig",

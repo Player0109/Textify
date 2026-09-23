@@ -4,6 +4,16 @@ The application bundle includes license texts in `textify/licenses`, the
 whisper.cpp license in `textify/WHISPER-LICENSE`, and Electron/Chromium notices
 provided by Electron. Node packages retain their own notices in the archive.
 
+The model browser includes publisher logos solely to identify the source of
+each model. These logos and names belong to their respective owners; their
+appearance does not imply endorsement of Textify. The bundled images came from
+the publishers' public profiles or site:
+
+- OpenAI: https://huggingface.co/openai
+- NVIDIA: https://nvidianews.nvidia.com/multimedia/corporate/nvidia-logos
+- Qwen: https://github.com/QwenLM
+- NetEase Youdao: https://dict.youdao.com/home
+
 - Electron and Chromium: https://github.com/electron/electron
 - React and React DOM, MIT: https://github.com/facebook/react
 - whisper.cpp, MIT, pinned to `a8d002cfd879315632a579e73f0148d06959de36`:
@@ -48,3 +58,8 @@ Bundled `transcribe.cpp.txt` and `audio.cpp.txt` include dependency notices.
 Qwen3-ASR, Parakeet TDT and Confucius4-R2T2 weights are downloaded or imported
 separately and remain subject to the licenses shown in the signed catalog.
 Confucius uses the NetEase Youdao Model Use License Agreement; it is not MIT.
+The original BF16 checkpoint is pinned to NetEase Youdao's Hugging Face revision
+`185ce639118ad1362d049ca0d8ed04b6ec5cd6c9`. Its original weights are not converted
+or quantized by Textify. The existing bundled `Confucius4-R2T2.txt` contains the
+publisher's model terms. audio.cpp is built with its model specifications embedded
+for offline safetensors-directory loading.

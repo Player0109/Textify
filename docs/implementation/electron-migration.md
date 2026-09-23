@@ -335,3 +335,341 @@ activation policy `0`; the owner confirmed the blue T is visible in the bottom
 Dock. The corrected application is pinned to `/Applications/Textify Electron.app`.
 The existing Accessibility grant was refreshed, and the app reports GPU ready
 and Hold Right Command after the update.
+
+## Original BF16, realtime previews and compact overlay — 2026-09-22
+
+`0.2.0-preview.4` adds the original NetEase Confucius4-R2T2 BF16 safetensors
+checkpoint alongside GGUF Q8_0/F16. Eleven publisher files are pinned to Hugging
+Face revision `185ce639118ad1362d049ca0d8ed04b6ec5cd6c9`, downloaded and locally
+verified (4,092,092,714 bytes total). The additional catalog under `electron/models/`
+has its own signature from the existing trusted key. The original Swift catalog
+and implementation remain unchanged; both catalogs use the same verification and
+sticky revocation rules. Directory downloads resume per file, hash every file,
+and replace an existing installation only after the complete candidate verifies.
+
+The initial BF16 fixture failed at model loading: the previous audio.cpp build
+had no embedded model specification. GGUF carries its own specification, so it
+had not exposed this packaging gap. Enabling the pinned runtime's deployment
+build embeds the required metadata and makes original HF folders self-contained.
+The original BF16 weights now run on Metal without Python, GGUF conversion or
+CPU model fallback. Temporary diagnostic instrumentation was removed.
+
+All three Confucius versions now emit incremental, in-memory text during capture.
+The preview controller appends token deltas, rolls the decoder at 25 seconds,
+bounds queued audio, and drains in-flight work before reset/cancellation. Final
+recognition still uses the complete capture and inserts exactly once on release.
+The floating panel follows the native 344×88-point shell, expanding to 344×156 for
+three preview lines, with target identity, waveform and a subtle colored border.
+Copy and dismissal remain available. The panel and skip-process-transformation
+settings that fixed Dock visibility are preserved.
+
+Local M4 Max evidence:
+
+- TypeScript and all 93 tests passed, including directory integrity/recovery,
+  directory revocations, preview cancellation, delta assembly and bounded windows.
+- Native rebuild and GPU-only graph policy tests passed.
+- Original BF16 passed English and Chinese streaming, stream finish/reset and
+  final recognition. GGUF Q8_0 and F16 passed the same English streaming checks.
+- A paced 32-second BF16 preview produced 57 updates, including 12 after the
+  decoder reset. The first update arrived at 1.088 seconds including fixture audio
+  arrival. This single public-fixture result is not a general latency benchmark.
+- The full BF16 fixture MediaStream → AudioWorklet → preview → final recognition
+  → overlay Copy path passed. Expanded-overlay bounds, transcript clearing,
+  renderer isolation, settings persistence and Dock behavior passed. Public
+  fixture screenshots are in `electron/artifacts/overlay-live.png` and
+  `electron/artifacts/overlay-copy.png`; no personal audio or transcript was saved.
+- Packaged launch, microphone entitlements and deep/strict signature checks passed.
+  Installed `/Applications/Textify Electron.app`, imported BF16 through the verified
+  directory installer, and selected **BF16 · Original**, English. The existing
+  Accessibility grant was refreshed through Settings; Right Command is enabled.
+  The running installed process remains in normal Dock activation policy `0` and
+  the existing Applications Dock pin is preserved.
+- The installed app initially failed its real microphone check despite the
+  existing enabled grant. macOS TCC logs identified a stale code requirement
+  after the ad-hoc signature changed. Resetting only this app's Microphone grant
+  (`tccutil reset Microphone io.github.Player0109.Textify.Electron`) and renewing
+  it restored capture; the installed UI now reports **Microphone permission is
+  available.** No other app's permission or system security setting was changed.
+
+The prior installed app is retained at
+`electron/.native/installed-backups/Textify Electron-before-bf16-streaming.app`.
+Installed `app.asar` SHA-256:
+`b65f93fa6800d274c61f0aa4f63a5e0573078e184b76b6a0be406b3fe9c3e9ac`.
+Installed audio worker SHA-256:
+`e9021ed53f1e15815dd8a6df4d1e0fb7417f7d0a909dea139abb1bc594885a37`.
+Owner confirmation of physical microphone dictation and real cross-app insertion
+is still separate from these fixture checks. Windows/Linux runtime support for
+Confucius remains outside this Mac implementation; no new remote CI pass is claimed.
+
+## Floating bar reference correction — 2026-09-22
+
+`0.2.0-preview.5` follows the owner's original Textify screenshots more closely.
+The recording row has the native 34 rounded gray capsules across the full width,
+with the native continuous waveform formula at up to 30 fps. Audio-level updates
+do not restart or abruptly resize it. The extra Listening label and recording
+close control are removed; Escape still cancels. The small coral voice mark stays
+beside the Textify wordmark. Identity, signal and transcript spacing now follows
+the native fixed 72/140-point panel body. Reduce Motion freezes the waveform.
+
+The Mac target helper now returns the actual destination application's icon as
+a bounded 48-pixel PNG. The session retains that icon alongside its original app
+name, including during processing or Copy recovery. Manual dictation resets to
+Textify. Icons remain in memory; no disk cache or external image request is used.
+Only embedded image data is newly allowed by the renderer's image CSP.
+
+Verification: all 94 tests, TypeScript/build, the Mac helper build, packaged
+launch, signed microphone entitlements and deep/strict bundle validation passed.
+The BF16 fixture capture → preview → recognition → Copy path passed, including
+full-width gray waveform geometry, continuous motion, Reduce Motion, and native
+icon PNG decoding/rendering. Screenshots were visually reviewed in
+`electron/artifacts/overlay-live.png`, `overlay-app-icon.png`, and `overlay-copy.png`.
+
+Installed at `/Applications/Textify Electron.app`; the existing Accessibility
+and Microphone grants were refreshed after the ad-hoc signature changed. The
+installed UI confirms GPU ready, Hold Right Command, and microphone permission
+available. BF16/English and the Dock behavior are preserved. No new physical
+speech or cross-app insertion verification is claimed by these fixture checks.
+
+Installed `app.asar` SHA-256:
+`53a37910cc470293141f29c5fad5c5d145a602642b4cf849702ecb872f7d7074`.
+Installed Mac platform helper SHA-256:
+`caf688f0b0ed7d685a21f75635f989d13815c20a95cb714f2033dfefdef3ebd8`.
+Previous installed build:
+`electron/.native/installed-backups/Textify Electron-before-overlay-refinement.app`.
+
+## Animated transcript overflow — 2026-09-22
+
+`0.2.0-preview.6` replaces the immediate `scrollTop` jump with a clipped
+three-line viewport and a translated text layer. Layout observation moves that
+layer only when wrapping changes its height, using the original Swift overlay's
+140 ms ease-out transition. All visible lines move upward together; additional
+tokens on the same line do not restart the movement.
+
+The owner explicitly requested always-on animations and no Reduce Motion
+control. The Electron overlay's motion checks and the app-wide reduced-motion
+transition override were removed; macOS system preferences are unchanged.
+
+All 94 tests, TypeScript and build checks passed. Renderer checks observed
+intermediate positions and correct settling for three-to-four-to-five-line
+wrapping, including an emulated reduced-motion system preference. The BF16
+fixture capture, live preview, final recognition and Copy path also passed,
+along with destination icons and Dock behavior. No physical speech or cross-app
+insertion claim is added by these checks.
+
+Installed and signature-verified `/Applications/Textify Electron.app`; refreshed
+its existing grants after the ad-hoc signature change. The installed UI confirms
+GPU ready, Hold Right Command, and microphone permission available. Installed
+`app.asar` SHA-256:
+`172a8dfa8c5fc92c72fc8cee532c18607e46e0ccaaa31be8c01b74c0e1e25d41`.
+Previous installed build is retained at
+`electron/.native/installed-backups/Textify Electron-before-transcript-animation.app`.
+
+## Floating Icon settings — 2026-09-22
+
+`0.2.0-preview.7` adds the native-style Floating Icon section to Dictation and
+replaces the former numeric controls in General. A miniature display preview,
+center/bottom guides, X/Y sliders, editable point values, arrow steppers, scale
+from 50–200%, and Reset Position & Scale follow the supplied reference. Preview
+updates during dragging; releasing saves through the existing settings path.
+Keyboard edits, bounded numeric entry and resetting preserve other preferences.
+
+Positive Y now moves the real bar up, matching native Textify and the preview.
+Scaling and transcript expansion retain a fixed bottom anchor; the complete
+window is clamped to the display's work area, including negative-origin displays
+and small work areas. Existing scale/offset settings remain in the same schema.
+
+All 98 tests and TypeScript/build checks passed. Full app checks covered dragging,
+keyboard adjustment, numeric input, 5% scale steps, preview direction, persisted
+values, reset, and the 780-point minimum window width. Screenshots in
+`electron/artifacts/floating-icon-settings.png` and
+`electron/artifacts/floating-icon-settings-compact.png` were visually reviewed.
+BF16 fixture dictation, animated transcript overflow, native app icons, Copy and
+Dock behavior also passed. No new physical speech/insertion result is claimed.
+
+The packaged launch, microphone entitlements and deep/strict signature checks
+passed. Installed `/Applications/Textify Electron.app`, retaining the prior
+bundle at `electron/.native/installed-backups/Textify Electron-before-floating-settings.app`.
+Installed `app.asar` SHA-256:
+`4bf5a7b02441d69c2530711090b02ef50046218728fd8dbd2bc89dafba3ddb59`.
+The installed UI confirms GPU ready, Hold Right Command and microphone permission
+available after refreshing the existing grants. The new Floating Icon panel was
+visually checked in the installed app; the owner's X 0 / Y 0 / 100% preferences
+are preserved.
+
+## Guided Accessibility setup — 2026-09-22
+
+`0.2.0-preview.8` implements the owner's approved permission-flow improvements.
+Dictation shows the Textify icon, two setup steps, Enable Accessibility, and live
+required/waiting/granted status. Privacy retains the permission status after
+setup. The native prompt and direct Settings link remain user initiated. A
+one-second, five-minute-bounded poll detects approval while Settings is frontmost;
+focus refresh catches later changes. Approval activates the existing shortcut
+automatically in the normal app. Revocation stops the shortcut and cancels an
+armed/recording session when detected, without proactively prompting.
+
+The fallback reveals the actual running app bundle in Finder and displays its
+exact path plus Settings +/Open instructions. Permission actions remain restricted
+to the main renderer. No TCC reset/database change, new entitlement permission,
+account, microphone recording or cross-app insertion is part of setup.
+
+Packaging no longer hardcodes an ad-hoc identity. macOS `package`/`dist` require a
+valid local Developer ID Application certificate/private key; ambiguous identity
+selection requires `CSC_NAME`. Signed builds retain library validation. Explicit
+`package:preview`/`dist:preview` commands preserve the local-preview path, and the
+Electron CI workflow now uses those commands. Publishing is always disabled.
+Optional notarization uses the existing electron-builder Keychain profile path;
+no credentials are stored in the repo or bundle.
+
+Validation: all 103 tests in 13 files, TypeScript and build passed. Existing app
+smoke covered navigation, settings, transcript animation, native icon rendering
+and Dock behavior. The new Accessibility smoke covered prompt deduplication,
+Settings URL, automatic status detection, revocation, Finder path, narrow layout
+and renderer authorization using substituted OS boundaries. It did not grant or
+revoke real Mac permissions. Both permission UI screenshots were visually checked.
+The explicit preview packaged successfully and passed deep/strict signature and
+microphone-entitlement verification. Packaged `app.asar` SHA-256:
+`fe32a83d531fea4e8e93c1ec205c8eec6fb54f5a275d47f750d54fdfa2d94aa2`.
+
+Pending: this Mac reported zero valid signing identities. The signed command was
+verified to fail with a clear certificate requirement rather than producing an
+ad-hoc output. The owner replied that they are arranging Apple signing; signed
+build, actual macOS approval/shortcut verification, and installation wait for
+that certificate. `/Applications/Textify Electron.app` remains preview.7 with its
+existing working grants. No current-user permission was changed in this slice.
+
+## Simplified models page — 2026-09-22
+
+`0.2.0-preview.9` implements the owner's simplified Electron model browser.
+The compact list shows model names and language summaries, with Installed/In use
+when applicable. The detail shows the name, full supported language list,
+versions with download sizes and the appropriate action, followed by one
+clickable upstream link. Import and Remove appear through each version's options
+disclosure. Progress, pause/resume and integrity states remain actionable.
+Provider, purpose, runtime names, descriptions, ratings, repeated captions and
+the general model footnote are removed from this UI. Catalog verification,
+license records, actual model support and inference behavior are unchanged.
+
+The model link passes only a catalog ID through the existing main-only model
+channel. The main process resolves its signed source and permits HTTPS without
+embedded credentials. It does not accept arbitrary renderer URLs, enable window
+navigation, or give the overlay link-opening access.
+
+Validation: 103 tests in 13 files, TypeScript and production build passed. The
+expanded existing UI smoke verifies source resolution, rejection of an arbitrary
+URL as an ID, overlay isolation, search, version options and minimum-width
+layout, alongside existing navigation/overlay/settings checks. Normal and compact
+screenshots were visually reviewed. The separate Accessibility smoke passed
+with substituted OS boundaries. Preview packaging, deep/strict signature,
+microphone entitlements and installed packaged launch all passed.
+
+Installed `/Applications/Textify Electron.app` as a local ad-hoc preview while
+Apple Developer enrollment remains pending. Previous preview.7 is backed up at
+`electron/.native/installed-backups/Textify Electron-before-models-preview9.app`.
+Installed `app.asar` SHA-256:
+`406f82aec5e197d500d2da7ce90fcdf10e33c919d960b6873b1e9320e47be42b`.
+The installed page was visually verified with existing downloaded models and
+Confucius BF16 in use. The stale Accessibility entry was refreshed for this
+same application through System Settings, without changing other permissions.
+After relaunch the UI reports GPU ready, Hold Right Command and microphone
+permission available. Current X 0 / Y 0 / 80% preferences are preserved.
+No new speech/insertion test or Developer ID signing/notarization is claimed.
+This installation also includes the preview.8 guided Accessibility setup.
+
+## Combined General page — 2026-09-22
+
+`0.2.0-preview.10` removes native settings import, including its preview UI,
+preload/IPC endpoint and now-unused converter. The three converter-specific
+tests are removed; ordinary Electron preference upgrades remain covered.
+The former Dictation page is now General and includes Launch at login below
+the dictation preferences. The separate General sidebar entry/component is
+removed; Floating Icon remains on the combined page. Model-file import and
+existing settings are unchanged.
+
+Validation: all 100 remaining tests, TypeScript, build, the existing UI smoke
+and Accessibility smoke passed. The General screenshot was visually reviewed.
+Completed preview packaging passed deep/strict signature and microphone
+entitlement checks. Installed packaged launch and navigation passed.
+Installed app.asar SHA-256:
+`266eeb38e7d3dd295950c5fd61b3389a0cbd6a7466a622de27db5ea4a4a1a3c4`.
+The previous bundle is preserved at
+`electron/.native/installed-backups/Textify Electron-before-general-preview10.app`.
+The existing Accessibility entry was refreshed through System Settings for the
+updated local preview. Apple Developer ID signing remains pending.
+
+## Simpler Privacy page — 2026-09-22
+
+`0.2.0-preview.11` removes the non-interactive Audio and dictated text and
+Clipboard settings rows. The introduction now states that speech is processed
+on this device and no recordings or transcript history are saved. Clipboard
+behavior remains documented in the Electron README. Permission controls and
+app exclusions retain their existing behavior.
+
+Validation: 100 tests, TypeScript, build and existing UI smoke passed. The
+preview passed deep/strict signature and microphone entitlement checks, and
+installed packaged launch/navigation passed. The installed Privacy page was
+visually checked; both explanatory rows are gone and the remaining controls
+fit without the previous long list.
+
+Installed app.asar SHA-256:
+`716fa6ea45577cc4570870bb539a6d9184623352ed247c1423257376e60ef636`.
+Previous preview preserved at
+`electron/.native/installed-backups/Textify Electron-before-privacy-preview11.app`.
+The same application's existing Accessibility entry was refreshed through
+System Settings. This remains a local ad-hoc preview; no new speech/insertion
+test or Developer ID signing/notarization is claimed.
+
+## Excluded apps card — 2026-09-22
+
+`0.2.0-preview.12` presents Excluded apps in a rounded charcoal card matching
+the neighboring permission sections. A blue app glyph, compact header and
+right-aligned Add app action replace the loose heading and button. The picker,
+empty state and saved app rows share the card; Cancel closes the picker and
+successful saves return to the list. App identities and exclusion persistence
+use the existing implementation.
+
+Validation: TypeScript, production build and 100 existing tests passed. An
+isolated run of the existing UI smoke with temporary app-list fixtures checked
+empty/picker/populated layouts, add/remove persistence, and 780px layout without
+horizontal overflow. Screenshots were visually reviewed. Preview packaging,
+deep/strict signature, microphone entitlements and installed launch checks passed.
+The installed Privacy card was visually checked on the user's Mac.
+
+Installed app.asar SHA-256:
+`75ef0b26d05d9c2d40e6805f66bfd2072c3c189cf14b2c4c640820f51283f878`.
+Previous preview preserved at
+`electron/.native/installed-backups/Textify Electron-before-exclusions-preview12.app`.
+The same application's existing Accessibility registration was refreshed through
+System Settings. This is a local ad-hoc preview. No new recording/insertion test
+or Developer ID signing/notarization is claimed.
+
+## Compact studio UI — 2026-09-23
+
+`0.2.0-preview.13` applies the owner-selected compact studio design to General,
+Transcription models, Floating Icon, Vocabulary, Privacy, guided Accessibility
+setup, and the recording overlay. The sidebar and model browser use concise
+rows; model details retain only languages, actionable versions with sizes, and
+the upstream link. General groups its controls and places the Floating Icon
+preview alongside its position and scale controls. Vocabulary uses two cards,
+while Privacy aligns Accessibility, Microphone and Excluded apps in one panel.
+The overlay keeps its destination app icon and three-line upward transcript
+movement, with a gray waveform and restrained red/blue accents.
+
+The redesign changes renderer presentation only. Model files and runtimes,
+preferences, permissions, recording, insertion, and Dock policy are unchanged.
+The UI smoke includes normal and 780px screenshots, navigation, model actions,
+settings persistence, overlay animation and destination-icon checks. All 100
+tests, TypeScript, build and UI smoke passed. The ad-hoc Mac preview passed
+deep/strict code-signature and Audio Input entitlement checks, and the
+installed bundle passed packaged launch, catalog and navigation smoke. Its
+installed `app.asar` SHA-256 is
+`49614c5e662585aed7508b885bc868e383c3c8d262ee7438d44798c2299fce6f`.
+The previous app is backed up at
+`electron/.native/installed-backups/Textify Electron-before-studio-preview13.app`.
+The same app's stale ad-hoc Accessibility entry was removed and the installed
+bundle re-added through System Settings after the owner approved Touch ID.
+System Settings and Textify both show the grant as enabled. The installed
+preview was visually checked on General, Models, Vocabulary, Privacy and
+Floating Icon; it reports GPU ready, Right Command active and Confucius BF16
+in use. The prior X 0 / Y 0 / 80% Floating Icon and Launch at login settings
+remain saved. No new live microphone-to-insertion test or Developer ID signing
+is claimed.

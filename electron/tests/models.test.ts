@@ -52,6 +52,42 @@ describe("catalog trust", () => {
 });
 
 describe("runtime admission", () => {
+  it("verifies the separately signed original BF16 directory and joins its existing checkpoint", async () => {
+    const { catalogModels } = await import("../src/main/models");
+    const extra = await readFile("models/manifest.json");
+    const sig = await readFile("models/manifest.json.sig");
+    const supplement = verifyCatalog(extra, sig);
+    const models = catalogModels(
+      verifyCatalog(bytes, signature),
+      "darwin",
+      "arm64",
+      supplement,
+    );
+    expect(models).toHaveLength(16);
+    const bf16 = models.find((m) => m.id === "confucius4-r2t2-bf16")!;
+    expect(bf16).toMatchObject({
+      directory: true,
+      engine: "audio_cpp",
+      variant: "BF16 · Original",
+      bytes: 4092092714,
+    });
+    expect(
+      models.filter((m) => m.checkpointID === bf16.checkpointID),
+    ).toHaveLength(3);
+    expect(bf16.files).toHaveLength(11);
+    expect(() =>
+      verifyCatalog(Buffer.from(extra.toString().replace("BF16", "FP32")), sig),
+    ).toThrow();
+    supplement.models[0].files[0].filename = "../config.json";
+    expect(() =>
+      catalogModels(
+        verifyCatalog(bytes, signature),
+        "darwin",
+        "arm64",
+        supplement,
+      ),
+    ).toThrow("catalog_artifact");
+  });
   it("admits the four new GGUF checkpoint families on Apple Silicon", async () => {
     const { catalogModels } = await import("../src/main/models");
     const models = catalogModels(

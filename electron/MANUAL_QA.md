@@ -1,4 +1,4 @@
-# Textify Electron desktop checks
+# Textify desktop checks
 
 These checks distinguish actual desktop behavior from automated fixture tests.
 Use a fresh unsigned preview installer. Record the app version, OS version,
@@ -10,7 +10,7 @@ automated Linux checks use Xvfb and do not establish GNOME/KDE Wayland behavior.
 ## Windows quick start
 
 1. Download the Windows artifact ZIP from the successful Electron workflow run,
-   extract it, and run `Textify-Electron-…-win-x64.exe`. The preview is unsigned.
+   extract it, and run `Textify-…-win-x64.exe`. The preview is unsigned.
 2. Open Textify, choose Models, and download Whisper small.en or import the exact
    signed model file. Allow microphone access when starting the first recording.
 3. Hold Textify's microphone button, speak a sentence, release, choose Copy, and
@@ -58,9 +58,9 @@ Use test text only. For focus checks, have Notepad and a browser test field open
 | Remove active model | Dictation becomes unavailable until a model is selected | Pending |
 | Add custom word and replacement pair | Saved across relaunch; replacement remains literal | Pending |
 | Choose Hindi with Whisper large-v3-turbo | Hindi text is preserved without English punctuation-command rewriting | Pending |
-| Import native settings JSON | Preview shown before Apply; original file unchanged | Pending |
 | Enable/disable Launch at login | Registration matches choice on next sign-in | Pending |
 | Change indicator position/scale | Indicator stays within the screen on different monitors | Pending |
+| Confucius live preview exceeds three lines | Older lines move upward smoothly while final text is inserted once on release | Pending |
 
 ## Linux desktop checks
 
@@ -108,8 +108,9 @@ feature builds must repeat CI and record their commit and artifact versions.
 - [x] Final installed, signed Parakeet worker recognizes the public fixture using the imported model.
 - [ ] Owner's physical speech and insertion check with the updated model selection.
 
-New families currently use Metal on Apple Silicon. No MLX/CoreML variants or
-Confucius live previews are claimed for this Electron build.
+New families currently use Metal on Apple Silicon. No MLX/CoreML variants are
+claimed for this Electron build. Confucius live previews need physical speech
+verification before public release.
 
 Implementation `87bc05c` passed all three OS jobs, including packaged launch and
 installer checks: https://github.com/Player0109/Textify/actions/runs/35698952276

@@ -2289,3 +2289,222 @@ Task 1 must merge before parallel Wave 1 work begins.
   the Dock pin still targets Applications. Restored the existing Accessibility
   grant after the ad-hoc signature changed, relaunched, and confirmed GPU ready,
   Hold Right Command and microphone permission available.
+
+## Electron Confucius BF16, Streaming and Floating Bar - 2026-09-22
+
+- The owner requested the original NetEase Confucius4-R2T2 BF16 checkpoint in
+  addition to GGUF, realtime recognition, and the original compact Textify overlay.
+- This slice owns `electron/` and its documentation, including a separately signed
+  `electron/models/manifest.json` BF16 entry. The original Swift catalog schema
+  does not admit audio.cpp safetensors directories; keep its catalog and sources
+  unchanged. Verify both catalogs with the existing embedded keys and apply the
+  same sticky revocation policy to all artifacts. Do not change GPU policy.
+- Use the pinned audio.cpp runtime for original safetensors and GGUF on Apple
+  Silicon. Stream ephemeral previews during capture; preserve one final insertion
+  on release, cancellation, target ownership and the five-minute session bound.
+- Follow the native overlay's compact identity row, waveform, subtle colored
+  border and three-line live preview. Preserve Electron's Copy recovery action,
+  macOS panel behavior, `skipTransformProcessType`, and normal Dock visibility.
+
+### Floating bar reference correction
+
+- Owner supplied the original overlay screenshots and requested its smooth gray
+  waveform and actual destination app icon. This follow-up owns the Electron
+  overlay, its target-identity snapshot, and the Mac helper's icon serialization.
+  Read the Swift overlay as the visual reference; do not edit its implementation
+  or change capture, model inference, hotkeys, or insertion behavior.
+- Follow-up: restore the native 140 ms upward transition when live text wraps
+  beyond three lines. The owner explicitly requested always-on floating-bar
+  motion and no Reduce Motion control; this supersedes the overlay's earlier
+  reduced-motion behavior for the Electron implementation only.
+
+### Floating Icon settings
+
+- Owner requested the native Floating Icon setter. This slice owns a dedicated
+  Electron Dictation settings component, removal of the old General numeric
+  controls, preview styling, and the overlay's placement calculation. Keep the
+  existing preferences and ranges; positive Y means up, matching native Textify.
+  Include live preview, precise values, sliders, steppers, reset, persistence and
+  visible-frame clamping. Keep animations on and leave inference/insertion alone.
+
+### Guided Accessibility setup
+
+- Owner approved the researched Accessibility improvements. This slice owns the
+  Electron permission state/controller, main-process trust checks and shortcut
+  activation, renderer setup card, fixed app-location fallback, focused tests,
+  and packaging configuration/documentation. Preserve the OS approval boundary;
+  never edit TCC databases or automatically reset permissions.
+- Use a consistent Apple-issued signing identity when available. This Mac has no
+  valid code-signing identity at intake. Signed packaging must fail clearly when
+  one is missing; ad-hoc packaging remains an explicit local-preview command.
+  Native Swift sources, model catalogs, inference and insertion stay unchanged.
+- Packaging command changes also own the Electron CI workflow's invocation of
+  explicitly unsigned preview packaging; do not change CI credentials or scope.
+
+### Simplified Electron model browser
+
+- Owner requested model names, supported languages, installable versions with
+  sizes, and an upstream link, removing the repeated explanatory metadata.
+  This supersedes the detailed Models presentation in SPEC section 13.3 for
+  Electron only. Own `ModelsPane.tsx`, model-specific styles, the Models header,
+  a catalog-ID-only source-link command, UI verification and preview packaging.
+- Keep Installed/In use, download progress and actionable integrity states.
+  Put Import/Remove behind a version's options disclosure; retain their existing
+  verification and confirmation behavior. Catalog data and runtimes are unchanged.
+- Design: existing system/rounded headings; #11151c page, #151a23 list,
+  #1d222c detail, #102b49 selection, #0a84ff actions, #e7eaf0 text.
+  A compact left-aligned model list sits beside name, full language list,
+  version/action rows and one source link. Remove decorative captions and
+  repeated facts, preserving Textify's existing charcoal/blue styling.
+
+### Remove native settings import
+
+- Owner requested removal of Import native Textify settings. Own the Electron
+  General row/preview and description, its preload/IPC interface, the unused
+  native-settings conversion function and only its tests, related styling/docs,
+  and preview packaging. Preserve existing preferences, normal Electron settings
+  upgrades, launch at login, and model-file import.
+- Follow-up: move Launch at login into the Dictation page and rename that page
+  General. Remove the separate General destination; preserve the recording
+  controls, Floating Icon section and the current startup preference. This also
+  owns the existing smoke scripts' page labels and relevant README navigation.
+
+### Simplify Privacy explanations
+
+- Owner questioned the non-interactive Audio and dictated text and Clipboard
+  rows. Own their removal from the Electron Privacy page and a concise retention
+  statement in the introduction. Keep microphone and Accessibility controls,
+  app exclusions, and all privacy behavior unchanged. Clipboard behavior remains
+  documented in the Electron README. Verify and install the updated preview.
+
+### Excluded apps card
+
+- Owner requested that Excluded apps match the Accessibility and Microphone
+  sections. Own `Exclusions.tsx`, its scoped styles and preview verification.
+  Keep the existing app picker, exclusion identities and save behavior.
+- Use the existing system typeface, #191f2980 card, #ffffff14 border,
+  #e7eaf0 text, #9ba4b4 secondary text and #0a84ff accent. Layout is left-aligned:
+  [app icon | heading and explanation | Add app], with the picker or app list
+  below a divider. Match the neighboring card rather than introducing a new
+  visual style; keep the empty state compact and controls aligned at narrow widths.
+
+### Electron studio UI rollout — 2026-09-23
+
+- The owner selected the compact studio-inventory concept C for Transcription
+  models and approved matching concepts for General, Floating Icon, Vocabulary,
+  Privacy, Accessibility setup, download progress and the floating dictation bar.
+- This follow-up owns Electron renderer markup and styling, UI smoke coverage,
+  Electron documentation and local preview packaging. Preserve the existing
+  model catalog, downloaded files, preferences, permission behavior, recording,
+  live transcript movement, insertion, and Dock process type. No Swift source
+  or release-signing changes belong to this slice.
+- Verify the actual installed preview at the default Mac window size and at a
+  narrow size, including model selection/actions, settings persistence, the
+  Accessibility state, and the three-line overlay.
+- Completed as `0.2.0-preview.13`: 100 tests, TypeScript, build, UI smoke,
+  Accessibility smoke, ad-hoc signature/entitlement and packaged launch checks
+  passed. Isolated UI screenshots covered default and 780px widths; the
+  installed app was visually checked at the default size on all four pages and
+  the Floating Icon controls. The existing Accessibility grant was refreshed
+  with owner-approved Touch ID, and the installed app reports GPU ready,
+  Confucius BF16 in use and Right Command active. No model/runtime or
+  preference value was changed.
+
+### Electron model publisher logos — 2026-09-23
+
+- This follow-up owns the Electron model browser renderer, model-specific
+  styling, bundled publisher images, their notices, UI smoke coverage, and the
+  local preview package. The signed model catalog and model runtime are unchanged.
+- Completed as `0.2.0-preview.14`: official profile/site logos for OpenAI,
+  Qwen, NVIDIA and NetEase Youdao appear beside every model and in the selected
+  model header. TypeScript, 100 tests, production build, UI smoke, ad-hoc
+  signature/entitlement checks and packaged launch passed. The installed Mac
+  app was visually checked, and its existing Accessibility permission was
+  refreshed after the ad-hoc update. Confucius BF16 and Right Command remain
+  selected.
+- Refined as `0.2.0-preview.15`: publisher marks now sit on subtle dark tiles,
+  with contrast adjustments for OpenAI and NetEase Youdao and NVIDIA's official
+  dark-background logo. TypeScript, 100 tests, build, UI smoke, signature and
+  packaged launch checks passed. Installed app visual inspection confirmed the
+  logo treatment and Confucius BF16 in use; its existing Accessibility grant
+  was refreshed and Right Command is active.
+
+### Electron Accessibility drag helper — 2026-09-23
+
+- This follow-up owns the Electron macOS Accessibility setup card, a small
+  Settings-overlay helper, its restricted native-file-drag IPC, and setup smoke
+  coverage. The helper drags only the exact running app bundle; the user still
+  decides whether to add it and enable the macOS switch. The Finder route stays
+  available for keyboard access and fallback.
+- The new helper and its 780px setup layout passed isolated macOS UI smoke;
+  TypeScript, 100 tests, build and the broader Electron smoke passed. Preview
+  packaging and installed-app checks are recorded after completion below.
+- Completed as `0.2.0-preview.17`: the packaged app passed strict code-signature,
+  entitlement and launch checks and was installed at
+  `/Applications/Textify Electron.app`. The owner confirmed that dragging the
+  helper icon into macOS Accessibility settings works. The installed app reports
+  Confucius BF16 in use and Right Command ready after permission detection.
+
+### Electron microphone control alignment — 2026-09-23
+
+- The General page now places Check microphone directly beneath the microphone
+  selector, aligned to its left edge. No microphone behavior or preference
+  handling changed.
+- Installed as `0.2.0-preview.18`. TypeScript, 100 tests, build, UI smoke,
+  signature, entitlement and packaged-launch checks passed. The installed
+  General page was visually checked with Confucius BF16 and Right Command ready;
+  a 780px layout capture confirmed the row stays aligned without overflow.
+- Follow-up: aligned Check microphone to the selector's right edge in
+  `0.2.0-preview.19`. TypeScript, 100 tests, build, signature, packaged-launch,
+  780px layout, and the installed General page were checked.
+
+### Electron floating-icon shortcut removal — 2026-09-23
+
+- The General page's Adjust position button only scrolled to the Floating Icon
+  controls immediately below it. Removed that duplicate shortcut card and its
+  unused styles; the preview and X/Y/scale controls remain in place.
+- Installed as `0.2.0-preview.20`. TypeScript, 100 tests, build, UI smoke,
+  signature, entitlement, and packaged-launch checks passed. The installed app
+  returned to a ready state with the single Floating Icon section visible.
+
+### Electron silent no-result dictation — 2026-09-23
+
+- The floating bar's “could not recognize clear speech” message was shown for
+  rejected ASR output or empty processed text, including filtered hallucinations.
+  Full silence also showed a separate error. These no-result cases now return to
+  idle without a message, matching the spec's silent no-op behavior. Missing
+  microphone audio and actual capture/model failures still show actionable errors.
+- Installed as `0.2.0-preview.21`. TypeScript, 101 tests, build, UI smoke,
+  signature, entitlement, and packaged-launch checks passed. The installed app
+  returned to GPU-ready state with Right Command active after its existing
+  Accessibility switch was refreshed.
+
+### Electron product rename — 2026-09-23
+
+- The Electron preview's visible product name, macOS bundle/executable, window
+  title, Linux autostart label, and release artifact prefix are now `Textify`.
+  The existing Electron bundle ID and `Textify Electron` app-data directory
+  remain stable so installed models and preferences carry forward, and the
+  separate native Swift app is unaffected.
+- Installed `0.2.0-preview.22` at `/Applications/Textify.app` after moving the
+  previous preview bundle to `electron/.native/installed-backups/`. The installed
+  app reports Confucius4-R2T2 1.7B, English, Right Command, GPU ready, and the
+  saved Floating Icon scale. Its Accessibility grant was refreshed through
+  macOS Settings and the global shortcut returned to ready state.
+- TypeScript, 101 tests, build, Electron smoke, strict packaged-signature and
+  launch checks passed. The generated macOS DMG contains `Textify.app` and its
+  SHA-256 checksum verifies.
+
+### Electron public-release preparation — 2026-09-23
+
+- The repository front page now distinguishes its existing published native
+  Mac preview from the unpublished cross-platform desktop app. A desktop
+  release procedure and separate signed-release installation notes were added.
+- Production Mac packaging now refuses to proceed without notarization
+  credentials and a Developer ID Application identity; the only currently
+  available Keychain identity is Apple Development. CI still creates explicit
+  unsigned previews on three platforms. The remaining physical-device checks
+  in `electron/MANUAL_QA.md` are release gates, not recorded as passed.
+- The `0.2.0-preview.22` Mac preview passes TypeScript, 101 tests, build,
+  Electron smoke, and DMG checksum verification. Both no-credential and
+  no-Developer-ID production packaging paths stop before making an artifact.

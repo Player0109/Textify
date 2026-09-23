@@ -28,6 +28,7 @@ export interface Preferences {
 }
 export type ModelEngine = "whisper_cpp" | "transcribe_cpp" | "audio_cpp";
 export interface ModelView {
+  directory: boolean;
   engine: ModelEngine;
   checkpointID: string;
   description: string;
@@ -50,8 +51,17 @@ export interface Snapshot {
   message: string;
   level: number;
   elapsed: number;
+  preview: string;
+  application: string;
+  applicationIcon: string;
   platform: string;
   triggerStatus: string;
+  triggerEnabled: boolean;
+  accessibility: {
+    status: "required" | "waiting" | "granted";
+    appName: string;
+    appPath: string;
+  } | null;
   insertion: "automatic" | "copy";
   ready: boolean;
   gpu: { backend: "Metal" | "Vulkan"; device: string } | null;
@@ -71,12 +81,14 @@ export type Action =
   | "dismiss"
   | "microphone"
   | "permissions"
+  | "permission-settings"
+  | "reveal-app"
   | "enable-trigger"
   | "download"
   | "cancel-download"
   | "import";
 export type ModelCommand = {
-  action: "download" | "import" | "use" | "verify" | "remove";
+  action: "download" | "import" | "use" | "verify" | "remove" | "source";
   id: string;
 };
 export type AudioCommand = {
@@ -96,14 +108,11 @@ export interface TextifyBridge {
   preferences(value: Preferences): Promise<void>;
   model(command: ModelCommand): Promise<void>;
   apps(): Promise<{ id: string; name: string }[]>;
-  importSettings(): Promise<{
-    preferences: Preferences;
-    notes: string[];
-  } | null>;
   subscribe(callback: (state: Snapshot) => void): () => void;
   audioListen(callback: (command: AudioCommand) => void): () => void;
   audioReply(reply: AudioReply): void;
   devices(): Promise<{ id: string; name: string }[]>;
+  accessibilityHelp(command: "drag" | "dismiss" | "reveal"): void;
 }
 declare global {
   interface Window {

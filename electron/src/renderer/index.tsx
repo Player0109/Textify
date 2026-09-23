@@ -3,9 +3,13 @@ import { createRoot } from "react-dom/client";
 import type { Action, Snapshot, ModelCommand } from "../shared";
 import { startAudioRenderer } from "./audio";
 import "./style.css";
+import "./studio.css";
 import { LANGUAGES } from "../shared";
 import { ModelsPane } from "./ModelsPane";
-import { GeneralPane } from "./GeneralPane";
+import { Overlay } from "./Overlay";
+import { FloatingIconSettings } from "./FloatingIconSettings";
+import { AccessibilitySetup } from "./AccessibilitySetup";
+import { AccessibilityDragHelp } from "./AccessibilityDragHelp";
 import { CustomWords } from "./CustomWords";
 import { Exclusions } from "./Exclusions";
 import textifyIcon from "../../assets/textify-icon.png";
@@ -45,51 +49,9 @@ function useSnapshot() {
   }, []);
   return state;
 }
-function Overlay() {
+function FloatingBar() {
   const state = useSnapshot();
-  if (!state) return null;
-  const copy = state.phase === "copy";
-  return (
-    <div className="overlay">
-      <Wave level={state.level} />
-      <div className="overlay-content">
-        <strong>
-          {state.phase === "recording"
-            ? "Listening"
-            : copy
-              ? "Ready to copy"
-              : state.phase === "error"
-                ? "Dictation stopped"
-                : "Transcribing"}
-        </strong>
-        <span>
-          {state.phase === "recording"
-            ? `${state.elapsed}s · Release to finish`
-            : copy
-              ? "Paste into your app after copying."
-              : state.message || "Processing on your device"}
-        </span>
-      </div>
-      {copy ? (
-        <button onClick={() => void window.textify.action("copy")}>Copy</button>
-      ) : null}
-      {["recording", "error", "copy"].includes(state.phase) && (
-        <button
-          className="icon-button"
-          aria-label={
-            state.phase === "recording" ? "Cancel dictation" : "Dismiss"
-          }
-          onClick={() =>
-            void window.textify.action(
-              state.phase === "recording" ? "cancel" : "dismiss",
-            )
-          }
-        >
-          ×
-        </button>
-      )}
-    </div>
-  );
+  return state ? <Overlay state={state} /> : null;
 }
 function NavIcon({ name }: { name: string }) {
   return (
@@ -103,19 +65,13 @@ function NavIcon({ name }: { name: string }) {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      {name === "Dictation" ? (
+      {name === "Models" ? (
         <>
-          <rect x="9" y="3" width="6" height="12" rx="3" />
-          <path d="M5 11a7 7 0 0 0 14 0M12 18v3m-3 0h6" />
-        </>
-      ) : name === "Models" ? (
-        <>
-          <rect x="5" y="5" width="14" height="14" rx="3" />
-          <path d="M9 9h6v6H9zM9 2v3m6-3v3M9 19v3m6-3v3M2 9h3m-3 6h3m14-6h3m-3 6h3" />
+          <path d="M3 10v4m4-8v12m4-15v18m4-13v8m4-11v14m4-9v4" />
         </>
       ) : name === "Vocabulary" ? (
         <>
-          <path d="M3 18 8 5l5 13M5 13h6M16 11c6-4 7 9 0 6-3-2 2-4 5-3" />
+          <path d="M12 20c-2-1.5-5-2.2-9-1.8V4.5c4-.4 7 .3 9 1.8m0 13.7c2-1.5 5-2.2 9-1.8V4.5c-4-.4-7 .3-9 1.8M12 6.3V20" />
         </>
       ) : name === "Privacy" ? (
         <>
@@ -124,25 +80,17 @@ function NavIcon({ name }: { name: string }) {
         </>
       ) : (
         <>
-          <path d="M4 6h16M4 12h16M4 18h16" />
-          <circle cx="9" cy="6" r="2" fill="#0d1118" />
-          <circle cx="15" cy="12" r="2" fill="#0d1118" />
-          <circle cx="8" cy="18" r="2" fill="#0d1118" />
+          <circle cx="12" cy="12" r="3" />
+          <path d="M10 2h4l.5 2.4 1.8.8 2.1-1.1 2.8 2.8-1.1 2.1.8 1.8L23 11v4l-2.4.5-.8 1.8 1.1 2.1-2.8 2.8-2.1-1.1-1.8.8L14 23h-4l-.5-2.4-1.8-.8-2.1 1.1-2.8-2.8 1.1-2.1-.8-1.8L1 15v-4l2.4-.5.8-1.8-1.1-2.1 2.8-2.8 2.1 1.1 1.8-.8z" />
         </>
       )}
     </svg>
   );
 }
-const panes = [
-  "Dictation",
-  "Models",
-  "Vocabulary",
-  "Privacy",
-  "General",
-] as const;
+const panes = ["General", "Models", "Vocabulary", "Privacy"] as const;
 function App() {
   const state = useSnapshot();
-  const [pane, setPane] = useState<(typeof panes)[number]>("Dictation");
+  const [pane, setPane] = useState<(typeof panes)[number]>("General");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [devices, setDevices] = useState<{ id: string; name: string }[]>([]);
@@ -163,9 +111,8 @@ function App() {
     };
   }, []);
   if (!state) return <main className="loading">Opening Textify…</main>;
-  const working =
-    state.modelBusy ||
-    ["armed", "recording", "processing", "inserting"].includes(state.phase);
+  const dictating = ["armed", "recording", "processing", "inserting"].includes(state.phase);
+  const working = state.modelBusy || dictating;
   async function run(action: Action) {
     setBusy(true);
     setError("");
@@ -194,16 +141,19 @@ function App() {
     }
   }
   async function runModel(command: ModelCommand) {
-    setBusy(true);
+    const changesModel = command.action !== "source";
+    if (changesModel) setBusy(true);
     setError("");
     try {
       await window.textify.model(command);
     } catch {
       setError(
-        "The model action could not finish. Check the model status, available storage, and selected language.",
+        command.action === "source"
+          ? "The model page could not open. Try the link again."
+          : "The model action could not finish. Check the model status, available storage, and selected language.",
       );
     } finally {
-      setBusy(false);
+      if (changesModel) setBusy(false);
     }
   }
   const activeModel = state.models.find(
@@ -220,70 +170,52 @@ function App() {
             ? "Ready when you are"
             : "Set up your first dictation";
   return (
-    <div className="app-shell">
+    <div className="app-shell studio">
       <aside>
         <div className="brand">
           <img className="brand-mark" src={textifyIcon} alt="" />
           <div className="brand-copy">
             <strong>Textify</strong>
-            <small>ON-DEVICE DICTATION</small>
           </div>
         </div>
         <nav aria-label="Settings">
-          {panes.map((name, i) => (
-            <React.Fragment key={name}>
-              {(i === 0 || i === 3) && (
-                <div className="nav-section">
-                  {i === 0 ? "SETUP" : "SYSTEM"}
-                </div>
-              )}
-              <button
-                aria-current={pane === name ? "page" : undefined}
-                onClick={() => setPane(name)}
-              >
-                <span aria-hidden="true">
-                  <NavIcon name={name} />
-                </span>
-                {name === "Models" ? "Transcription models" : name}
-              </button>
-            </React.Fragment>
+          {panes.map((name) => (
+            <button
+              key={name}
+              aria-current={pane === name ? "page" : undefined}
+              onClick={() => setPane(name)}
+            >
+              <span aria-hidden="true">
+                <NavIcon name={name} />
+              </span>
+              {name === "Models" ? "Transcription models" : name}
+            </button>
           ))}
         </nav>
-        <div className="sidebar-note">
-          <span className="privacy-dot" /> On-device dictation
-          <p>
-            {state.platform}
-            <br />
-            Electron preview 0.2
-          </p>
-        </div>
       </aside>
       <main className={pane === "Models" ? "models-main" : undefined}>
         <header>
           <div>
             <h1>{pane === "Models" ? "Transcription models" : pane}</h1>
-            <p>
-              {pane === "Dictation"
-                ? "Your voice, ready for wherever you write."
-                : pane === "Models"
-                  ? "Speech recognition that stays on your device."
-                  : pane === "Vocabulary"
-                    ? "Keep names and phrases the way you write them."
-                    : pane === "General"
-                      ? "Startup, recording indicator, and settings import."
-                      : "A small footprint on your private information."}
-            </p>
+            {pane === "Vocabulary" && (
+              <p>
+                Custom words apply to Whisper models. Replacement pairs work
+                with every model.
+              </p>
+            )}
           </div>
-          <span className="offline-tag">Offline after setup</span>
         </header>
         {(error || state.message) && (
           <div className="notice" role="status">
             {error || state.message}
           </div>
         )}
-        {pane === "Dictation" && (
+        {pane === "General" && (
           <>
-            <section className="dictation-stage" aria-label="Record dictation">
+            {state.accessibility && state.accessibility.status !== "granted" && (
+              <AccessibilitySetup state={state} busy={busy || dictating} run={run} />
+            )}
+            <section className={`dictation-stage ${state.phase === "recording" ? "is-recording" : ""}`} aria-label="Record dictation">
               <div className="stage-copy">
                 <div className="ready-label">
                   <span className={state.ready ? "ready-dot" : "waiting-dot"} />
@@ -295,19 +227,15 @@ function App() {
                     ? state.triggerStatus
                     : "Dictation requires a supported GPU and an installed speech model."}
                 </p>
-                {state.gpu && (
-                  <p>
-                    {state.gpu.device} · {state.gpu.backend}
-                  </p>
+                {state.ready && activeModel && (
+                  <p className="stage-model">Using <strong>{activeModel.name}</strong></p>
                 )}
-                <div className="level-row">
-                  <Wave level={state.level} />
-                  <span>
-                    {state.phase === "recording"
-                      ? `${state.elapsed}s recorded`
-                      : "Hold to speak. Release to finish."}
-                  </span>
-                </div>
+                {state.phase === "recording" && (
+                  <div className="level-row">
+                    <Wave level={state.level} />
+                    <span>{state.elapsed}s recorded</span>
+                  </div>
+                )}
               </div>
               <button
                 className={`record-button ${state.phase === "recording" ? "recording" : ""}`}
@@ -359,13 +287,11 @@ function App() {
               <div className="setting-row">
                 <div>
                   <h3>Speech model</h3>
-                  <p>
-                    {state.ready
-                      ? `${activeModel?.name} · ${LANGUAGES[state.preferences.language] ?? state.preferences.language}`
-                      : state.modelBusy
-                        ? "Preparing the model…"
-                        : "One model is required to dictate."}
-                  </p>
+                  <p>{state.ready
+                    ? activeModel?.name
+                    : state.modelBusy
+                      ? "Preparing the model…"
+                      : "One model is required to dictate."}</p>
                 </div>
                 <button className="secondary" onClick={() => setPane("Models")}>
                   {state.ready ? "View model" : "Choose model"}
@@ -374,10 +300,6 @@ function App() {
               <div className="setting-row">
                 <div>
                   <h3>Dictation language</h3>
-                  <p>
-                    Only languages supported by the selected model are
-                    available.
-                  </p>
                 </div>
                 <select
                   aria-label="Dictation language"
@@ -408,12 +330,8 @@ function App() {
               <div className="setting-row">
                 <div>
                   <h3>Microphone</h3>
-                  <p>
-                    Audio is captured only while dictating or checking
-                    permission.
-                  </p>
                 </div>
-                <div className="control-stack">
+                <div className="control-stack microphone-control">
                   <select
                     aria-label="Microphone"
                     disabled={working || busy}
@@ -454,7 +372,6 @@ function App() {
               <div className="setting-row">
                 <div>
                   <h3>Dictation trigger</h3>
-                  <p>{state.triggerStatus}</p>
                 </div>
                 <div className="control-stack">
                   <select
@@ -480,23 +397,20 @@ function App() {
                     <option value="right-control">Right Control</option>
                     <option value="control-space">Control + Space</option>
                   </select>
-                  <button
-                    className="text-button"
-                    disabled={working || busy}
-                    onClick={() => void run("enable-trigger")}
-                  >
-                    Enable global trigger
-                  </button>
+                  {!state.triggerEnabled && (!state.accessibility || state.accessibility.status === "granted") && (
+                    <button
+                      className="text-button"
+                      disabled={working || busy}
+                      onClick={() => void run("enable-trigger")}
+                    >
+                      Enable global trigger
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="setting-row">
                 <div>
                   <h3>Text delivery</h3>
-                  <p>
-                    {state.insertion === "automatic"
-                      ? "Global dictation pastes into the original app. The microphone button above offers Copy."
-                      : "Copy your completed dictation, then paste it into your app."}
-                  </p>
                 </div>
                 <span className="value-label">
                   {state.insertion === "automatic"
@@ -504,7 +418,29 @@ function App() {
                     : "Copy and paste"}
                 </span>
               </div>
+              <div className="setting-row">
+                <div>
+                  <h3>Launch at login</h3>
+                </div>
+                <input
+                  type="checkbox"
+                  aria-label="Launch at login"
+                  checked={state.preferences.launchAtLogin}
+                  disabled={working || busy || !state.startupAvailable}
+                  onChange={(event) =>
+                    void save({
+                      ...state.preferences,
+                      launchAtLogin: event.target.checked,
+                    })
+                  }
+                />
+              </div>
             </section>
+            <FloatingIconSettings
+              preferences={state.preferences}
+              busy={working || busy}
+              save={save}
+            />
             <p className="footnote">
               {state.platform.includes("Wayland")
                 ? "Use Cancel in the recording indicator to cancel."
@@ -516,115 +452,100 @@ function App() {
         {pane === "Models" && (
           <ModelsPane state={state} busy={working || busy} run={runModel} />
         )}
-        {pane === "General" && (
-          <GeneralPane
-            state={state}
-            busy={working || busy || state.modelBusy}
-            save={save}
-          />
-        )}
-        {pane === "Vocabulary" && !activeModel?.vocabulary && (
-          <div className="notice">
-            Custom words apply to Whisper models. Replacement pairs work with
-            every model.
-          </div>
-        )}
         {pane === "Vocabulary" && (
-          <CustomWords
-            preferences={state.preferences}
-            busy={working || busy || state.modelBusy}
-            save={save}
-          />
-        )}
-        {pane === "Vocabulary" && (
-          <section className="vocabulary">
-            <h2>Replacement pairs</h2>
-            <p>
-              Replace a spoken word or phrase with the exact text you choose.
-            </p>
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (trigger.trim() && replacement.trim())
-                  void save({
-                    ...state.preferences,
-                    replacements: [
-                      ...state.preferences.replacements,
-                      { trigger, replacement },
-                    ],
-                  }).then((saved) => {
-                    if (saved) {
-                      setTrigger("");
-                      setReplacement("");
-                    }
-                  });
-              }}
-            >
-              <label>
-                When I say
-                <input
-                  required
-                  maxLength={200}
-                  value={trigger}
-                  onChange={(e) => setTrigger(e.target.value)}
-                  placeholder="text if eye"
-                />
-              </label>
-              <label>
-                Replace with
-                <input
-                  required
-                  maxLength={1000}
-                  value={replacement}
-                  onChange={(e) => setReplacement(e.target.value)}
-                  placeholder="Textify"
-                />
-              </label>
-              <button disabled={working || busy}>Add pair</button>
-            </form>
-            {state.preferences.replacements.length ? (
-              <ul>
-                {state.preferences.replacements.map((pair, i) => (
-                  <li key={pair.trigger}>
-                    <span>{pair.trigger}</span>
-                    <strong>{pair.replacement}</strong>
-                    <button
-                      className="text-button"
-                      disabled={working || busy}
-                      onClick={() =>
-                        void save({
-                          ...state.preferences,
-                          replacements: state.preferences.replacements.filter(
-                            (_, index) => index !== i,
-                          ),
-                        })
+          <div className="vocabulary-grid">
+            <CustomWords
+              preferences={state.preferences}
+              busy={working || busy || state.modelBusy}
+              save={save}
+            />
+            <section className="vocabulary vocabulary-panel">
+              <h2>Replacement pairs</h2>
+              <p>
+                Replace a spoken word or phrase with the exact text you choose.
+              </p>
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (trigger.trim() && replacement.trim())
+                    void save({
+                      ...state.preferences,
+                      replacements: [
+                        ...state.preferences.replacements,
+                        { trigger, replacement },
+                      ],
+                    }).then((saved) => {
+                      if (saved) {
+                        setTrigger("");
+                        setReplacement("");
                       }
-                    >
-                      Remove
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="empty">
-                <strong>No replacement pairs yet</strong>
-                <p>Add names, abbreviations, or phrases you use often.</p>
-              </div>
-            )}
-          </section>
+                    });
+                }}
+              >
+                <label>
+                  When I say
+                  <input
+                    required
+                    maxLength={200}
+                    value={trigger}
+                    onChange={(e) => setTrigger(e.target.value)}
+                    placeholder="text if eye"
+                  />
+                </label>
+                <label>
+                  Replace with
+                  <input
+                    required
+                    maxLength={1000}
+                    value={replacement}
+                    onChange={(e) => setReplacement(e.target.value)}
+                    placeholder="Textify"
+                  />
+                </label>
+                <button disabled={working || busy}>Add pair</button>
+              </form>
+              {state.preferences.replacements.length ? (
+                <ul>
+                  {state.preferences.replacements.map((pair, i) => (
+                    <li key={pair.trigger}>
+                      <span>{pair.trigger}</span>
+                      <strong>{pair.replacement}</strong>
+                      <button
+                        className="text-button"
+                        disabled={working || busy}
+                        onClick={() =>
+                          void save({
+                            ...state.preferences,
+                            replacements: state.preferences.replacements.filter(
+                              (_, index) => index !== i,
+                            ),
+                          })
+                        }
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="vocabulary-empty">No replacement pairs yet</div>
+              )}
+            </section>
+          </div>
         )}
         {pane === "Privacy" && (
           <section className="privacy">
             <div className="privacy-intro">
-              <span className="privacy-symbol">◇</span>
               <h2>Your speech stays here.</h2>
               <p>
-                Textify processes audio on this device. There are no accounts,
-                analytics, or transcript uploads.
+                Textify processes speech on this device. No recordings or
+                transcript history are saved.
               </p>
             </div>
-            <div className="settings-list">
-              <div className="setting-row">
+            <div className="privacy-workspace">
+              <AccessibilitySetup state={state} busy={busy || dictating} run={run} />
+              <div className="privacy-microphone">
+                <span className="privacy-microphone-icon"><Microphone /></span>
                 <div>
                   <h3>Microphone permission</h3>
                   <p>
@@ -639,41 +560,8 @@ function App() {
                   Check microphone
                 </button>
               </div>
-              {state.platform === "macOS" && (
-                <div className="setting-row">
-                  <div>
-                    <h3>Accessibility permission</h3>
-                    <p>Needed for global keys and pasting into another app.</p>
-                  </div>
-                  <button
-                    className="secondary"
-                    onClick={() => void run("permissions")}
-                  >
-                    Open settings
-                  </button>
-                </div>
-              )}
-              <div className="setting-row">
-                <div>
-                  <h3>Audio and dictated text</h3>
-                  <p>
-                    Audio stays in memory. No recordings or transcript history
-                    are saved.
-                  </p>
-                </div>
-              </div>
-              <div className="setting-row">
-                <div>
-                  <h3>Clipboard</h3>
-                  <p>
-                    Automatic insertion restores the previous clipboard when it
-                    has not changed. Explicit Copy replaces it until you copy
-                    something else.
-                  </p>
-                </div>
-              </div>
+              <Exclusions state={state} busy={working || busy} save={save} />
             </div>
-            <Exclusions state={state} busy={working || busy} save={save} />
             <p className="footnote">
               Network access is used only when you choose to download a model.
               Model hosts receive normal download request information.
@@ -688,7 +576,9 @@ if (mode === "audio") startAudioRenderer();
 else {
   document.documentElement.classList.toggle("overlay-page", mode === "overlay");
   document.body.classList.toggle("overlay-page", mode === "overlay");
+  document.documentElement.classList.toggle("accessibility-help-page", mode === "accessibility-help");
+  document.body.classList.toggle("accessibility-help-page", mode === "accessibility-help");
   createRoot(document.getElementById("root")!).render(
-    mode === "overlay" ? <Overlay /> : <App />,
+    mode === "overlay" ? <FloatingBar /> : mode === "accessibility-help" ? <AccessibilityDragHelp /> : <App />,
   );
 }

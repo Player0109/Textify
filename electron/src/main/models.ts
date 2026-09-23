@@ -6,6 +6,7 @@ import {
   stat,
   writeFile,
   readdir,
+  lstat,
 } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { verifyCatalog } from "./trust";
@@ -23,6 +24,7 @@ const supported: Record<string, string> = {
 };
 export interface Model extends ModelView {
   file: ModelFile;
+  files: ModelFile[];
   restorations: string[];
 }
 const macArtifacts: Record<string, string> = {
@@ -45,33 +47,75 @@ export function catalogModels(
   catalog: any,
   platform = process.platform,
   arch = process.arch,
+  supplement?: any,
 ): Model[] {
+  if (
+    supplement &&
+    (supplement.models?.length !== 1 ||
+      supplement.models[0].id !== "confucius4-r2t2-bf16" ||
+      catalog.models.some((entry: any) => entry.id === "confucius4-r2t2-bf16"))
+  )
+    throw new Error("catalog_model");
   const engines = {
     ...Object.fromEntries(
       Object.keys(supported).map((id) => [id, "whisper_cpp"]),
     ),
     ...(platform === "darwin" && arch === "arm64" ? macArtifacts : {}),
+    ...(supplement && platform === "darwin" && arch === "arm64"
+      ? { "confucius4-r2t2-bf16": "audio_cpp" }
+      : {}),
   };
   return Object.entries(engines).map(([id, engine]) => {
-    const entry = catalog.models.find((item: any) => item.id === id);
+    const source = id === "confucius4-r2t2-bf16" ? supplement : catalog;
+    const entry = source.models.find((item: any) => item.id === id);
+    const directory = id === "confucius4-r2t2-bf16";
     if (
       !entry ||
-      entry.files?.length !== 1 ||
+      !Array.isArray(entry.files) ||
+      !entry.files.length ||
+      (!directory && entry.files.length !== 1) ||
       entry.runtime?.engine !== engine ||
-      entry.runtime?.artifactLayout !== "single_file"
+      entry.runtime?.artifactLayout !==
+        (directory ? "model_directory" : "single_file")
     )
       throw new Error("catalog_model");
-    const file = entry.files[0] as ModelFile;
-    if (
-      !/^[a-f0-9]{64}$/.test(file.sha256) ||
-      !Number.isSafeInteger(file.sizeBytes) ||
-      file.sizeBytes <= 0 ||
-      !/^[a-zA-Z0-9._-]+\.(bin|gguf)$/.test(file.filename) ||
-      !/^https:\/\/(github\.com\/Player0109\/Textify\/releases\/download\/[^/]+\/[^/]+|huggingface\.co\/[^/]+\/[^/]+\/resolve\/[a-f0-9]{40}\/[^?#]+)$/.test(
-        file.url,
+    const files = entry.files as ModelFile[];
+    for (const file of files) {
+      if (
+        !/^[a-f0-9]{64}$/.test(file.sha256) ||
+        !Number.isSafeInteger(file.sizeBytes) ||
+        file.sizeBytes <= 0 ||
+        !(
+          directory
+            ? /^[a-zA-Z0-9_-]+\.(json|txt|safetensors)$/
+            : /^[a-zA-Z0-9._-]+\.(bin|gguf)$/
+        ).test(file.filename) ||
+        (directory && (file as any).relativePath !== file.filename) ||
+        !/^https:\/\/(github\.com\/Player0109\/Textify\/releases\/download\/[^/]+\/[^/]+|huggingface\.co\/[^/]+\/[^/]+\/resolve\/[a-f0-9]{40}\/[^?#]+)$/.test(
+          file.url,
+        )
       )
+        throw new Error("catalog_artifact");
+    }
+    const bytes = files.reduce((total, file) => total + file.sizeBytes, 0);
+    if (
+      new Set(files.map((f) => f.filename)).size !== files.length ||
+      !Number.isSafeInteger(bytes) ||
+      bytes !== entry.sizeBytes
     )
       throw new Error("catalog_artifact");
+    if (
+      directory &&
+      [
+        "model.safetensors",
+        "config.json",
+        "generation_config.json",
+        "preprocessor_config.json",
+        "tokenizer.json",
+      ].some((name) => !files.some((f) => f.filename === name))
+    )
+      throw new Error("catalog_artifact");
+    const file = files[0];
     const languages = entry.capabilities?.languages;
     if (
       !Array.isArray(languages) ||
@@ -82,13 +126,13 @@ export function catalogModels(
       )
     )
       throw new Error("catalog_language");
-    const checkpoint = catalog.presentationGraph?.checkpoints?.find(
+    const checkpoint = source.presentationGraph?.checkpoints?.find(
       (item: any) => item.artifactIDs?.includes(id),
     );
-    const artifact = catalog.presentationGraph?.artifacts?.find(
+    const artifact = source.presentationGraph?.artifacts?.find(
       (item: any) => item.id === id,
     );
-    const family = catalog.presentationGraph?.families?.find((item: any) =>
+    const family = source.presentationGraph?.families?.find((item: any) =>
       item.checkpointIDs?.includes(checkpoint?.id),
     );
     if (
@@ -104,7 +148,7 @@ export function catalogModels(
       checkpointID: checkpoint.id,
       description:
         engine === "audio_cpp"
-          ? "English and Chinese dictation, with final text on release."
+          ? "Live English and Chinese previews, with final insertion on release."
           : engine === "whisper_cpp"
             ? id.includes("turbo")
               ? "Fast Whisper dictation for English and Hindi."
@@ -118,7 +162,8 @@ export function catalogModels(
       source: entry.provenance.originalModelUrl,
       vocabulary: engine === "whisper_cpp",
 
-      bytes: file.sizeBytes,
+      bytes,
+      directory,
       installed: false,
       status: "not-installed",
       languages:
@@ -128,6 +173,7 @@ export function catalogModels(
       resumable: false,
       storedBytes: 0,
       file,
+      files,
       restorations: [],
     };
   });
@@ -164,6 +210,7 @@ export class Models {
   }
   pathFor(id: string) {
     const model = this.get(id);
+    if (model.directory) return join(this.storage, id);
     return join(
       this.storage,
       `${id}.${model.engine === "whisper_cpp" ? "bin" : "gguf"}`,
@@ -176,7 +223,8 @@ export class Models {
   }
   views(): ModelView[] {
     return this.entries.map(
-      ({ file: _file, restorations: _restorations, ...view }) => view,
+      ({ file: _file, files: _files, restorations: _restorations, ...view }) =>
+        view,
     );
   }
   async init(id = this.id) {
@@ -184,20 +232,35 @@ export class Models {
     this.changed();
     try {
       await mkdir(this.storage, { recursive: true });
-      const [catalog, signature, revocations, revocationSignature] =
-        await Promise.all([
-          readFile(join(this.resources, "manifest.json")),
-          readFile(join(this.resources, "manifest.json.sig")),
-          readFile(join(this.resources, "revocations.json")),
-          readFile(join(this.resources, "revocations.json.sig")),
-        ]);
+      const [
+        catalog,
+        signature,
+        revocations,
+        revocationSignature,
+        extra,
+        extraSignature,
+      ] = await Promise.all([
+        readFile(join(this.resources, "manifest.json")),
+        readFile(join(this.resources, "manifest.json.sig")),
+        readFile(join(this.resources, "revocations.json")),
+        readFile(join(this.resources, "revocations.json.sig")),
+        readFile(join(this.resources, "extra-models/manifest.json")),
+        readFile(join(this.resources, "extra-models/manifest.json.sig")),
+      ]);
       await this.revocations.load(
         catalog,
         signature,
         revocations,
         revocationSignature,
       );
-      this.entries = catalogModels(verifyCatalog(catalog, signature));
+      const supplement = verifyCatalog(extra, extraSignature);
+      this.revocations.addAliases(supplement.artifactAliases);
+      this.entries = catalogModels(
+        verifyCatalog(catalog, signature),
+        process.platform,
+        process.arch,
+        supplement,
+      );
       this.id = id;
       for (const model of this.entries) await this.refresh(model);
     } finally {
@@ -206,9 +269,9 @@ export class Models {
     }
   }
   private async refresh(model: Model) {
-    const protection = this.revocations.status(model.id, model.file);
+    const protection = this.revocations.status(model.id, model.files);
     model.restorations = protection.restorations;
-    model.installed = await validFile(this.pathFor(model.id), model.file);
+    model.installed = await this.valid(model);
     model.resumable = await stat(`${this.pathFor(model.id)}.partial`)
       .then((value) => value.size > 0)
       .catch(() => false);
@@ -219,7 +282,7 @@ export class Models {
         name === `${basename(this.pathFor(model.id))}.partial` ||
         name.startsWith(`${basename(this.pathFor(model.id))}.retained-`)
       )
-        model.storedBytes += (await stat(join(this.storage, name))).size;
+        model.storedBytes += await storedBytes(join(this.storage, name));
     let receipt: string[] = [];
     try {
       receipt = JSON.parse(
@@ -235,7 +298,7 @@ export class Models {
           : "installed";
   }
   private admit(model: Model) {
-    if (this.revocations.status(model.id, model.file).revoked)
+    if (this.revocations.status(model.id, model.files).revoked)
       throw new Error("model_revoked");
   }
   private async receipt(model: Model) {
@@ -243,7 +306,10 @@ export class Models {
     await writeFile(
       `${path}.tmp`,
       JSON.stringify({
-        sha256: model.file.sha256,
+        files: model.files.map(({ filename, sha256 }) => ({
+          filename,
+          sha256,
+        })),
         restorations: model.restorations,
       }),
       { mode: 0o600 },
@@ -260,8 +326,7 @@ export class Models {
     try {
       const model = this.get(id);
       this.admit(model);
-      if (!(await validFile(this.pathFor(id), model.file)))
-        throw new Error("model_integrity");
+      if (!(await this.valid(model))) throw new Error("model_integrity");
       this.admit(model);
       await this.receipt(model);
       await this.refresh(model);
@@ -286,20 +351,24 @@ export class Models {
         await rename(`${this.pathFor(id)}.partial`, retained);
         await rm(`${this.pathFor(id)}.partial.json`, { force: true });
       }
-      const partial = await transfer(
-        model.file,
-        this.pathFor(id),
-        this.abort.signal,
-        (value) => {
-          this.progress = value;
-          this.changed();
-        },
-        source,
-      );
-      this.admit(model);
-      this.abort.signal.throwIfAborted();
-      await rename(partial, this.pathFor(id));
-      await rm(`${partial}.json`, { force: true });
+      if (model.directory) {
+        await this.installDirectory(model, this.abort.signal, source);
+      } else {
+        const partial = await transfer(
+          model.file,
+          this.pathFor(id),
+          this.abort.signal,
+          (value) => {
+            this.progress = value;
+            this.changed();
+          },
+          source,
+        );
+        this.admit(model);
+        this.abort.signal.throwIfAborted();
+        await rename(partial, this.pathFor(id));
+        await rm(`${partial}.json`, { force: true });
+      }
       await this.receipt(model);
     } finally {
       try {
@@ -320,14 +389,98 @@ export class Models {
     this.changed();
     try {
       for (const suffix of ["", ".partial", ".partial.json", ".receipt.json"])
-        await rm(`${this.pathFor(id)}${suffix}`, { force: true });
+        await rm(`${this.pathFor(id)}${suffix}`, {
+          force: true,
+          recursive: true,
+        });
       for (const name of await readdir(this.storage))
         if (name.startsWith(`${basename(this.pathFor(id))}.retained-`))
-          await rm(join(this.storage, name), { force: true });
+          await rm(join(this.storage, name), { force: true, recursive: true });
       await this.refresh(model);
     } finally {
       this.busy = false;
       this.changed();
     }
   }
+  private async valid(model: Model, path = this.pathFor(model.id)) {
+    if (!model.directory) return validFile(path, model.file);
+    try {
+      // Never load extra GGUF weights, scripts, or symlinks from an imported folder.
+      if (!(await lstat(path)).isDirectory()) return false;
+      const names = await readdir(path);
+      if (names.length !== model.files.length) return false;
+      for (const file of model.files)
+        if (
+          !(await lstat(join(path, file.filename))).isFile() ||
+          !(await validFile(join(path, file.filename), file))
+        )
+          return false;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  private async installDirectory(
+    model: Model,
+    signal: AbortSignal,
+    source?: string,
+  ) {
+    const destination = this.pathFor(model.id),
+      staging = `${destination}.partial`;
+    await mkdir(staging, { recursive: true, mode: 0o700 });
+    let completed = 0;
+    for (const file of model.files) {
+      signal.throwIfAborted();
+      this.admit(model);
+      const path = join(staging, file.filename);
+      if (!(await validFile(path, file))) {
+        const partial = await transfer(
+          file,
+          path,
+          signal,
+          (fraction) => {
+            this.progress =
+              (completed + fraction * file.sizeBytes) / model.bytes;
+            this.changed();
+          },
+          source ? join(source, file.filename) : undefined,
+        );
+        signal.throwIfAborted();
+        await rename(partial, path);
+        await rm(`${partial}.json`, { force: true });
+      }
+      completed += file.sizeBytes;
+    }
+    if (!(await this.valid(model, staging))) throw new Error("model_integrity");
+    this.admit(model);
+    signal.throwIfAborted();
+    // Keep an existing installation intact until every replacement file verifies.
+    const retained = `${destination}.retained-${Date.now()}`;
+    let moved = false;
+    try {
+      await rename(destination, retained).then(
+        () => {
+          moved = true;
+        },
+        (error) => {
+          if (error.code !== "ENOENT") throw error;
+        },
+      );
+      await rename(staging, destination);
+    } catch (error) {
+      if (moved) await rename(retained, destination);
+      throw error;
+    }
+    if (moved) await rm(retained, { recursive: true, force: true });
+  }
+}
+
+async function storedBytes(path: string): Promise<number> {
+  const info = await lstat(path);
+  if (info.isFile()) return info.size;
+  if (!info.isDirectory()) return 0;
+  let bytes = 0;
+  for (const name of await readdir(path))
+    bytes += await storedBytes(join(path, name));
+  return bytes;
 }

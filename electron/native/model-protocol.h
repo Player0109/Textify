@@ -50,16 +50,17 @@ inline ggml_backend_dev_t metal() {
     }
     return nullptr;
 }
-inline void ready(ggml_backend_dev_t device) {
+inline void ready(ggml_backend_dev_t device, bool streaming = false) {
     std::cout << "{\"ready\":true,\"gpu\":{\"backend\":\"Metal\",\"device\":"
-              << json(ggml_backend_dev_description(device)) << "}}\n" << std::flush;
+              << json(ggml_backend_dev_description(device)) << "},\"streaming\":"
+              << (streaming ? "true" : "false") << "}\n" << std::flush;
 }
-inline bool audio(std::vector<float> &samples) {
-    const auto n = count();
+inline bool audio(std::vector<float> &samples, uint32_t n) {
     if (!n || n > 480000) return false;
     samples.resize(n);
     if (!std::cin.read(reinterpret_cast<char *>(samples.data()), n * sizeof(float))) return false;
     return std::all_of(samples.begin(), samples.end(), [](float x) { return std::isfinite(x) && std::abs(x) <= 1; });
 }
+inline bool audio(std::vector<float> &samples) { return audio(samples, count()); }
 inline void quiet(ggml_log_level, const char *, void *) {}
 }

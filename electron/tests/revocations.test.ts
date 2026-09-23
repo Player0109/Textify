@@ -7,6 +7,7 @@ import {
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { createHash } from "node:crypto";
 const file = { filename: "model.bin", sha256: "a".repeat(64), sizeBytes: 100 };
 const digest = {
   algorithm: "sha256",
@@ -35,6 +36,40 @@ const restoration = {
   contentDigest: null,
 };
 describe("sticky model revocations", () => {
+  it("matches a whole directory layout and each managed file without confusing payload digests", () => {
+    const files = [
+      file,
+      { ...file, filename: "config.json", sha256: "b".repeat(64) },
+    ];
+    const layout = createHash("sha256")
+      .update(
+        `config.json\t${"b".repeat(64)}\t100\nmodel.bin\t${file.sha256}\t100\n`,
+      )
+      .digest("hex");
+    for (const contentDigest of [
+      {
+        algorithm: "sha256",
+        value: layout,
+        scope: { type: "canonical_layout", version: 1 },
+      },
+      {
+        algorithm: "sha256",
+        value: files[1].sha256,
+        scope: { type: "managed_file", relativePath: "config.json" },
+      },
+    ]) {
+      const state = new RevocationState();
+      state.accept(
+        policy(2, [
+          { recordID: "directory", exactArtifactID: null, contentDigest },
+        ]),
+      );
+      expect(state.status("other-id", files).revoked).toBe(true);
+    }
+    const state = new RevocationState();
+    state.accept(policy(2, [{ ...record, exactArtifactID: null }]));
+    expect(state.status("other-id", files).revoked).toBe(false);
+  });
   it("retains protection across omission and older bundled releases", () => {
     const state = new RevocationState();
     state.accept(policy(2, [record]));

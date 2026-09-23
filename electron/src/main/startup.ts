@@ -7,7 +7,7 @@ export function desktopEntry(executable: string) {
     .replace(/\\/g, "\\\\\\\\")
     .replace(/["`$]/g, "\\\\$&")
     .replace(/%/g, "%%");
-  return `[Desktop Entry]\nType=Application\nName=Textify Electron\nExec="${escaped}" --background\nTerminal=false\nX-GNOME-Autostart-enabled=true\n`;
+  return `[Desktop Entry]\nType=Application\nName=Textify\nExec="${escaped}" --background\nTerminal=false\nX-GNOME-Autostart-enabled=true\n`;
 }
 export async function linuxStartup(
   config: string,

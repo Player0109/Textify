@@ -184,8 +184,11 @@ export class RevocationState {
   }
   status(
     id: string,
-    file: { filename: string; sha256: string; sizeBytes: number },
+    input:
+      | { filename: string; sha256: string; sizeBytes: number }
+      | { filename: string; sha256: string; sizeBytes: number }[],
   ) {
+    const files = Array.isArray(input) ? input : [input];
     const identities = new Set([id]);
     let changed = true;
     while (changed) {
@@ -202,7 +205,16 @@ export class RevocationState {
         }
     }
     const layout = createHash("sha256")
-      .update(`${file.filename}\t${file.sha256}\t${file.sizeBytes}\n`)
+      .update(
+        [...files]
+          .sort((a, b) =>
+            a.filename < b.filename ? -1 : a.filename > b.filename ? 1 : 0,
+          )
+          .map(
+            (file) => `${file.filename}\t${file.sha256}\t${file.sizeBytes}\n`,
+          )
+          .join(""),
+      )
       .digest("hex");
     const matches = (entry: Target) =>
       (entry.exactArtifactID !== null &&
@@ -210,9 +222,14 @@ export class RevocationState {
       (entry.contentDigest !== null &&
         (entry.contentDigest.scope.type === "canonical_layout"
           ? entry.contentDigest.value === layout
-          : entry.contentDigest.value === file.sha256 &&
-            (entry.contentDigest.scope.type === "single_file_payload" ||
-              entry.contentDigest.scope.relativePath === file.filename)));
+          : files.some(
+              (file) =>
+                entry.contentDigest!.value === file.sha256 &&
+                (entry.contentDigest!.scope.type === "single_file_payload"
+                  ? files.length === 1
+                  : entry.contentDigest!.scope.type === "managed_file" &&
+                    entry.contentDigest!.scope.relativePath === file.filename),
+            )));
     let revoked = false;
     const acknowledged = new Set<string>();
     for (const record of this.records.values()) {

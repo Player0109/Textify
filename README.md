@@ -1,9 +1,19 @@
 # Textify
 
-Native, offline dictation for Apple Silicon Macs.
+Offline dictation for desktop computers. The currently published download is
+the native Apple Silicon Mac preview. A redesigned cross-platform app for
+macOS, Windows, and Linux is being prepared in [`electron/`](electron/README.md).
 
 [![CI](https://github.com/Player0109/Textify/actions/workflows/ci.yml/badge.svg)](https://github.com/Player0109/Textify/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/Player0109/Textify)](LICENSE)
+
+The cross-platform app has the Textify name and icon, local model downloads,
+live transcription previews for Confucius4-R2T2, and a global dictation
+shortcut. It is still in testing; no cross-platform installer has been
+published as a GitHub Release. See the
+[desktop installation and testing notes](electron/PREVIEW_INSTALL.md) for its
+platform requirements. The download and instructions below describe the
+existing native Mac preview.
 
 ## What it does
 

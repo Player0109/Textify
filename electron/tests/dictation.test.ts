@@ -32,6 +32,49 @@ function harness(overrides: Partial<DictationPorts> = {}) {
 describe("dictation lifecycle", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
+  it("keeps the destination icon with its session and clears it for manual dictation", async () => {
+    const target = {
+      target: "42",
+      secure: false,
+      appName: "TextEdit",
+      appIcon: "data:image/png;base64,icon",
+    };
+    const h = harness({ target: async () => target });
+    h.app.press();
+    await vi.advanceTimersByTimeAsync(300);
+    expect(h.app.application).toBe("TextEdit");
+    expect(h.app.applicationIcon).toBe(target.appIcon);
+    h.speech();
+    await h.app.release();
+    expect(h.ports.insert).toHaveBeenCalledWith("Hello, world", target);
+    h.app.press(true);
+    await vi.advanceTimersByTimeAsync(300);
+    expect(h.app.application).toBe("Textify");
+    expect(h.app.applicationIcon).toBe("");
+    await h.app.cancel();
+  });
+  it("shows live text before release but inserts only the finalized transcript once", async () => {
+    const stream = {
+      beginStream: vi.fn(async () => {}),
+      pushStream: vi.fn(async () => "live preview"),
+      finishStream: vi.fn(async () => "stream final"),
+      resetStream: vi.fn(async () => {}),
+    };
+    const h = harness({ streaming: () => stream });
+    h.app.press();
+    await vi.advanceTimersByTimeAsync(300);
+    h.speech();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(h.app.preview).toBe("live preview");
+    expect(h.ports.insert).not.toHaveBeenCalled();
+    await h.app.release();
+    expect(h.ports.insert).toHaveBeenCalledExactlyOnceWith("Hello, world", {
+      target: "42",
+      secure: false,
+    });
+    expect(h.app.preview).toBe("");
+    expect(stream.resetStream).toHaveBeenCalledOnce();
+  });
   it("keeps Copy available after clipboard failure and waits for a successful write", async () => {
     const h = harness();
     h.app.press(true);
@@ -126,14 +169,15 @@ describe("dictation lifecycle", () => {
     await h.app.release();
     expect(h.ports.insert).toHaveBeenCalledOnce();
   });
-  it("discards silence and cancelled samples without inference", async () => {
+  it("silently discards silence and cancelled samples without inference", async () => {
     const h = harness();
     h.app.press();
     await vi.advanceTimersByTimeAsync(300);
     h.samples(new Float32Array(320));
     await h.app.release();
     expect(h.ports.transcribe).not.toHaveBeenCalled();
-    expect(h.app.message).toMatch(/No speech detected/);
+    expect(h.app.phase).toBe("idle");
+    expect(h.app.message).toBe("");
     h.app.press();
     await vi.advanceTimersByTimeAsync(300);
     h.speech();
@@ -190,15 +234,25 @@ describe("dictation lifecycle", () => {
     expect(h.app.phase).toBe("copy");
     expect(h.app.pending).toBe("Hello, world");
   });
-  it("aborts the whole result when recognition rejects a window", async () => {
+  it("silently discards the whole result when recognition rejects a window", async () => {
     const h = harness({ transcribe: async () => null });
     h.app.press();
     await vi.advanceTimersByTimeAsync(300);
     h.speech();
     await h.app.release();
     expect(h.ports.insert).not.toHaveBeenCalled();
-    expect(h.app.phase).toBe("error");
-    expect(h.app.message).toMatch(/could not recognize/);
+    expect(h.app.phase).toBe("idle");
+    expect(h.app.message).toBe("");
+  });
+  it("silently discards an empty recognition result", async () => {
+    const h = harness({ transcribe: async () => "   " });
+    h.app.press();
+    await vi.advanceTimersByTimeAsync(300);
+    h.speech();
+    await h.app.release();
+    expect(h.ports.insert).not.toHaveBeenCalled();
+    expect(h.app.phase).toBe("idle");
+    expect(h.app.message).toBe("");
   });
   it("waits for cancelled recognition and ignores late results", async () => {
     const recognition = deferred<string>();

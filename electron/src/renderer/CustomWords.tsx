@@ -11,7 +11,7 @@ export function CustomWords({
 }) {
   const [word, setWord] = useState("");
   return (
-    <section className="vocabulary custom-words">
+    <section className="vocabulary vocabulary-panel custom-words">
       <h2>Custom words</h2>
       <p>
         Give Whisper names or terms to listen for. Recognition is not
@@ -65,6 +65,9 @@ export function CustomWords({
           </li>
         ))}
       </ul>
+      {!preferences.customWords.length && (
+        <div className="vocabulary-empty">No custom words yet</div>
+      )}
     </section>
   );
 }

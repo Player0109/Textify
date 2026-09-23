@@ -1,5 +1,12 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+  mkdir,
+  readdir,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -37,6 +44,8 @@ async function fixture() {
       source: "https://example.invalid",
       vocabulary: true,
       file,
+      files: [file],
+      directory: false,
       bytes: file.sizeBytes,
       installed: false,
       status: "not-installed",
@@ -49,6 +58,61 @@ async function fixture() {
   return { directory, model, bytes };
 }
 describe("verified model storage", () => {
+  async function directoryFixture() {
+    const h = await fixture();
+    const entry = h.model.entries[0];
+    entry.engine = "audio_cpp";
+    entry.directory = true;
+    entry.file.filename = "model.safetensors";
+    entry.files.push({ ...entry.file, filename: "config.json" });
+    entry.bytes *= 2;
+    const source = join(h.directory, "original");
+    await mkdir(source);
+    for (const f of entry.files)
+      await writeFile(join(source, f.filename), h.bytes);
+    return { ...h, source, entry };
+  }
+  it("imports and verifies every approved directory file, ignoring extra source contents", async () => {
+    const h = await directoryFixture();
+    await writeFile(join(h.source, "untrusted.gguf"), "extra");
+    await h.model.install(h.source);
+    expect(h.model.installed).toBe(true);
+    expect(await readdir(h.model.path)).toEqual([
+      "config.json",
+      "model.safetensors",
+    ]);
+    expect(h.entry.storedBytes).toBe(h.bytes.length * 2);
+    await writeFile(join(h.model.path, "untrusted.gguf"), "extra");
+    await expect(h.model.verify()).rejects.toThrow("model_integrity");
+    await h.model.remove(h.model.id);
+    expect(h.entry.storedBytes).toBe(0);
+    expect(await readFile(join(h.source, "model.safetensors"))).toEqual(
+      h.bytes,
+    );
+  });
+  it("preserves an installed directory when a replacement has one corrupt file", async () => {
+    const h = await directoryFixture();
+    await h.model.install(h.source);
+    await writeFile(join(h.source, "config.json"), "bad");
+    await expect(h.model.install(h.source)).rejects.toThrow("model_integrity");
+    expect(h.model.installed).toBe(true);
+    expect(await readFile(join(h.model.path, "config.json"))).toEqual(h.bytes);
+  });
+  it("resumes a directory after interruption without redownloading completed verified files", async () => {
+    const h = await directoryFixture();
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(h.bytes))
+      .mockRejectedValueOnce(new Error("offline"));
+    vi.stubGlobal("fetch", fetcher);
+    await expect(h.model.install()).rejects.toThrow("offline");
+    expect(h.entry.installed).toBe(false);
+    expect(h.entry.resumable).toBe(true);
+    fetcher.mockResolvedValueOnce(new Response(h.bytes));
+    await h.model.install();
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(h.model.installed).toBe(true);
+  });
   it("retains the GGUF extension required by the audio.cpp loader", async () => {
     const h = await fixture();
     h.model.entries[0].engine = "audio_cpp";

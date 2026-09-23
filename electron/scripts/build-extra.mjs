@@ -27,6 +27,7 @@ export async function buildExtra() {
           ]
         : [
             "-DAUDIOCPP_MODEL_SET=custom",
+            "-DAUDIOCPP_DEPLOYMENT_BUILD=ON",
             "-DAUDIOCPP_MODELS=confucius4_r2t2",
             "-DAUDIOCPP_BUILD_C_API=ON",
             "-DAUDIOCPP_BUILD_NATIVE_MODEL_MANAGER=OFF",

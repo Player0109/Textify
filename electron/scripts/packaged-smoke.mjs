@@ -13,6 +13,7 @@ const application = await electron.launch({
 });
 try {
   assert.equal(await application.evaluate(({ app }) => app.isPackaged), true);
+  assert.equal(await application.evaluate(({ app }) => app.getName()), "Textify");
   // Audio and overlay windows may finish loading before the settings window.
   await application.firstWindow();
   let page;
@@ -26,7 +27,7 @@ try {
       throw new Error("Settings window did not load");
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  await page.getByRole("heading", { name: "Dictation", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "General", exact: true }).waitFor();
   if (process.platform === "darwin")
     assert.equal(
       await application.evaluate(({ app }) => app.dock.isVisible()),

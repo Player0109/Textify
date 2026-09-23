@@ -10,6 +10,26 @@ static std::string identity() {
     NSRunningApplication *app = NSWorkspace.sharedWorkspace.frontmostApplication;
     return std::to_string(app.processIdentifier) + ":" + std::to_string((long long)(app.launchDate.timeIntervalSince1970 * 1000));
 }
+static NSString *applicationIcon(NSImage *image) {
+    if (!image) return @"";
+    // A 48 px in-memory PNG provides a sharp 24 pt Retina icon without exposing
+    // app bundle paths to the renderer or retaining a disk cache.
+    NSBitmapImageRep *bitmap = [[NSBitmapImageRep alloc]
+        initWithBitmapDataPlanes:nullptr pixelsWide:48 pixelsHigh:48
+        bitsPerSample:8 samplesPerPixel:4 hasAlpha:YES isPlanar:NO
+        colorSpaceName:NSDeviceRGBColorSpace bytesPerRow:0 bitsPerPixel:0];
+    NSGraphicsContext *context = [NSGraphicsContext graphicsContextWithBitmapImageRep:bitmap];
+    if (!context) return @"";
+    [NSGraphicsContext saveGraphicsState];
+    NSGraphicsContext.currentContext = context;
+    context.imageInterpolation = NSImageInterpolationHigh;
+    [image drawInRect:NSMakeRect(0, 0, 48, 48) fromRect:NSZeroRect
+           operation:NSCompositingOperationCopy fraction:1.0];
+    [NSGraphicsContext restoreGraphicsState];
+    NSData *png = [bitmap representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
+    if (!png || png.length > 10000) return @"";
+    return [@"data:image/png;base64," stringByAppendingString:[png base64EncodedStringWithOptions:0]];
+}
 static bool secure(pid_t pid) {
     AXUIElementRef app = AXUIElementCreateApplication(pid);
     CFTypeRef field = nullptr, subrole = nullptr;
@@ -38,7 +58,8 @@ int main(int argc, char **argv) {
         if (argc == 2 && std::string(argv[1]) == "target") {
             const auto pid = target();
             NSRunningApplication *app = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
-            return json(@{@"target": [NSString stringWithUTF8String:identity().c_str()], @"secure": @(secure(pid)), @"appID":app.bundleIdentifier ?: @"", @"appName":app.localizedName ?: @""});
+            NSString *targetID = [NSString stringWithFormat:@"%d:%lld", pid, (long long)(app.launchDate.timeIntervalSince1970 * 1000)];
+            return json(@{@"target": targetID, @"secure": @(secure(pid)), @"appID":app.bundleIdentifier ?: @"", @"appName":app.localizedName ?: @"", @"appIcon":applicationIcon(app.icon)});
         }
         if (argc != 3 || std::string(argv[1]) != "paste") return 2;
         std::string input((std::istreambuf_iterator<char>(std::cin)), {});
