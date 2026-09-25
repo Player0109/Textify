@@ -48,20 +48,25 @@ jobs:
           TEXTIFY_MODEL_REVOCATION_KEY_ID: textify-model-manifest-2026-huggingface
         run: script/models/verify_model_revocations.sh models/revocations.json models/revocations.json.sig
 
-      - name: Run test suite
+      - name: Test shared catalog verification
         run: swift test --jobs 2
 
-      - name: Build release executable
-        run: swift build --configuration release --arch arm64 --jobs 2
-
-      - name: Verify release architecture and deployment target
+      - name: Build catalog verification tools
         run: |
-          binary_path="$(swift build --configuration release --arch arm64 --show-bin-path)/Textify"
-          test -x "$binary_path"
-          test "$(lipo -archs "$binary_path")" = "arm64"
-          executable_minos="$(
-            otool -l "$binary_path" \
-              | awk '$1 == "cmd" { in_build_version = ($2 == "LC_BUILD_VERSION"); next }
-                     in_build_version && $1 == "minos" { print $2; exit }'
-          )"
-          test "$executable_minos" = "14.0"
+          swift build --configuration release --arch arm64 --jobs 2 --product TextifyModelManifestVerifier
+          swift build --configuration release --arch arm64 --jobs 2 --product TextifyModelRevocationVerifier
+
+      - name: Verify catalog tool architecture and deployment target
+        run: |
+          binary_dir="$(swift build --configuration release --arch arm64 --show-bin-path)"
+          for tool in TextifyModelManifestVerifier TextifyModelRevocationVerifier; do
+            binary_path="$binary_dir/$tool"
+            test -x "$binary_path"
+            test "$(lipo -archs "$binary_path")" = "arm64"
+            executable_minos="$(
+              otool -l "$binary_path" \
+                | awk '$1 == "cmd" { in_build_version = ($2 == "LC_BUILD_VERSION"); next }
+                       in_build_version && $1 == "minos" { print $2; exit }'
+            )"
+            test "$executable_minos" = "14.0"
+          done

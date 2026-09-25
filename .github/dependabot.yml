@@ -1,8 +1,8 @@
 version: 2
 
 updates:
-  - package-ecosystem: swift
-    directory: /
+  - package-ecosystem: npm
+    directory: /electron
     schedule:
       interval: weekly
       day: monday

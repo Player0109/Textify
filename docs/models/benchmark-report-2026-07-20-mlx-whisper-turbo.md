@@ -1,5 +1,11 @@
 # MLX Whisper Large V3 Turbo Catalog Benchmark - 2026-07-20
 
+> Historical catalog and model evidence. Runtime support, ratings, UI behavior,
+> and commands below describe the implementation at the recorded date.
+> Retired benchmark commands are retained as provenance, not instructions.
+> See the [desktop guide](../../electron/README.md) for current supported
+> artifacts and features; these records do not claim Electron performance.
+
 This report records Textify's promotion evidence for the exact
 `mlx-community/whisper-large-v3-turbo` model requested for the native MLX path.
 It does not generalize the English measurements to other languages.

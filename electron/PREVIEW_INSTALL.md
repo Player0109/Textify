@@ -8,7 +8,7 @@ if GPU initialization/memory allocation fails, dictation stays unavailable.
 There is no CPU inference mode or fallback. Audio preparation and token sampling
 still perform ordinary CPU work.
 
-This is a testing build, separate from native Textify.
+This is an unsigned testing build of the desktop app.
 No speech models are bundled. After installation, choose Models to download or
 import a verified model. Use the microphone button, release, then Copy and paste
 for the first test. Audio is processed locally.

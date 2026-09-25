@@ -1,3 +1,7 @@
+> Historical provenance for the retired standalone Swift app. The native
+> implementation has been removed; paths and build commands below describe that
+> archived implementation, not the current Electron build.
+
 # whisper.cpp Upstream Snapshot
 
 Upstream repository: https://github.com/ggml-org/whisper.cpp

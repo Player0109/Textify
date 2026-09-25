@@ -1,137 +1,60 @@
-# Catalog App Release And V3 Rollback
+# Bundled catalog releases and recovery
 
-This is the release contract for shipping a bundled model catalog after
-manifest v3 state has shipped. It supplements `docs/RELEASING.md`; it does not
-authorize an unsigned catalog, a lower revision, a runtime catalog feed, or an
-arbitrary application downgrade.
+This guide covers the signed catalogs used by the Electron desktop app. Use the
+[desktop release procedure](../../electron/RELEASING.md) for application
+packaging and distribution. The retired Swift application's bundle-publication
+and rollback-bridge tools are not part of the current release flow.
 
-## Signing Identities
+## Inputs and trust
 
-Catalog and revocation inputs have separate signature domains and separately
-recorded identities:
+Retain each exact input with its detached signature:
 
-- Catalog: `io.github.Player0109.Textify.model-manifest`
-- Revocations: `io.github.Player0109.Textify.model-revocations`
+- `models/manifest.json` and `models/manifest.json.sig`;
+- `models/revocations.json` and `models/revocations.json.sig`;
+- `electron/models/manifest.json` and its signature for desktop-specific
+  supplementary artifacts.
 
-Each detached envelope must name an exact `keyId` from the bridge build's
-embedded allowlist. The two domains may currently use entries backed by the same
-maintainer key, but publication still records and validates both key IDs. A key
-rotation must first ship in a trusted app build; a remotely supplied key is
-never accepted. The publication verifier imports the same
-`ProductionModelCatalogTrust` table as the application and has no environment
-override for keys or key IDs. Private keys remain outside the repository and
-CI.
+Catalog and revocation signatures use separate domains:
+`io.github.Player0109.Textify.model-manifest` and
+`io.github.Player0109.Textify.model-revocations`. These protocol identifiers
+remain unchanged. Trusted public keys are embedded in the desktop verifier and
+retained catalog tools. A remotely supplied key is never a trust anchor. Keep
+private keys outside the repository and CI.
 
-## Revision Rules
+Do not reformat signed JSON, prune unused catalog entries, or replace signatures
+as part of application cleanup. The desktop app exposes only its implemented
+subset; retaining other exact artifacts preserves signed provenance.
 
-`generatedAt` is the signed revision for both inputs.
+## Review a catalog change
 
-- A candidate older than retained publication evidence is rejected.
-- Repeating one revision is idempotent only when the exact signed content hash
-  is unchanged.
-- A catalog correction uses a higher catalog revision.
-- A security withdrawal uses a higher revocation revision. Previously accepted
-  records remain sticky even if a later body omits them.
-- A restoration uses a higher revocation revision and the exact restoration
-  rules in `docs/SPEC.md`; it does not reactivate an artifact.
-- Never ship a lower revision as rollback or recovery.
+1. Review exact model source revisions, files, sizes, SHA-256 values, licenses,
+   language capabilities, and runtime compatibility. A valid catalog record
+   does not add a new desktop runtime.
+2. Keep `generatedAt` revisions monotonic. A correction or security withdrawal
+   requires a higher revision. Do not change content under an existing revision.
+3. Sign and verify the candidate pairs using the retained
+   [signing and verification tools](model-manifest-signing.md). Keep previous
+   signed inputs and their hashes with release evidence.
+4. Run the desktop checks and verify the packaged resources contain the exact
+   reviewed pairs. Exercise the affected download/import, revocation, and
+   restoration behavior with isolated data.
+5. Publish the catalog only as part of a verified desktop app release. There is
+   no runtime catalog feed, and no separate catalog endpoint updates installed
+   applications.
 
-Keep each successful evidence JSON with the release records. It binds catalog
-revision/hash/signer, revocation revision/hash/signer, exact app build identity,
-artifact count, an optional legacy source endpoint, and verification time.
+The retained Swift command-line verifiers check catalog signatures and policy;
+they do not validate an Electron installer or replace its packaging checks.
+Historical benchmark results may establish provenance but are not Electron
+accuracy, performance, or platform-support claims.
 
-## Prerelease Gate
+## Recovery boundaries
 
-Build and sign the exact candidate application first. The gate requires its
-code signature to pass strict verification, requires the production bundle
-identifier, and reads its short version, build version, and executable SHA-256
-rather than accepting an operator-supplied build label.
+Previously accepted security revocations stay enforced locally. A restoration
+requires explicit artifact verification and must not silently reactivate a
+selection. Never rewrite the trusted signed inputs or lower a revision to bypass
+a revocation.
 
-```bash
-script/models/prepublish_model_catalog.sh \
-  candidate/manifest.json \
-  candidate/manifest.json.sig \
-  candidate/revocations.json \
-  candidate/revocations.json.sig \
-  build/release/Textify.app \
-  build/release/catalog-publication-evidence.json \
-  previous/catalog-publication-evidence.json
-```
-
-Normal release validation requires the immediately prior retained evidence, so
-anti-rollback and sticky-revocation checks cannot be skipped accidentally. For
-the one-time first v3 authority baseline only, replace the final previous-evidence
-argument with an explicit leading `--bootstrap`; the resulting evidence marks
-that it establishes the authority baseline and must be retained permanently.
-
-This gate reuses the application verifiers and then requires manifest v3. It
-validates every production Exact Artifact's approved immutable URL, lowercase
-typed SHA-256, exact leaf and aggregate sizes, bounded peak installation space,
-nonempty HTTPS-backed license metadata, pinned provenance, supported Runtime
-and Compute Route, and one signed presentation owner.
-
-The legacy `smoke_model_catalog_endpoint.sh` remains available for archival
-endpoint checks, but it is not a release gate and current Textify builds do not
-consume its results. Release verification instead compares the tracked signed
-pair byte-for-byte with `Contents/Resources/ModelCatalog/` and exercises the
-staged app with network access disabled. Final artifact-byte smokes stay in the
-credentialed release checklist.
-
-## Additive Migration Contract
-
-The v3 migration keeps existing application-support files and adds information
-through decode-compatible fields:
-
-- Installation Receipts keep their operational `ModelEntry`, storage identity,
-  local file ownership, Curated history, import history, and restoration
-  acknowledgments.
-- Queue Attempts keep stable attempt identity, authorized Exact Artifact,
-  typed digest targets, expected file layout, FIFO history, and retained-data
-  attribution.
-- Placements are derived from the retained trusted v3 graph and receipt
-  history; catalog withdrawal does not turn Curated content into Custom or
-  Legacy.
-- Transcription and Voice Cleaning active Exact Artifact IDs stay distinct.
-- Older builds may retain a trusted catalog archive for migration and rollback
-  evidence, but current presentation ignores it in favor of the bundled pair.
-  The revocation archive retains exact signed snapshots and alias evidence.
-
-Migration must not delete, rename, or reinterpret managed bytes merely because
-a new app or catalog no longer presents them. Copy the complete Textify
-Application Support directory before a rollback rehearsal and compare receipt,
-queue, and attributed-byte inventories afterward.
-
-## Designated Rollback Bridge
-
-The designated bridge is the exact signed build identity recorded in
-publication evidence and tested by
-`ModelV3RollbackBridge.rehearsePersistedWithdrawal`. It loads the persisted v3
-settings, receipt, Queue Attempt, trusted-catalog archive, and sticky-revocation
-archive using the embedded production trust table. It strictly verifies the
-bridge app's code signature and requires its derived identity to match the
-publication evidence before recording state-file and owned-byte SHA-256
-evidence. The rehearsal covers legacy persisted remote-catalog state while
-continuing to use retained signed authority. It must prove:
-
-- every receipt and storage identity remains owned;
-- every Queue Attempt remains attributable;
-- active identities are not replaced or silently reactivated;
-- matching revoked active content remains blocked;
-- retained Curated placement is not reinterpreted; and
-- no state or managed bytes are mutated by rehearsal.
-
-Run the focused persisted-state rehearsal and retain its test log beside the
-publication evidence. Its receipt, queue, and active-identity inputs are frozen
-pre-bridge JSON fixtures rather than data encoded by the test under review:
-
-```bash
-swift test \
-  --filter ModelCatalogPublicationTests.testRollbackBridgeRetainsOwnedStateAndBlocksRevokedActiveContent \
-  | tee build/release/v3-rollback-rehearsal.log
-```
-
-If a shipped application must be withdrawn, redistribute only a notarized
-designated bridge build whose exact build identity has this evidence. A build
-from before manifest v3 is explicitly unsupported as recovery: it cannot
-understand the authority or ownership contract and must not be presented to
-users as a rollback path.
+Preserve installed model bytes, preferences, trust records, and the current
+application identity during updates. There is no supported migration back to
+the retired Swift application. Investigate a release regression against the
+current desktop storage and trust rules before distributing a recovery build.

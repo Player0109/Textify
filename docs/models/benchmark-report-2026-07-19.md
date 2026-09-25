@@ -1,5 +1,11 @@
 # Multi-Model Benchmark Report — 2026-07-19
 
+> Historical catalog and model evidence. Runtime support, ratings, UI behavior,
+> and commands below describe the implementation at the recorded date.
+> Retired benchmark commands are retained as provenance, not instructions.
+> See the [desktop guide](../../electron/README.md) for current supported
+> artifacts and features; these records do not claim Electron performance.
+
 This report compares the curated English model choices across Textify's two
 shipping runtime families on the same Apple M4 Max, macOS 26.5.1 host. Every
 candidate received identical 16 kHz mono audio and ran fully offline after its

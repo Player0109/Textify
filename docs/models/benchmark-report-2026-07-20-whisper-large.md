@@ -1,5 +1,11 @@
 # Whisper Large V2/V3 Catalog Benchmark - 2026-07-20
 
+> Historical catalog and model evidence. Runtime support, ratings, UI behavior,
+> and commands below describe the implementation at the recorded date.
+> Retired benchmark commands are retained as provenance, not instructions.
+> See the [desktop guide](../../electron/README.md) for current supported
+> artifacts and features; these records do not claim Electron performance.
+
 This report records the promotion evidence for the exact Whisper Large V2 and
 V3 q5_0 artifacts requested from the supplied Artificial Analysis comparison.
 It does not generalize these English measurements to other languages.

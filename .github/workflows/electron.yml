@@ -2,9 +2,9 @@ name: Textify desktop
 
 on:
   push:
-    paths: ['electron/**', 'models/**', '.github/workflows/electron.yml']
+    paths: ['electron/**', 'models/**', 'LICENSE', 'THIRD_PARTY_LICENSES/**', 'Vendor/whisper.cpp/LICENSE', '.github/workflows/electron.yml']
   pull_request:
-    paths: ['electron/**', 'models/**', '.github/workflows/electron.yml']
+    paths: ['electron/**', 'models/**', 'LICENSE', 'THIRD_PARTY_LICENSES/**', 'Vendor/whisper.cpp/LICENSE', '.github/workflows/electron.yml']
   workflow_dispatch:
 
 permissions:

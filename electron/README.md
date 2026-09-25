@@ -1,8 +1,7 @@
 # Textify desktop preview
 
-An Electron remake alongside the existing Swift application. The first release
-targets macOS, Windows, and Linux. This directory currently provides the first
-end-to-end preview; it does not yet replace all features of the native app.
+Textify's desktop application for macOS, Windows, and Linux. This directory
+contains the Electron interface, desktop integration, and local GPU workers.
 
 ## Run locally
 
@@ -30,7 +29,7 @@ filters narrow the list. A version's options button reveals Import and Remove.
 All platforms support Whisper small.en, large-v2, large-v3, and large-v3-turbo.
 The first three expose English; turbo exposes English and Hindi according to
 the bundled signed catalog. Import copies into this app's own storage and
-checks size and SHA-256. It never changes a model used by the Swift app.
+checks size and SHA-256.
 
 Apple Silicon also supports these GPU-only versions:
 
@@ -43,12 +42,13 @@ Apple Silicon also supports these GPU-only versions:
 
 Confucius shows live English or Chinese text in the compact floating bar while
 recording. All models perform final recognition on release and insert once.
-The bar follows native Textify's app identity, waveform, colored border and
-three-line transcript, with compact Copy and dismissal controls for recovery.
-Qwen and Parakeet offer automatic language detection. Native MLX/CoreML variants
+The bar shows Textify's icon, waveform, colored border and three-line
+transcript, with compact Copy and dismissal controls for recovery.
+Qwen and Parakeet offer automatic language detection. MLX/CoreML variants
 are not included. Custom vocabulary prompts apply
 to Whisper; replacement pairs apply to every engine. New family support on
-Windows/Linux is deferred. Native app ratings are not claimed for Electron.
+Windows/Linux is deferred. Published catalog benchmark ratings are not claimed
+as measurements of these desktop workers.
 
 **BF16 · Original** downloads the publisher's 11 original files (4.09 GB) from
 `netease-youdao/Confucius4-R2T2` revision
@@ -58,7 +58,7 @@ as a complete directory; partial transfers can resume. Extra source files are
 not imported. The entry is in `models/manifest.json` inside this Electron directory,
 signed with the existing trusted catalog key. Both catalogs are verified and all
 files remain subject to sticky revocations, including canonical directory digests.
-The root Swift catalog is unchanged. Model weights remain BF16; there is no
+The shared root catalog is unchanged. Model weights remain BF16; there is no
 Python service, runtime conversion to GGUF, cloud ASR or CPU inference fallback.
 
 The extra source archives are checksum-pinned. They build offline as separate
@@ -208,10 +208,9 @@ Windows CI also runs it. Physical microphone, real app, login startup and Linux
 GNOME/KDE Wayland checks remain in [MANUAL_QA.md](MANUAL_QA.md). The owner can test
 Windows; a Linux desktop tester is still needed. Xvfb is not a Wayland desktop.
 
-The portable preview does not yet include all of the Swift app's inference
-engines, speech enhancement, or diagnostics export. Confucius4-R2T2 provides
-live transcription previews on macOS. No full native-app parity or production
-readiness is claimed.
+The preview does not include speech enhancement or diagnostics export.
+Confucius4-R2T2 provides live transcription previews on macOS. Outstanding
+physical-device checks are recorded in the desktop QA guide.
 
 For additional local model checks, `scripts/runtime-smoke.mjs` verifies the signed
 model hash and exercises language and custom-word configuration with public test

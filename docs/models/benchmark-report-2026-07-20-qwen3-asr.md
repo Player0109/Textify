@@ -1,5 +1,11 @@
 # Qwen3-ASR MLX and GGUF benchmark record
 
+> Historical catalog and model evidence. Runtime support, ratings, UI behavior,
+> and commands below describe the implementation at the recorded date.
+> Retired benchmark commands are retained as provenance, not instructions.
+> See the [desktop guide](../../electron/README.md) for current supported
+> artifacts and features; these records do not claim Electron performance.
+
 Date: 2026-07-20
 
 Host: Apple M4 Max, arm64, macOS 26.5.1 build 25F80

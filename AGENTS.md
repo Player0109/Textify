@@ -1,6 +1,10 @@
 # Textify Agent Notes
 
-Agents must read `docs/SPEC.md` and `docs/superpowers/plans/2026-07-03-textify-v1-parallel-implementation.md` before editing.
+Agents must read `docs/SPEC.md` and `electron/README.md` before editing.
+
+The desktop application lives in `electron/`. The root Swift package contains
+model-catalog verification tools, not an application. Preserve signed catalog
+bytes and the licenses consumed by the desktop build.
 
 Keep file ownership narrow. If an implementation needs to change another task's owned files, record the handoff in `docs/implementation/coordination.md` before continuing.
 

@@ -1,4 +1,0 @@
-module TextifyWhisperShim {
-  header "TextifyWhisperShim.h"
-  export *
-}

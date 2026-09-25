@@ -1,5 +1,11 @@
 # ASR Post-Processing Research - 2026-08-09
 
+> Historical catalog and model evidence. Runtime support, ratings, UI behavior,
+> and commands below describe the implementation at the recorded date.
+> Retired benchmark commands are retained as provenance, not instructions.
+> See the [desktop guide](../../electron/README.md) for current supported
+> artifacts and features; these records do not claim Electron performance.
+
 This note follows the repo's existing pattern of keeping dated ASR and model research in `docs/models/`.
 
 ## Executive summary

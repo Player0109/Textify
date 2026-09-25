@@ -1,72 +1,55 @@
 # Textify Privacy
 
-This statement applies to Textify 1.1.x. Textify is a local dictation utility
-with no accounts, analytics service, crash reporter, transcript history, or
-automatic upload path for dictated content.
+This statement applies to the desktop app in `electron/`, distributed for
+macOS, Windows, and Linux. Textify has no accounts, analytics service, crash
+reporting service, transcript history, or speech upload.
 
 ## Audio and dictated text
 
-- Audio is captured only while you actively dictate.
-- Audio and optional voice cleaning are processed locally through the installed
-  on-device runtime.
-- Raw audio is processed in memory and is not saved by default. It is released
-  after the active dictation finishes.
-- Dictated text is inserted locally. Textify does not keep transcript history.
-- Textify does not send audio, transcripts, vocabulary, custom words, or
-  replacement pairs to a Textify server or cloud speech service.
+- Audio is captured while you actively dictate and processed locally by the
+  installed speech model.
+- Audio, live previews, and pending dictated text stay in memory for the active
+  session. Textify does not retain recordings or transcript history.
+- Textify does not send audio, dictated text, custom vocabulary, or replacement
+  pairs to a cloud speech service.
 
-## Clipboard use
+## Clipboard and text delivery
 
-Textify uses the system clipboard only as an insertion transport. Before paste,
-it snapshots the current clipboard, writes the dictated text, marks that item
-transient and concealed on a best-effort basis, posts paste, and restores the
-snapshot only while Textify's expected clipboard marker remains.
+On macOS and Windows, global dictation can paste into the original app after
+checking that it is still focused. Automatic paste restores the previous
+clipboard only if the clipboard has not changed. Textify does not overwrite
+newer clipboard content or retry an uncertain paste.
 
-If another app or the user changes the clipboard during insertion, Textify does
-not overwrite that newer content. Transient and concealed pasteboard markers
-are conventions, not guarantees; third-party clipboard managers may still
-observe or retain the temporary dictated text.
+The in-app microphone button uses an explicit Copy workflow. Linux also uses
+Copy followed by manual paste. Explicit Copy replaces the clipboard normally.
+Third-party clipboard managers may observe or retain copied text.
 
-## Local settings and diagnostics
+## Local data
 
-Settings, model receipts, vocabulary, custom words, replacement pairs, and
-excluded-app records remain local.
+Preferences, custom vocabulary, replacement pairs, app exclusions, downloaded
+models, verification records, and model download progress remain on the device.
+The desktop app uses its existing Textify Electron data directory so updates
+retain these settings.
 
-Activity stores daily numeric totals for completed dictations on this device:
-word count, dictation count, recording duration, and estimated time saved. It
-does not store dictated words, audio, or destination apps. The estimate uses a
-40-words-per-minute typing baseline minus the time to produce the text; it
-cannot measure later edits. Nothing is
-sent to an analytics service.
+Activity stores daily numeric totals for completed dictations. Day, week, and
+month views are derived from those totals; dictated words, recordings, and
+destination apps are not stored in Activity or sent to an analytics service.
 
-Diagnostics export is explicit. Exported diagnostics are redacted and must not
-contain transcripts, clipboard contents, vocabulary, custom words, replacement
-text, or raw audio. They are limited to technical state such as permissions,
-model status, timings, and error categories.
+The desktop preview does not provide a diagnostics export. Review screenshots
+or error details before voluntarily attaching them to a support issue.
 
 ## Network access
 
-The signed model catalog and its signature are bundled with Textify. The app
-does not fetch catalog or revocation metadata when it launches, when onboarding
-opens, or when Settings opens.
+Signed model catalogs and revocation metadata are bundled with the app. A model
+download makes an explicit request to its listed host, such as GitHub or Hugging
+Face, and verifies the received files before use. Dictation works offline once
+a supported model is installed.
 
-Textify itself makes network requests only for a model download that you
-explicitly start, from an immutable Textify GitHub Release asset or an exact
-commit-pinned public Hugging Face file.
+Download hosts receive the requested model URL and ordinary request metadata,
+such as the IP address, user agent, and request time. This can reveal which
+model file was requested. Textify does not add dictated content or an analytics
+payload to those requests.
 
-GitHub or Hugging Face receives the requested immutable URL, including its
-repository path and model filename, and ordinary request metadata such as IP
-address, user agent, and request time. The provider can therefore infer which
-model file was requested. Textify does not send a separate installed-model
-inventory, local storage paths, analytics, system profiles, or dictated content
-with that request.
-
-Actions you explicitly initiate outside Textify can create separate browser
-requests. These include downloading the app manually from GitHub Releases and
-opening model, source, or license links from Settings. Those links may visit
-GitHub, Hugging Face, ModelScope, or a license publisher. Your default browser
-then sends the requested URL and ordinary request metadata to that provider
-under the browser's and provider's privacy practices.
-
-Automatic updates are deferred in Textify 1.1, so the app does not make update
-checks or send Sparkle system-profile data.
+Opening model, source, or license links uses the default browser, whose privacy
+practices apply. App updates are downloaded manually from GitHub Releases;
+Textify does not run an automatic update check.
