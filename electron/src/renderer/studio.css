@@ -545,6 +545,291 @@
   margin-top: 16px;
 }
 
+.studio .activity-page {
+  display: grid;
+  gap: 16px;
+  max-width: 1200px;
+}
+
+.studio .activity-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.studio .activity-toolbar > span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.studio .activity-grouping {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #202936;
+}
+
+.studio .activity-grouping button {
+  min-width: 70px;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #b5c2d2;
+  font-size: 12px;
+  font-weight: 560;
+}
+
+.studio .activity-grouping button[aria-pressed="true"] {
+  background: #286abf;
+  color: #fff;
+  box-shadow: 0 1px 3px #0005;
+}
+
+.studio .activity-dashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1.75fr) minmax(270px, 0.9fr);
+  gap: 14px;
+}
+
+.studio .activity-chart-panel,
+.studio .activity-summary,
+.studio .activity-footer {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.studio .activity-chart-panel {
+  min-width: 0;
+  padding: 25px 27px 24px;
+}
+
+.studio .activity-chart-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+}
+
+.studio .activity-chart-heading h2 {
+  margin: 0 0 5px;
+  font-size: 20px;
+}
+
+.studio .activity-chart-heading p,
+.studio .activity-chart-heading > span {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.studio .activity-chart-heading > span {
+  padding-top: 4px;
+  white-space: nowrap;
+}
+
+.studio .activity-plot {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  height: 300px;
+  margin-top: 28px;
+}
+
+.studio .activity-scale {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 270px;
+  color: #8495a9;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.studio .activity-chart {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  height: 300px;
+  min-width: 0;
+  background: linear-gradient(to bottom, #ffffff13 0 1px, transparent 1px 49.8%, #ffffff13 50% calc(50% + 1px), transparent calc(50% + 1px) calc(100% - 31px), #ffffff24 calc(100% - 31px) calc(100% - 30px), transparent calc(100% - 30px));
+}
+
+.studio .activity-chart.group-week {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+
+.studio .activity-chart.group-day {
+  grid-template-columns: repeat(30, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.studio .activity-period {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-weight: 400;
+}
+
+.studio .activity-bar-track {
+  display: flex;
+  flex: 1;
+  align-items: end;
+  justify-content: center;
+  min-height: 0;
+}
+
+.studio .activity-bar {
+  width: min(100%, 60px);
+  border-radius: 5px 5px 0 0;
+}
+
+.studio .activity-chart.group-day .activity-bar {
+  border-radius: 3px 3px 0 0;
+}
+
+.studio .activity-bar.has-words {
+  min-height: 3px;
+  background: linear-gradient(180deg, #5c9fe7, #2c61a9);
+}
+
+.studio .activity-period[aria-pressed="true"] .activity-bar.has-words {
+  background: linear-gradient(180deg, #73b5ff, #2f86f6);
+  box-shadow: 0 0 0 1px #8cc1ff66, 0 0 18px #368dff33;
+}
+
+.studio .activity-period:hover .activity-bar.has-words {
+  filter: brightness(1.2);
+}
+
+.studio .activity-period-label {
+  display: block;
+  position: relative;
+  left: 50%;
+  width: 54px;
+  height: 30px;
+  padding-top: 9px;
+  transform: translateX(-50%);
+  color: #8f9fb1;
+  font-size: 10px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.studio .activity-period[aria-pressed="true"] .activity-period-label {
+  color: #e8f2ff;
+  font-weight: 650;
+}
+
+.studio .activity-chart-empty {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  margin-top: 28px;
+  border: 1px dashed #ffffff24;
+  border-radius: 9px;
+  color: #aab8c9;
+  font-size: 13px;
+  text-align: center;
+  padding: 20px;
+}
+
+.studio .activity-summary {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 25px 26px 18px;
+}
+
+.studio .activity-summary-heading > span {
+  color: #8199b8;
+  font-size: 10px;
+  font-weight: 670;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+}
+
+.studio .activity-summary-heading h2 {
+  margin: 6px 0 18px;
+  color: #eef3fa;
+  font-size: 17px;
+  font-weight: 620;
+}
+
+.studio .activity-summary-primary > span,
+.studio .activity-summary-rows span {
+  color: #adbacb;
+  font-size: 12px;
+}
+
+.studio .activity-summary-primary strong {
+  display: block;
+  margin: 0 0 14px;
+  color: #f7f9fd;
+  font-size: clamp(48px, 5vw, 68px);
+  font-weight: 680;
+  letter-spacing: -2px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.studio .activity-summary-rows > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 47px;
+  border-top: 1px solid var(--line);
+}
+
+.studio .activity-summary-rows strong {
+  color: #eef3fa;
+  font-size: 15px;
+  font-weight: 650;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.studio .activity-all-time {
+  align-self: flex-start;
+  margin-top: auto;
+  padding-top: 15px;
+  color: #68aeff;
+}
+
+.studio .activity-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 17px 22px;
+}
+
+.studio .activity-footer strong {
+  color: #e7edf6;
+  font-size: 12px;
+}
+
+.studio .activity-footer p {
+  margin: 5px 0 0;
+  color: #96a5b8;
+  font-size: 11px;
+}
+
+.studio .activity-loading,
+.studio .activity-unavailable {
+  padding: 25px;
+}
+
 .studio > main > .accessibility-setup {
   padding: 22px;
   border-color: var(--line);
@@ -888,9 +1173,20 @@
   .studio .floating-preview {
     min-height: 250px;
   }
+  .studio .activity-dashboard {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 930px) {
+  .studio .activity-toolbar > span {
+    display: none;
+  }
+  .studio .activity-footer {
+    flex-direction: column;
+    align-items: start;
+    gap: 8px;
+  }
   .studio .settings-list,
   .studio .vocabulary-grid {
     display: block;

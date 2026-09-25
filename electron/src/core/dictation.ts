@@ -1,12 +1,14 @@
 import type { Phase, Replacement } from "../shared";
 import {
   MAX_SAMPLES,
+  SAMPLE_RATE,
   rms,
   SpeechGuard,
   stitch,
   trimSilence,
   windows,
 } from "./audio";
+import { countWords } from "./activity";
 import { processText } from "./text";
 import { engineError } from "./engine-error";
 import { LivePreview, type StreamingPorts } from "./live-preview";
@@ -33,6 +35,11 @@ export interface DictationPorts {
     text: string,
     target: Target,
   ): Promise<"sent" | "skipped" | "unavailable">;
+  completed?(result: {
+    words: number;
+    recordingSeconds: number;
+    elapsedSeconds: number;
+  }): void;
   changed(): void;
 }
 type Session = {
@@ -57,6 +64,11 @@ export class Dictation {
   applicationIcon = "";
   private serial = 0;
   private copying = false;
+  private pendingActivity?: {
+    words: number;
+    recordingSeconds: number;
+    elapsedSeconds: number;
+  };
   private session?: Session;
   private processingTask?: Promise<void>;
   private activation?: ReturnType<typeof setTimeout>;
@@ -87,6 +99,7 @@ export class Dictation {
   press(manual = false) {
     if (this.busy) return;
     this.pending = "";
+    this.pendingActivity = undefined;
     this.preview = "";
     this.application = "Textify";
     this.applicationIcon = "";
@@ -197,6 +210,7 @@ export class Dictation {
     const s = this.session;
     if (!s) {
       this.pending = "";
+      this.pendingActivity = undefined;
       this.update("idle");
       return;
     }
@@ -286,8 +300,14 @@ export class Dictation {
         if (!s.cancelled) this.update("idle");
         return;
       }
+      const completion = () => ({
+        words: countWords(text),
+        recordingSeconds: s.count / SAMPLE_RATE,
+        elapsedSeconds: Math.max(0, (this.now() - s.started) / 1000),
+      });
       if (!s.target) {
         this.pending = text;
+        this.pendingActivity = completion();
         this.update(
           "copy",
           "Your dictation is ready. Copy it, then paste into your app.",
@@ -299,6 +319,7 @@ export class Dictation {
       if (s.cancelled) return;
       if (result === "unavailable") {
         this.pending = text;
+        this.pendingActivity = completion();
         this.update(
           "copy",
           "Automatic insertion is unavailable here. Copy your dictation to paste it.",
@@ -308,7 +329,10 @@ export class Dictation {
           "error",
           "Textify could not confirm delivery to the original app. Check that text field before dictating again.",
         );
-      } else this.update("idle");
+      } else {
+        this.ports.completed?.(completion());
+        this.update("idle");
+      }
     } catch (error) {
       if (!s.cancelled)
         this.update(
@@ -328,7 +352,9 @@ export class Dictation {
     this.copying = true;
     try {
       await write(this.pending);
+      if (this.pendingActivity) this.ports.completed?.(this.pendingActivity);
       this.pending = "";
+      this.pendingActivity = undefined;
       this.update("idle");
     } finally {
       this.copying = false;
@@ -338,6 +364,7 @@ export class Dictation {
   dismiss() {
     if (this.copying) return;
     this.pending = "";
+    this.pendingActivity = undefined;
     if (!this.busy) this.update("idle");
   }
 }

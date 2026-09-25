@@ -12,6 +12,7 @@ import { AccessibilitySetup } from "./AccessibilitySetup";
 import { AccessibilityDragHelp } from "./AccessibilityDragHelp";
 import { CustomWords } from "./CustomWords";
 import { Exclusions } from "./Exclusions";
+import { ActivityPane } from "./ActivityPane";
 import textifyIcon from "../../assets/textify-icon.png";
 
 const mode = new URLSearchParams(location.search).get("mode");
@@ -69,6 +70,10 @@ function NavIcon({ name }: { name: string }) {
         <>
           <path d="M3 10v4m4-8v12m4-15v18m4-13v8m4-11v14m4-9v4" />
         </>
+      ) : name === "Activity" ? (
+        <>
+          <path d="M3 19h18M5 16V9m5 7V5m5 11v-4m5 4V7" />
+        </>
       ) : name === "Vocabulary" ? (
         <>
           <path d="M12 20c-2-1.5-5-2.2-9-1.8V4.5c4-.4 7 .3 9 1.8m0 13.7c2-1.5 5-2.2 9-1.8V4.5c-4-.4-7 .3-9 1.8M12 6.3V20" />
@@ -87,7 +92,7 @@ function NavIcon({ name }: { name: string }) {
     </svg>
   );
 }
-const panes = ["General", "Models", "Vocabulary", "Privacy"] as const;
+const panes = ["General", "Models", "Vocabulary", "Activity", "Privacy"] as const;
 function App() {
   const state = useSnapshot();
   const [pane, setPane] = useState<(typeof panes)[number]>("General");
@@ -203,6 +208,7 @@ function App() {
                 with every model.
               </p>
             )}
+            {pane === "Activity" && <p>Your dictation activity, saved on this device.</p>}
           </div>
         </header>
         {(error || state.message) && (
@@ -533,6 +539,7 @@ function App() {
             </section>
           </div>
         )}
+        {pane === "Activity" && <ActivityPane phase={state.phase} />}
         {pane === "Privacy" && (
           <section className="privacy">
             <div className="privacy-intro">

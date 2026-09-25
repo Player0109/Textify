@@ -21,6 +21,8 @@ Whisper import, several local Apple Silicon runtimes, multilingual model
 routing with a persisted Dictation Language selector, vocabulary and
 replacement pairs, and optional MossFormer2 speech enhancement before ASR.
 It still omits Sparkle, transcript history, per-app profiles, and cloud ASR.
+The Electron app's Activity page keeps only local daily numeric usage totals;
+it does not add transcript history or product telemetry.
 Confucius4-R2T2 adds an in-memory live transcript preview to the recording
 overlay. One uninterrupted trigger hold may capture up to five minutes; Textify processes longer captures as internal model-safe ASR
 windows and still produces one final insertion. The trigger is user-selectable from the four
@@ -340,7 +342,7 @@ Also state:
 - Audio is captured only while actively dictating.
 - Audio is processed in memory and never saved by default.
 - No dictation history.
-- No analytics.
+- No analytics service or usage telemetry; Activity totals remain local.
 - No crash reporting.
 - No accounts.
 - No servers that see dictated content.
@@ -920,7 +922,7 @@ Diagnostics:
 Privacy statement:
 
 - Textify runs offline for dictation.
-- No analytics.
+- No analytics service or usage telemetry; Activity totals remain local.
 - No crash reporting.
 - No accounts.
 - No servers.
@@ -2475,6 +2477,11 @@ No user-facing transcript history.
 
 No internal transcript history by default.
 
+The Electron Activity page stores daily numeric totals for completed
+dictations: words, count, recording duration, and estimated time saved. No
+dictated text, audio, or destination app is stored with those totals. Users can
+view the totals by day, week, or month. Activity has no in-app deletion control.
+
 Diagnostics do not contain dictated text.
 
 Audio:
@@ -2815,7 +2822,7 @@ These are not V1 commitments:
 - custom model storage path
 - proxy settings UI
 - crash reporting
-- product analytics
+- remote product analytics or usage telemetry
 - automatic model binary downloads
 - model rollback UI
 - full localization

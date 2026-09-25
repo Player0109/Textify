@@ -122,9 +122,10 @@ accept model binary pull requests or issue attachments.
 ## Privacy
 
 Audio and dictated text stay on the Mac. Textify does not have accounts,
-analytics, crash reporting, transcript history, or an automatic upload path for
-dictated content. Clipboard insertion is brief and restored on a best-effort
-basis.
+an analytics service, crash reporting, transcript history, or an automatic
+upload path for dictated content. The Activity page keeps only daily numeric
+usage totals on this device. Clipboard insertion is brief and restored on a
+best-effort basis.
 
 See [PRIVACY.md](PRIVACY.md) for the full privacy statement.
 

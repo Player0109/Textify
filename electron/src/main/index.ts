@@ -25,6 +25,7 @@ import { Platform, nativeTrigger } from "./platform";
 import { waylandTrigger } from "./wayland";
 import { Capture } from "./capture";
 import { AccessibilitySetup } from "./accessibility";
+import { ActivityStore } from "./activity";
 import { defaults, validatePreferences } from "./preferences";
 import { linuxStartup, linuxStartupEnabled } from "./startup";
 import type { Action, Preferences, Snapshot, ModelCommand } from "../shared";
@@ -68,6 +69,8 @@ let models: Models,
   worker: WhisperWorker,
   capture: Capture,
   dictation: Dictation;
+const activity = new ActivityStore(join(app.getPath("userData"), "activity.json"));
+let activityError = false;
 let broadcastTimer: ReturnType<typeof setTimeout> | undefined;
 const appBundle = dirname(dirname(dirname(process.execPath)));
 const accessibility = process.platform === "darwin"
@@ -520,6 +523,7 @@ else {
     .whenReady()
     .then(async () => {
       await mkdir(app.getPath("userData"), { recursive: true });
+      await activity.load().catch(() => { activityError = true; });
       try {
         preferences = validatePreferences(
           JSON.parse(
@@ -620,6 +624,12 @@ else {
           transcribe: (samples) => worker.transcribe(samples),
           streaming: () => (worker.streaming ? worker : undefined),
           insert: (text, target) => platform.insert(text, target),
+          completed: (result) => {
+            if (!activityError)
+              void activity.record(result).catch(() => {
+                activityError = true;
+              });
+          },
           changed,
         },
         () => preferences.replacements,
@@ -659,6 +669,12 @@ else {
       ipcMain.handle("snapshot", (event) => {
         if (!allowed(event, [main, overlay])) throw new Error("unauthorized");
         return snapshot();
+      });
+      ipcMain.handle("activity", async (event) => {
+        if (!allowed(event, [main])) throw new Error("unauthorized");
+        if (activityError) throw new Error("activity_unavailable");
+        await activity.flush();
+        return activity.snapshot();
       });
       ipcMain.handle("devices", (event) => {
         if (!allowed(event, [main])) throw new Error("unauthorized");
@@ -813,6 +829,7 @@ else {
     audio?.destroy();
     void (async () => {
       await dictation?.cancel();
+      await activity.flush().catch(() => {});
       overlay?.destroy();
       accessibilityHelp?.destroy();
       tray?.destroy();

@@ -32,6 +32,13 @@ observe or retain the temporary dictated text.
 Settings, model receipts, vocabulary, custom words, replacement pairs, and
 excluded-app records remain local.
 
+Activity stores daily numeric totals for completed dictations on this device:
+word count, dictation count, recording duration, and estimated time saved. It
+does not store dictated words, audio, or destination apps. The estimate uses a
+40-words-per-minute typing baseline minus the time to produce the text; it
+cannot measure later edits. Nothing is
+sent to an analytics service.
+
 Diagnostics export is explicit. Exported diagnostics are redacted and must not
 contain transcripts, clipboard contents, vocabulary, custom words, replacement
 text, or raw audio. They are limited to technical state such as permissions,

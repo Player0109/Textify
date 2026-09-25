@@ -126,6 +126,44 @@ describe("dictation lifecycle", () => {
     expect(h.app.phase).toBe("idle");
     expect(h.app.pending).toBe("");
   });
+  it("counts only delivered or successfully copied results", async () => {
+    const completed = vi.fn();
+    const h = harness({ completed });
+    h.app.press();
+    await vi.advanceTimersByTimeAsync(300);
+    h.speech();
+    await h.app.release();
+    expect(completed).toHaveBeenCalledExactlyOnceWith({
+      words: 2,
+      recordingSeconds: 0.4,
+      elapsedSeconds: 0.3,
+    });
+
+    const manual = harness({ completed });
+    manual.app.press(true);
+    await vi.advanceTimersByTimeAsync(300);
+    manual.speech();
+    await manual.app.release();
+    expect(completed).toHaveBeenCalledTimes(1);
+    await expect(manual.app.copy(async () => { throw new Error("clipboard failed"); })).rejects.toThrow();
+    expect(completed).toHaveBeenCalledTimes(1);
+    await manual.app.copy(async () => {});
+    expect(completed).toHaveBeenCalledTimes(2);
+
+    const skipped = harness({ completed, insert: async () => "skipped" });
+    skipped.app.press();
+    await vi.advanceTimersByTimeAsync(300);
+    skipped.speech();
+    await skipped.app.release();
+    expect(completed).toHaveBeenCalledTimes(2);
+
+    const cancelled = harness({ completed });
+    cancelled.app.press();
+    await vi.advanceTimersByTimeAsync(300);
+    cancelled.speech();
+    await cancelled.app.cancel();
+    expect(completed).toHaveBeenCalledTimes(2);
+  });
   it("does not start the microphone after release during target admission", async () => {
     const target = deferred<{ target: string; secure: boolean }>();
     const h = harness({ target: () => target.promise });

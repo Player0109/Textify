@@ -5,6 +5,7 @@ import {
   rm,
   copyFile,
   readFile,
+  writeFile,
   cp,
   stat,
 } from "node:fs/promises";
@@ -13,6 +14,12 @@ import { join, resolve } from "node:path";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 const data = await mkdtemp(join(tmpdir(), "textify-electron-smoke-"));
+const today = new Date();
+const dayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+await writeFile(join(data, "activity.json"), JSON.stringify({
+  version: 1,
+  days: [{ date: dayKey, words: 500, dictations: 4, recordingSeconds: 120, estimatedTimeSavedSeconds: 630 }],
+}));
 const env = { ...process.env, TEXTIFY_ELECTRON_TEST_DATA: data };
 const fixtureID = process.env.TEXTIFY_MODEL_ID ?? "ggml-small.en-q5_1";
 const noGPU = process.env.TEXTIFY_EXPECT_NO_GPU === "1";
@@ -129,7 +136,34 @@ try {
     }),
     true,
   );
+  assert.equal(await indicator.evaluate(async () => {
+    try { await window.textify.activity(); return false; }
+    catch { return true; }
+  }), true, "The overlay cannot read activity totals");
   await mkdir("artifacts", { recursive: true });
+  await page.getByRole("button", { name: "Activity", exact: true }).click();
+  await page.getByRole("heading", { name: "Activity", exact: true }).waitFor();
+  await page.locator(".activity-summary-primary strong").getByText("500").waitFor();
+  assert.equal(await page.getByRole("button", { name: "Month", exact: true }).getAttribute("aria-pressed"), "true");
+  await page.getByRole("button", { name: "Week", exact: true }).click();
+  await page.getByRole("heading", { name: "Weekly activity" }).waitFor();
+  assert.equal(await page.locator(".activity-period").count(), 8);
+  await page.getByRole("button", { name: "Day", exact: true }).click();
+  await page.getByRole("heading", { name: "Daily activity" }).waitFor();
+  assert.equal(await page.locator(".activity-period").count(), 30);
+  await page.locator(".activity-period").first().click();
+  await page.locator(".activity-summary-primary strong").getByText("0").waitFor();
+  await page.getByRole("button", { name: "View all time" }).click();
+  await page.getByRole("heading", { name: "All time" }).waitFor();
+  await page.locator(".activity-summary-primary strong").getByText("500").waitFor();
+  await page.getByRole("button", { name: "Month", exact: true }).click();
+  assert.equal(await page.locator(".activity-bar.has-words").count(), 1);
+  assert.equal(await page.getByRole("button", { name: "Reset activity data" }).count(), 0);
+  assert.equal(await page.evaluate(() => typeof window.textify.resetActivity), "undefined");
+  await page.screenshot({ path: "artifacts/activity.png" });
+  assert.equal((await page.evaluate(() => window.textify.activity())).totals.words, 500);
+  assert.equal(JSON.parse(await readFile(join(data, "activity.json"), "utf8")).days[0].words, 500);
+  await page.getByRole("button", { name: "General", exact: true }).click();
   await page.screenshot({ path: "artifacts/dictation.png" });
   await page
     .getByRole("button", { name: "Transcription models", exact: true })
@@ -140,10 +174,9 @@ try {
     await page.locator(".checkpoint-row").count(),
   );
   assert.equal(await page.locator(".checkpoint-detail-heading .provider-logo img").count(), 1);
-  assert.ok(
-    await page.locator(".provider-logo img").evaluateAll((images) =>
-      images.every((image) => image.complete && image.naturalWidth > 0)),
-    "Bundled publisher logos load offline",
+  await page.waitForFunction(() =>
+    Array.from(document.querySelectorAll(".provider-logo img")).every((image) =>
+      image.complete && image.naturalWidth > 0),
   );
   // Source links resolve a catalog ID in the main process; renderer-provided
   // URLs must never become an unrestricted shell.openExternal capability.
@@ -676,6 +709,19 @@ try {
       "Native destination icon, in-memory PNG decoding and overlay rendering passed.",
     );
   }
+  await page.getByRole("button", { name: "Activity", exact: true }).click();
+  const activitySize = await app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows().find((item) => item.webContents.getURL().endsWith("/index.html"));
+    const size = window.getSize();
+    window.setSize(780, 780);
+    return size;
+  });
+  await page.waitForFunction(() => innerWidth <= 780);
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "Activity fits the minimum window width");
+  await page.screenshot({ path: "artifacts/activity-compact.png" });
+  await app.evaluate(({ BrowserWindow }, size) => {
+    BrowserWindow.getAllWindows().find((item) => item.webContents.getURL().endsWith("/index.html")).setSize(...size);
+  }, activitySize);
   assert.deepEqual(errors, []);
   // Closing the settings window leaves the utility alive and reopening reuses it.
   await app.evaluate(({ BrowserWindow }) => {

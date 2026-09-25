@@ -117,8 +117,10 @@ and X11; Wayland cannot reliably identify foreground apps and shows exclusions
 as unavailable. On any desktop, the in-app microphone button is an explicit
 Copy workflow and does not inspect another app.
 
-Audio and pending dictation stay in memory. There is no transcript history,
-telemetry, or speech upload. Model downloads require an explicit action.
+Audio and pending dictation stay in memory. Activity stores only daily numeric
+totals for completed dictations, with day, week, and month views derived from
+those totals. There is no transcript
+history, telemetry, or speech upload. Model downloads require an explicit action.
 Custom words, preferences, model files and trust records remain in the existing
 **Textify Electron** data directory so preview updates retain them.
 

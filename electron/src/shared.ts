@@ -73,6 +73,19 @@ export interface Snapshot {
   preferences: Preferences;
   models: ModelView[];
 }
+export interface ActivityTotals {
+  words: number;
+  dictations: number;
+  recordingSeconds: number;
+  estimatedTimeSavedSeconds: number;
+}
+export interface ActivityDay extends ActivityTotals {
+  date: string;
+}
+export interface ActivitySnapshot {
+  totals: ActivityTotals;
+  days: ActivityDay[];
+}
 export type Action =
   | "press"
   | "release"
@@ -104,6 +117,7 @@ export type AudioReply = {
 };
 export interface TextifyBridge {
   snapshot(): Promise<Snapshot>;
+  activity(): Promise<ActivitySnapshot>;
   action(action: Action): Promise<void>;
   preferences(value: Preferences): Promise<void>;
   model(command: ModelCommand): Promise<void>;
