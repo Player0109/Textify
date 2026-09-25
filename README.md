@@ -27,9 +27,9 @@
 
 ## See it in action
 
-[![Textify demo: choose a model, record speech, and copy the transcription](docs/media/textify-demo.gif)](docs/media/textify-demo.mp4)
+[![Textify demo: choose a model, record speech, and copy the transcription](docs/media/textify-demo.gif)](docs/media/textify-demo.mp4?raw=1)
 
-**[Watch the video with sound](docs/media/textify-demo.mp4)** · [Download the MP4](docs/media/textify-demo.mp4?raw=1)
+**[Download the video with sound (MP4)](docs/media/textify-demo.mp4?raw=1)** · [How the demo was recorded](docs/media/README.md)
 
 *Actual app footage with local GPU transcription on Apple Silicon. Prerecorded sample audio; the caption below the app shows the text copied by Textify.*
 
