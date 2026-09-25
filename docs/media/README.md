@@ -1,6 +1,39 @@
 # Video provenance
 
-## Dictation promotion
+## Promotion video
+
+`textify-ad.mp4` is a 45-second motion graphic promotion in 1080p at 30 fps,
+with synthetic voiceover, one spoken dictation example, music and sound effects.
+`textify-ad.gif` is its silent README preview: the shortcut and email dictation
+scenes, from 5.1 to 18.55 seconds.
+
+The frames are HTML, CSS and SVG animation rendered with
+[HyperFrames](https://github.com/heygen-com/hyperframes). The Textify logo is the
+existing app asset and the only image in the video; all text is set in Inter.
+The writing apps (an email draft, notes, a document, code and chat) are generic
+illustrations, not footage of named products, and the recording bar is a
+simplified drawing of the app's floating bar. The dictated email appears once
+after release and processing, matching the macOS shortcut workflow. These scenes
+are not evidence of microphone capture, cross-app insertion or measured
+recognition speed.
+
+Narration and the dictated example are synthetic speech from the configured TTS
+service, cloned from a reference clip supplied by the project owner
+(`voice_preview_beth`). The music is a track from the HeyGen music library, cut
+to the edit and ducked beneath speech. The keyboard, click, whoosh, pop and
+impact sounds come from the HeyGen sound library. The soundtrack is mastered to
+-14 LUFS integrated with a -1 dBTP true-peak ceiling.
+
+The end card names macOS, Windows and Linux and states the hardware
+requirements: Apple Silicon with macOS 14 or later, or a Vulkan GPU on Windows
+and Linux. The animation demonstrates the macOS workflow only; on Linux,
+Textify uses Copy and manual paste.
+
+The editable HyperFrames project is not included in this repository.
+
+## Earlier dictation promotion
+
+The README now shows the promotion above; these files remain for reference.
 
 `textify-promo.mp4` is a 42-second motion graphic promotion in 1080p at 30 fps,
 with synthetic voiceover, two spoken dictation examples and original instrumental
@@ -21,9 +54,13 @@ Whisper small.en model and real Metal inference; they were visual references,
 not automatic-insertion footage. No personal documents, real microphone audio,
 messages, permission changes or installed-app data were used.
 
-Narration uses the installed macOS Aman voice; dictated examples use Samantha.
-The instrumental bed is composed and synthesized locally without stock music.
-The two voices do not overlap, and the music ducks beneath speech.
+Narration and dictated examples use the configured TTS service's clear male and
+female Kenney voice presets (`announcer_kenney_male` and
+`announcer_kenney_female`). The service identifies their reference material as
+the CC0 Kenney Voiceover Pack. Speech is synthetic and fits the original edit
+without acceleration. The instrumental bed is composed and synthesized locally
+without stock music. The two voices do not overlap, and the music ducks beneath
+speech.
 
 The end card links to the desktop preview and states that a hardware GPU is
 required and Linux uses Copy + paste. The animation demonstrates the macOS

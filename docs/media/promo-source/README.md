@@ -33,21 +33,33 @@ before the full render. Frame paths and imported assets are project-relative.
 
 ## Audio
 
-`audio.py` creates six synthetic speech segments with installed macOS `say`
-voices: Aman (English India) narrates, and Samantha speaks the two dictated
-examples. `audio.json` records the text, voice identities, cue times and measured
-durations. Voice synthesis is a production tool; these are not recordings of a
-person using Textify.
+`audio.py` creates six synthetic speech segments through the configured TTS
+service. The `announcer_kenney_male` preset narrates, and
+`announcer_kenney_female` speaks the two dictated examples. The service identifies
+their reference material as the CC0 Kenney Voiceover Pack. `audio.json` records
+the text, voice identities, cue times and measured durations. Voice synthesis is
+a production tool; these are not recordings of a person using Textify.
 
 The same script composes an original D-major instrumental bed from oscillators,
 soft pads and piano-like notes. It uses no stock recording or sampled instrument.
 Music ducks beneath speech. Narration and the dictation examples never overlap.
-The WAV mix measures approximately −16 LUFS integrated and −1.6 dBTP. The final
-AAC video mix, with another 0.5 dB of headroom, measures −16.5 LUFS and −2.0 dBTP.
+The WAV mix measures approximately −16 LUFS integrated and −1.7 dBTP. The final
+AAC video mix, with another 0.5 dB of headroom, measures −16.5 LUFS and −2.2 dBTP.
 
-Copy `audio.py` to an output directory and run it there with Python 3, NumPy,
-ffmpeg, ffprobe and the named installed macOS voices. It writes its outputs beside
-the script. No voice download or external speech service is needed.
+Use Python 3, NumPy, curl, ffmpeg and ffprobe. Pass the local service guide and
+an output directory. The private service URL is read at runtime and must never
+be committed. Only the promotion's script is sent for speech generation; this
+service is not an application dependency.
+
+```sh
+python3 docs/media/promo-source/audio.py \
+  --service-guide /private/path/to/AGENT_GUIDE.md --output-dir /path/to/audio
+```
+
+Existing generated takes can be remixed without a service call using
+`--takes-dir /path/to/takes --output-dir /path/to/audio`. All six published takes
+fit without time stretching. Silence trimming preserves a short margin around
+speech, and both dictation examples finish before the illustrated key release.
 
 ```sh
 ffmpeg -i textify-promo/renders/visual.mp4 -i audio/finalmix.wav \
