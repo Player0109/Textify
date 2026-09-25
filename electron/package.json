@@ -30,7 +30,7 @@
     "uiohook-napi": "1.5.5"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.6.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "electron": "44.4.3",
