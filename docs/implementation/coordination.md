@@ -2540,3 +2540,8 @@ Task 1 must merge before parallel Wave 1 work begins.
   staple/Gatekeeper failures, and missing platform installers. TypeScript,
   Node syntax checks for the three release scripts, and `git diff --check`
   passed. These checks do not claim successful real signing or notarization.
+- The integrated preview.23 candidate passed `npm run check` (116 tests,
+  TypeScript and production build) and isolated Electron smoke. Master was
+  merged by retaining the Activity specification and Electron handoff notes
+  in documentation-only conflicts; the merge did not alter the candidate's
+  file tree. New three-platform CI artifacts are required for this candidate.
