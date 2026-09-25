@@ -1,0 +1,45 @@
+{
+  "date": "2026-09-25",
+  "duration_seconds": 42,
+  "video": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "frames": 1260,
+    "codec": "H.264"
+  },
+  "audio": {
+    "codec": "AAC",
+    "sample_rate": 48000,
+    "channels": 2,
+    "integrated_lufs": -16.5,
+    "true_peak_dbfs": -2.0
+  },
+  "workflow": "Animated macOS workflow; sample apps and illustrative timing, not a live recording",
+  "insertions_seconds": {
+    "email": 10.3,
+    "document": 24.0
+  },
+  "source_logo_sha256": "a2b7afc0b1f4bf1b9f403c581c367ef1c7c6bee470a95e765293e3abba340ecd",
+  "validation": [
+    "Higgsedit native check: clean",
+    "Native render: 1260 frames; no diagnostics or fallbacks",
+    "Encoded contact sheet: scene boundaries and both insertion sequences reviewed",
+    "Source proof frames reviewed at full resolution",
+    "Final MP4 decoded through ffmpeg EBU R128 measurement"
+  ],
+  "artifacts": {
+    "docs/media/textify-promo.mp4": {
+      "bytes": 4887406,
+      "sha256": "e045b8a6049447e0b3fada39c9e290eda3f741a0ab8a7c5fa9b747bc4b74ebfa"
+    },
+    "docs/media/textify-promo.gif": {
+      "bytes": 1205655,
+      "sha256": "e2fdd981feb0abf70a893da350ec85971813d67cfe0a071c9430d81fead43442"
+    },
+    "docs/media/textify-promo-poster.png": {
+      "bytes": 149750,
+      "sha256": "acc36e105e9d62ce78b66efa018bd0644da85432bc1dc1c3cfc077d0dd1ef045"
+    }
+  }
+}

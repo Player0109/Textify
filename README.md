@@ -27,11 +27,13 @@
 
 ## See it in action
 
-[![Textify demo: choose a model, record speech, and copy the transcription](docs/media/textify-demo.gif)](docs/media/textify-demo.mp4?raw=1)
+[![Textify: dictate into an email or document with Hold, Speak, Release](docs/media/textify-promo.gif)](docs/media/textify-promo.mp4?raw=1)
 
-**[Download the video with sound (MP4)](docs/media/textify-demo.mp4?raw=1)** · [How the demo was recorded](docs/media/README.md)
+**[Watch the 42-second promo with sound (MP4 download)](docs/media/textify-promo.mp4?raw=1)** · [Video details and source](docs/media/README.md)
 
-*Actual app footage with local GPU transcription on Apple Silicon. Prerecorded sample audio; the caption below the app shows the text copied by Textify.*
+*An animated macOS workflow showing dictation into sample writing apps, with voiceover and music. Timing is illustrative; Linux uses Copy and manual paste.*
+
+[Actual app recording: model selection, local recognition, and Copy](docs/media/textify-demo.mp4?raw=1).
 
 ## Download
 

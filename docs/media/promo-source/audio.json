@@ -1,0 +1,102 @@
+{
+  "duration": 42.0,
+  "measurement_scope": "Source finalmix.wav before video attenuation and AAC encoding; see delivery.json for final MP4 measurements",
+  "sample_rate": 48000,
+  "channels": 2,
+  "pcm_bits": 24,
+  "voices": "macOS say, installed system voices; synthetic speech",
+  "music": "Original programmatic D-major ambient pad and synthesized piano; no third-party samples or stock recording",
+  "disclosure": "Synthetic voiceover and dictation examples; illustrative timing, not a recognition-speed measurement",
+  "segments": [
+    {
+      "id": "01_intro",
+      "role": "narrator",
+      "voice": "Aman (English (India))",
+      "start": 0.65,
+      "deadline": 6.0,
+      "rate": 128,
+      "text": "An email to finish. A document to shape. Start with what you want to say.",
+      "duration": 4.819687,
+      "end": 5.469688,
+      "file": "segments/01_intro.wav",
+      "synthetic_voice": true
+    },
+    {
+      "id": "02_email",
+      "role": "dictation",
+      "voice": "Samantha",
+      "start": 6.15,
+      "deadline": 10.3,
+      "rate": 140,
+      "text": "Hi Maya, I have added my comments to the draft.",
+      "duration": 3.244,
+      "end": 9.394,
+      "file": "segments/02_email.wav",
+      "synthetic_voice": true
+    },
+    {
+      "id": "03_workflow",
+      "role": "narrator",
+      "voice": "Aman (English (India))",
+      "start": 12.15,
+      "deadline": 19.5,
+      "rate": 176,
+      "text": "With Textify, hold your shortcut, speak, and release. Your words arrive at the cursor, ready to edit.",
+      "duration": 6.389625,
+      "end": 18.539625,
+      "file": "segments/03_workflow.wav",
+      "synthetic_voice": true
+    },
+    {
+      "id": "04_document",
+      "role": "dictation",
+      "voice": "Samantha",
+      "start": 20.15,
+      "deadline": 24.3,
+      "rate": 140,
+      "text": "The next step is to review the proposal together.",
+      "duration": 2.899521,
+      "end": 23.049521,
+      "file": "segments/04_document.wav",
+      "synthetic_voice": true
+    },
+    {
+      "id": "05_privacy",
+      "role": "narrator",
+      "voice": "Aman (English (India))",
+      "start": 26.6,
+      "deadline": 34.5,
+      "rate": 174,
+      "text": "Speech recognition happens on your device. No account. No speech upload.",
+      "duration": 4.776021,
+      "end": 31.376021,
+      "file": "segments/05_privacy.wav",
+      "synthetic_voice": true
+    },
+    {
+      "id": "06_outro",
+      "role": "narrator",
+      "voice": "Aman (English (India))",
+      "start": 36.4,
+      "deadline": 40.5,
+      "rate": 174,
+      "text": "Textify. Your voice, in your writing.",
+      "duration": 2.4835,
+      "end": 38.8835,
+      "file": "segments/06_outro.wav",
+      "synthetic_voice": true
+    }
+  ],
+  "final_loudness": {
+    "input_i": "-16.06",
+    "input_tp": "-1.60",
+    "input_lra": "9.10",
+    "input_thresh": "-27.40",
+    "output_i": "-16.65",
+    "output_tp": "-1.50",
+    "output_lra": "4.70",
+    "output_thresh": "-27.66",
+    "normalization_type": "dynamic",
+    "target_offset": "0.65"
+  }
+}
