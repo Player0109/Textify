@@ -1,201 +1,147 @@
-# Textify
+<p align="center">
+  <img src="electron/assets/textify-icon.png" alt="Textify app logo" width="144" height="144">
+</p>
 
-Offline GPU dictation for macOS, Windows, and Linux. Hold the dictation trigger,
-speak, and release to transcribe locally. Speech models download separately
-and are verified before use.
+<h1 align="center">Textify</h1>
 
-[![CI](https://github.com/Player0109/Textify/actions/workflows/ci.yml/badge.svg)](https://github.com/Player0109/Textify/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/Player0109/Textify)](LICENSE)
+<p align="center">
+  <strong>Offline dictation for macOS, Windows, and Linux.</strong><br>
+  Hold your shortcut, speak, and release. Turn speech into text on your own computer.
+</p>
 
-## Download desktop preview 23
+<p align="center">
+  <a href="https://github.com/Player0109/Textify/releases/tag/v0.2.0-preview.23"><img src="https://img.shields.io/badge/preview-0.2.0--preview.23-2563eb?style=flat-square" alt="Download Preview 23"></a>
+  <a href="https://github.com/Player0109/Textify/actions/workflows/electron.yml"><img src="https://github.com/Player0109/Textify/actions/workflows/electron.yml/badge.svg?branch=master" alt="Desktop build status"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-64748b?style=flat-square" alt="Apache License 2.0"></a>
+</p>
 
-[Release notes and checksums](https://github.com/Player0109/Textify/releases/tag/v0.2.0-preview.23)
+<p align="center">
+  <a href="#see-it-in-action">Watch the demo</a> &nbsp;·&nbsp;
+  <a href="#download">Download</a> &nbsp;·&nbsp;
+  <a href="#get-started">Get started</a> &nbsp;·&nbsp;
+  <a href="#privacy">Privacy</a> &nbsp;·&nbsp;
+  <a href="https://github.com/Player0109/Textify/issues">Report an issue</a>
+</p>
 
-| Platform | Download | Requirements |
-| --- | --- | --- |
-| macOS | [Apple Silicon DMG](https://github.com/Player0109/Textify/releases/download/v0.2.0-preview.23/Textify-0.2.0-preview.23-mac-arm64.dmg) | macOS 14+, Metal |
-| Windows | [x64 installer](https://github.com/Player0109/Textify/releases/download/v0.2.0-preview.23/Textify-0.2.0-preview.23-win-x64.exe) | Hardware Vulkan GPU and compatible driver |
-| Linux | [AppImage](https://github.com/Player0109/Textify/releases/download/v0.2.0-preview.23/Textify-0.2.0-preview.23-linux-x86_64.AppImage) / [Debian package](https://github.com/Player0109/Textify/releases/download/v0.2.0-preview.23/Textify-0.2.0-preview.23-linux-amd64.deb) | x64, hardware Vulkan GPU and compatible driver |
+---
 
-The Mac installer is Developer ID signed and notarized. Windows and Linux
-installers are unsigned and have not been tested on physical hardware; their
-automated installer and launch checks pass. This is a preview release.
-CPU-only inference is not supported.
+## See it in action
 
-[Installation guide](electron/RELEASE_INSTALL.md) ·
-[Desktop app and development](electron/README.md) ·
-[Physical-device checks](electron/MANUAL_QA.md)
+[![Textify demo: choose a model, record speech, and copy the transcription](docs/media/textify-demo.gif)](docs/media/textify-demo.mp4?raw=1)
 
-The desktop app includes a floating recording bar, verified local model
-downloads, vocabulary and replacement pairs, microphone selection, and local
-numeric Activity totals. It keeps no dictated text or audio history. Linux
-uses Copy and manual paste; Wayland shortcuts depend on the desktop portal.
-Updates are installed manually from GitHub Releases.
+**[Download the video with sound (MP4)](docs/media/textify-demo.mp4?raw=1)** · [How the demo was recorded](docs/media/README.md)
 
-<details>
-<summary>Earlier native macOS implementation and unsigned preview</summary>
+*Actual app footage with local GPU transcription on Apple Silicon. Prerecorded sample audio; the caption below the app shows the text copied by Textify.*
 
-The following documentation describes the separate Swift macOS app and its
-older unsigned preview, not the desktop downloads above.
+## Download
 
-## What it does
+**[Textify 0.2.0 Preview 23](https://github.com/Player0109/Textify/releases/tag/v0.2.0-preview.23)**
 
-Textify records while you hold the dictation trigger, transcribes the completed
-recording locally, and inserts the final text into the focused text field. It
-runs as both a Dock app and a menu-bar app, keeps no transcript history, and
-does not use cloud speech recognition.
+| Platform | Installer | What you need |
+| :-- | :-- | :-- |
+| **macOS** | [Apple Silicon DMG](https://github.com/Player0109/Textify/releases/download/v0.2.0-preview.23/Textify-0.2.0-preview.23-mac-arm64.dmg) | macOS 14 or later · Apple Silicon · Metal |
+| **Windows** | [x64 installer](https://github.com/Player0109/Textify/releases/download/v0.2.0-preview.23/Textify-0.2.0-preview.23-win-x64.exe) | x64 · hardware Vulkan GPU · compatible driver |
+| **Linux** | [AppImage](https://github.com/Player0109/Textify/releases/download/v0.2.0-preview.23/Textify-0.2.0-preview.23-linux-x86_64.AppImage) · [Debian package](https://github.com/Player0109/Textify/releases/download/v0.2.0-preview.23/Textify-0.2.0-preview.23-linux-amd64.deb) | x64 · hardware Vulkan GPU · compatible driver |
 
-Textify intentionally produces one final transcript after recording rather than
-live partial captions. Closing the main window leaves dictation running; reopen
-it from the Dock or the menu-bar **Open Textify** action.
+The Mac app is **Developer ID signed and notarized by Apple**. Windows and Linux installers are unsigned and have not been tested on physical hardware; their automated installer and launch checks pass. Second-Mac fresh-install and update checks remain outstanding. This is a preview release.
 
-## Requirements
+A hardware GPU is required; CPU-only inference and Intel Macs are not supported. Speech models download separately. Updates are installed manually from GitHub Releases.
 
-- macOS 14 (Sonoma) or later, Apple Silicon (M1 or later). Intel Macs are not
-  supported.
-- Microphone permission for recording.
-- Accessibility permission for the global Right Command trigger and text
-  insertion.
-- Network access when downloading the app or a model. Dictation itself is
-  offline after a model is installed.
+[Installation instructions](electron/RELEASE_INSTALL.md) · [SHA-256 checksums](https://github.com/Player0109/Textify/releases/download/v0.2.0-preview.23/SHA256SUMS.txt) · [Platform QA](electron/MANUAL_QA.md)
 
-The current public binary is an unsigned GitHub pre-release. A future
-production build will use a Developer ID signed and notarized DMG. Textify is
-not available through the Mac App Store.
+## Get started
 
-## Installation
+1. **Install Textify.** Download the installer for your platform. On macOS, drag Textify into Applications and grant Microphone and Accessibility access when prompted.
+2. **Choose a model.** Open **Transcription models** and download a supported version. After verification, click **Use model** when shown, then choose a supported dictation language.
+3. **Start dictating.** Enable the global trigger, focus a text field, hold your shortcut, speak, then release. You can also use the in-app microphone button and choose **Copy**.
 
-The Textify 1.1.0 production app has not been published yet. The download
-below is only an unsigned preview.
+| Desktop | Default shortcut | Your text |
+| :-- | :-- | :-- |
+| **macOS** | Right Command | Pasted into the original app when it is still focused |
+| **Windows** | Right Control | Pasted into the original app when it is still focused |
+| **Linux X11** | Right Control | Choose **Copy**, then paste manually |
+| **Linux Wayland** | Chosen through the desktop's GlobalShortcuts portal | Choose **Copy**, then paste manually |
 
-Textify 1.1.0 Unsigned Preview 1 is available for people who are comfortable
-manually approving an unnotarized app. It is not the future `v1.1.0`
-production release.
+On Wayland, shortcut availability depends on the desktop portal. The microphone button remains available when a global shortcut cannot be enabled.
 
-1. Download `Textify-1.1.0-unsigned-preview.1-arm64.dmg` and its `.sha256`
-   file from the
-   [unsigned preview release](https://github.com/Player0109/Textify/releases/tag/v1.1.0-unsigned-preview.1).
-2. Verify the download:
+## Built for everyday dictation
 
-   ```bash
-   shasum -a 256 -c Textify-1.1.0-unsigned-preview.1-arm64.dmg.sha256
-   ```
+<table>
+<tr>
+<td width="50%" valign="top">
+<strong>Local transcription</strong><br>
+Speech recognition runs on your GPU. Once a model is installed, dictation works offline.
+</td>
+<td width="50%" valign="top">
+<strong>A compact recording bar</strong><br>
+See recording and processing state without keeping the main window open. Adjust its position and scale.
+</td>
+</tr>
+<tr>
+<td valign="top">
+<strong>Your words and shortcuts</strong><br>
+Add custom vocabulary for Whisper and replacement pairs for every engine. Choose your microphone and dictation language.
+</td>
+<td valign="top">
+<strong>A choice of models</strong><br>
+Browse supported languages, download verified models, and switch between installed versions.
+</td>
+</tr>
+<tr>
+<td valign="top">
+<strong>Live previews on Apple Silicon</strong><br>
+Confucius4-R2T2 can display text while you speak. Final recognition still runs when you release.
+</td>
+<td valign="top">
+<strong>Activity without transcript history</strong><br>
+View daily, weekly, and monthly numeric usage totals. Dictated text and recordings are not retained.
+</td>
+</tr>
+</table>
 
-3. Open the DMG and drag Textify to Applications.
-4. Try to launch Textify from Applications. macOS will block the first launch
-   because this preview has no Developer ID signature or Apple notarization.
-5. If you trust the download, open **System Settings → Privacy & Security**,
-   find the blocked Textify message, choose **Open Anyway**, and confirm.
+### Models
 
-Do not disable Gatekeeper or remove quarantine attributes system-wide. See
-[Apple's unknown-developer guidance](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac)
-for the scoped approval flow. You can alternatively build Textify from this
-source repository. Because each ad-hoc build has a different code identity,
-macOS may require you to remove and re-add Textify under Accessibility after a
-later preview update.
+**Whisper** is available on macOS, Windows, and Linux. Apple Silicon also supports **Parakeet**, **Qwen3-ASR**, and **Confucius4-R2T2**. Model and language availability varies by platform and catalog entry; the app shows the supported languages for each choice.
 
-Automatic updates are deferred in Textify 1.1. To update, download the next
-GitHub Release DMG and replace the installed app.
-
-## Getting started
-
-1. Complete the Microphone and Accessibility permission steps in onboarding.
-2. Choose and install a transcription model from the bundled signed catalog.
-3. Focus a text field, hold Right Command, speak, and release the key.
-4. Use Settings to change the model, language, microphone, trigger, or
-   recording-overlay placement. Textify follows the macOS System Default input
-   unless you select a specific available microphone.
-
-Onboarding and Settings show a live input level only while their Microphone
-surface is visible. If a specifically selected microphone disconnects, Textify
-keeps that selection visible as unavailable and does not silently record from a
-different device.
-
-Textify records one uninterrupted trigger hold for up to five minutes. Longer
-captures are divided in memory into model-safe transcription windows, then
-stitched, post-processed, and inserted once. The overlay warns during the final
-ten seconds and switches to processing automatically at the cap.
-
-## Models
-
-Textify 1.1 ships a signed catalog of 44 choices: 41 transcription models and
-three optional MossFormer2 SE voice-cleaning models. The catalog includes
-Whisper, CrisperWhisper 2.0, Parakeet, Paraformer, ReazonSpeech, SenseVoice,
-Qwen3-ASR, Nemotron, Granite Speech, Voxtral, MOSS Transcribe-Diarize, and
-other eligible local routes across whisper.cpp, FluidAudio/Core ML, MLX Audio,
-transcribe.cpp, and sherpa-onnx.
-
-Textify does not bundle speech model binaries. During onboarding or from
-Settings, Textify can download curated model files from immutable Textify
-GitHub Release assets or exact commit-pinned public Hugging Face files. Every
-file is checked against the signed catalog's byte size and SHA-256 before it
-can become active. Custom model import is limited to supported Whisper
-GGML/GGUF files and remains local.
-
-Support tiers are curator guidance, not benchmark scores. Some catalog entries
-are explicitly Experimental or Unrated. Exact model capabilities, runtime
-requirements, sources, revisions, licenses, sizes, checksums, and provenance
-are documented in [the curated model guide](docs/models/curated-models.md), the
-[third-party notices](THIRD_PARTY_NOTICES.md), and the signed
-[model manifest](models/manifest.json).
-
-Model suggestions are accepted through GitHub issues only. Textify does not
-accept model binary pull requests or issue attachments.
+Model binaries are downloaded separately from pinned sources and checked against signed metadata before use. See the [desktop model and runtime details](electron/README.md) for the supported versions. The desktop preview does not include every engine or feature of the earlier Swift app.
 
 ## Privacy
 
-Audio and dictated text stay on the Mac. Textify does not have accounts,
-an analytics service, crash reporting, transcript history, or an automatic
-upload path for dictated content. The Activity page keeps only daily numeric
-usage totals on this device. Clipboard insertion is brief and restored on a
-best-effort basis.
+Audio and dictated text are processed locally and held in memory for the active session. Textify has **no transcript history, accounts, analytics service, or speech upload**. Activity stores only daily numeric totals on your device.
 
-See [PRIVACY.md](PRIVACY.md) for the full privacy statement.
+Model downloads are explicit network requests. Their hosts receive ordinary request metadata, such as an IP address and the requested model file. Dictation itself works offline after setup.
 
-## Contributing
+Automatic paste restores the previous clipboard when it has not changed; explicit **Copy** replaces the clipboard normally. Third-party clipboard managers may retain copied text. Learn more about [desktop behavior and clipboard handling](electron/README.md#desktop-behavior).
 
-Bug reports, feature requests, and model suggestions are welcome through
-[GitHub Issues](https://github.com/Player0109/Textify/issues). External pull
-requests are not accepted at this time; see
-[CONTRIBUTING.md](.github/CONTRIBUTING.md) for the current contribution policy.
-Report vulnerabilities privately as described in
-[SECURITY.md](.github/SECURITY.md).
+## Development
 
-Building from source requires an Apple Silicon Mac and Xcode 26 with Swift 6.2
-or later. The resulting app still targets macOS 14.
+The current desktop app lives in [`electron/`](electron/). Start with the [desktop development guide](electron/README.md) for platform prerequisites, local builds, and verification. Release packaging is documented in [the desktop release guide](electron/RELEASING.md).
 
-Build and test locally:
+<details>
+<summary><strong>Earlier native macOS app</strong></summary>
 
-```bash
+The repository also contains the separate Swift implementation. Its [older unsigned preview](https://github.com/Player0109/Textify/releases/tag/v1.1.0-unsigned-preview.1) is distinct from the desktop downloads above.
+
+Building the native app requires an Apple Silicon Mac and Xcode 26 with Swift 6.2 or later; its deployment target is macOS 14.
+
+```sh
 swift build
 swift test
-```
-
-Run the development app:
-
-```bash
 ./script/build_and_run.sh
 ```
 
-Verify a staged app bundle:
-
-```bash
-./script/build_and_run.sh --verify
-```
-
-Release builds require the additional signing, notarization, and evidence gates
-in [docs/RELEASING.md](docs/RELEASING.md).
+[Native specification](docs/SPEC.md) · [Native release guide](docs/RELEASING.md) · [Native model catalog](docs/models/curated-models.md) · [Native privacy statement](PRIVACY.md)
 
 </details>
 
-## License
+## Support and contributions
 
-Textify is licensed under the [Apache License 2.0](LICENSE).
+[Bug reports, feature requests, and model suggestions](https://github.com/Player0109/Textify/issues) are welcome. Contributions currently happen through GitHub Issues; external pull requests and model binary submissions are not accepted. See the [contribution policy](.github/CONTRIBUTING.md).
 
-## Acknowledgments
+Please report vulnerabilities privately through the process in [SECURITY.md](.github/SECURITY.md).
 
-Textify builds on open-source speech runtimes and model work from many
-communities. See [ACKNOWLEDGMENTS.md](ACKNOWLEDGMENTS.md),
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), and
-[THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES/) for attribution, provenance, and
-copied license texts.
+## License and acknowledgments
+
+Textify is licensed under the **[Apache License 2.0](LICENSE)**. It builds on open-source speech runtimes and models from many communities.
+
+[Acknowledgments](ACKNOWLEDGMENTS.md) · [Third-party notices](THIRD_PARTY_NOTICES.md) · [Third-party licenses](THIRD_PARTY_LICENSES/)
