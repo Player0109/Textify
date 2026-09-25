@@ -21,9 +21,13 @@ Whisper small.en model and real Metal inference; they were visual references,
 not automatic-insertion footage. No personal documents, real microphone audio,
 messages, permission changes or installed-app data were used.
 
-Narration uses the installed macOS Aman voice; dictated examples use Samantha.
-The instrumental bed is composed and synthesized locally without stock music.
-The two voices do not overlap, and the music ducks beneath speech.
+Narration and dictated examples use the configured TTS service's clear male and
+female Kenney voice presets (`announcer_kenney_male` and
+`announcer_kenney_female`). The service identifies their reference material as
+the CC0 Kenney Voiceover Pack. Speech is synthetic and fits the original edit
+without acceleration. The instrumental bed is composed and synthesized locally
+without stock music. The two voices do not overlap, and the music ducks beneath
+speech.
 
 The end card links to the desktop preview and states that a hardware GPU is
 required and Linux uses Copy + paste. The animation demonstrates the macOS

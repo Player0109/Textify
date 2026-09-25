@@ -2767,3 +2767,15 @@ Task 1 must merge before parallel Wave 1 work begins.
   script and timing manifest under `docs/media/promo-source/` and now owns their
   documentation and final-export metadata. The final AAC measurements are kept
   separately from the source WAV's normalization report.
+
+### Promotion voice replacement — 2026-09-25
+
+- The parent owns replacement speech generation, the audio source and metadata,
+  remuxing the existing video, provenance, and publication. Use the user's TTS
+  service through their local guide; keep its private URL out of source and logs.
+- The verification agent owns read-only timing and media checks. Preserve the
+  original visual stream, silent GIF, poster and composed music. New speech must
+  finish before each illustrated shortcut release and fit the existing scenes.
+- The audio worker owns only `docs/media/promo-source/audio.py` for the private
+  service client and timing-aware mix. Keep the music synthesis unchanged. The
+  parent owns generated takes, manifests, documentation, final export and QA.
