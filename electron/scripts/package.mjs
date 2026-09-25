@@ -24,8 +24,8 @@ if (process.platform === "darwin") {
         ? "Install a valid Developer ID Application certificate with its private key in Keychain, then run packaging again. Ad-hoc local previews require npm run package:preview."
         : "Several Developer ID Application certificates are available. Set CSC_NAME to the intended certificate name so updates keep the same signing identity.");
     }
-    identity = selected[0];
-    releaseIdentity = identity;
+    releaseIdentity = selected[0];
+    identity = releaseIdentity.replace(/^Developer ID Application:\s*/, "");
     // Stapling changes the final bytes; automatic updates/blockmaps are deferred.
     config.dmg = { sign: true, writeUpdateInfo: false };
   }

@@ -2551,6 +2551,18 @@ Task 1 must merge before parallel Wave 1 work begins.
   macOS preview branch, where the identity is fixed to `-` and notarization is
   disabled. Production Developer ID and local-credential requirements stay in
   force.
+- The parent also owns `electron/src/core/activity.ts` for the Windows Activity
+  grouping timeout found in PR CI. One day/week/month render constructs 96
+  identical locale formatters; a local 100-render probe constructed 9,600.
+  Reuse two formatters within each grouping call while preserving the current
+  locale, time zone, labels, period boundaries and totals. Keep the existing
+  test timeout and verify the existing grouping tests.
+- Validation of the formatter reuse: all 116 Electron tests, TypeScript,
+  production build and isolated UI smoke passed. Old and new period output
+  matched in 60 grouping/date/time-zone cases, including leap day, year
+  boundaries and daylight-saving transitions. The same local 100-render
+  probe dropped from 9,600 formatter constructions in 205 ms to 600 in 20 ms;
+  the slow Windows runner still needs a fresh CI run.
 - CI run `36102323619` confirmed electron-builder's target-specific Linux
   filenames: `linux-x86_64.AppImage` and `linux-amd64.deb`. The production
   installer gate and its test fixtures now require those actual names and
@@ -2571,3 +2583,45 @@ Task 1 must merge before parallel Wave 1 work begins.
 - Validation: `swift test --jobs 2 --filter ModelInstallCoordinatorQueueTests`
   rebuilt the changed tests and passed all 23 tests in 0.494 seconds. The build
   took 13.89 seconds. No full Swift suite or production-source change was made.
+
+### Cleaner boundary-test isolation — 2026-09-25
+
+- Release CI diagnosis owns only
+  `AppCompositionTests.testDisableVoiceCleaningWaitsForTheCurrentSegmentBoundary`
+  and any directly needed local test fixture in
+  `Tests/TextifyAppTests/AppCompositionTests.swift`. This handoff precedes edits;
+  production runtime and unrelated tests remain outside this slice.
+- CI run `36103858495` passed all 23 corrected queue tests but failed the
+  cleaner identity assertion in this composition test. The unchanged test
+  reproduced that exact failure locally on the ninth isolated repetition.
+  Preserve the boundary assertion and identify the fixture/scheduling cause
+  before changing it; do not merely extend a timeout.
+- Instrumentation reproduced the failure on the sixth repetition and showed
+  that the segment had no voice-cleaning artifact before disable was requested.
+  Startup revocation enforcement can overlap the fixture's first admission.
+  The test now awaits that startup work and asserts cleaner ownership before
+  exercising disable; its original boundary and preference assertions remain.
+- Validation: 40 isolated repetitions with the startup barrier passed. After
+  removing diagnostic prints, `swift test --jobs 2 --filter AppCompositionTests`
+  rebuilt the tests and passed all 97 tests in 8.146 seconds; another 30 isolated
+  repetitions passed against that final binary. No production code changed.
+
+### Electron Developer ID qualifier correction — 2026-09-25
+
+- The release verification agent owns `electron/scripts/package.mjs` and a
+  focused package-script regression test. This handoff precedes those edits.
+  Preserve the parent's Activity edits and the native test agent's changes.
+- The pinned electron-builder rejects a signing qualifier containing the
+  `Developer ID Application:` prefix. Pass the certificate name without that
+  prefix to the builder, while retaining the full authority for final DMG
+  verification. Preview signing must remain ad-hoc and publication disabled.
+- Validation: reproduced the pinned builder's prefix rejection without signing
+  or reading Keychain identities. The package-script regression failed before
+  the fix and passed after it; all 12 focused packaging/release tests,
+  TypeScript, the package-script syntax check, and `git diff --check` passed.
+  Build, Keychain, and notarization boundaries were substituted in these tests;
+  they do not claim a real production signing or notarization run.
+- The parent release task owns an evidence-only update to
+  `electron/MANUAL_QA.md`: on September 25 the owner confirmed macOS microphone
+  and text insertion testing, with Windows and Linux untested. This does not
+  establish final signed preview.23 installer or second-Mac verification.

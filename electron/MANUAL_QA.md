@@ -79,6 +79,11 @@ Repeat on GNOME Wayland, KDE Wayland, and X11. Record the desktop version.
 
 ## Current evidence
 
+On September 25, 2026, the owner confirmed macOS microphone and text insertion
+testing. Windows and Linux have not been tested on physical hardware. This
+report does not verify the final signed preview.23 installer or fresh-install
+and update behavior on a second Mac; those checks remain pending.
+
 The first CI preview passed native compilation, offline fixture transcription,
 Electron smoke, packaged launch, and installer creation on all three OSes:
 https://github.com/Player0109/Textify/actions/runs/35684967292

@@ -2360,7 +2360,13 @@ final class AppCompositionTests: XCTestCase {
             voiceCleaner: ActivationVoiceCleanerSpy()
         )
 
+        // Finish startup revocation enforcement before admitting the test segment.
+        await services.enforceModelRevocations()
         await services.dictation.handleTriggerAction(.beginRecording)
+        XCTAssertEqual(
+            services.dictation.currentSegment?.voiceCleaningArtifactID,
+            cleaner.id
+        )
         let disablement = Task { @MainActor in
             await services.disableVoiceCleaning()
         }

@@ -28,33 +28,25 @@ function periodStart(date: Date, grouping: ActivityGrouping): Date {
   return start;
 }
 
-function periodLabel(start: Date, grouping: ActivityGrouping): Pick<ActivityPeriod, "label" | "fullLabel"> {
-  if (grouping === "month") return {
-    label: new Intl.DateTimeFormat(undefined, { month: "short" }).format(start),
-    fullLabel: new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(start),
-  };
-  if (grouping === "day") return {
-    label: new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(start),
-    fullLabel: new Intl.DateTimeFormat(undefined, { dateStyle: "long" }).format(start),
-  };
-  const end = new Date(start);
-  end.setDate(end.getDate() + 6);
-  return {
-    label: new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(start),
-    fullLabel: `${new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(start)}–${new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(end)}`,
-  };
-}
-
 export function activityPeriods(days: ActivityDay[], grouping: ActivityGrouping, today = new Date()): ActivityPeriod[] {
   const count = grouping === "day" ? 30 : grouping === "week" ? 8 : 6;
   const current = periodStart(today, grouping);
+  const shortLabel = new Intl.DateTimeFormat(undefined, grouping === "month"
+    ? { month: "short" } : { month: "short", day: "numeric" });
+  const fullLabel = new Intl.DateTimeFormat(undefined, grouping === "month"
+    ? { month: "long", year: "numeric" } : grouping === "day"
+      ? { dateStyle: "long" } : { month: "short", day: "numeric", year: "numeric" });
   const periods = Array.from({ length: count }, (_, index) => {
     const start = new Date(current);
     if (grouping === "month") start.setMonth(start.getMonth() - (count - 1 - index));
     else start.setDate(start.getDate() - (count - 1 - index) * (grouping === "week" ? 7 : 1));
+    const label = shortLabel.format(start);
+    const end = new Date(start);
+    if (grouping === "week") end.setDate(end.getDate() + 6);
     return {
       key: dateKey(start),
-      ...periodLabel(start, grouping),
+      label,
+      fullLabel: grouping === "week" ? `${label}–${fullLabel.format(end)}` : fullLabel.format(start),
       totals: { words: 0, dictations: 0, recordingSeconds: 0, estimatedTimeSavedSeconds: 0 },
     };
   });
