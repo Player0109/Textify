@@ -62,10 +62,12 @@ describe("production Mac release gates", () => {
     });
 
   it("requires every requested platform installer and rechecks the DMG before checksums", () => {
-    const files = ["mac-arm64.dmg", "win-x64.exe", "linux-x64.AppImage", "linux-x64.deb"]
+    const files = ["mac-arm64.dmg", "win-x64.exe", "linux-x86_64.AppImage", "linux-amd64.deb"]
       .map((suffix) => `Textify-test-${suffix}`);
     expect(() => verifyProductionInstallers(files.slice(1), "test", "darwin", commands().run))
       .toThrow("Missing release installer");
+    expect(() => verifyProductionInstallers(files.map((file) => file.replace(/linux-(x86_64|amd64)/, "linux-x64")), "test", "darwin", commands().run))
+      .toThrow("Missing release installer: Textify-test-linux-x86_64.AppImage");
     expect(() => verifyProductionInstallers(files, "test", "linux", commands().run))
       .toThrow("maintainer Mac");
     expect(() => verifyProductionInstallers(files, "test", "darwin", commands({ authority: "adhoc" }).run))

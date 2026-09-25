@@ -12,6 +12,8 @@ const config = {};
 let releaseIdentity;
 if (process.platform === "darwin") {
   let identity = "-";
+  // PR previews still need ad-hoc microphone entitlements; no signing key is used.
+  if (preview) process.env.CSC_FOR_PULL_REQUEST = "true";
   if (!preview) {
     notaryCredentials();
     const listing = execFileSync("security", ["find-identity", "-v", "-p", "codesigning"], { encoding: "utf8" });

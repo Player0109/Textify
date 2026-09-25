@@ -58,7 +58,7 @@ export function notarizeMacDmg(dmg, identity, env = process.env, run = runMacToo
 export function verifyProductionInstallers(files, version, platform = process.platform, run = runMacTool) {
   if (platform !== "darwin")
     throw new Error("Assemble production checksums on the maintainer Mac so the DMG can be verified.");
-  for (const suffix of ["mac-arm64.dmg", "win-x64.exe", "linux-x64.AppImage", "linux-x64.deb"]) {
+  for (const suffix of ["mac-arm64.dmg", "win-x64.exe", "linux-x86_64.AppImage", "linux-amd64.deb"]) {
     if (!files.includes(`Textify-${version}-${suffix}`))
       throw new Error(`Missing release installer: Textify-${version}-${suffix}`);
   }

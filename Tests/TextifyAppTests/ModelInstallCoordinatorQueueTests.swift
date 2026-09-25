@@ -1360,25 +1360,25 @@ final class ModelInstallCoordinatorQueueTests: XCTestCase {
     private func waitUntil(
         _ predicate: @escaping @MainActor () -> Bool
     ) async {
-        for _ in 0..<2_000 {
-            if predicate() {
-                return
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while !predicate() {
+            if ContinuousClock.now >= deadline {
+                return XCTFail("Timed out waiting for coordinator state.")
             }
-            await Task.yield()
+            try? await Task.sleep(for: .milliseconds(10))
         }
-        XCTFail("Timed out waiting for coordinator state.")
     }
 
     private func waitUntilAsync(
         _ predicate: @escaping @Sendable () async -> Bool
     ) async {
-        for _ in 0..<2_000 {
-            if await predicate() {
-                return
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while !(await predicate()) {
+            if ContinuousClock.now >= deadline {
+                return XCTFail("Timed out waiting for asynchronous test state.")
             }
-            await Task.yield()
+            try? await Task.sleep(for: .milliseconds(10))
         }
-        XCTFail("Timed out waiting for asynchronous test state.")
     }
 
     private func temporaryDirectory() -> URL {

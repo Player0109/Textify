@@ -2545,3 +2545,29 @@ Task 1 must merge before parallel Wave 1 work begins.
   merged by retaining the Activity specification and Electron handoff notes
   in documentation-only conflicts; the merge did not alter the candidate's
   file tree. New three-platform CI artifacts are required for this candidate.
+- The parent release task also owns the explicit-preview packaging correction:
+  electron-builder skipped ad-hoc signing on the pull-request run while the
+  identical push run signed successfully. Permit PR signing only inside the
+  macOS preview branch, where the identity is fixed to `-` and notarization is
+  disabled. Production Developer ID and local-credential requirements stay in
+  force.
+- CI run `36102323619` confirmed electron-builder's target-specific Linux
+  filenames: `linux-x86_64.AppImage` and `linux-amd64.deb`. The production
+  installer gate and its test fixtures now require those actual names and
+  reject the incorrect generic `linux-x64` names. All 10 focused release-gate
+  tests and `git diff --check` passed after the correction.
+
+### Native queue-test scheduling correction — 2026-09-25
+
+- The release CI stabilization slice owns only the two private wait helper
+  bodies in `Tests/TextifyAppTests/ModelInstallCoordinatorQueueTests.swift`.
+  This handoff precedes those edits. Production queue behavior is unchanged.
+- Native CI run `36102326402` exhausted the asynchronous helper's 2,000 yields
+  in three tests, including failures after only 12 ms and 39 ms. The test file
+  and production coordinator were identical to `origin/master`; all 23 queue
+  tests passed locally against the cached binary. Replace yield counts with
+  a five-second monotonic deadline and 10 ms suspensions, then rebuild and run
+  the focused queue tests.
+- Validation: `swift test --jobs 2 --filter ModelInstallCoordinatorQueueTests`
+  rebuilt the changed tests and passed all 23 tests in 0.494 seconds. The build
+  took 13.89 seconds. No full Swift suite or production-source change was made.
