@@ -2779,3 +2779,10 @@ Task 1 must merge before parallel Wave 1 work begins.
 - The audio worker owns only `docs/media/promo-source/audio.py` for the private
   service client and timing-aware mix. Keep the music synthesis unchanged. The
   parent owns generated takes, manifests, documentation, final export and QA.
+
+### README promotion video — 2026-09-25
+
+- The owner approved the HyperFrames promotion with cloned narration for the
+  README. This task owns `docs/media/textify-ad.mp4` and `textify-ad.gif`, the
+  README promotion links, and the new section of `docs/media/README.md`. The
+  earlier promotion files and `promo-source/` remain unchanged.
