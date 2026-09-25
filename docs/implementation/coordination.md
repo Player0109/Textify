@@ -2786,3 +2786,10 @@ Task 1 must merge before parallel Wave 1 work begins.
   README. This task owns `docs/media/textify-ad.mp4` and `textify-ad.gif`, the
   README promotion links, and the new section of `docs/media/README.md`. The
   earlier promotion files and `promo-source/` remain unchanged.
+
+### Playable README video — 2026-09-25
+
+- The parent owns the README embed and its media documentation, replacing the
+  silent GIF preview with GitHub's video player. The approved promotion's
+  original video and audio remain unchanged. The verification agent performs
+  read-only checks of GitHub's supported attachment and playback behavior.

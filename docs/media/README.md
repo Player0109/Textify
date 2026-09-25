@@ -4,7 +4,9 @@
 
 `textify-ad.mp4` is a 45-second motion graphic promotion in 1080p at 30 fps,
 with synthetic voiceover, one spoken dictation example, music and sound effects.
-`textify-ad.gif` is its silent README preview: the shortcut and email dictation
+The README uses GitHub's video player for playback with sound, volume controls
+and seeking. The repository MP4 remains available as a download.
+`textify-ad.gif` is the earlier silent preview: the shortcut and email dictation
 scenes, from 5.1 to 18.55 seconds.
 
 The frames are HTML, CSS and SVG animation rendered with

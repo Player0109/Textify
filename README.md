@@ -27,9 +27,11 @@
 
 ## See it in action
 
-[![Textify: hold a key, speak, and the words land in an email draft](docs/media/textify-ad.gif)](docs/media/textify-ad.mp4?raw=1)
+https://github.com/user-attachments/assets/ed91275b-9716-4aab-a41a-eb5b3807abaf
 
-**[Watch the 45-second promo with sound (MP4 download)](docs/media/textify-ad.mp4?raw=1)** · [Video details](docs/media/README.md)
+Press play, then use the speaker control to turn on sound.
+
+**[Download the 45-second promo (MP4)](docs/media/textify-ad.mp4?raw=1)** · [Video details](docs/media/README.md)
 
 *An animated macOS workflow showing dictation into sample writing apps, with voiceover and music. Timing is illustrative; Linux uses Copy and manual paste.*
 
