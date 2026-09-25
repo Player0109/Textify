@@ -1,9 +1,14 @@
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { readdir, readFile, writeFile, copyFile } from "node:fs/promises";
+import { readdir, readFile, writeFile, copyFile, rm } from "node:fs/promises";
+import { verifyProductionInstallers } from "./mac-release.mjs";
 const production = process.argv.slice(2).includes("--production");
 if (process.argv.slice(2).some((arg) => arg !== "--production"))
   throw new Error("Only --production is supported");
+if (production) {
+  await rm("release/SHA256SUMS.txt", { force: true });
+  await rm("release/RELEASE_INSTALL.md", { force: true });
+}
 const { version } = JSON.parse(await readFile("package.json", "utf8"));
 const files = (await readdir("release"))
   .filter(
@@ -13,6 +18,7 @@ const files = (await readdir("release"))
   )
   .sort();
 if (!files.length) throw new Error("No preview installers found");
+if (production) verifyProductionInstallers(files, version);
 const lines = [];
 for (const file of files) {
   const hash = createHash("sha256");

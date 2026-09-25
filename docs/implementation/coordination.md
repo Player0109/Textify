@@ -2515,3 +2515,28 @@ Task 1 must merge before parallel Wave 1 work begins.
   directory resume checks its entries, and smoke decodes the Accessibility icon
   only where present. Local TypeScript, 101 tests, build, and Electron smoke
   passed again; the cross-platform rerun is pending.
+
+### Electron final-DMG release verification — 2026-09-25
+
+- The publishing workstream owns `electron/scripts/package.mjs`,
+  `electron/scripts/checksums.mjs`, a directly shared Mac release helper and its
+  tests, and `electron/RELEASING.md`. This handoff precedes those edits.
+- Production packaging must sign the final DMG with Developer ID, submit it
+  using local notarization credentials, staple and validate it, and require
+  Gatekeeper acceptance before reporting success. Production checksums must
+  verify the Mac artifact before copying signed-release installation notes.
+- Preserve explicit preview behavior, existing Activity changes, local-only
+  credentials, and the prohibition on packaging auto-publication. The parent
+  release task owns version changes, Git operations, public release notes, and
+  credential setup. This slice uses targeted tests with substituted commands;
+  it does not perform a real build, signing, or notarization operation.
+- The parent owns `electron/package.json` and `electron/package-lock.json` for
+  preview.23, the Mac-to-device wording in
+  `electron/src/renderer/ActivityPane.tsx`, and truthful draft notes in
+  `docs/release/v0.2.0-preview.23.md`. Its Git snapshot includes the existing
+  Activity edits.
+- Validation: 10 focused release-gate tests passed with substituted command
+  runners, including rejected notarization, incorrect signing identities,
+  staple/Gatekeeper failures, and missing platform installers. TypeScript,
+  Node syntax checks for the three release scripts, and `git diff --check`
+  passed. These checks do not claim successful real signing or notarization.
