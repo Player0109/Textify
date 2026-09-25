@@ -2638,3 +2638,46 @@ Task 1 must merge before parallel Wave 1 work begins.
 - Validation: isolated `npm run smoke`, the smoke-script syntax check, and
   `git diff --check` passed. A fresh Linux CI run must verify the original
   runner path; no installed app, permissions, or live user data were changed.
+
+### Native segment-boundary fixture synchronization — 2026-09-25
+
+- The native test agent owns only the four composition tests for activation,
+  active deletion, mid-segment revocation, and cleaner disable at a recording
+  boundary, plus their directly needed private helpers in
+  `Tests/TextifyAppTests/AppCompositionTests.swift`. This handoff precedes
+  diagnostic probes and edits. Production code, other tests, and release
+  artifacts remain outside this slice.
+- CI `36106123009` passed the cleaner and queue corrections but exhausted the
+  mid-segment test's 20 yields before its two active-model nil assertions.
+  Probe the existing resolver suspension seam to distinguish delayed cleanup
+  from a missed automatic callback. Preserve all behavior assertions and do
+  not manually invoke revocation enforcement after the segment finishes.
+- The unmodified test passed 40 isolated and 80 concurrent local repetitions.
+  A deterministic probe then suspended the existing resolver readiness seam:
+  after the original 20 yields the active ID remained set and readiness was
+  suspended; releasing it let automatic cleanup clear the ID. No explicit
+  enforcement call was made after finish. This establishes that a yield count
+  does not synchronize the separate observation task's asynchronous cleanup.
+- The four tests now share startup enforcement before recording and bounded
+  waits for their observable transaction or preference state. Each checks
+  captured artifact ownership; all existing behavior assertions remain. The
+  waiter uses the queue tests' five-second monotonic deadline and 10 ms
+  suspension, and reports a descriptive failure at the calling test on timeout.
+  Other fixture construction and yield loops are unchanged.
+- Validation: removed the diagnostic probe, rebuilt with
+  `swift test --jobs 2 --filter AppCompositionTests`, and passed all 97 tests in
+  8.319 seconds (build 6.46 seconds). `git diff --check` passed. No production
+  file changed, so this correction does not change the packaged app binaries.
+
+### Desktop release download documentation — 2026-09-25
+
+- The parent publishing task owns the repository README download section and
+  the preview.23 release notes. The README promotes the cross-platform
+  installers and preserves the older native Mac documentation in an explicitly
+  labeled expandable section. These links are prepared for publication with
+  the release; the pull request and GitHub release remain drafts for review.
+- Desktop artifact source is `be19bbb1bc5156b2f589a2aee57977d59d698430`.
+  Both three-platform desktop CI runs passed. The Mac app and DMG were accepted
+  by Apple and passed strict signatures, staple validation, Gatekeeper,
+  mounted-app checks, and signed-worker Metal fixture recognition. Later native
+  test and documentation changes do not alter these desktop binaries.
