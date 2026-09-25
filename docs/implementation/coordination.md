@@ -2681,3 +2681,14 @@ Task 1 must merge before parallel Wave 1 work begins.
   by Apple and passed strict signatures, staple validation, Gatekeeper,
   mounted-app checks, and signed-worker Metal fixture recognition. Later native
   test and documentation changes do not alter these desktop binaries.
+
+### Release documentation consistency handoff — 2026-09-25
+
+- The release audit agent owns only the introductory status in
+  `electron/MANUAL_QA.md`, synchronization of
+  `docs/release/v0.2.0-preview.23.md` with the parent's scratch canonical release
+  notes, and the AppImage executable-bit instruction in the source
+  `electron/RELEASE_INSTALL.md`. This handoff precedes those edits.
+- Preserve draft status and pending second-Mac verification. Release policy,
+  generated release files, app code, GitHub state, and CI are outside this
+  handoff; the parent retains publication and final-artifact ownership.

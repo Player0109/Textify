@@ -24,9 +24,10 @@ The default global trigger is Right Control.
 ## Linux x64
 
 Choose either the Debian/Ubuntu `.deb` or the portable `.AppImage` and verify
-its SHA-256 value against `SHA256SUMS.txt`. The AppImage needs FUSE for normal
-mounting. Linux uses explicit Copy and manual paste; on Wayland, the global
-trigger also depends on desktop GlobalShortcuts portal support.
+its SHA-256 value against `SHA256SUMS.txt`. Before opening the AppImage, run
+`chmod +x` followed by the downloaded file's path. The AppImage needs FUSE for
+normal mounting. Linux uses explicit Copy and manual paste; on Wayland, the
+global trigger also depends on desktop GlobalShortcuts portal support.
 
 After launch, open Transcription models, install a supported model, then use the
 microphone button for a first recording. Check the release notes for tested

@@ -1,11 +1,15 @@
 # Textify desktop checks
 
 These checks distinguish actual desktop behavior from automated fixture tests.
-Use a fresh unsigned preview installer. Record the app version, OS version,
-desktop environment (on Linux), microphone, and pass/fail for each row.
+Use a fresh preview installer. The preview.23 Mac installer is Developer ID
+signed and notarized; Windows and Linux installers are unsigned. Record the app
+version, OS version, desktop environment (on Linux), microphone, and pass/fail
+for each row.
 
-The owner is testing Windows. A Linux desktop tester is still needed. The
-automated Linux checks use Xvfb and do not establish GNOME/KDE Wayland behavior.
+The owner confirmed macOS microphone and text insertion testing. Windows and
+Linux remain untested on physical hardware. Final signed Mac fresh-install and
+update verification on a second Mac remains pending. Automated Linux checks use
+Xvfb and do not establish GNOME/KDE Wayland behavior.
 
 ## Windows quick start
 
