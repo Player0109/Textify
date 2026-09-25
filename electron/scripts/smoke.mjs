@@ -302,6 +302,10 @@ try {
     .press("ArrowRight");
   await waitSnapshot((state) => state.preferences.overlay.x === 31);
   const slider = page.getByRole("slider", { name: "X Offset", exact: true });
+  await page.waitForFunction(() => {
+    const input = document.querySelector('input[aria-label="X Offset"]');
+    return !input.disabled && input.value === "31";
+  });
   const track = await slider.boundingBox();
   await page.mouse.move(track.x + track.width / 2, track.y + track.height / 2);
   await page.mouse.down();

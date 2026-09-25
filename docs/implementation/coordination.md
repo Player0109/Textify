@@ -2625,3 +2625,16 @@ Task 1 must merge before parallel Wave 1 work begins.
   `electron/MANUAL_QA.md`: on September 25 the owner confirmed macOS microphone
   and text insertion testing, with Windows and Linux untested. This does not
   establish final signed preview.23 installer or second-Mac verification.
+
+### Electron slider-smoke synchronization — 2026-09-25
+
+- The release verification agent owns only `electron/scripts/smoke.mjs` for
+  the PR Linux drag assertion failure in run `36105421678`. This handoff
+  precedes the edit; app behavior and other agents' files remain unchanged.
+- After the keyboard adjustment, wait for the slider to be enabled and show
+  the saved value before raw pointer input. Main-process snapshot completion
+  alone does not establish renderer readiness. Preserve the drag-preview and
+  release-persistence assertions without sleeps or longer timeouts.
+- Validation: isolated `npm run smoke`, the smoke-script syntax check, and
+  `git diff --check` passed. A fresh Linux CI run must verify the original
+  runner path; no installed app, permissions, or live user data were changed.
