@@ -9,42 +9,34 @@ body:
       value: |
         Thanks for reporting a problem. Do not paste dictated text, clipboard contents, window titles, document names, URLs, diagnostics secrets, or other private content.
 
-        Textify's current signed catalog contains 42 exact artifacts: 39 transcription models across multiple local runtimes and 3 optional voice-cleaning models. Please copy model names or Exact Artifact IDs from Textify when possible.
+        Please copy the model name and version from Textify's Transcription models page. Available models depend on your platform.
   - type: input
     id: textify_version
     attributes:
       label: Textify version
-      placeholder: "1.1.0 (1)"
+      placeholder: "0.2.0-preview.23"
     validations:
       required: true
   - type: input
-    id: macos_version
+    id: operating_system
     attributes:
-      label: macOS version
-      placeholder: "14.6.1"
+      label: Operating system and version
+      placeholder: "macOS 14.6.1, Windows 11, or Ubuntu 24.04 (GNOME Wayland)"
     validations:
       required: true
   - type: input
-    id: mac_model
+    id: hardware
     attributes:
-      label: Mac model and chip
-      placeholder: "MacBook Air, Apple M2"
+      label: Computer, processor, and GPU
+      placeholder: "MacBook Air / Apple M2, or processor / GPU / graphics driver version"
     validations:
       required: true
   - type: input
     id: transcription_model
     attributes:
       label: Transcription model
-      description: Copy the model name or Exact Artifact ID from Settings > Models. Enter "Not sure" if unavailable.
-      placeholder: "Model name or Exact Artifact ID"
-    validations:
-      required: true
-  - type: input
-    id: voice_cleaning_model
-    attributes:
-      label: Voice-cleaning model
-      description: Enter "Disabled", the model name or Exact Artifact ID, or "Not sure".
-      placeholder: "Disabled"
+      description: Copy the model name and version from Transcription models. Enter "Not sure" if unavailable.
+      placeholder: "Whisper small.en / GGML Q5_1"
     validations:
       required: true
   - type: dropdown
@@ -56,6 +48,8 @@ body:
         - Right Option
         - Right Control
         - Control + Space
+        - Desktop shortcut portal (Wayland)
+        - In-app microphone button
         - Not sure
     validations:
       required: true
@@ -121,13 +115,6 @@ body:
         3. Observe ...
     validations:
       required: true
-  - type: checkboxes
-    id: diagnostics
-    attributes:
-      label: Diagnostics
-      description: Export diagnostics from Textify only if you are comfortable attaching them.
-      options:
-        - label: I reviewed any attached diagnostics and removed information I do not want to share.
   - type: checkboxes
     id: privacy_confirmation
     attributes:

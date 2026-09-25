@@ -1,5 +1,11 @@
 # Parakeet TDT And Nemotron MLX/GGUF Benchmark - 2026-07-20
 
+> Historical catalog and model evidence. Runtime support, ratings, UI behavior,
+> and commands below describe the implementation at the recorded date.
+> Retired benchmark commands are retained as provenance, not instructions.
+> See the [desktop guide](../../electron/README.md) for current supported
+> artifacts and features; these records do not claim Electron performance.
+
 ## Decision
 
 Textify publishes twelve Experimental choices: one MLX directory and F16,

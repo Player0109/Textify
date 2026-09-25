@@ -1,5 +1,13 @@
 # Third Party Notices
 
+Current desktop dependencies and bundled notices are documented in
+[electron/THIRD_PARTY_NOTICES.md](electron/THIRD_PARTY_NOTICES.md).
+
+The records below retain upstream attribution for the shared signed catalog
+and historical model evaluation. Runtime descriptions refer to that historical
+implementation unless listed in the desktop notices. They do not imply that
+the current app ships every runtime or exposes every catalog entry.
+
 Textify does not bundle speech model artifacts. Curated models are downloaded
 from immutable Textify release assets or exact commit-pinned upstream files and
 verified against the signed model catalog before installation. User-imported
@@ -7,8 +15,8 @@ Whisper models remain local and their licenses are not verified by Textify.
 
 ## whisper.cpp
 
-Textify vendors a pinned source subset of whisper.cpp for local native
-transcription.
+Textify's desktop build downloads and verifies a pinned whisper.cpp source
+archive. The repository retains its license and historical vendor provenance.
 
 - Upstream repository: https://github.com/ggml-org/whisper.cpp
 - Upstream tag: v1.7.6
@@ -18,8 +26,8 @@ transcription.
 - Vendored license source: `Vendor/whisper.cpp/LICENSE`
 - Vendor provenance: `Vendor/whisper.cpp/UPSTREAM.md`
 
-The vendored subset is built through SwiftPM targets only. Model binaries remain
-external curated downloads and are not included in this repository snapshot.
+The desktop worker is built with CMake. Model binaries remain external curated
+downloads and are not included in this repository snapshot.
 
 ## OpenAI Whisper models
 
@@ -72,7 +80,7 @@ included in the application bundle or this repository snapshot.
 Textify does not ship or link the CrisperWhisper.cpp runtime. Inference uses
 Textify's existing pinned ggml-org whisper.cpp `v1.7.6` Metal integration at
 commit `a8d002cfd879315632a579e73f0148d06959de36`. Focused decoder logic in
-Textify's shim is adapted from the pinned CrisperWhisper.cpp implementation
+The retired Swift app's shim was adapted from the pinned CrisperWhisper.cpp implementation
 identified above.
 
 The standard public CrisperWhisper 2.0 repositories publish noncommercial
@@ -97,8 +105,8 @@ included in the application bundle or this repository snapshot.
 
 ## FluidAudio
 
-Textify pins FluidAudio `0.15.5` for Core ML speech-model loading and Parakeet
-and Paraformer inference on Apple Silicon.
+The historical runtime pinned FluidAudio `0.15.5` for Core ML speech-model
+loading and Parakeet and Paraformer inference on Apple Silicon.
 
 - Upstream repository: https://github.com/FluidInference/FluidAudio
 - Pinned version: 0.15.5
@@ -111,8 +119,7 @@ and Paraformer inference on Apple Silicon.
 
 ## SwiftNIO and Swift Crypto
 
-Textify links SwiftNIO Core `2.101.3` and Swift Crypto `4.5.1` through its
-local runtime and integrity-verification paths.
+The historical runtime linked SwiftNIO Core `2.101.3` and Swift Crypto `4.5.1`.
 
 - SwiftNIO revision: `0b18836bd8b0162e7e17a995a3fbee20ed8f3b2b`
 - Swift Crypto revision: `47d3869a7291f085c1fb9fb1e6d3b97a793f45c6`
@@ -176,7 +183,7 @@ use the package's network-backed pretrained-model loader.
 - MLX Audio Swift: https://github.com/Blaizzy/mlx-audio-swift (MIT)
 - MLX Swift: https://github.com/ml-explore/mlx-swift (MIT)
 - MLX Swift LM: https://github.com/ml-explore/mlx-swift-lm (MIT)
-- Exact direct and transitive revisions: `Package.resolved`
+- Exact historical direct and transitive revisions remain in Git history.
 - Exact copied license texts for MLX, Hugging Face Swift, Swift project,
   EventSource, and yyjson dependencies: `THIRD_PARTY_LICENSES/`
 - Linked MLX Swift nested component texts:
@@ -187,7 +194,7 @@ use the package's network-backed pretrained-model loader.
 
 ## LiteRT-LM
 
-Textify links a pinned arm64 slice of Google's LiteRT-LM native runtime for
+The historical runtime linked a pinned arm64 slice of Google's LiteRT-LM for
 eligible local model paths.
 
 - Upstream repository: https://github.com/google-ai-edge/LiteRT-LM

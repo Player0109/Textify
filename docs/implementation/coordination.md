@@ -2710,3 +2710,35 @@ Task 1 must merge before parallel Wave 1 work begins.
   Metal, with the exact Copy result displayed outside the app frame. This is
   a sample-audio demonstration, not physical microphone or insertion QA.
   Application code, installers, and existing app assets are unchanged.
+
+### Retire the standalone Swift app — 2026-09-25
+
+- The owner explicitly requested removal of the older Swift application,
+  preserving components needed by the current Electron desktop app.
+- The parent owns README, agent guidance, privacy/changelog, GitHub workflows,
+  local run configuration, integration, and final validation/publication.
+  It also owns the Electron overview/release guide and GitHub issue/security
+  templates where they still describe the retired application.
+  Root acknowledgments and notices retain attribution while distinguishing
+  current desktop dependencies from historical model-catalog provenance.
+- The source retirement agent owns root `Package.swift`, `Package.resolved`,
+  `Sources/`, `Tests/`, `Vendor/`, legacy `Benchmarks/RealtimeASR` executable
+  tooling, and `script/runtime/` plus native metallib build helpers. Preserve
+  signed catalog bytes, catalog verification tools and their tests, required
+  licenses, and existing benchmark data used as model provenance.
+- The documentation/packaging agent owns `docs/` except this record,
+  `script/release/`, native `script/build_and_run.sh` and Xcode generation,
+  `Resources/`, `Textify.xcodeproj/`, native entitlement files, and `project.yml`.
+  It also owns native-only catalog publication shell wrappers as agreed with
+  the source agent. Replace the native specification with the current desktop
+  scope and remove obsolete native-only plans and release instructions.
+- Each agent must preserve the other agent's changes. Electron runtime source,
+  installed apps, user data, signed catalog contents, and published artifacts
+  are outside this retirement change.
+- Local verification: 245 catalog-tool tests and both release verifier builds
+  pass, including arm64/macOS 14.0 checks. The desktop passes TypeScript checks,
+  118 tests, production bundling, all three native-worker builds and GPU-policy
+  tests, and isolated real Metal fixture transcription through AudioWorklet to
+  explicit Copy. UI/navigation/settings/overlay smoke checks also pass.
+  Changed Markdown links resolve and edited YAML parses. Desktop runtime source,
+  dependency locks, and signed catalogs remain byte-identical to the base.

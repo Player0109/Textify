@@ -1,4 +1,10 @@
-# Electron migration
+# Electron migration history
+
+This is a historical implementation and verification record. References to the
+retired Swift app, earlier previews, and old commands describe work at that
+time. The current product scope is [SPEC.md](../SPEC.md); use the
+[desktop guide](../../electron/README.md) and
+[desktop release procedure](../../electron/RELEASING.md) for current instructions.
 
 The owner approved macOS, Windows, and Linux together, with explicit Copy and
 manual paste wherever safe automatic insertion is unavailable on Wayland.

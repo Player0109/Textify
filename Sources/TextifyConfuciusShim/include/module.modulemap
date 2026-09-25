@@ -1,4 +1,0 @@
-module TextifyConfuciusShim {
-    header "TextifyConfuciusShim.h"
-    export *
-}

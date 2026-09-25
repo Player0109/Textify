@@ -1,10 +1,14 @@
 # Model Manifest Signing
 
-Textify model-manifest versions 1, 2, and 3 use a detached JSON signature envelope at
-`manifest.json.sig`. The envelope records the SHA-256 of the exact raw manifest
-bytes, and the Ed25519 signature covers the canonical UTF-8 payload defined in
-`docs/SPEC.md` section 22.2. Do not reformat or rewrite the manifest between
-signing and publishing.
+The retained catalog tools support model-manifest versions 1, 2, and 3. The
+Electron desktop app accepts manifest v3 and revocation versions 1 and 2 with
+the canonical detached JSON signature envelope. The envelope records the
+SHA-256 of the exact raw JSON bytes. Do not reformat or rewrite those bytes
+between signing and publishing.
+
+The root Swift package contains catalog verification tools, not an application.
+Catalog validity and desktop model support are separate: see the
+[desktop guide](../../electron/README.md) for the implemented artifact subset.
 
 ## Secret Boundary
 
@@ -77,11 +81,8 @@ Keychain service by default; a separately managed service can be named with
 public trust entry are committed. The private key is never printed or copied
 into the repository.
 
-The app and verification helper temporarily accept the previously deployed
-four-field raw-byte signature envelope so existing V1.1 installs can still
-download the production model. The signing helper emits only the canonical
-SPEC envelope; republish the live signature in that format at the next
-maintainer signing opportunity.
+The Electron verifier requires the canonical envelope's exact fields. Legacy
+signature formats accepted by archival tooling are not accepted desktop inputs.
 
 The signing helper reads `manifestVersion` from the exact input bytes and
 emits the matching content type. Versions 1, 2, and 3 are accepted, and
@@ -89,6 +90,28 @@ verification rejects a correctly signed envelope when its content-type version
 differs from the parsed manifest version.
 
 ## Verify Before Publishing
+
+The signature covers a canonical UTF-8 payload with exactly this field order
+and a final LF:
+
+```text
+TEXTIFY-MODEL-MANIFEST-SIGNATURE-V1
+signatureVersion=1
+signatureType=io.github.Player0109.Textify.model-manifest
+algorithm=Ed25519
+keyId=<trusted key ID>
+manifestFile=manifest.json
+contentType=application/vnd.textify.model-manifest+json;version=<manifest version>
+contentSHA256=<lowercase SHA-256 of the exact JSON bytes>
+```
+
+For revocations, use `TEXTIFY-MODEL-REVOCATIONS-SIGNATURE-V1`, the
+`io.github.Player0109.Textify.model-revocations` signature type,
+`revocationFile=revocations.json`, and the
+`application/vnd.textify.model-revocations+json;version=<revocation version>`
+content type in the same positions. The Ed25519 signature is encoded as
+unpadded base64url in the envelope. The signature does not sign itself. The
+desktop implementation is [trust.ts](../../electron/src/main/trust.ts).
 
 ```bash
 export TEXTIFY_MODEL_MANIFEST_PUBLIC_KEY_BASE64='<raw public key base64>'
@@ -133,22 +156,14 @@ Verification checks the detached signature and the production catalog policy:
 Manifest v1 remains valid and cannot contain `benchmark`. Manifest v2 adds
 benchmark evidence, and manifest v3 retains those exact operational records
 while requiring the normalized presentation graph. A model may leave
-`benchmark` absent; the app then shows quality and speed as `Unrated`. An
-eligible candidate is generated under
-`Benchmarks/RealtimeASR` and reviewed manually:
+`benchmark` absent. Existing ratings and benchmark records are retained as
+historical provenance; the legacy benchmark runner has been retired. They do
+not establish Electron accuracy or performance. Keep a v3 production catalog
+at v3, preserve its graph mapping, and verify any metadata change before
+signing. No automated workflow receives a manifest private key.
 
-```bash
-./generate_english_catalog_rating.sh \
-  MODEL_ID MEASURED_AT RUN_ID_1 RUN_ID_2 RUN_ID_3 candidate.json
-```
-
-Copy the complete candidate object into that model entry's `benchmark` field.
-Use manifest v2 only for a catalog that has no presentation graph; keep a v3
-production catalog at v3 and preserve its exact graph mapping. Run the
-verification tests and only then sign with the maintainer key. Nightly
-workflows never modify the catalog and never receive a manifest private key.
-
-The production runtime tuples are deliberately closed:
+The retained base-catalog policy includes these historical runtime tuples.
+This table is not the desktop app's supported-model list:
 
 | Engine | Accelerator | Artifact layout |
 | --- | --- | --- |
@@ -164,14 +179,15 @@ Every Core ML leaf file must have a safe unique `relativePath`. The signed
 catalog may advertise only a released variant implemented by the pinned
 FluidAudio version; a conversion repository existing on its own is not enough.
 
-The app release embeds this signed pair under
-`Contents/Resources/ModelCatalog/`. The app verifies that bundled pair locally
-and uses it as the only runtime catalog. Catalog changes require a new Textify
-app release. Model weights are never embedded in the app.
+The desktop build copies the root signed pairs into `electron/resources/` and
+its supplementary pair into `electron/resources/extra-models/`. Packaging
+includes them in the app's `textify` resource directory. The app verifies both
+catalogs locally and selects only implemented exact artifacts. Catalog changes
+require a new desktop app release. Model weights are never embedded in the app.
 
-Do not rely on a GitHub Pages catalog to update installed builds. Legacy
-endpoint tooling may retain an archival copy, but current Textify builds do not
-request it.
+There is no runtime catalog endpoint. The old native-app endpoint and
+bundle-publication helpers have been retired; use the
+[bundled catalog release rules](catalog-publication-and-rollback.md).
 
 Model files may use an immutable Textify GitHub Release asset, for example:
 

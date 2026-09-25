@@ -1,3 +1,7 @@
+> Historical provenance for the retired standalone Swift app. The native
+> implementation has been removed; paths and build commands below describe that
+> archived implementation, not the current Electron build.
+
 # transcribe.cpp runtime provenance
 
 - Upstream: `https://github.com/handy-computer/transcribe.cpp`

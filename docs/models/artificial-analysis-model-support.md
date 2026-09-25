@@ -1,5 +1,11 @@
 # Artificial Analysis Model Support
 
+> Historical catalog and model evidence. Runtime support, ratings, UI behavior,
+> and commands below describe the implementation at the recorded date.
+> Retired benchmark commands are retained as provenance, not instructions.
+> See the [desktop guide](../../electron/README.md) for current supported
+> artifacts and features; these records do not claim Electron performance.
+
 Snapshot date: 2026-07-20
 
 This matrix tracks the exact model names in the supplied Artificial Analysis

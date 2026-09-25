@@ -1,6 +1,12 @@
-# Textify Curated Models
+# Textify catalog provenance
 
-The signed catalog shipped with the current app contains 44 curated choices:
+> Historical catalog and model evidence. Runtime support, ratings, UI behavior,
+> and commands below describe the implementation at the recorded date.
+> Retired benchmark commands are retained as provenance, not instructions.
+> See the [desktop guide](../../electron/README.md) for current supported
+> artifacts and features; these records do not claim Electron performance.
+
+The retained signed base catalog contains 44 curated choices:
 41 transcription models and three independent voice-cleaning models. The ASR
 choices are Whisper small.en; Experimental Whisper Large V2 and V3 q5_0;
 Whisper Large V3 Turbo q5_0 and a separate MLX Turbo entry; Experimental

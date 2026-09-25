@@ -9,16 +9,7 @@ body:
       value: |
         Model suggestions are reviewed by maintainers and added at their discretion based on license compatibility, quality, and fit. Filing this issue does not guarantee inclusion or a timeline.
 
-        Textify supports multiple local runtimes and currently curates 42 exact artifacts: 39 transcription models and 3 voice-cleaning models. Do not attach or submit model binaries. Textify maintainers obtain eligible artifacts directly from their authoritative upstream source.
-  - type: dropdown
-    id: purpose
-    attributes:
-      label: Intended purpose
-      options:
-        - Transcription
-        - Voice cleaning
-    validations:
-      required: true
+        Textify supports Whisper on all three desktop platforms, plus Parakeet, Qwen3-ASR, and Confucius4-R2T2 on Apple Silicon. Do not attach or submit model binaries. Textify maintainers obtain eligible artifacts directly from their authoritative upstream source.
   - type: input
     id: model_name
     attributes:
@@ -67,7 +58,7 @@ body:
     id: rationale
     attributes:
       label: Why should Textify consider it?
-      description: Explain its quality, latency, hardware requirements, and fit for short dictation or voice cleaning.
+      description: Explain its quality, latency, hardware requirements, and fit for short dictation.
     validations:
       required: true
   - type: textarea
@@ -78,13 +69,11 @@ body:
       placeholder: "Runtime, artifact format, and required integration"
     validations:
       required: true
-  - type: dropdown
-    id: tested_on_apple_silicon
+  - type: input
+    id: tested_hardware
     attributes:
-      label: Tested locally on Apple Silicon?
-      options:
-        - "Yes"
-        - "No"
-        - Not sure
+      label: Tested platform and hardware
+      description: Name the operating system, GPU, and runtime you tested, or enter "Not tested".
+      placeholder: "macOS / Apple M2 / Metal, or Not tested"
     validations:
       required: true

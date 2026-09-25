@@ -1,3 +1,7 @@
+> Historical provenance for the retired standalone Swift app. The native
+> implementation has been removed; paths and build commands below describe that
+> archived implementation, not the current Electron build.
+
 # Confucius4-R2T2 native runtime
 
 - Upstream: https://github.com/0xShug0/audio.cpp

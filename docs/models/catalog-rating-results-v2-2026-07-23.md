@@ -1,5 +1,11 @@
 # English Catalog Rating V2 Results
 
+> Historical catalog and model evidence. Runtime support, ratings, UI behavior,
+> and commands below describe the implementation at the recorded date.
+> Retired benchmark commands are retained as provenance, not instructions.
+> See the [desktop guide](../../electron/README.md) for current supported
+> artifacts and features; these records do not claim Electron performance.
+
 Status: promoted into the signed repository production manifest, 2026-07-23
 
 This report applies `english-catalog-rating-v2` to the complete raw evidence

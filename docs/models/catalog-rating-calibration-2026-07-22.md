@@ -1,5 +1,11 @@
 # English Catalog Rating v1 Calibration
 
+> Historical catalog and model evidence. Runtime support, ratings, UI behavior,
+> and commands below describe the implementation at the recorded date.
+> Retired benchmark commands are retained as provenance, not instructions.
+> See the [desktop guide](../../electron/README.md) for current supported
+> artifacts and features; these records do not claim Electron performance.
+
 Status: frozen pre-production calibration evidence, 2026-07-22
 
 The `english-catalog-rating-v1` policy and suite were exercised against two
@@ -63,8 +69,8 @@ Run IDs:
 - `calibration-parakeet-v3-1`, `calibration-parakeet-v3-2`,
   `calibration-parakeet-v3-3`
 
-The generated candidate JSON files live under the ignored
-`Benchmarks/RealtimeASR/.benchmark-results/` directory. Regenerate them from
-the immutable raw run directories with `generate_english_catalog_rating.sh`;
-do not copy them into production without manual review and a separate signing
-step.
+The generated candidate JSON files were stored under the ignored
+`Benchmarks/RealtimeASR/.benchmark-results/` directory. The retired
+`generate_english_catalog_rating.sh` runner generated them from immutable raw
+run directories. They were not production inputs without manual review and a
+separate signing step.

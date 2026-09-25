@@ -103,7 +103,7 @@ View daily, weekly, and monthly numeric usage totals. Dictated text and recordin
 
 **Whisper** is available on macOS, Windows, and Linux. Apple Silicon also supports **Parakeet**, **Qwen3-ASR**, and **Confucius4-R2T2**. Model and language availability varies by platform and catalog entry; the app shows the supported languages for each choice.
 
-Model binaries are downloaded separately from pinned sources and checked against signed metadata before use. See the [desktop model and runtime details](electron/README.md) for the supported versions. The desktop preview does not include every engine or feature of the earlier Swift app.
+Model binaries are downloaded separately from pinned sources and checked against signed metadata before use. See the [desktop model and runtime details](electron/README.md) for the supported versions.
 
 ## Privacy
 
@@ -116,23 +116,6 @@ Automatic paste restores the previous clipboard when it has not changed; explici
 ## Development
 
 The current desktop app lives in [`electron/`](electron/). Start with the [desktop development guide](electron/README.md) for platform prerequisites, local builds, and verification. Release packaging is documented in [the desktop release guide](electron/RELEASING.md).
-
-<details>
-<summary><strong>Earlier native macOS app</strong></summary>
-
-The repository also contains the separate Swift implementation. Its [older unsigned preview](https://github.com/Player0109/Textify/releases/tag/v1.1.0-unsigned-preview.1) is distinct from the desktop downloads above.
-
-Building the native app requires an Apple Silicon Mac and Xcode 26 with Swift 6.2 or later; its deployment target is macOS 14.
-
-```sh
-swift build
-swift test
-./script/build_and_run.sh
-```
-
-[Native specification](docs/SPEC.md) · [Native release guide](docs/RELEASING.md) · [Native model catalog](docs/models/curated-models.md) · [Native privacy statement](PRIVACY.md)
-
-</details>
 
 ## Support and contributions
 

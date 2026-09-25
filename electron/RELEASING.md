@@ -1,8 +1,7 @@
 # Publishing the Textify desktop app
 
-The existing GitHub Release is for the native macOS app. Publish the Electron
-desktop app under its own `v0.2.0-preview.*` tag until its platform QA is
-complete. Do not reuse a native app tag or label an unsigned build as a
+Publish the desktop app under a new `v0.2.0-preview.*` tag until its platform QA
+is complete. Do not reuse a published tag or label an unsigned build as a
 notarized release.
 
 ## Release gates
