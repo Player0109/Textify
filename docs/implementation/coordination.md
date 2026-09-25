@@ -2742,3 +2742,28 @@ Task 1 must merge before parallel Wave 1 work begins.
   explicit Copy. UI/navigation/settings/overlay smoke checks also pass.
   Changed Markdown links resolve and edited YAML parses. Desktop runtime source,
   dependency locks, and signed catalogs remain byte-identical to the base.
+
+### Dictation promotion video — 2026-09-25
+
+- The parent owns the promotional edit, motion graphics, audio mix, delivery
+  assets, and README integration. The requested focus is writing by dictation
+  in other applications.
+- The capture agent owns only `electron/.native/promo-capture/` while recording
+  the real desktop app, local inference, and native insertion into a separate
+  owned sample writing window. Use temporary app profiles and public synthetic
+  speech. Preserve clipboard contents and avoid personal documents, real
+  microphone capture, permission changes, and production-code changes.
+- Identify sample writing surfaces and prerecorded audio in the provenance.
+  Do not present simulated typing, accelerated inference, or manual Copy as
+  automatic insertion. Keep macOS/Windows insertion and Linux Copy distinctions
+  accurate in the promotion.
+- Isolated automatic insertion is blocked by existing Accessibility permissions.
+  The parent will author a clearly labeled animated macOS workflow with sample
+  writing apps and illustrative timing. No permission changes are needed.
+- The audio worker owns `electron/.native/dictation-promo-audio/` and optional
+  `docs/media/promo-source/audio.py` / `audio.json`; the parent owns the native
+  motion source, rendered deliverables, provenance, and README integration.
+- Audio production is complete. The parent has adopted the worker's reproduction
+  script and timing manifest under `docs/media/promo-source/` and now owns their
+  documentation and final-export metadata. The final AAC measurements are kept
+  separately from the source WAV's normalization report.
