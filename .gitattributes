@@ -6,3 +6,5 @@ models/manifest.json -text
 models/manifest.json.sig -text
 models/revocations.json -text
 models/revocations.json.sig -text
+electron/models/manifest.json -text
+electron/models/manifest.json.sig -text

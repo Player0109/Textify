@@ -2,6 +2,55 @@
 
 This file records cross-agent handoffs during implementation.
 
+## Electron Cross-Platform Remake Handoff - 2026-09-22
+
+Follow-up scope: the owner approved the complete next-stage plan: three-OS CI
+with real transcription, desktop QA, additional models/languages, vocabulary,
+exclusions, launch-at-login, settings migration, download recovery, persistent
+revocations, and installers. This retains the Electron workstream's ownership
+and explicitly includes preview packaging and platform test harnesses. The
+owner will perform Windows desktop QA and selected unsigned preview installers
+while signing credentials are unavailable. Production signing/notarization and
+public release publication remain deferred. Linux physical-desktop QA is not
+yet assigned. Work on a dedicated Electron branch; CI pushes are part of the
+authorized validation work.
+
+- The product owner approved an Electron remake alongside the existing Swift
+  app, targeting macOS, Windows, and Linux in its first release. On Wayland
+  desktops without safe automatic insertion, the owner explicitly selected
+  Copy followed by a user-initiated paste.
+- This workstream owns `electron/`, its isolated build/test/package workflow,
+  `.github/workflows/electron.yml`, and
+  `docs/implementation/electron-migration.md`. It may update this coordination
+  record. Existing Swift sources, packaging, settings, models, and signed
+  catalogs remain owned by their existing workstreams.
+- The active milestone explicitly owns real global triggers, in-memory audio,
+  a portable whisper.cpp worker, platform insertion, and their tests. Its
+  implementation supersedes the historical mock-only and native-Apple-only
+  restrictions for the new Electron directory only. Release signing,
+  publication, notarization, and automatic updates are not part of this
+  milestone. Local macOS preview packages use an ad-hoc signature.
+- First prove one complete dictation path before migrating every model and
+  setting. The existing signed catalog remains the source of artifact bytes;
+  Apple runtime requirements and benchmark results must not be presented as
+  verified Windows/Linux compatibility or performance.
+- Implemented the first offline English dictation path and the Copy workflow.
+  Local validation: 47 tests, TypeScript/build, native fixture recognition,
+  fixture MediaStream through capture/recognition/Copy, packaged Mac launch,
+  and macOS signature verification. Baseline `e3095ad` subsequently passed the
+  three-OS CI workflow (run `35684967292`), including real fixture recognition,
+  packaged launch and unsigned installers. Expanded `0.2.0-preview.1` adds four
+  Whisper profiles, English/Hindi routing, vocabulary, exclusions, settings
+  import, startup/indicator settings, download recovery and persistent trust.
+  Final preview commit `4c18c95` passed all three jobs in run `35687215578`:
+  66 tests per OS, capture/Copy fixture, native builds, packaged launch and
+  installer checks. Windows and local macOS owned-window tests verified paste,
+  clipboard restoration, target mismatch and password rejection. Checksums for
+  all four downloaded installers matched. Current artifacts and model runtime
+  evidence are recorded in the migration document. Physical desktop checks and
+  full native runtime parity remain outstanding.
+
+
 ## Confucius4-R2T2 Live Dictation Handoff - 2026-09-20
 
 - The product owner requested Confucius4-R2T2 integration and explicitly chose
@@ -2198,3 +2247,448 @@ Task 1 must merge before parallel Wave 1 work begins.
 - Any later in-app experiment requires a separate handoff before changing
   `Package.swift`, `TextifyRuntime`, app composition, settings, model purposes,
   the signed catalog, legal notices, or release packaging.
+
+## Electron GPU Requirement and Mac Dictation Handoff - 2026-09-22
+
+- The product owner reports that Right Command shows the Mac overlay but no text
+  is inserted after release, and requires GPU inference on macOS, Windows, and
+  Linux. CPU-only inference and silent CPU fallback are no longer permitted.
+- This slice owns `electron/`, `.github/workflows/electron.yml`, and the Electron
+  migration notes. It may patch the pinned Electron whisper dependency to enforce
+  GPU execution, update native packaging, and fix the demonstrated insertion
+  failure. Swift sources and the signed model catalog remain outside this slice.
+- Use Metal on macOS and hardware Vulkan on Windows/Linux (including NVIDIA).
+  Report missing/incompatible GPU or driver and prevent dictation; audio capture,
+  preprocessing and token sampling still require ordinary CPU work.
+- GPU-less CI must assert refusal. Real GPU transcription, microphone, and
+  cross-app insertion evidence must be reported separately from installer checks.
+
+## Electron Native UI and Additional Models Handoff - 2026-09-22
+
+- The product owner requested the native Textify visual design and the Confucius4-R2T2,
+  Parakeet TDT 0.6B V3, and Qwen3-ASR 0.6B/1.7B model families in Electron.
+- This slice owns Electron renderer, catalog adapter, isolated native workers,
+  dependency preparation, packaging, tests and Electron documentation. Swift sources,
+  vendored Swift runtimes, and the signed catalog remain read-only references.
+- Implement the existing signed GGUF artifacts on Apple Silicon first. Preserve
+  mandatory GPU execution, including Parakeet's decoder; do not expose native
+  MLX/CoreML variants through a worker that cannot execute them. Existing Windows
+  and Linux Whisper support remains available. Native benchmark scores are not
+  measurements of these new Electron runtime builds.
+
+## Electron Logo Selection - 2026-09-22
+
+- The owner selected concept A, the blue T with cyan waveform bars, from the
+  generated logo comparison sheet. This slice owns the Electron icon asset,
+  sidebar branding and packaging references; the native Swift app remains unchanged.
+- Use the same transparent source image for the installed application, Dock,
+  tray and Electron sidebar. Preserve the existing Dock pin and dictation settings.
+- Verified TypeScript, packaging, packaged launch, renderer appearance, signed
+  microphone entitlements and deep/strict signature validation. Installed the
+  updated bundle; confirmed its native icon contains the selected artwork and
+  the Dock pin still targets Applications. Restored the existing Accessibility
+  grant after the ad-hoc signature changed, relaunched, and confirmed GPU ready,
+  Hold Right Command and microphone permission available.
+
+## Electron Confucius BF16, Streaming and Floating Bar - 2026-09-22
+
+- The owner requested the original NetEase Confucius4-R2T2 BF16 checkpoint in
+  addition to GGUF, realtime recognition, and the original compact Textify overlay.
+- This slice owns `electron/` and its documentation, including a separately signed
+  `electron/models/manifest.json` BF16 entry. The original Swift catalog schema
+  does not admit audio.cpp safetensors directories; keep its catalog and sources
+  unchanged. Verify both catalogs with the existing embedded keys and apply the
+  same sticky revocation policy to all artifacts. Do not change GPU policy.
+- Use the pinned audio.cpp runtime for original safetensors and GGUF on Apple
+  Silicon. Stream ephemeral previews during capture; preserve one final insertion
+  on release, cancellation, target ownership and the five-minute session bound.
+- Follow the native overlay's compact identity row, waveform, subtle colored
+  border and three-line live preview. Preserve Electron's Copy recovery action,
+  macOS panel behavior, `skipTransformProcessType`, and normal Dock visibility.
+
+### Floating bar reference correction
+
+- Owner supplied the original overlay screenshots and requested its smooth gray
+  waveform and actual destination app icon. This follow-up owns the Electron
+  overlay, its target-identity snapshot, and the Mac helper's icon serialization.
+  Read the Swift overlay as the visual reference; do not edit its implementation
+  or change capture, model inference, hotkeys, or insertion behavior.
+- Follow-up: restore the native 140 ms upward transition when live text wraps
+  beyond three lines. The owner explicitly requested always-on floating-bar
+  motion and no Reduce Motion control; this supersedes the overlay's earlier
+  reduced-motion behavior for the Electron implementation only.
+
+### Floating Icon settings
+
+- Owner requested the native Floating Icon setter. This slice owns a dedicated
+  Electron Dictation settings component, removal of the old General numeric
+  controls, preview styling, and the overlay's placement calculation. Keep the
+  existing preferences and ranges; positive Y means up, matching native Textify.
+  Include live preview, precise values, sliders, steppers, reset, persistence and
+  visible-frame clamping. Keep animations on and leave inference/insertion alone.
+
+### Guided Accessibility setup
+
+- Owner approved the researched Accessibility improvements. This slice owns the
+  Electron permission state/controller, main-process trust checks and shortcut
+  activation, renderer setup card, fixed app-location fallback, focused tests,
+  and packaging configuration/documentation. Preserve the OS approval boundary;
+  never edit TCC databases or automatically reset permissions.
+- Use a consistent Apple-issued signing identity when available. This Mac has no
+  valid code-signing identity at intake. Signed packaging must fail clearly when
+  one is missing; ad-hoc packaging remains an explicit local-preview command.
+  Native Swift sources, model catalogs, inference and insertion stay unchanged.
+- Packaging command changes also own the Electron CI workflow's invocation of
+  explicitly unsigned preview packaging; do not change CI credentials or scope.
+
+### Simplified Electron model browser
+
+- Owner requested model names, supported languages, installable versions with
+  sizes, and an upstream link, removing the repeated explanatory metadata.
+  This supersedes the detailed Models presentation in SPEC section 13.3 for
+  Electron only. Own `ModelsPane.tsx`, model-specific styles, the Models header,
+  a catalog-ID-only source-link command, UI verification and preview packaging.
+- Keep Installed/In use, download progress and actionable integrity states.
+  Put Import/Remove behind a version's options disclosure; retain their existing
+  verification and confirmation behavior. Catalog data and runtimes are unchanged.
+- Design: existing system/rounded headings; #11151c page, #151a23 list,
+  #1d222c detail, #102b49 selection, #0a84ff actions, #e7eaf0 text.
+  A compact left-aligned model list sits beside name, full language list,
+  version/action rows and one source link. Remove decorative captions and
+  repeated facts, preserving Textify's existing charcoal/blue styling.
+
+### Remove native settings import
+
+- Owner requested removal of Import native Textify settings. Own the Electron
+  General row/preview and description, its preload/IPC interface, the unused
+  native-settings conversion function and only its tests, related styling/docs,
+  and preview packaging. Preserve existing preferences, normal Electron settings
+  upgrades, launch at login, and model-file import.
+- Follow-up: move Launch at login into the Dictation page and rename that page
+  General. Remove the separate General destination; preserve the recording
+  controls, Floating Icon section and the current startup preference. This also
+  owns the existing smoke scripts' page labels and relevant README navigation.
+
+### Simplify Privacy explanations
+
+- Owner questioned the non-interactive Audio and dictated text and Clipboard
+  rows. Own their removal from the Electron Privacy page and a concise retention
+  statement in the introduction. Keep microphone and Accessibility controls,
+  app exclusions, and all privacy behavior unchanged. Clipboard behavior remains
+  documented in the Electron README. Verify and install the updated preview.
+
+### Excluded apps card
+
+- Owner requested that Excluded apps match the Accessibility and Microphone
+  sections. Own `Exclusions.tsx`, its scoped styles and preview verification.
+  Keep the existing app picker, exclusion identities and save behavior.
+- Use the existing system typeface, #191f2980 card, #ffffff14 border,
+  #e7eaf0 text, #9ba4b4 secondary text and #0a84ff accent. Layout is left-aligned:
+  [app icon | heading and explanation | Add app], with the picker or app list
+  below a divider. Match the neighboring card rather than introducing a new
+  visual style; keep the empty state compact and controls aligned at narrow widths.
+
+### Electron studio UI rollout — 2026-09-23
+
+- The owner selected the compact studio-inventory concept C for Transcription
+  models and approved matching concepts for General, Floating Icon, Vocabulary,
+  Privacy, Accessibility setup, download progress and the floating dictation bar.
+- This follow-up owns Electron renderer markup and styling, UI smoke coverage,
+  Electron documentation and local preview packaging. Preserve the existing
+  model catalog, downloaded files, preferences, permission behavior, recording,
+  live transcript movement, insertion, and Dock process type. No Swift source
+  or release-signing changes belong to this slice.
+- Verify the actual installed preview at the default Mac window size and at a
+  narrow size, including model selection/actions, settings persistence, the
+  Accessibility state, and the three-line overlay.
+- Completed as `0.2.0-preview.13`: 100 tests, TypeScript, build, UI smoke,
+  Accessibility smoke, ad-hoc signature/entitlement and packaged launch checks
+  passed. Isolated UI screenshots covered default and 780px widths; the
+  installed app was visually checked at the default size on all four pages and
+  the Floating Icon controls. The existing Accessibility grant was refreshed
+  with owner-approved Touch ID, and the installed app reports GPU ready,
+  Confucius BF16 in use and Right Command active. No model/runtime or
+  preference value was changed.
+
+### Electron model publisher logos — 2026-09-23
+
+- This follow-up owns the Electron model browser renderer, model-specific
+  styling, bundled publisher images, their notices, UI smoke coverage, and the
+  local preview package. The signed model catalog and model runtime are unchanged.
+- Completed as `0.2.0-preview.14`: official profile/site logos for OpenAI,
+  Qwen, NVIDIA and NetEase Youdao appear beside every model and in the selected
+  model header. TypeScript, 100 tests, production build, UI smoke, ad-hoc
+  signature/entitlement checks and packaged launch passed. The installed Mac
+  app was visually checked, and its existing Accessibility permission was
+  refreshed after the ad-hoc update. Confucius BF16 and Right Command remain
+  selected.
+- Refined as `0.2.0-preview.15`: publisher marks now sit on subtle dark tiles,
+  with contrast adjustments for OpenAI and NetEase Youdao and NVIDIA's official
+  dark-background logo. TypeScript, 100 tests, build, UI smoke, signature and
+  packaged launch checks passed. Installed app visual inspection confirmed the
+  logo treatment and Confucius BF16 in use; its existing Accessibility grant
+  was refreshed and Right Command is active.
+
+### Electron Accessibility drag helper — 2026-09-23
+
+- This follow-up owns the Electron macOS Accessibility setup card, a small
+  Settings-overlay helper, its restricted native-file-drag IPC, and setup smoke
+  coverage. The helper drags only the exact running app bundle; the user still
+  decides whether to add it and enable the macOS switch. The Finder route stays
+  available for keyboard access and fallback.
+- The new helper and its 780px setup layout passed isolated macOS UI smoke;
+  TypeScript, 100 tests, build and the broader Electron smoke passed. Preview
+  packaging and installed-app checks are recorded after completion below.
+- Completed as `0.2.0-preview.17`: the packaged app passed strict code-signature,
+  entitlement and launch checks and was installed at
+  `/Applications/Textify Electron.app`. The owner confirmed that dragging the
+  helper icon into macOS Accessibility settings works. The installed app reports
+  Confucius BF16 in use and Right Command ready after permission detection.
+
+### Electron microphone control alignment — 2026-09-23
+
+- The General page now places Check microphone directly beneath the microphone
+  selector, aligned to its left edge. No microphone behavior or preference
+  handling changed.
+- Installed as `0.2.0-preview.18`. TypeScript, 100 tests, build, UI smoke,
+  signature, entitlement and packaged-launch checks passed. The installed
+  General page was visually checked with Confucius BF16 and Right Command ready;
+  a 780px layout capture confirmed the row stays aligned without overflow.
+- Follow-up: aligned Check microphone to the selector's right edge in
+  `0.2.0-preview.19`. TypeScript, 100 tests, build, signature, packaged-launch,
+  780px layout, and the installed General page were checked.
+
+### Electron floating-icon shortcut removal — 2026-09-23
+
+- The General page's Adjust position button only scrolled to the Floating Icon
+  controls immediately below it. Removed that duplicate shortcut card and its
+  unused styles; the preview and X/Y/scale controls remain in place.
+- Installed as `0.2.0-preview.20`. TypeScript, 100 tests, build, UI smoke,
+  signature, entitlement, and packaged-launch checks passed. The installed app
+  returned to a ready state with the single Floating Icon section visible.
+
+### Electron silent no-result dictation — 2026-09-23
+
+- The floating bar's “could not recognize clear speech” message was shown for
+  rejected ASR output or empty processed text, including filtered hallucinations.
+  Full silence also showed a separate error. These no-result cases now return to
+  idle without a message, matching the spec's silent no-op behavior. Missing
+  microphone audio and actual capture/model failures still show actionable errors.
+- Installed as `0.2.0-preview.21`. TypeScript, 101 tests, build, UI smoke,
+  signature, entitlement, and packaged-launch checks passed. The installed app
+  returned to GPU-ready state with Right Command active after its existing
+  Accessibility switch was refreshed.
+
+### Electron product rename — 2026-09-23
+
+- The Electron preview's visible product name, macOS bundle/executable, window
+  title, Linux autostart label, and release artifact prefix are now `Textify`.
+  The existing Electron bundle ID and `Textify Electron` app-data directory
+  remain stable so installed models and preferences carry forward, and the
+  separate native Swift app is unaffected.
+- Installed `0.2.0-preview.22` at `/Applications/Textify.app` after moving the
+  previous preview bundle to `electron/.native/installed-backups/`. The installed
+  app reports Confucius4-R2T2 1.7B, English, Right Command, GPU ready, and the
+  saved Floating Icon scale. Its Accessibility grant was refreshed through
+  macOS Settings and the global shortcut returned to ready state.
+- TypeScript, 101 tests, build, Electron smoke, strict packaged-signature and
+  launch checks passed. The generated macOS DMG contains `Textify.app` and its
+  SHA-256 checksum verifies.
+
+### Electron public-release preparation — 2026-09-23
+
+- The repository front page now distinguishes its existing published native
+  Mac preview from the unpublished cross-platform desktop app. A desktop
+  release procedure and separate signed-release installation notes were added.
+- Production Mac packaging now refuses to proceed without notarization
+  credentials and a Developer ID Application identity; the only currently
+  available Keychain identity is Apple Development. CI still creates explicit
+  unsigned previews on three platforms. The remaining physical-device checks
+  in `electron/MANUAL_QA.md` are release gates, not recorded as passed.
+- The `0.2.0-preview.22` Mac preview passes TypeScript, 101 tests, build,
+  Electron smoke, and DMG checksum verification. Both no-credential and
+  no-Developer-ID production packaging paths stop before making an artifact.
+- The first PR run passed macOS packaging and CodeQL. Windows exposed checkout
+  line-ending conversion of the supplemental signed manifest and a directory
+  `stat().size` assumption in resume state; Linux exposed a macOS-only icon
+  selector in UI smoke. The signed manifest is now byte-preserved in Git,
+  directory resume checks its entries, and smoke decodes the Accessibility icon
+  only where present. Local TypeScript, 101 tests, build, and Electron smoke
+  passed again; the cross-platform rerun is pending.
+
+### Electron final-DMG release verification — 2026-09-25
+
+- The publishing workstream owns `electron/scripts/package.mjs`,
+  `electron/scripts/checksums.mjs`, a directly shared Mac release helper and its
+  tests, and `electron/RELEASING.md`. This handoff precedes those edits.
+- Production packaging must sign the final DMG with Developer ID, submit it
+  using local notarization credentials, staple and validate it, and require
+  Gatekeeper acceptance before reporting success. Production checksums must
+  verify the Mac artifact before copying signed-release installation notes.
+- Preserve explicit preview behavior, existing Activity changes, local-only
+  credentials, and the prohibition on packaging auto-publication. The parent
+  release task owns version changes, Git operations, public release notes, and
+  credential setup. This slice uses targeted tests with substituted commands;
+  it does not perform a real build, signing, or notarization operation.
+- The parent owns `electron/package.json` and `electron/package-lock.json` for
+  preview.23, the Mac-to-device wording in
+  `electron/src/renderer/ActivityPane.tsx`, and truthful draft notes in
+  `docs/release/v0.2.0-preview.23.md`. Its Git snapshot includes the existing
+  Activity edits.
+- Validation: 10 focused release-gate tests passed with substituted command
+  runners, including rejected notarization, incorrect signing identities,
+  staple/Gatekeeper failures, and missing platform installers. TypeScript,
+  Node syntax checks for the three release scripts, and `git diff --check`
+  passed. These checks do not claim successful real signing or notarization.
+- The integrated preview.23 candidate passed `npm run check` (116 tests,
+  TypeScript and production build) and isolated Electron smoke. Master was
+  merged by retaining the Activity specification and Electron handoff notes
+  in documentation-only conflicts; the merge did not alter the candidate's
+  file tree. New three-platform CI artifacts are required for this candidate.
+- The parent release task also owns the explicit-preview packaging correction:
+  electron-builder skipped ad-hoc signing on the pull-request run while the
+  identical push run signed successfully. Permit PR signing only inside the
+  macOS preview branch, where the identity is fixed to `-` and notarization is
+  disabled. Production Developer ID and local-credential requirements stay in
+  force.
+- The parent also owns `electron/src/core/activity.ts` for the Windows Activity
+  grouping timeout found in PR CI. One day/week/month render constructs 96
+  identical locale formatters; a local 100-render probe constructed 9,600.
+  Reuse two formatters within each grouping call while preserving the current
+  locale, time zone, labels, period boundaries and totals. Keep the existing
+  test timeout and verify the existing grouping tests.
+- Validation of the formatter reuse: all 116 Electron tests, TypeScript,
+  production build and isolated UI smoke passed. Old and new period output
+  matched in 60 grouping/date/time-zone cases, including leap day, year
+  boundaries and daylight-saving transitions. The same local 100-render
+  probe dropped from 9,600 formatter constructions in 205 ms to 600 in 20 ms;
+  the slow Windows runner still needs a fresh CI run.
+- CI run `36102323619` confirmed electron-builder's target-specific Linux
+  filenames: `linux-x86_64.AppImage` and `linux-amd64.deb`. The production
+  installer gate and its test fixtures now require those actual names and
+  reject the incorrect generic `linux-x64` names. All 10 focused release-gate
+  tests and `git diff --check` passed after the correction.
+
+### Native queue-test scheduling correction — 2026-09-25
+
+- The release CI stabilization slice owns only the two private wait helper
+  bodies in `Tests/TextifyAppTests/ModelInstallCoordinatorQueueTests.swift`.
+  This handoff precedes those edits. Production queue behavior is unchanged.
+- Native CI run `36102326402` exhausted the asynchronous helper's 2,000 yields
+  in three tests, including failures after only 12 ms and 39 ms. The test file
+  and production coordinator were identical to `origin/master`; all 23 queue
+  tests passed locally against the cached binary. Replace yield counts with
+  a five-second monotonic deadline and 10 ms suspensions, then rebuild and run
+  the focused queue tests.
+- Validation: `swift test --jobs 2 --filter ModelInstallCoordinatorQueueTests`
+  rebuilt the changed tests and passed all 23 tests in 0.494 seconds. The build
+  took 13.89 seconds. No full Swift suite or production-source change was made.
+
+### Cleaner boundary-test isolation — 2026-09-25
+
+- Release CI diagnosis owns only
+  `AppCompositionTests.testDisableVoiceCleaningWaitsForTheCurrentSegmentBoundary`
+  and any directly needed local test fixture in
+  `Tests/TextifyAppTests/AppCompositionTests.swift`. This handoff precedes edits;
+  production runtime and unrelated tests remain outside this slice.
+- CI run `36103858495` passed all 23 corrected queue tests but failed the
+  cleaner identity assertion in this composition test. The unchanged test
+  reproduced that exact failure locally on the ninth isolated repetition.
+  Preserve the boundary assertion and identify the fixture/scheduling cause
+  before changing it; do not merely extend a timeout.
+- Instrumentation reproduced the failure on the sixth repetition and showed
+  that the segment had no voice-cleaning artifact before disable was requested.
+  Startup revocation enforcement can overlap the fixture's first admission.
+  The test now awaits that startup work and asserts cleaner ownership before
+  exercising disable; its original boundary and preference assertions remain.
+- Validation: 40 isolated repetitions with the startup barrier passed. After
+  removing diagnostic prints, `swift test --jobs 2 --filter AppCompositionTests`
+  rebuilt the tests and passed all 97 tests in 8.146 seconds; another 30 isolated
+  repetitions passed against that final binary. No production code changed.
+
+### Electron Developer ID qualifier correction — 2026-09-25
+
+- The release verification agent owns `electron/scripts/package.mjs` and a
+  focused package-script regression test. This handoff precedes those edits.
+  Preserve the parent's Activity edits and the native test agent's changes.
+- The pinned electron-builder rejects a signing qualifier containing the
+  `Developer ID Application:` prefix. Pass the certificate name without that
+  prefix to the builder, while retaining the full authority for final DMG
+  verification. Preview signing must remain ad-hoc and publication disabled.
+- Validation: reproduced the pinned builder's prefix rejection without signing
+  or reading Keychain identities. The package-script regression failed before
+  the fix and passed after it; all 12 focused packaging/release tests,
+  TypeScript, the package-script syntax check, and `git diff --check` passed.
+  Build, Keychain, and notarization boundaries were substituted in these tests;
+  they do not claim a real production signing or notarization run.
+- The parent release task owns an evidence-only update to
+  `electron/MANUAL_QA.md`: on September 25 the owner confirmed macOS microphone
+  and text insertion testing, with Windows and Linux untested. This does not
+  establish final signed preview.23 installer or second-Mac verification.
+
+### Electron slider-smoke synchronization — 2026-09-25
+
+- The release verification agent owns only `electron/scripts/smoke.mjs` for
+  the PR Linux drag assertion failure in run `36105421678`. This handoff
+  precedes the edit; app behavior and other agents' files remain unchanged.
+- After the keyboard adjustment, wait for the slider to be enabled and show
+  the saved value before raw pointer input. Main-process snapshot completion
+  alone does not establish renderer readiness. Preserve the drag-preview and
+  release-persistence assertions without sleeps or longer timeouts.
+- Validation: isolated `npm run smoke`, the smoke-script syntax check, and
+  `git diff --check` passed. A fresh Linux CI run must verify the original
+  runner path; no installed app, permissions, or live user data were changed.
+
+### Native segment-boundary fixture synchronization — 2026-09-25
+
+- The native test agent owns only the four composition tests for activation,
+  active deletion, mid-segment revocation, and cleaner disable at a recording
+  boundary, plus their directly needed private helpers in
+  `Tests/TextifyAppTests/AppCompositionTests.swift`. This handoff precedes
+  diagnostic probes and edits. Production code, other tests, and release
+  artifacts remain outside this slice.
+- CI `36106123009` passed the cleaner and queue corrections but exhausted the
+  mid-segment test's 20 yields before its two active-model nil assertions.
+  Probe the existing resolver suspension seam to distinguish delayed cleanup
+  from a missed automatic callback. Preserve all behavior assertions and do
+  not manually invoke revocation enforcement after the segment finishes.
+- The unmodified test passed 40 isolated and 80 concurrent local repetitions.
+  A deterministic probe then suspended the existing resolver readiness seam:
+  after the original 20 yields the active ID remained set and readiness was
+  suspended; releasing it let automatic cleanup clear the ID. No explicit
+  enforcement call was made after finish. This establishes that a yield count
+  does not synchronize the separate observation task's asynchronous cleanup.
+- The four tests now share startup enforcement before recording and bounded
+  waits for their observable transaction or preference state. Each checks
+  captured artifact ownership; all existing behavior assertions remain. The
+  waiter uses the queue tests' five-second monotonic deadline and 10 ms
+  suspension, and reports a descriptive failure at the calling test on timeout.
+  Other fixture construction and yield loops are unchanged.
+- Validation: removed the diagnostic probe, rebuilt with
+  `swift test --jobs 2 --filter AppCompositionTests`, and passed all 97 tests in
+  8.319 seconds (build 6.46 seconds). `git diff --check` passed. No production
+  file changed, so this correction does not change the packaged app binaries.
+
+### Desktop release download documentation — 2026-09-25
+
+- The parent publishing task owns the repository README download section and
+  the preview.23 release notes. The README promotes the cross-platform
+  installers and preserves the older native Mac documentation in an explicitly
+  labeled expandable section. These links are prepared for publication with
+  the release; the pull request and GitHub release remain drafts for review.
+- Desktop artifact source is `be19bbb1bc5156b2f589a2aee57977d59d698430`.
+  Both three-platform desktop CI runs passed. The Mac app and DMG were accepted
+  by Apple and passed strict signatures, staple validation, Gatekeeper,
+  mounted-app checks, and signed-worker Metal fixture recognition. Later native
+  test and documentation changes do not alter these desktop binaries.
+
+### Release documentation consistency handoff — 2026-09-25
+
+- The release audit agent owns only the introductory status in
+  `electron/MANUAL_QA.md`, synchronization of
+  `docs/release/v0.2.0-preview.23.md` with the parent's scratch canonical release
+  notes, and the AppImage executable-bit instruction in the source
+  `electron/RELEASE_INSTALL.md`. This handoff precedes those edits.
+- Preserve draft status and pending second-Mac verification. Release policy,
+  generated release files, app code, GitHub state, and CI are outside this
+  handoff; the parent retains publication and final-artifact ownership.

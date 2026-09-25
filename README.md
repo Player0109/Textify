@@ -1,9 +1,42 @@
 # Textify
 
-Native, offline dictation for Apple Silicon Macs.
+Offline GPU dictation for macOS, Windows, and Linux. Hold the dictation trigger,
+speak, and release to transcribe locally. Speech models download separately
+and are verified before use.
 
 [![CI](https://github.com/Player0109/Textify/actions/workflows/ci.yml/badge.svg)](https://github.com/Player0109/Textify/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/Player0109/Textify)](LICENSE)
+
+## Download desktop preview 23
+
+[Release notes and checksums](https://github.com/Player0109/Textify/releases/tag/v0.2.0-preview.23)
+
+| Platform | Download | Requirements |
+| --- | --- | --- |
+| macOS | [Apple Silicon DMG](https://github.com/Player0109/Textify/releases/download/v0.2.0-preview.23/Textify-0.2.0-preview.23-mac-arm64.dmg) | macOS 14+, Metal |
+| Windows | [x64 installer](https://github.com/Player0109/Textify/releases/download/v0.2.0-preview.23/Textify-0.2.0-preview.23-win-x64.exe) | Hardware Vulkan GPU and compatible driver |
+| Linux | [AppImage](https://github.com/Player0109/Textify/releases/download/v0.2.0-preview.23/Textify-0.2.0-preview.23-linux-x86_64.AppImage) / [Debian package](https://github.com/Player0109/Textify/releases/download/v0.2.0-preview.23/Textify-0.2.0-preview.23-linux-amd64.deb) | x64, hardware Vulkan GPU and compatible driver |
+
+The Mac installer is Developer ID signed and notarized. Windows and Linux
+installers are unsigned and have not been tested on physical hardware; their
+automated installer and launch checks pass. This is a preview release.
+CPU-only inference is not supported.
+
+[Installation guide](electron/RELEASE_INSTALL.md) ·
+[Desktop app and development](electron/README.md) ·
+[Physical-device checks](electron/MANUAL_QA.md)
+
+The desktop app includes a floating recording bar, verified local model
+downloads, vocabulary and replacement pairs, microphone selection, and local
+numeric Activity totals. It keeps no dictated text or audio history. Linux
+uses Copy and manual paste; Wayland shortcuts depend on the desktop portal.
+Updates are installed manually from GitHub Releases.
+
+<details>
+<summary>Earlier native macOS implementation and unsigned preview</summary>
+
+The following documentation describes the separate Swift macOS app and its
+older unsigned preview, not the desktop downloads above.
 
 ## What it does
 
@@ -112,9 +145,10 @@ accept model binary pull requests or issue attachments.
 ## Privacy
 
 Audio and dictated text stay on the Mac. Textify does not have accounts,
-analytics, crash reporting, transcript history, or an automatic upload path for
-dictated content. Clipboard insertion is brief and restored on a best-effort
-basis.
+an analytics service, crash reporting, transcript history, or an automatic
+upload path for dictated content. The Activity page keeps only daily numeric
+usage totals on this device. Clipboard insertion is brief and restored on a
+best-effort basis.
 
 See [PRIVACY.md](PRIVACY.md) for the full privacy statement.
 
@@ -151,6 +185,8 @@ Verify a staged app bundle:
 
 Release builds require the additional signing, notarization, and evidence gates
 in [docs/RELEASING.md](docs/RELEASING.md).
+
+</details>
 
 ## License
 

@@ -1214,13 +1214,16 @@ final class AppCompositionTests: XCTestCase {
             transcriber: transcriber
         )
 
-        await services.dictation.handleTriggerAction(.beginRecording)
+        await beginRecordingAfterStartup(services)
+        XCTAssertEqual(
+            services.dictation.currentSegment?.transcriptionArtifactID,
+            previous.id
+        )
         let activation = Task { @MainActor in
             await services.activateInstalledModel(candidate.id)
         }
-        for _ in 0..<100
-        where services.dictation.allowsModelTransactions {
-            await Task.yield()
+        await waitUntil("the purpose transaction waits for the segment") {
+            !services.dictation.allowsModelTransactions
         }
 
         XCTAssertFalse(services.dictation.allowsModelTransactions)
@@ -1582,20 +1585,22 @@ final class AppCompositionTests: XCTestCase {
             transcriber: transcriber
         )
 
-        await services.dictation.handleTriggerAction(.beginRecording)
+        await beginRecordingAfterStartup(services)
+        XCTAssertEqual(
+            services.dictation.currentSegment?.transcriptionArtifactID,
+            model.id
+        )
         let removal = Task { @MainActor in
             try await services.removeInstalledModel(
                 model.id,
                 activeResolution: .disablePurpose
             )
         }
-        for _ in 0..<100
-        where services.modelRemovalStatus
-            != AppModelRemovalStatus(
+        await waitUntil("model removal waits for the segment") {
+            services.modelRemovalStatus == AppModelRemovalStatus(
                 artifactID: model.id,
                 phase: .finishingCurrentDictation
-            ) {
-            await Task.yield()
+            )
         }
 
         XCTAssertEqual(
@@ -2001,7 +2006,7 @@ final class AppCompositionTests: XCTestCase {
             transcriber: ActivationTranscriberSpy()
         )
 
-        await services.dictation.handleTriggerAction(.beginRecording)
+        await beginRecordingAfterStartup(services)
         XCTAssertEqual(
             services.dictation.currentSegment?
                 .transcriptionArtifactID,
@@ -2030,8 +2035,8 @@ final class AppCompositionTests: XCTestCase {
         XCTAssertEqual(services.preferences.activeModelID, model.id)
 
         await services.dictation.handleTriggerAction(.finishRecording)
-        for _ in 0..<20 where services.preferences.activeModelID != nil {
-            await Task.yield()
+        await waitUntil("deferred revocation clears the active model") {
+            services.preferences.activeModelID == nil
         }
 
         XCTAssertEqual(
@@ -2360,13 +2365,16 @@ final class AppCompositionTests: XCTestCase {
             voiceCleaner: ActivationVoiceCleanerSpy()
         )
 
-        await services.dictation.handleTriggerAction(.beginRecording)
+        await beginRecordingAfterStartup(services)
+        XCTAssertEqual(
+            services.dictation.currentSegment?.voiceCleaningArtifactID,
+            cleaner.id
+        )
         let disablement = Task { @MainActor in
             await services.disableVoiceCleaning()
         }
-        for _ in 0..<100
-        where services.dictation.allowsModelTransactions {
-            await Task.yield()
+        await waitUntil("the purpose transaction waits for the segment") {
+            !services.dictation.allowsModelTransactions
         }
 
         XCTAssertFalse(services.dictation.allowsModelTransactions)
@@ -4036,6 +4044,28 @@ final class AppCompositionTests: XCTestCase {
         services.startRuntime()
         XCTAssertEqual(services.runtimeIssue, .persistentStorageUnavailable)
         XCTAssertFalse(services.hotkeyMonitor.isRunning)
+    }
+
+    @MainActor
+    private func beginRecordingAfterStartup(_ services: AppServices) async {
+        await services.enforceModelRevocations()
+        await services.dictation.handleTriggerAction(.beginRecording)
+    }
+
+    @MainActor
+    private func waitUntil(
+        _ condition: String,
+        file: StaticString = #filePath,
+        line: UInt = #line,
+        _ predicate: @escaping @MainActor () -> Bool
+    ) async {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while !predicate() {
+            if ContinuousClock.now >= deadline {
+                return XCTFail("Timed out waiting for \(condition).", file: file, line: line)
+            }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
     }
 
     @MainActor

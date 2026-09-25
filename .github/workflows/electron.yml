@@ -1,0 +1,143 @@
+name: Textify desktop
+
+on:
+  push:
+    paths: ['electron/**', 'models/**', '.github/workflows/electron.yml']
+  pull_request:
+    paths: ['electron/**', 'models/**', '.github/workflows/electron.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: electron-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-26, windows-2025, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      # Hosted macOS exposes a paravirtual device without required SIMD support.
+      # Physical GPU recognition is a separate device check on every platform.
+      TEXTIFY_EXPECT_NO_GPU: '1'
+    defaults:
+      run:
+        working-directory: electron
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: electron/package-lock.json
+      - name: Linux desktop libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev libxt-dev libxtst-dev libxinerama-dev libxrandr-dev libasound2t64 libgbm1 xvfb libvulkan-dev glslc mesa-vulkan-drivers
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Verified Windows Vulkan SDK
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $sdkVersion = '1.4.357.0'
+          $sdkInstaller = Join-Path $env:RUNNER_TEMP 'vulkan-sdk.exe'
+          Invoke-WebRequest "https://sdk.lunarg.com/sdk/download/$sdkVersion/windows/vulkansdk-windows-X64-$sdkVersion.exe" -OutFile $sdkInstaller
+          if ((Get-FileHash $sdkInstaller -Algorithm SHA256).Hash.ToLower() -ne '81f474711e9042f4cd22b31b2f7a8870db2e428b21586fb43dd80150be97310d') { throw 'Vulkan SDK checksum mismatch' }
+          $sdkRoot = Join-Path $env:RUNNER_TEMP 'VulkanSDK'
+          $install = Start-Process $sdkInstaller -ArgumentList @('--root', $sdkRoot, '--accept-licenses', '--default-answer', '--confirm-command', 'install', 'copy_only=1') -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw 'Vulkan SDK installation failed' }
+          "VULKAN_SDK=$sdkRoot" | Out-File $env:GITHUB_ENV -Append
+          (Join-Path $sdkRoot 'Bin') | Out-File $env:GITHUB_PATH -Append
+      - run: npm ci
+      - run: npm run native:prepare
+      - run: npm run native:build
+      - run: npm run check
+      - name: Prepare verified transcription fixture
+        run: node scripts/prepare-smoke.mjs
+      - name: Refuse CPU fallback on GPU-less runners
+        run: node scripts/no-gpu-smoke.mjs
+      - name: Electron smoke
+        if: runner.os != 'Linux'
+        run: npm run smoke
+      - name: Electron smoke under Xvfb
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum npm run smoke
+      - name: Windows native insertion and clipboard checks
+        if: runner.os == 'Windows'
+        run: node scripts/insertion-smoke.mjs
+      - run: npm run package:preview
+      - name: Verify signed microphone capability
+        if: runner.os == 'macOS'
+        run: node scripts/mac-signature-smoke.mjs 'release/mac-arm64/Textify.app'
+      - name: Packaged macOS smoke
+        if: runner.os == 'macOS'
+        run: node scripts/packaged-smoke.mjs 'release/mac-arm64/Textify.app/Contents/MacOS/Textify'
+      - name: Packaged Windows smoke
+        if: runner.os == 'Windows'
+        run: node scripts/packaged-smoke.mjs 'release/win-unpacked/Textify.exe'
+      - name: Packaged Linux smoke
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum node scripts/packaged-smoke.mjs 'release/linux-unpacked/textify-electron'
+      - name: Build preview installers
+        run: npm run dist:preview -- --publish never
+      - name: Test Windows installation
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = (Get-ChildItem release -Filter '*win-x64.exe' | Select-Object -First 1).FullName
+          $installDirectory = Join-Path $env:RUNNER_TEMP 'TextifyInstall'
+          $install = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$installDirectory") -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw 'Windows installation failed' }
+          node scripts/packaged-smoke.mjs (Join-Path $installDirectory 'Textify.exe')
+          if ($LASTEXITCODE -ne 0) { throw 'Installed Windows app failed' }
+          $uninstaller = (Get-ChildItem $installDirectory -Filter 'Uninstall*.exe' | Select-Object -First 1).FullName
+          Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait
+      - name: Test Debian installation and AppImage extraction
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get install -y "$PWD"/release/*.deb
+          xvfb-run --auto-servernum node scripts/packaged-smoke.mjs "$(command -v textify-electron)"
+          mkdir -p .native/appimage-check
+          image=$(realpath release/*.AppImage)
+          chmod +x "$image"
+          (cd .native/appimage-check && "$image" --appimage-extract > /dev/null)
+          xvfb-run --auto-servernum node scripts/packaged-smoke.mjs .native/appimage-check/squashfs-root/textify-electron
+          sudo apt-get remove -y textify-electron
+      - name: Test macOS disk image
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          mkdir -p .native/mounted-dmg
+          hdiutil attach release/*.dmg -readonly -nobrowse -mountpoint .native/mounted-dmg
+          trap 'hdiutil detach .native/mounted-dmg' EXIT
+          node scripts/packaged-smoke.mjs '.native/mounted-dmg/Textify.app/Contents/MacOS/Textify'
+      - name: Add checksums and installation notes
+        run: node scripts/checksums.mjs
+      - name: Upload unsigned preview installers
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: textify-desktop-${{ matrix.os }}
+          path: |
+            electron/release/*.dmg
+            electron/release/*.exe
+            electron/release/*.AppImage
+            electron/release/*.deb
+            electron/release/*.blockmap
+            electron/release/SHA256SUMS.txt
+            electron/release/PREVIEW_INSTALL.md
+          retention-days: 7
+      - name: Upload test screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: electron-checks-${{ matrix.os }}
+          path: electron/artifacts/
+          retention-days: 7

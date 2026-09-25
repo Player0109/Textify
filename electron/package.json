@@ -1,0 +1,113 @@
+{
+  "name": "textify-electron",
+  "productName": "Textify",
+  "version": "0.2.0-preview.23",
+  "private": true,
+  "description": "Offline desktop dictation for macOS, Windows and Linux",
+  "homepage": "https://github.com/Player0109/Textify",
+  "author": "Textify contributors",
+  "license": "Apache-2.0",
+  "main": "dist/main.cjs",
+  "desktopName": "io.github.Player0109.Textify.Electron.desktop",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "npm run build && electron .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "native:prepare": "node scripts/prepare-native.mjs",
+    "native:build": "node scripts/build-native.mjs",
+    "check": "npm run typecheck && npm test && npm run build",
+    "package": "npm run build && node scripts/package.mjs --dir",
+    "package:preview": "npm run build && node scripts/package.mjs --dir --preview",
+    "dist": "npm run build && node scripts/package.mjs",
+    "dist:preview": "npm run build && node scripts/package.mjs --preview",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@deltachat/dbus-next": "1.0.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "uiohook-napi": "1.5.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "electron": "44.4.3",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.28.2",
+    "playwright": "1.63.0",
+    "typescript": "5.9.3",
+    "vite": "8.3.0",
+    "vitest": "5.0.1"
+  },
+  "build": {
+    "beforePack": "./scripts/before-pack.cjs",
+    "appId": "io.github.Player0109.Textify.Electron",
+    "asar": true,
+    "asarUnpack": [
+      "**/*.node"
+    ],
+    "npmRebuild": false,
+    "directories": {
+      "output": "release"
+    },
+    "icon": "resources/icon.png",
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "textify"
+      }
+    ],
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "minimumSystemVersion": "14.0",
+      "category": "public.app-category.productivity",
+      "entitlements": "native/entitlements.mac.plist",
+      "entitlementsInherit": "native/entitlements.mac.plist",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Textify records your voice while you dictate and transcribes it on this device."
+      }
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility",
+      "executableName": "textify-electron",
+      "desktop": {
+        "entry": {
+          "StartupWMClass": "textify-electron"
+        }
+      },
+      "maintainer": "Textify contributors <Player0109@users.noreply.github.com>"
+    },
+    "artifactName": "Textify-${version}-${os}-${arch}.${ext}",
+    "deb": {
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libuuid1",
+        "libsecret-1-0",
+        "libvulkan1"
+      ]
+    }
+  }
+}
