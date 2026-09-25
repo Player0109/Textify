@@ -2692,3 +2692,21 @@ Task 1 must merge before parallel Wave 1 work begins.
 - Preserve draft status and pending second-Mac verification. Release policy,
   generated release files, app code, GitHub state, and CI are outside this
   handoff; the parent retains publication and final-artifact ownership.
+
+### Public README and app demonstration — 2026-09-25
+
+- The parent documentation task owns `README.md` and this coordination record:
+  add the existing app logo, a clearer desktop introduction, visible downloads,
+  and an app demonstration while preserving platform and privacy limitations.
+- The demo agent owns only new media under `docs/media/` and ignored scratch
+  files under `electron/.native/readme-demo/`. Record the real Electron UI with
+  prerecorded public or synthetic speech, isolated app storage, and actual local
+  GPU transcription. Keep the installed app, user data, permissions, production
+  code, and system clipboard untouched. Identify the sample-audio setup in the
+  README; do not present synthetic UI state as actual recognition.
+- Verification: GitHub-rendered Markdown checked in light and dark themes and
+  at 390px width; all images, local links, and navigation anchors resolve. The
+  24-second MP4 and looping GIF use actual Whisper small.en recognition on
+  Metal, with the exact Copy result displayed outside the app frame. This is
+  a sample-audio demonstration, not physical microphone or insertion QA.
+  Application code, installers, and existing app assets are unchanged.
