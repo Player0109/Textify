@@ -225,7 +225,7 @@ public JFK sample. No recognized text is logged or saved.
 `0.2.0-preview.2` supersedes the CPU-based Windows/Linux preview. Metal is
 required on macOS; Windows and Linux build with `GGML_VULKAN=ON`. For Windows
 builds install the Vulkan SDK (headers, libraries and glslc); Ubuntu builds need
-`libvulkan-dev glslc`. End users need their hardware vendor's GPU driver, not
+`libvulkan-dev glslc spirv-headers`. End users need their hardware vendor's GPU driver, not
 the SDK. Linux also requires the system Vulkan loader (`libvulkan1`).
 Workers start with `DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1=1`. On a Windows PC
 with an NVIDIA GPU, an older AMD driver's switchable-graphics layer returned an
