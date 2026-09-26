@@ -44,6 +44,21 @@ it("accepts a confirmed GPU and clears it when stopped", async () => {
   worker.stop();
   expect(worker.gpu).toBeNull();
 });
+it("starts the native worker with AMD's switchable-graphics Vulkan layer disabled", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "textify-worker-env-"));
+  const script = join(dir, "worker.cjs");
+  await writeFile(
+    script,
+    `process.stdin.resume(); console.log(JSON.stringify({ready: true, gpu: {backend: "Vulkan", device: "layer disabled: " + process.env.DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1}}));`,
+  );
+  const worker = new WhisperWorker(process.execPath, () => {});
+  cleanup.push(async () => {
+    worker.stop();
+    await rm(dir, { recursive: true });
+  });
+  await worker.load(script);
+  expect(worker.gpu?.device).toBe("layer disabled: 1");
+});
 
 it.each(["transcribe_cpp", "audio_cpp"] as const)(
   "accepts %s text without inventing Whisper confidence scores",

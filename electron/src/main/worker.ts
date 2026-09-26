@@ -50,6 +50,9 @@ export class WhisperWorker {
       stdio: "pipe",
       windowsHide: true,
       shell: false,
+      // Old AMD drivers' switchable-graphics Vulkan layer returns VK_INCOMPLETE
+      // on every GPU enumeration, and ggml retries forever.
+      env: { ...process.env, DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1: "1" },
     }));
     const lines = createInterface({ input: child.stdout });
     lines.on("line", (line) => {

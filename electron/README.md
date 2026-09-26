@@ -224,6 +224,10 @@ required on macOS; Windows and Linux build with `GGML_VULKAN=ON`. For Windows
 builds install the Vulkan SDK (headers, libraries and glslc); Ubuntu builds need
 `libvulkan-dev glslc`. End users need their hardware vendor's GPU driver, not
 the SDK. Linux also requires the system Vulkan loader (`libvulkan1`).
+Workers start with `DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1=1`. On a Windows PC
+with an NVIDIA GPU, an older AMD driver's switchable-graphics layer returned an
+incomplete device list on every call, and ggml retried until model loading
+timed out.
 
 `native/require-gpu.mjs` applies exact edits to the checksum-pinned whisper
 source: GPU backend initialization must succeed, model weights must use GPU
