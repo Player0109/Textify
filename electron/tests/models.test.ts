@@ -57,12 +57,7 @@ describe("runtime admission", () => {
     const extra = await readFile("models/manifest.json");
     const sig = await readFile("models/manifest.json.sig");
     const supplement = verifyCatalog(extra, sig);
-    const models = catalogModels(
-      verifyCatalog(bytes, signature),
-      "darwin",
-      "arm64",
-      supplement,
-    );
+    const models = catalogModels(verifyCatalog(bytes, signature), supplement);
     expect(models).toHaveLength(16);
     const bf16 = models.find((m) => m.id === "confucius4-r2t2-bf16")!;
     expect(bf16).toMatchObject({
@@ -80,21 +75,12 @@ describe("runtime admission", () => {
     ).toThrow();
     supplement.models[0].files[0].filename = "../config.json";
     expect(() =>
-      catalogModels(
-        verifyCatalog(bytes, signature),
-        "darwin",
-        "arm64",
-        supplement,
-      ),
+      catalogModels(verifyCatalog(bytes, signature), supplement),
     ).toThrow("catalog_artifact");
   });
-  it("admits the four new GGUF checkpoint families on Apple Silicon", async () => {
+  it("admits the four new GGUF checkpoint families", async () => {
     const { catalogModels } = await import("../src/main/models");
-    const models = catalogModels(
-      verifyCatalog(bytes, signature),
-      "darwin",
-      "arm64",
-    );
+    const models = catalogModels(verifyCatalog(bytes, signature));
     expect(models).toHaveLength(15);
     expect(new Set(models.map((m) => m.checkpointID)).size).toBe(8);
     const qwen = models.find((m) => m.id === "qwen3-asr-1.7b-bf16")!;
@@ -111,21 +97,6 @@ describe("runtime admission", () => {
     expect(confucius.license).toContain("NetEase");
     expect(models.some((m) => /mlx|coreml/.test(m.id))).toBe(false);
   });
-  it.each([
-    ["win32", "x64"],
-    ["linux", "x64"],
-    ["darwin", "x64"],
-  ] as const)(
-    "keeps unavailable engines out of %s/%s",
-    async (platform, arch) => {
-      const { catalogModels } = await import("../src/main/models");
-      expect(
-        catalogModels(verifyCatalog(bytes, signature), platform, arch).map(
-          (m) => m.engine,
-        ),
-      ).toEqual(Array(4).fill("whisper_cpp"));
-    },
-  );
   it("rejects engine mismatches and unsafe GGUF paths", async () => {
     const { catalogModels } = await import("../src/main/models");
     const catalog = verifyCatalog(bytes, signature);
@@ -133,13 +104,9 @@ describe("runtime admission", () => {
       (m: any) => m.id === "qwen3-asr-0.6b-q8-0",
     );
     model.runtime.engine = "audio_cpp";
-    expect(() => catalogModels(catalog, "darwin", "arm64")).toThrow(
-      "catalog_model",
-    );
+    expect(() => catalogModels(catalog)).toThrow("catalog_model");
     model.runtime.engine = "transcribe_cpp";
     model.files[0].filename = "../outside.gguf";
-    expect(() => catalogModels(catalog, "darwin", "arm64")).toThrow(
-      "catalog_artifact",
-    );
+    expect(() => catalogModels(catalog)).toThrow("catalog_artifact");
   });
 });

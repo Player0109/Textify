@@ -21,13 +21,11 @@ module.exports = async (context) => {
     throw new Error(
       "Build native helpers on the target OS/architecture before packaging. Cross-packaging host binaries is prohibited.",
     );
-  if (native.platform === "darwin") {
-    if (native.extraMetalWorkers !== true)
-      throw new Error("Rebuild the additional Metal workers before packaging.");
-    await access(join(resources, "textify-transcribe"));
-    await access(join(resources, "textify-audio"));
-  }
+  if (native.extraWorkers !== true)
+    throw new Error("Rebuild the additional GPU workers before packaging.");
   const suffix = native.platform === "win32" ? ".exe" : "";
+  await access(join(resources, `textify-transcribe${suffix}`));
+  await access(join(resources, `textify-audio${suffix}`));
   await access(join(resources, `textify-whisper${suffix}`));
   await access(join(resources, `textify-platform${suffix}`));
 };

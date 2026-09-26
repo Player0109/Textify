@@ -1,6 +1,6 @@
 # Textify desktop specification
 
-Current scope: September 25, 2026.
+Current scope: September 27, 2026.
 
 Textify is an Electron desktop dictation utility for macOS, Windows, and Linux.
 The previous Swift macOS application has been retired. The remaining Swift
@@ -12,7 +12,7 @@ an application.
 Hold the microphone button or an available global trigger, speak, and release.
 Textify records in memory, transcribes with a local GPU worker, applies the
 selected text rules, and delivers one final result. Recording has a five-minute
-limit. Confucius4-R2T2 additionally supports an in-memory live preview on macOS.
+limit. Confucius4-R2T2 additionally supports an in-memory live preview.
 This is a dictation utility, not a transcript-history or file-transcription
 workspace.
 
@@ -54,9 +54,9 @@ alone is not a promise of desktop support. The supported subset is defined by
 `electron/src/main/models.ts` and documented in the
 [desktop model guide](../electron/README.md).
 
-Whisper small.en, large-v2, large-v3, and large-v3-turbo are available on all
-three platforms. Apple Silicon also supports selected Parakeet TDT, Qwen3-ASR,
-and Confucius4-R2T2 artifacts. Languages and import formats follow each signed
+Whisper small.en, large-v2, large-v3, and large-v3-turbo, and selected Parakeet
+TDT, Qwen3-ASR, and Confucius4-R2T2 artifacts, are available on all three
+platforms. Languages and import formats follow each signed
 artifact's capabilities. Imports copy and verify exact supported artifacts;
 arbitrary custom model files and runtime plugins are not supported.
 

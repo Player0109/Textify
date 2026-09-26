@@ -43,7 +43,8 @@ The pinned whisper source is modified by `native/require-gpu.mjs` to refuse
 CPU graph execution, require GPU weights/backends and reject software Vulkan
 devices.
 
-Apple Silicon builds also contain isolated, statically linked Metal workers:
+All builds also contain isolated, statically linked GPU workers, using Metal on
+macOS and Vulkan on Windows and Linux:
 
 - transcribe.cpp 0.1.3, MIT, commit `5a5a49664a8ea1f0e5b3be1dfc544730d1b62561`:
   https://github.com/handy-computer/transcribe.cpp
@@ -51,9 +52,10 @@ Apple Silicon builds also contain isolated, statically linked Metal workers:
   https://github.com/0xShug0/audio.cpp
 
 The checksum-pinned source archives include their exact ggml and tokenizer
-sources. `native/prepare-extra.mjs` adds CPU graph refusal and moves Parakeet
-TDT's predictor/joint graphs to the GPU. The audio.cpp C ABI is linked statically
-into its worker so its ggml symbols do not collide with other runtimes.
+sources. `native/prepare-extra.mjs` adds CPU graph refusal, rejects software
+Vulkan devices and moves Parakeet TDT's predictor/joint graphs to the GPU. The
+audio.cpp C ABI is linked statically into its worker so its ggml symbols do not
+collide with other runtimes.
 Bundled `transcribe.cpp.txt` and `audio.cpp.txt` include dependency notices.
 Qwen3-ASR, Parakeet TDT and Confucius4-R2T2 weights are downloaded or imported
 separately and remain subject to the licenses shown in the signed catalog.

@@ -6,8 +6,9 @@ int main(int argc, char **argv) {
     const std::string language = argv[2];
     if (language != "en" && language != "zh") return 2;
     ggml_log_set(textify::quiet, nullptr);
-    auto device = textify::metal();
-    if (!device) return textify::failure("gpu_unavailable");
+    textify::gpu_device gpu;
+    try { gpu = textify::gpu(); } catch (...) { return textify::failure("gpu_init"); }
+    if (!gpu.handle) return textify::failure("gpu_unavailable");
     audiocpp_registry *registry = nullptr;
     audiocpp_model *model = nullptr;
     audiocpp_session *session = nullptr;
@@ -21,7 +22,8 @@ int main(int argc, char **argv) {
     audiocpp_model_config config = {};
     config.family_hint = "confucius4_r2t2";
     audiocpp_backend_config backend = {};
-    backend.backend = "metal";
+    backend.backend = textify::metal ? "metal" : "vulkan";
+    backend.device = gpu.index;
     backend.threads = 4;
     if (audiocpp_registry_create(nullptr, &registry) != AUDIOCPP_OK ||
         audiocpp_model_load(registry, argv[1], &config, nullptr, &model) != AUDIOCPP_OK ||
@@ -37,7 +39,7 @@ int main(int argc, char **argv) {
         audiocpp_session_create(model, "asr", "streaming", &backend, options, &stream) == AUDIOCPP_OK;
     if (options) audiocpp_options_free(options);
     if (!configured) { cleanup(); return textify::failure("gpu_model_load"); }
-    textify::ready(device, true);
+    textify::ready(gpu.handle, true);
     // Commands occupy values outside the valid PCM frame-count range. Streaming
     // audio has the high bit set; ordinary counts retain the offline protocol.
     constexpr uint32_t start = 0xffffffff, reset = 0xfffffffe, finish = 0xfffffffd, push = 0x80000000;

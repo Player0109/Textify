@@ -2793,3 +2793,41 @@ Task 1 must merge before parallel Wave 1 work begins.
   silent GIF preview with GitHub's video player. The approved promotion's
   original video and audio remain unchanged. The verification agent performs
   read-only checks of GitHub's supported attachment and playback behavior.
+
+### Windows/Linux Vulkan fixes and additional models — 2026-09-27
+
+- The owner reported that preview.23 on a Windows PC with an NVIDIA RTX 2060
+  never finished loading a model, and asked for every model family on Windows
+  and Linux. This task owns the worker environment in
+  `electron/src/main/worker.ts`; the additional workers
+  (`electron/native/transcribe-worker.cpp` and `audio-worker.cpp`, renamed from
+  `.mm`, `model-protocol.h`, `utf8.manifest` and `prepare-extra.mjs`); the
+  Vulkan device edit exported from `require-gpu.mjs`; `scripts/build-extra.mjs`,
+  `build-native.mjs`, `before-pack.cjs`, the additional-worker section of
+  `no-gpu-smoke.mjs`, `runtime-smoke.mjs` and the model browser checks in
+  `smoke.mjs`; platform filtering in `src/main/models.ts`; their tests; and the
+  matching README, SPEC, THIRD_PARTY_NOTICES and MANUAL_QA text. Signed
+  catalogs, model bytes, renderer files and the whisper.cpp pin are unchanged.
+- Cause of the load failure: an older AMD driver's switchable-graphics Vulkan
+  layer returned VK_INCOMPLETE on every device enumeration, and ggml retried
+  until the load timed out. Workers now start with
+  `DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1=1`. With the variable set by hand,
+  the owner's dictation ran on the NVIDIA GPU.
+- transcribe.cpp and audio.cpp now also build with Vulkan on Windows and Linux.
+  They keep CPU graph refusal, reject software Vulkan devices and accept
+  integrated GPUs. Windows workers delay-load `vulkan-1.dll` and use a UTF-8
+  process code page. Neither worker links OpenMP or a system BLAS.
+- Handoff: the uncommitted "Quiet speech trimming and speech check" task also
+  edits `transcribe-worker.mm`, `require-gpu.mjs`, `no-gpu-smoke.mjs`,
+  `before-pack.cjs`, `build-native.mjs`, README, SPEC and THIRD_PARTY_NOTICES,
+  in different parts of those files. Whichever branch merges second resolves
+  the overlap: the speech task's `TRANSCRIBE_ERR_OUTPUT_TRUNCATED` handling
+  goes into the renamed `transcribe-worker.cpp`, and its whisper-only
+  `require-gpu.mjs` edits follow the shared `vulkanDevicePolicy` edit.
+- Validation: 116 tests, TypeScript and production build pass. Rebuilt Metal
+  workers and MoltenVK Vulkan builds of both additional workers produce the
+  same public-fixture text for Parakeet Q8_0/Q5_K_M, Qwen 0.6B Q8_0/Q5_K_M
+  (English/Hindi), Qwen 1.7B BF16 and Confucius Q8_0/F16/original BF16
+  (English/Chinese), including Confucius live preview. The Windows CI build,
+  the Windows NVIDIA check of the new families and all Linux hardware checks
+  are pending; Linux is covered by CI only.

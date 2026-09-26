@@ -189,44 +189,42 @@ try {
   await modelLink.click();
   assert.deepEqual(await app.evaluate(() => globalThis.modelSourceURLs), [source]);
   await page.screenshot({ path: "artifacts/models.png" });
-  if (process.platform === "darwin" && process.arch === "arm64") {
-    await page.getByLabel("Search models", { exact: true }).fill("Qwen3");
-    assert.equal(await page.locator(".checkpoint-row").count(), 2);
-    await page.getByRole("button", { name: /Qwen3-ASR 1.7B/ }).click();
-    await page
-      .getByRole("heading", { name: "Qwen3-ASR 1.7B", exact: true })
-      .waitFor();
-    assert.equal(await page.locator(".variant").count(), 3);
-    await page.screenshot({ path: "artifacts/qwen-models.png" });
-    await page.getByLabel("Search models", { exact: true }).fill("Confucius");
-    await page
-      .getByRole("heading", { name: "Confucius4-R2T2 1.7B", exact: true })
-      .waitFor();
-    assert.equal(await page.locator(".variant").count(), 3);
-    await page.screenshot({ path: "artifacts/confucius-models.png" });
-    await page.getByRole("button", { name: "Options for BF16 · Original" }).click();
-    await page.getByRole("button", { name: "Import folder", exact: true }).waitFor();
-    await page.getByRole("button", { name: "Options for BF16 · Original" }).click();
-    const originalSize = await app.evaluate(({ BrowserWindow }) => {
-      const main = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().endsWith("/index.html"));
-      const size = main.getSize();
-      main.setSize(780, 780);
-      return size;
-    });
-    await page.getByRole("link", { name: /model page$/ }).scrollIntoViewIfNeeded();
-    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "Model browser fits the minimum window width");
-    await page.screenshot({ path: "artifacts/models-compact.png" });
-    await app.evaluate(({ BrowserWindow }, size) => {
-      BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().endsWith("/index.html")).setSize(...size);
-    }, originalSize);
-    await page
-      .getByLabel("Search models", { exact: true })
-      .fill("no-such-model");
-    assert.equal(await page.locator(".checkpoint-row").count(), 0);
-    await page.getByLabel("Search models", { exact: true }).fill("");
-    await page.getByRole("button", { name: /Confucius4-R2T2 1.7B/ }).click();
-    await page.screenshot({ path: "artifacts/models-simplified.png" });
-  }
+  await page.getByLabel("Search models", { exact: true }).fill("Qwen3");
+  assert.equal(await page.locator(".checkpoint-row").count(), 2);
+  await page.getByRole("button", { name: /Qwen3-ASR 1.7B/ }).click();
+  await page
+    .getByRole("heading", { name: "Qwen3-ASR 1.7B", exact: true })
+    .waitFor();
+  assert.equal(await page.locator(".variant").count(), 3);
+  await page.screenshot({ path: "artifacts/qwen-models.png" });
+  await page.getByLabel("Search models", { exact: true }).fill("Confucius");
+  await page
+    .getByRole("heading", { name: "Confucius4-R2T2 1.7B", exact: true })
+    .waitFor();
+  assert.equal(await page.locator(".variant").count(), 3);
+  await page.screenshot({ path: "artifacts/confucius-models.png" });
+  await page.getByRole("button", { name: "Options for BF16 · Original" }).click();
+  await page.getByRole("button", { name: "Import folder", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Options for BF16 · Original" }).click();
+  const originalSize = await app.evaluate(({ BrowserWindow }) => {
+    const main = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().endsWith("/index.html"));
+    const size = main.getSize();
+    main.setSize(780, 780);
+    return size;
+  });
+  await page.getByRole("link", { name: /model page$/ }).scrollIntoViewIfNeeded();
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "Model browser fits the minimum window width");
+  await page.screenshot({ path: "artifacts/models-compact.png" });
+  await app.evaluate(({ BrowserWindow }, size) => {
+    BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().endsWith("/index.html")).setSize(...size);
+  }, originalSize);
+  await page
+    .getByLabel("Search models", { exact: true })
+    .fill("no-such-model");
+  assert.equal(await page.locator(".checkpoint-row").count(), 0);
+  await page.getByLabel("Search models", { exact: true }).fill("");
+  await page.getByRole("button", { name: /Confucius4-R2T2 1.7B/ }).click();
+  await page.screenshot({ path: "artifacts/models-simplified.png" });
   assert.equal(await page.evaluate(async () => {
     try { await window.textify.model({ action: "source", id: "https://example.com" }); return false; }
     catch { return true; }

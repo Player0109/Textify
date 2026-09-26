@@ -31,7 +31,7 @@ The first three expose English; turbo exposes English and Hindi according to
 the bundled signed catalog. Import copies into this app's own storage and
 checks size and SHA-256.
 
-Apple Silicon also supports these GPU-only versions:
+All platforms also support these GPU-only versions:
 
 | Checkpoint | Versions | Runtime |
 | --- | --- | --- |
@@ -46,8 +46,9 @@ The bar shows Textify's icon, waveform, colored border and three-line
 transcript, with compact Copy and dismissal controls for recovery.
 Qwen and Parakeet offer automatic language detection. MLX/CoreML variants
 are not included. Custom vocabulary prompts apply
-to Whisper; replacement pairs apply to every engine. New family support on
-Windows/Linux is deferred. Published catalog benchmark ratings are not claimed
+to Whisper; replacement pairs apply to every engine. Windows and Linux run these
+versions on Vulkan; their physical-GPU checks are listed in
+[MANUAL_QA.md](MANUAL_QA.md). Published catalog benchmark ratings are not claimed
 as measurements of these desktop workers.
 
 **BF16 · Original** downloads the publisher's 11 original files (4.09 GB) from
@@ -62,11 +63,13 @@ The shared root catalog is unchanged. Model weights remain BF16; there is no
 Python service, runtime conversion to GGUF, cloud ASR or CPU inference fallback.
 
 The extra source archives are checksum-pinned. They build offline as separate
-executables with embedded Metal shaders and no non-system dylibs. audio.cpp's
-deployment build also embeds model specifications required by original HF folders.
-Parakeet's
-predictor/joint graphs are moved to Metal, and each ggml copy rejects CPU graph
-execution. GPU-less Mac CI also checks both additional workers refuse startup.
+executables with embedded Metal or Vulkan shaders. Mac workers use no non-system
+dylibs; Windows and Linux workers use the system Vulkan loader, as the Whisper
+worker does. audio.cpp's deployment build also embeds model specifications
+required by original HF folders. Parakeet's predictor/joint graphs are moved to
+the GPU, each ggml copy rejects CPU graph execution, and software Vulkan devices
+are rejected. CI on all three OSes checks that both additional workers refuse
+startup without a supported GPU.
 
 Streaming uses 320 ms chunks and bounded 25-second decoder windows, independent
 of the complete five-minute capture retained for final recognition. Cancel and
@@ -209,7 +212,7 @@ GNOME/KDE Wayland checks remain in [MANUAL_QA.md](MANUAL_QA.md). The owner can t
 Windows; a Linux desktop tester is still needed. Xvfb is not a Wayland desktop.
 
 The preview does not include speech enhancement or diagnostics export.
-Confucius4-R2T2 provides live transcription previews on macOS. Outstanding
+Confucius4-R2T2 provides live transcription previews. Outstanding
 physical-device checks are recorded in the desktop QA guide.
 
 For additional local model checks, `scripts/runtime-smoke.mjs` verifies the signed

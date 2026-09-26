@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile, mkdir, rm } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
+import { vulkanDevicePolicy } from "./require-gpu.mjs";
 
 export const extraRuntimes = [
   {
@@ -20,7 +21,6 @@ export const extraRuntimes = [
   },
 ];
 export async function prepareExtra() {
-  if (process.platform !== "darwin") return;
   for (const runtime of extraRuntimes) {
     const root = `.native/${runtime.name}`;
     let archive;
@@ -55,12 +55,15 @@ export async function prepareExtra() {
         throw new Error(`Pinned GPU patch mismatch: ${file}`);
       await writeFile(file, source.replaceAll(before, after));
     }
+    // Unlike whisper's ggml, these copies give integrated GPUs their own type.
+    const notGPU = `const auto type = ggml_backend_dev_type(ggml_backend_get_device(backend));
+        type != GGML_BACKEND_DEVICE_TYPE_GPU && type != GGML_BACKEND_DEVICE_TYPE_IGPU`;
     // This guard also covers direct graph calls, used by Parakeet's decoder.
     await edit(
       `${runtime.ggml}/src/ggml-backend.cpp`,
       "    return backend->iface.graph_compute(backend, cgraph);",
       `    // Textify: never compute model operations on a CPU or host accelerator.
-    if (ggml_backend_dev_type(ggml_backend_get_device(backend)) != GGML_BACKEND_DEVICE_TYPE_GPU) {
+    if (${notGPU}) {
         for (int n = 0; n < cgraph->n_nodes; ++n) {
             const auto op = cgraph->nodes[n]->op;
             if (op != GGML_OP_NONE && op != GGML_OP_RESHAPE && op != GGML_OP_VIEW &&
@@ -72,8 +75,12 @@ export async function prepareExtra() {
     await edit(
       `${runtime.ggml}/src/ggml-backend.cpp`,
       "    return backend->iface.graph_plan_compute(backend, plan);",
-      `    if (ggml_backend_dev_type(ggml_backend_get_device(backend)) != GGML_BACKEND_DEVICE_TYPE_GPU) return GGML_STATUS_FAILED;
+      `    if (${notGPU}) return GGML_STATUS_FAILED;
     return backend->iface.graph_plan_compute(backend, plan);`,
+    );
+    await edit(
+      `${runtime.ggml}/src/ggml-vulkan/ggml-vulkan.cpp`,
+      ...vulkanDevicePolicy,
     );
     if (runtime.name === "transcribe") {
       // Direct depthwise convolution is not supported by this pinned Metal
@@ -82,7 +89,7 @@ export async function prepareExtra() {
       await edit(
         "src/arch/parakeet/encoder.cpp",
         'return conf::resolve_conv_direct("TRANSCRIBE_CONV_DIRECT_DW", "TRANSCRIBE_CONV_NO_DIRECT_DW",\n                                     /*backend_default=*/true);',
-        "return false; // Textify: keep depthwise convolution on Metal.",
+        "return false; // Textify: keep depthwise convolution on the GPU.",
       );
       await edit(
         "src/arch/parakeet/encoder.cpp",
@@ -90,14 +97,15 @@ export async function prepareExtra() {
         backend != nullptr && (std::strstr(backend, "Metal") != nullptr || std::strstr(backend, "metal") != nullptr);
     return conf::resolve_conv_direct("TRANSCRIBE_CONV_DIRECT_DW", "TRANSCRIBE_CONV_NO_DIRECT_DW",
                                      /*backend_default=*/!is_metal);`,
-        "    (void) backend;\n    return false; // Textify: keep depthwise convolution on Metal.",
+        "    (void) backend;\n    return false; // Textify: keep depthwise convolution on the GPU.",
       );
       // Upstream uses ggml graphs for the entire TDT decoder, but explicitly
-      // allocates three CPU backends. Keep those same graphs on the Metal GPU.
+      // allocates three CPU backends. Keep those same graphs on the GPU the
+      // encoder uses: a discrete GPU first, then an integrated one.
       await edit(
         "src/arch/parakeet/decoder.cpp",
         "ggml_backend_init_by_type(GGML_BACKEND_DEVICE_TYPE_CPU, nullptr)",
-        "ggml_backend_init_by_type(GGML_BACKEND_DEVICE_TYPE_GPU, nullptr)",
+        "ggml_backend_init_best()",
         3,
       );
     } else {
@@ -108,15 +116,14 @@ export async function prepareExtra() {
         "add_library(audiocpp STATIC src/capi/audiocpp.cpp)",
       );
     }
-    await edit(
-      "CMakeLists.txt",
+    const ggml =
       runtime.name === "transcribe"
         ? "\nadd_subdirectory(ggml)\n"
-        : 'add_subdirectory("${AUDIOCPP_GGML_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/ggml")',
-      "\nenable_language(OBJC OBJCXX)\n" +
-        (runtime.name === "transcribe"
-          ? "\nadd_subdirectory(ggml)\n"
-          : 'add_subdirectory("${AUDIOCPP_GGML_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/ggml")'),
+        : 'add_subdirectory("${AUDIOCPP_GGML_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/ggml")';
+    await edit(
+      "CMakeLists.txt",
+      ggml,
+      "\nif(GGML_METAL)\n  enable_language(OBJC OBJCXX)\nendif()\n" + ggml,
     );
     const target = runtime.name === "transcribe" ? "transcribe" : "audiocpp";
     const native = resolve("native").replaceAll("\\", "/");
@@ -126,13 +133,27 @@ export async function prepareExtra() {
       (await readFile(cmake, "utf8")) +
         `
 # Textify isolated GPU worker; source archives are immutable and checksum-pinned.
-enable_language(OBJCXX)
-add_executable(textify-${runtime.name} "${native}/${runtime.name}-worker.mm")
+add_executable(textify-${runtime.name} "${native}/${runtime.name}-worker.cpp")
 target_include_directories(textify-${runtime.name} PRIVATE "\${CMAKE_SOURCE_DIR}/include")
-target_compile_options(textify-${runtime.name} PRIVATE -fobjc-arc)
-target_link_libraries(textify-${runtime.name} PRIVATE ${target} ggml "-framework Metal")
+target_link_libraries(textify-${runtime.name} PRIVATE ${target} ggml)
 add_executable(textify-gpu-policy-test "${native}/extra-gpu-policy-test.cpp")
 target_link_libraries(textify-gpu-policy-test PRIVATE ggml)
+if(GGML_METAL)
+  set_source_files_properties("${native}/${runtime.name}-worker.cpp" PROPERTIES LANGUAGE OBJCXX)
+  target_compile_definitions(textify-${runtime.name} PRIVATE TEXTIFY_METAL)
+  target_compile_options(textify-${runtime.name} PRIVATE -fobjc-arc)
+  target_link_libraries(textify-${runtime.name} PRIVATE "-framework Metal")
+endif()
+if(WIN32)
+  # Check the system driver loader before using Vulkan; a missing DLL must
+  # produce a structured GPU error, not a Windows startup-error dialog.
+  foreach(exe textify-${runtime.name} textify-gpu-policy-test)
+    target_link_libraries(\${exe} PRIVATE delayimp)
+    target_link_options(\${exe} PRIVATE "/DELAYLOAD:vulkan-1.dll")
+  endforeach()
+  # A UTF-8 process code page lets both libraries open non-ASCII model paths.
+  target_sources(textify-${runtime.name} PRIVATE "${native}/utf8.manifest")
+endif()
 enable_testing()
 add_test(NAME gpu-required COMMAND textify-gpu-policy-test)
 `,

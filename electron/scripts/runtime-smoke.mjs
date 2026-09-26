@@ -27,8 +27,6 @@ const models = catalogModels(
     await readFile("resources/manifest.json"),
     await readFile("resources/manifest.json.sig"),
   ),
-  process.platform,
-  process.arch,
   verifyCatalog(
     await readFile("resources/extra-models/manifest.json"),
     await readFile("resources/extra-models/manifest.json.sig"),
