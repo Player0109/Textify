@@ -781,9 +781,12 @@ else {
         ]),
       );
       tray = new Tray(
-        nativeImage
-          .createFromPath(join(resources, "icon.png"))
-          .resize({ width: 20, height: 20 }),
+        // Windows picks the icon file's size for the display scale.
+        process.platform === "win32"
+          ? join(resources, "icon.ico")
+          : nativeImage
+              .createFromPath(join(resources, "icon.png"))
+              .resize({ width: 20, height: 20 }),
       );
       tray.setToolTip("Textify");
       tray.setContextMenu(

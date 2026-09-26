@@ -1,7 +1,8 @@
 import { build } from "esbuild";
 import { build as viteBuild } from "vite";
-import { cp, mkdir, access } from "node:fs/promises";
+import { cp, mkdir, access, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { windowsIcon } from "./windows-icon.mjs";
 
 await mkdir("resources", { recursive: true });
 await cp("models", "resources/extra-models", { recursive: true });
@@ -50,6 +51,9 @@ await cp(
   "assets/textify-icon.png",
   "resources/icon.png",
 );
+// Windows gets a mark without the tile, drawn for its small icon sizes.
+if (process.platform === "win32")
+  await writeFile("resources/icon.ico", windowsIcon());
 await Promise.all([
   build({
     entryPoints: ["src/main/index.ts"],

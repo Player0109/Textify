@@ -153,5 +153,8 @@ This automated evidence does not mark the pending physical-desktop checks passed
   recognizes a public phrase; Confucius shows live text while recording.
 - [ ] Windows: a new-family model loads from a path containing non-ASCII
   characters, as in a user profile with a non-ASCII name.
+- [ ] Windows icon: the taskbar, title bar, Alt+Tab, notification area and
+  installer show the T mark without the tile, sharp at 100%, 125% and 150%
+  display scaling, on light and dark taskbars.
 - [ ] Linux hardware Vulkan: untested. CI covers compilation and refusal
   without a supported GPU only.

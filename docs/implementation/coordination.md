@@ -2838,6 +2838,13 @@ Task 1 must merge before parallel Wave 1 work begins.
   `index.tsx`) edit other parts of those files. Using, verifying or removing a
   model still waits for the load, and only one download or import runs at a
   time.
+- The owner approved a Windows-only icon: the logo's T and waveform bars on a
+  transparent background, laid out on whole pixels for each Win32 size, because
+  the tile shrank to a blue square in the taskbar. This task also owns
+  `electron/scripts/windows-icon.mjs`, its test, the icon step in
+  `scripts/build.mjs`, `win.icon` in `package.json`, the Windows tray icon in
+  `src/main/index.ts` and the Windows section of `electron/assets/README.md`.
+  macOS and Linux keep `textify-icon.png`.
 - Validation: 116 tests, TypeScript and production build pass. Rebuilt Metal
   workers and MoltenVK Vulkan builds of both additional workers produce the
   same public-fixture text for Parakeet Q8_0/Q5_K_M, Qwen 0.6B Q8_0/Q5_K_M
@@ -2845,5 +2852,7 @@ Task 1 must merge before parallel Wave 1 work begins.
   (English/Chinese), including Confucius live preview. An isolated Electron
   check started a Whisper small.en download while Confucius F16 was loading,
   found a second download locked, paused the first and saw the load finish on
-  Metal. The Windows CI build, the Windows NVIDIA check of the new families
-  and all Linux hardware checks are pending; Linux is covered by CI only.
+  Metal. electron-builder 26.15.3 accepts the generated icon file (15 sizes,
+  PNG at 256 px). The Windows CI build, the Windows NVIDIA check of the new
+  families, the Windows icon check and all Linux hardware checks are pending;
+  Linux is covered by CI only.
