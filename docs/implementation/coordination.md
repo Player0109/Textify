@@ -2807,7 +2807,7 @@ Task 1 must merge before parallel Wave 1 work begins.
   `no-gpu-smoke.mjs`, `runtime-smoke.mjs` and the model browser checks in
   `smoke.mjs`; platform filtering in `src/main/models.ts`; their tests; and the
   matching README, SPEC, THIRD_PARTY_NOTICES and MANUAL_QA text. Signed
-  catalogs, model bytes, renderer files and the whisper.cpp pin are unchanged.
+  catalogs, model bytes and the whisper.cpp pin are unchanged.
 - Cause of the load failure: an older AMD driver's switchable-graphics Vulkan
   layer returned VK_INCOMPLETE on every device enumeration, and ggml retried
   until the load timed out. Workers now start with
@@ -2824,10 +2824,23 @@ Task 1 must merge before parallel Wave 1 work begins.
   the overlap: the speech task's `TRANSCRIBE_ERR_OUTPUT_TRUNCATED` handling
   goes into the renamed `transcribe-worker.cpp`, and its whisper-only
   `require-gpu.mjs` edits follow the shared `vulkanDevicePolicy` edit.
+- The owner approved letting other models download or import while the active
+  model loads, so a slow load no longer locks the model pane. This task also
+  owns `savePreferences`, `modelAction` and the snapshot's `modelStorageBusy`
+  field in `electron/src/main/index.ts`, that field in `electron/src/shared.ts`,
+  the button locks in `electron/src/renderer/ModelsPane.tsx` and the
+  `ModelsPane` `busy` prop in `electron/src/renderer/index.tsx`. The speech task
+  (startup in `index.ts`, a preference in `shared.ts`, a settings toggle in
+  `index.tsx`) and the General settings alignment task (a control-stack class in
+  `index.tsx`) edit other parts of those files. Using, verifying or removing a
+  model still waits for the load, and only one download or import runs at a
+  time.
 - Validation: 116 tests, TypeScript and production build pass. Rebuilt Metal
   workers and MoltenVK Vulkan builds of both additional workers produce the
   same public-fixture text for Parakeet Q8_0/Q5_K_M, Qwen 0.6B Q8_0/Q5_K_M
   (English/Hindi), Qwen 1.7B BF16 and Confucius Q8_0/F16/original BF16
-  (English/Chinese), including Confucius live preview. The Windows CI build,
-  the Windows NVIDIA check of the new families and all Linux hardware checks
-  are pending; Linux is covered by CI only.
+  (English/Chinese), including Confucius live preview. An isolated Electron
+  check started a Whisper small.en download while Confucius F16 was loading,
+  found a second download locked, paused the first and saw the load finish on
+  Metal. The Windows CI build, the Windows NVIDIA check of the new families
+  and all Linux hardware checks are pending; Linux is covered by CI only.

@@ -125,6 +125,7 @@ function snapshot(): Snapshot {
     ),
     gpu: worker?.gpu ?? null,
     modelBusy: modelBusy || Boolean(models?.busy),
+    modelStorageBusy: Boolean(models?.busy),
     download: models?.progress ?? null,
     preferences,
     models: models?.views() ?? [],
@@ -415,15 +416,14 @@ async function savePreferences(value: unknown) {
     preferences = next;
     notice = "";
     models.id = next.activeModelID;
-    if (changedModel) {
-      worker.stop();
-      if (models.installed) await loadModel();
-    }
+    if (changedModel) worker.stop();
     if (next.trigger !== previous.trigger && stopTrigger) await enableTrigger();
     changed();
   } finally {
     savingPreferences = false;
   }
+  // Reload outside the settings lock so a slow load cannot block downloads.
+  if (changedModel && models.installed) await loadModel();
 }
 async function modelAction(command: ModelCommand) {
   if (command?.action === "source" && typeof command.id === "string") {
@@ -433,9 +433,13 @@ async function modelAction(command: ModelCommand) {
     await shell.openExternal(source.href);
     return;
   }
+  // Another model may download or import while the active one loads.
+  const installingOther =
+    (command?.action === "download" || command?.action === "import") &&
+    command.id !== models.id;
   if (
     dictation.busy ||
-    modelBusy ||
+    (modelBusy && !installingOther) ||
     models.busy ||
     savingPreferences ||
     !initialized
@@ -505,7 +509,13 @@ async function modelAction(command: ModelCommand) {
               },
             ],
       });
-      if (choice.canceled || dictation.busy || modelBusy || models.busy) return;
+      if (
+        choice.canceled ||
+        dictation.busy ||
+        (modelBusy && models.id === command.id) ||
+        models.busy
+      )
+        return;
       source = choice.filePaths[0];
     }
     if (models.id === command.id) worker.stop();

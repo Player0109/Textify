@@ -456,7 +456,12 @@ function App() {
           </>
         )}
         {pane === "Models" && (
-          <ModelsPane state={state} busy={working || busy} run={runModel} />
+          <ModelsPane
+            state={state}
+            // While a model loads, the snapshot decides which buttons lock.
+            busy={dictating || (busy && !state.modelBusy)}
+            run={runModel}
+          />
         )}
         {pane === "Vocabulary" && (
           <div className="vocabulary-grid">

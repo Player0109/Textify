@@ -74,6 +74,8 @@ export function ModelsPane({
     filtered[0];
   const checkpoint = visible?.[0];
   const locked = busy || state.modelBusy;
+  // Loading the active model does not stop another model's download or import.
+  const installLocked = busy || state.modelStorageBusy;
   const languages = [...new Set(state.models.flatMap((m) => m.languages))]
     .filter((l) => l !== "auto")
     .sort((a, b) => (LANGUAGES[a] ?? a).localeCompare(LANGUAGES[b] ?? b));
@@ -218,7 +220,7 @@ export function ModelsPane({
                           </button>
                         ) : model.status !== "revoked" && !using ? (
                           <button
-                            disabled={locked}
+                            disabled={model.installed ? locked : installLocked}
                             onClick={() =>
                               void run({
                                 action: model.installed
@@ -261,7 +263,7 @@ export function ModelsPane({
                         {model.status !== "revoked" && (
                           <button
                             className="secondary"
-                            disabled={locked}
+                            disabled={model.id === active?.id ? locked : installLocked}
                             onClick={() => void run({ action: "import", id: model.id })}
                           >
                             Import {model.directory ? "folder" : "file"}

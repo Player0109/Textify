@@ -66,6 +66,8 @@ export interface Snapshot {
   ready: boolean;
   gpu: { backend: "Metal" | "Vulkan"; device: string } | null;
   modelBusy: boolean;
+  // A download, import, verification or removal; excludes worker loading.
+  modelStorageBusy: boolean;
   download: number | null;
   downloadModelID: string | null;
   exclusionsAvailable: boolean;
