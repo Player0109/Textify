@@ -2816,7 +2816,10 @@ Task 1 must merge before parallel Wave 1 work begins.
 - transcribe.cpp and audio.cpp now also build with Vulkan on Windows and Linux.
   They keep CPU graph refusal, reject software Vulkan devices and accept
   integrated GPUs. Windows workers delay-load `vulkan-1.dll` and use a UTF-8
-  process code page. Neither worker links OpenMP or a system BLAS.
+  process code page. Neither worker links OpenMP or a system BLAS. The first
+  Windows CI build failed to link the audio worker: audio.cpp's C API is built
+  statically but tells its users to import it from a DLL, so
+  `prepare-extra.mjs` removes that define.
 - Handoff: the uncommitted "Quiet speech trimming and speech check" task also
   edits `transcribe-worker.mm`, `require-gpu.mjs`, `no-gpu-smoke.mjs`,
   `before-pack.cjs`, `build-native.mjs`, README, SPEC and THIRD_PARTY_NOTICES,

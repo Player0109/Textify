@@ -115,6 +115,17 @@ export async function prepareExtra() {
         "add_library(audiocpp SHARED src/capi/audiocpp.cpp)",
         "add_library(audiocpp STATIC src/capi/audiocpp.cpp)",
       );
+      // Linked statically, so the worker must not import these functions from
+      // a DLL on Windows.
+      await edit(
+        "CMakeLists.txt",
+        `        # Anything linking this gets __declspec(dllimport) on Windows without
+        # having to know to ask for it. No effect elsewhere.
+        INTERFACE
+            AUDIOCPP_USE_DLL
+`,
+        "",
+      );
     }
     const ggml =
       runtime.name === "transcribe"
