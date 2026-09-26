@@ -158,3 +158,10 @@ This automated evidence does not mark the pending physical-desktop checks passed
   display scaling, on light and dark taskbars.
 - [ ] Linux hardware Vulkan: untested. CI covers compilation and refusal
   without a supported GPU only.
+
+Commit `8642e84` passed all three OS jobs, including the Windows build of both
+additional workers, packaged launch and installer checks:
+https://github.com/Player0109/Textify/actions/runs/36266929560
+The Windows installer's embedded icon matches the generated icon at all 15
+sizes. This automated evidence does not mark the pending physical-desktop checks
+passed.

@@ -2852,7 +2852,9 @@ Task 1 must merge before parallel Wave 1 work begins.
   (English/Chinese), including Confucius live preview. An isolated Electron
   check started a Whisper small.en download while Confucius F16 was loading,
   found a second download locked, paused the first and saw the load finish on
-  Metal. electron-builder 26.15.3 accepts the generated icon file (15 sizes,
-  PNG at 256 px). The Windows CI build, the Windows NVIDIA check of the new
-  families, the Windows icon check and all Linux hardware checks are pending;
-  Linux is covered by CI only.
+  Metal. Commit `8642e84` passed all three OS jobs in CI run 36266929560,
+  including the Windows build of both additional workers and the installer
+  checks. The installer's embedded icon matches the generated one at all 15
+  sizes. The Windows NVIDIA check of the new families, the icon check on a
+  Windows PC and all Linux hardware checks are pending; Linux is covered by CI
+  only.
