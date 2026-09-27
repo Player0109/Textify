@@ -23,6 +23,7 @@ export interface Preferences {
   language: string;
   activeModelID: string;
   launchAtLogin: boolean;
+  saveRecordings: boolean;
   exclusions: { id: string; name: string }[];
   overlay: { x: number; y: number; scale: number };
 }
@@ -86,6 +87,10 @@ export interface ActivitySnapshot {
   totals: ActivityTotals;
   days: ActivityDay[];
 }
+export interface RecordingsSummary {
+  count: number;
+  seconds: number;
+}
 export type Action =
   | "press"
   | "release"
@@ -96,6 +101,7 @@ export type Action =
   | "permissions"
   | "permission-settings"
   | "reveal-app"
+  | "reveal-recordings"
   | "enable-trigger"
   | "download"
   | "cancel-download"
@@ -118,6 +124,7 @@ export type AudioReply = {
 export interface TextifyBridge {
   snapshot(): Promise<Snapshot>;
   activity(): Promise<ActivitySnapshot>;
+  recordings(): Promise<RecordingsSummary>;
   action(action: Action): Promise<void>;
   preferences(value: Preferences): Promise<void>;
   model(command: ModelCommand): Promise<void>;

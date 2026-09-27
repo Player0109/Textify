@@ -12,6 +12,7 @@ import { AccessibilitySetup } from "./AccessibilitySetup";
 import { AccessibilityDragHelp } from "./AccessibilityDragHelp";
 import { CustomWords } from "./CustomWords";
 import { Exclusions } from "./Exclusions";
+import { Recordings } from "./Recordings";
 import { ActivityPane } from "./ActivityPane";
 import textifyIcon from "../../assets/textify-icon.png";
 
@@ -545,8 +546,10 @@ function App() {
             <div className="privacy-intro">
               <h2>Your speech stays here.</h2>
               <p>
-                Textify processes speech on this device. No recordings or
-                transcript history are saved.
+                Textify processes speech on this device.{" "}
+                {state.preferences.saveRecordings
+                  ? "Recordings you choose to save stay in a folder on this device."
+                  : "No recordings or transcript history are saved."}
               </p>
             </div>
             <div className="privacy-workspace">
@@ -567,6 +570,7 @@ function App() {
                   Check microphone
                 </button>
               </div>
+              <Recordings state={state} busy={working || busy} save={save} run={run} />
               <Exclusions state={state} busy={working || busy} save={save} />
             </div>
             <p className="footnote">

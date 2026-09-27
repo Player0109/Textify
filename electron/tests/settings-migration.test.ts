@@ -12,6 +12,13 @@ describe("settings and language migration", () => {
     expect(next.replacements).toHaveLength(1);
     expect(next.microphone).toBe("device");
     expect(next.language).toBe("en");
+    expect(next.saveRecordings).toBe(false);
+  });
+  it("accepts only a boolean training recordings choice", () => {
+    expect(validatePreferences({ ...defaults(), saveRecordings: true }).saveRecordings).toBe(true);
+    expect(() =>
+      validatePreferences({ ...defaults(), saveRecordings: "yes" }),
+    ).toThrow();
   });
   it("rejects duplicate custom words and invalid overlay sizes", () => {
     expect(() =>

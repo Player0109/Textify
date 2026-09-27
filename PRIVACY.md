@@ -2,14 +2,20 @@
 
 This statement applies to the desktop app in `electron/`, distributed for
 macOS, Windows, and Linux. Textify has no accounts, analytics service, crash
-reporting service, transcript history, or speech upload.
+reporting service, or speech upload. It keeps no transcript history unless you
+turn on training recordings.
 
 ## Audio and dictated text
 
 - Audio is captured while you actively dictate and processed locally by the
   installed speech model.
 - Audio, live previews, and pending dictated text stay in memory for the active
-  session. Textify does not retain recordings or transcript history.
+  session. Textify does not retain recordings or transcript history unless you
+  turn on **Save recordings for training** in Privacy.
+- That setting is off by default. When it is on, each completed dictation's
+  audio and transcript are saved in a `Recordings` folder in the Textify
+  Electron data directory so you can correct them and fine-tune a model. The
+  files stay on the device until you delete them.
 - Textify does not send audio, dictated text, custom vocabulary, or replacement
   pairs to a cloud speech service.
 

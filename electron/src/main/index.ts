@@ -26,6 +26,7 @@ import { waylandTrigger } from "./wayland";
 import { Capture } from "./capture";
 import { AccessibilitySetup } from "./accessibility";
 import { ActivityStore } from "./activity";
+import { RecordingStore } from "./recordings";
 import { defaults, validatePreferences } from "./preferences";
 import { linuxStartup, linuxStartupEnabled } from "./startup";
 import type { Action, Preferences, Snapshot, ModelCommand } from "../shared";
@@ -71,6 +72,7 @@ let models: Models,
   dictation: Dictation;
 const activity = new ActivityStore(join(app.getPath("userData"), "activity.json"));
 let activityError = false;
+const recordings = new RecordingStore(join(app.getPath("userData"), "Recordings"));
 let broadcastTimer: ReturnType<typeof setTimeout> | undefined;
 const appBundle = dirname(dirname(dirname(process.execPath)));
 const accessibility = process.platform === "darwin"
@@ -348,6 +350,10 @@ async function action(action: Action) {
       break;
     case "reveal-app":
       if (accessibility) shell.showItemInFolder(appBundle);
+      break;
+    case "reveal-recordings":
+      await mkdir(recordings.directory, { recursive: true, mode: 0o700 });
+      await shell.openPath(recordings.directory);
       break;
     case "enable-trigger":
       if (!active) await enableTrigger();
@@ -630,6 +636,20 @@ else {
                 activityError = true;
               });
           },
+          recorded: (sample) => {
+            if (!preferences.saveRecordings) return;
+            void recordings
+              .save({
+                ...sample,
+                modelID: preferences.activeModelID,
+                language: preferences.language,
+              })
+              .catch(() => {
+                notice =
+                  "A training recording could not be saved. Check available storage.";
+                changed();
+              });
+          },
           changed,
         },
         () => preferences.replacements,
@@ -675,6 +695,10 @@ else {
         if (activityError) throw new Error("activity_unavailable");
         await activity.flush();
         return activity.snapshot();
+      });
+      ipcMain.handle("recordings", (event) => {
+        if (!allowed(event, [main])) throw new Error("unauthorized");
+        return recordings.summary();
       });
       ipcMain.handle("devices", (event) => {
         if (!allowed(event, [main])) throw new Error("unauthorized");
@@ -830,6 +854,7 @@ else {
     void (async () => {
       await dictation?.cancel();
       await activity.flush().catch(() => {});
+      await recordings.flush().catch(() => {});
       overlay?.destroy();
       accessibilityHelp?.destroy();
       tray?.destroy();

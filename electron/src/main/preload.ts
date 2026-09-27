@@ -3,6 +3,7 @@ import type { TextifyBridge } from "../shared";
 const bridge: TextifyBridge = {
   snapshot: () => ipcRenderer.invoke("snapshot"),
   activity: () => ipcRenderer.invoke("activity"),
+  recordings: () => ipcRenderer.invoke("recordings"),
   action: (action) => ipcRenderer.invoke("action", action),
   preferences: (value) => ipcRenderer.invoke("preferences", value),
   model: (command) => ipcRenderer.invoke("model", command),

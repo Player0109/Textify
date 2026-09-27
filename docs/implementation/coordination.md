@@ -2793,3 +2793,27 @@ Task 1 must merge before parallel Wave 1 work begins.
   silent GIF preview with GitHub's video player. The approved promotion's
   original video and audio remain unchanged. The verification agent performs
   read-only checks of GitHub's supported attachment and playback behavior.
+
+### Opt-in training recordings — 2026-09-27
+
+- This task owns the new `electron/src/main/recordings.ts`,
+  `electron/src/renderer/Recordings.tsx`, and `electron/tests/recordings.test.ts`.
+  It hands off narrow edits to `electron/src/shared.ts`,
+  `electron/src/main/preferences.ts`, `electron/src/main/preload.ts`,
+  `electron/src/main/index.ts`, `electron/src/core/dictation.ts`, the Privacy
+  pane in `electron/src/renderer/index.tsx`, the Privacy row selectors in
+  `electron/src/renderer/studio.css`, the dictation and settings tests, and the
+  privacy statements in `docs/SPEC.md`, `electron/README.md`, and `PRIVACY.md`.
+  This handoff precedes those edits. The General settings alignment edits in
+  the same renderer files are left untouched.
+- An off-by-default Privacy setting saves each completed dictation's trimmed
+  16 kHz audio as WAV with a JSON record of the model output, final text, model,
+  language, and an empty correction field, for later review and fine-tuning.
+  Cancelled, secure-field, excluded-app, and empty dictations are not saved.
+- Validation: TypeScript, 124 tests and the production build passed. An
+  isolated Electron check fed the public JFK fixture through the real
+  AudioWorklet and Parakeet Q8_0 worker with the setting on. It produced one
+  11.19 s WAV and a matching JSON record, and the Privacy row showed the saved
+  count. Show folder opened the folder, and turning the setting off updated
+  `settings.json`. The overlay cannot read the recordings summary. The row
+  fits at 1120 and 780 px widths.

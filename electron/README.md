@@ -121,6 +121,15 @@ Audio and pending dictation stay in memory. Activity stores only daily numeric
 totals for completed dictations, with day, week, and month views derived from
 those totals. There is no transcript
 history, telemetry, or speech upload. Model downloads require an explicit action.
+
+**Privacy → Save recordings for training** is off by default. When it is on,
+each completed dictation is saved in the data directory's `Recordings` folder
+as a 16 kHz mono 16-bit WAV of the audio the model received, plus a JSON record:
+`modelText` (raw model output), `finalText` (after replacement pairs and spoken
+punctuation), `modelID`, `language`, `seconds`, and `correctedText`, which stays
+`null` until you fill it in during review. Cancelled, empty, secure-field and
+excluded-app dictations are not saved. Nothing is uploaded; **Show folder**
+opens the folder, and deleting files there removes them.
 Custom words, preferences, model files and trust records remain in the existing
 **Textify Electron** data directory so preview updates retain them.
 
