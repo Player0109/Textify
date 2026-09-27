@@ -2840,3 +2840,6 @@ Task 1 must merge before parallel Wave 1 work begins.
   advancing past reviewed clips, deletion of both files, Show folder, and
   refusal of recordings calls from the overlay and of names outside the
   folder. The page fits at 1120 and 780 px widths (screenshots inspected).
+- Follow-up: the owner could not find the review page under Privacy, so it
+  is also a **Recordings** sidebar pane, shown while saving is on. This adds
+  that pane and its icon to the navigation in `renderer/index.tsx`.

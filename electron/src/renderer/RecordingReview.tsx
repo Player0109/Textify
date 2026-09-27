@@ -3,11 +3,9 @@ import type { Action, RecordingEntry, Snapshot } from "../shared";
 export function RecordingReview({
   phase,
   run,
-  back,
 }: {
   phase: Snapshot["phase"];
   run(action: Action): Promise<void>;
-  back(): void;
 }) {
   const [entries, setEntries] = useState<RecordingEntry[]>();
   const [open, setOpen] = useState<string>();
@@ -91,9 +89,6 @@ export function RecordingReview({
   return (
     <section className="recording-review">
       <div className="recording-toolbar">
-        <button className="text-button" onClick={back}>
-          Back to Privacy
-        </button>
         {entries && (
           <p>
             {entries.length} saved · {reviewed!.length} reviewed ·{" "}

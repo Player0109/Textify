@@ -80,6 +80,11 @@ function NavIcon({ name }: { name: string }) {
         <>
           <path d="M12 20c-2-1.5-5-2.2-9-1.8V4.5c4-.4 7 .3 9 1.8m0 13.7c2-1.5 5-2.2 9-1.8V4.5c-4-.4-7 .3-9 1.8M12 6.3V20" />
         </>
+      ) : name === "Recordings" ? (
+        <>
+          <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <path d="M8 13h1m2-2v4m2-3v2m2-1h1" />
+        </>
       ) : name === "Privacy" ? (
         <>
           <path d="M12 2 4 6v6c0 5 8 10 8 10s8-5 8-10V6z" />
@@ -94,13 +99,17 @@ function NavIcon({ name }: { name: string }) {
     </svg>
   );
 }
-const panes = ["General", "Models", "Vocabulary", "Activity", "Privacy"] as const;
+const panes = [
+  "General",
+  "Models",
+  "Vocabulary",
+  "Activity",
+  "Recordings",
+  "Privacy",
+] as const;
 function App() {
   const state = useSnapshot();
-  // Recording review opens from Privacy and keeps it selected.
-  const [pane, setPane] = useState<(typeof panes)[number] | "Recordings">(
-    "General",
-  );
+  const [pane, setPane] = useState<(typeof panes)[number]>("General");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [devices, setDevices] = useState<{ id: string; name: string }[]>([]);
@@ -189,22 +198,28 @@ function App() {
           </div>
         </div>
         <nav aria-label="Settings">
-          {panes.map((name) => (
-            <button
-              key={name}
-              aria-current={
-                pane === name || (pane === "Recordings" && name === "Privacy")
-                  ? "page"
-                  : undefined
-              }
-              onClick={() => setPane(name)}
-            >
-              <span aria-hidden="true">
-                <NavIcon name={name} />
-              </span>
-              {name === "Models" ? "Transcription models" : name}
-            </button>
-          ))}
+          {panes
+            // Recordings appears while saving is on; Privacy → Review opens it otherwise.
+            .filter((name) => name !== "Recordings" || state.preferences.saveRecordings)
+            .map((name) => (
+              <button
+                key={name}
+                aria-current={
+                  pane === name ||
+                  (pane === "Recordings" &&
+                    name === "Privacy" &&
+                    !state.preferences.saveRecordings)
+                    ? "page"
+                    : undefined
+                }
+                onClick={() => setPane(name)}
+              >
+                <span aria-hidden="true">
+                  <NavIcon name={name} />
+                </span>
+                {name === "Models" ? "Transcription models" : name}
+              </button>
+            ))}
         </nav>
       </aside>
       <main className={pane === "Models" ? "models-main" : undefined}>
@@ -562,11 +577,7 @@ function App() {
         )}
         {pane === "Activity" && <ActivityPane phase={state.phase} />}
         {pane === "Recordings" && (
-          <RecordingReview
-            phase={state.phase}
-            run={run}
-            back={() => setPane("Privacy")}
-          />
+          <RecordingReview phase={state.phase} run={run} />
         )}
         {pane === "Privacy" && (
           <section className="privacy">

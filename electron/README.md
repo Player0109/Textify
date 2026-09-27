@@ -130,7 +130,8 @@ punctuation), `modelID`, `language`, `seconds`, and `correctedText`, which stays
 `null` until you fill it in during review. Cancelled, empty, secure-field and
 excluded-app dictations are not saved. Nothing is uploaded.
 
-**Privacy → Review** lists the saved clips, newest first. Opening a clip plays
+**Recordings**, in the sidebar while saving is on (or **Privacy → Review**),
+lists the saved clips, newest first. Opening a clip plays
 it and shows the model's transcript for editing; **Save** writes the text to
 `correctedText` and opens the next clip that needs review. Keep spoken commands
 such as "comma" as words, because the correction is the training target for the
