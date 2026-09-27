@@ -88,12 +88,20 @@ export class RecordingStore {
       const id = name.slice(0, -".json".length);
       if (!name.endsWith(".json") || !ID.test(id)) continue;
       try {
-        const { createdAt, seconds, modelID, modelText, finalText, correctedText } =
-          JSON.parse(await readFile(join(this.directory, name), "utf8"));
+        const {
+          createdAt,
+          seconds,
+          modelID,
+          modelText,
+          finalText,
+          correctedText,
+          language,
+          comparisons,
+        } = JSON.parse(await readFile(join(this.directory, name), "utf8"));
         if (
           !Number.isFinite(seconds) ||
           seconds <= 0 ||
-          ![createdAt, modelID, modelText, finalText].every(
+          ![createdAt, modelID, modelText, finalText, language].every(
             (value) => typeof value === "string",
           )
         )
@@ -106,6 +114,12 @@ export class RecordingStore {
           modelText,
           finalText,
           correctedText: typeof correctedText === "string" ? correctedText : null,
+          language,
+          comparisons: Object.fromEntries(
+            Object.entries(
+              comparisons && typeof comparisons === "object" ? comparisons : {},
+            ).filter(([, text]) => typeof text === "string"),
+          ) as Record<string, string>,
         });
       } catch {
         /* Skip records edited into invalid JSON during review. */
@@ -117,6 +131,24 @@ export class RecordingStore {
 
   async audio(id: string): Promise<Buffer> {
     return readFile(this.file(id, "wav"));
+  }
+
+  async samples(id: string): Promise<Float32Array> {
+    const data = await this.audio(id);
+    const samples = new Float32Array(Math.max(0, data.length - 44) >> 1);
+    for (let i = 0; i < samples.length; i++)
+      samples[i] = data.readInt16LE(44 + i * 2) / 32767;
+    data.fill(0);
+    return samples;
+  }
+
+  async compare(id: string, modelID: string, text: string): Promise<void> {
+    const record = this.file(id, "json");
+    return this.queue(async () => {
+      const data = JSON.parse(await readFile(record, "utf8"));
+      data.comparisons = { ...data.comparisons, [modelID]: text };
+      await this.write(record, JSON.stringify(data, null, 2));
+    });
   }
 
   async correct(id: string, text: string): Promise<void> {

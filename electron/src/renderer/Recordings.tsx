@@ -22,7 +22,7 @@ export function Recordings({
     return () => {
       active = false;
     };
-  }, [state.phase, enabled]);
+  }, [state.recordingsVersion, enabled]);
   const seconds = entries.reduce((total, entry) => total + entry.seconds, 0);
   const reviewed = entries.filter((entry) => entry.correctedText !== null).length;
   return (

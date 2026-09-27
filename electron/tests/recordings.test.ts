@@ -82,6 +82,8 @@ describe("training recordings", () => {
       modelText: "hello comma world",
       finalText: "Hello, world",
       correctedText: null,
+      language: "en",
+      comparisons: {},
     });
     await writeFile(join(directory, "2026-09-27T10-00-02-000Z.json"), "{");
     await writeFile(join(directory, "notes.json"), "{}");
@@ -101,6 +103,30 @@ describe("training recordings", () => {
     expect((await store.audio(id)).length).toBe(44 + 32000);
     await expect(store.correct(id, "   ")).rejects.toThrow("recording_text");
     expect(await readdir(directory)).not.toContain(`${id}.json.tmp`);
+  });
+
+  it("keeps other models' text beside the correction and reads the audio back", async () => {
+    const directory = await fixture();
+    const store = new RecordingStore(directory);
+    const id = "2026-09-27T10-00-00-000Z";
+    void store.save(sample(1), new Date("2026-09-27T10:00:00.000Z"));
+    void store.compare(id, "whisper-large-v3-q5_0", "hello comma world");
+    void store.correct(id, "hello comma word");
+    await store.compare(id, "parakeet-tdt-0.6b-v3-f16", "Hello, comma word.");
+    const [entry] = await store.list();
+    expect(entry.comparisons).toEqual({
+      "whisper-large-v3-q5_0": "hello comma world",
+      "parakeet-tdt-0.6b-v3-f16": "Hello, comma word.",
+    });
+    expect(entry.correctedText).toBe("hello comma word");
+    const samples = await store.samples(id);
+    expect(samples.length).toBe(16000);
+    expect(samples[0]).toBeCloseTo(0.5, 3);
+    await writeFile(
+      join(directory, `${id}.json`),
+      JSON.stringify({ ...JSON.parse(await readFile(join(directory, `${id}.json`), "utf8")), comparisons: "text" }),
+    );
+    expect((await store.list())[0].comparisons).toEqual({});
   });
 
   it("deletes a clip's record and audio", async () => {

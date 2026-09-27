@@ -73,6 +73,8 @@ export interface Snapshot {
   startupAvailable: boolean;
   preferences: Preferences;
   models: ModelView[];
+  // Changes whenever a training recording is saved, compared, or edited.
+  recordingsVersion: number;
 }
 export interface ActivityTotals {
   words: number;
@@ -95,6 +97,9 @@ export interface RecordingEntry {
   modelText: string;
   finalText: string;
   correctedText: string | null;
+  language: string;
+  // Other installed models' text for the same audio, by model ID.
+  comparisons: Record<string, string>;
 }
 export type Action =
   | "press"

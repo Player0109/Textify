@@ -1,10 +1,83 @@
-import React, { useEffect, useState } from "react";
-import type { Action, RecordingEntry, Snapshot } from "../shared";
+import React, { useEffect, useMemo, useState } from "react";
+import type { Action, ModelView, RecordingEntry, Snapshot } from "../shared";
+import { differences, disagreement, tokens } from "../core/compare";
+
+const mac = navigator.userAgent.includes("Mac");
+
+// Clips that need review come first, those where the other models disagree
+// most at the top, then clips not compared yet, then reviewed clips.
+function rank(entries: RecordingEntry[]) {
+  return entries
+    .map((entry) => ({
+      ...entry,
+      score: disagreement(entry.modelText, Object.values(entry.comparisons)),
+    }))
+    .sort(
+      (a, b) =>
+        Number(a.correctedText !== null) - Number(b.correctedText !== null) ||
+        Number(a.score === undefined) - Number(b.score === undefined) ||
+        (b.score ?? 0) - (a.score ?? 0) ||
+        b.id.localeCompare(a.id),
+    );
+}
+
+function Marked({ text, marks }: { text: string; marks: boolean[] }) {
+  return (
+    <>
+      {tokens(text).map((token, i) => (
+        <React.Fragment key={i}>
+          {i > 0 && " "}
+          {marks[i] ? <mark>{token.text}</mark> : token.text}
+        </React.Fragment>
+      ))}
+    </>
+  );
+}
+
+// Each model's text for the clip, with the words the models disagree on marked.
+function Outputs({
+  entry,
+  models,
+  use,
+}: {
+  entry: RecordingEntry;
+  models: ModelView[];
+  use(text: string): void;
+}) {
+  const others = Object.entries(entry.comparisons).map(
+    ([id, text]) => [id, text, differences(entry.modelText, text)] as const,
+  );
+  const disputed = tokens(entry.modelText).map((_, i) =>
+    others.some(([, , result]) => result.left[i]),
+  );
+  const name = (id: string) =>
+    models.find((model) => model.id === id)?.name ?? id;
+  return (
+    <div className="recording-outputs">
+      {[
+        [entry.modelID, entry.modelText, disputed] as const,
+        ...others.map(([id, text, result]) => [id, text, result.right] as const),
+      ].map(([id, text, marks]) => (
+        <div className="recording-output" key={id}>
+          <span>
+            {name(id)}
+            {id === entry.modelID && " · dictation"}
+          </span>
+          <p>{text ? <Marked text={text} marks={marks} /> : <em>No speech heard</em>}</p>
+          <button className="text-button" disabled={!text} onClick={() => use(text)}>
+            Use
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function RecordingReview({
-  phase,
+  state,
   run,
 }: {
-  phase: Snapshot["phase"];
+  state: Snapshot;
   run(action: Action): Promise<void>;
 }) {
   const [entries, setEntries] = useState<RecordingEntry[]>();
@@ -26,7 +99,8 @@ export function RecordingReview({
     return () => {
       active = false;
     };
-  }, [phase]);
+  }, [state.recordingsVersion]);
+  const ranked = useMemo(() => rank(entries ?? []), [entries]);
   useEffect(() => {
     if (!open) return;
     let url: string | undefined;
@@ -50,29 +124,25 @@ export function RecordingReview({
     setText(entry ? (entry.correctedText ?? entry.modelText) : "");
     setError("");
   }
-  // Continue with the next clip that still needs review, wrapping to the top.
-  function advance(list: RecordingEntry[], index: number) {
+  // Continue with the most useful clip that still needs review.
+  function advance(list: RecordingEntry[]) {
     setEntries(list);
-    select(
-      [...list.slice(index), ...list.slice(0, index)].find(
-        (entry) => entry.correctedText === null,
-      ),
-    );
+    select(rank(list).find((entry) => entry.correctedText === null));
   }
   async function change(entry: RecordingEntry, remove: boolean) {
     setBusy(true);
     setError("");
     try {
-      const index = entries!.indexOf(entry);
       if (remove) {
         await window.textify.deleteRecording(entry.id);
-        advance(entries!.filter((item) => item !== entry), index);
+        advance(entries!.filter((item) => item.id !== entry.id));
       } else {
         await window.textify.correctRecording(entry.id, text);
-        const list = entries!.map((item) =>
-          item === entry ? { ...item, correctedText: text.trim() } : item,
+        advance(
+          entries!.map((item) =>
+            item.id === entry.id ? { ...item, correctedText: text.trim() } : item,
+          ),
         );
-        advance(list, index + 1);
       }
     } catch {
       setError(
@@ -115,7 +185,7 @@ export function RecordingReview({
       )}
       {!!entries?.length && (
         <ul className="recording-list">
-          {entries.map((entry) => (
+          {ranked.map((entry) => (
             <li key={entry.id}>
               <button
                 className="recording-row"
@@ -131,6 +201,8 @@ export function RecordingReview({
                     timeStyle: "short",
                   })}{" "}
                   · {entry.seconds.toFixed(1)} s
+                  {entry.score !== undefined &&
+                    (entry.score > 0 ? " · Models differ" : " · Models agree")}
                 </span>
                 <span
                   className={
@@ -145,11 +217,7 @@ export function RecordingReview({
               {entry.id === open && (
                 <div className="recording-editor">
                   <audio controls autoPlay src={audio} />
-                  {entry.correctedText !== null && (
-                    <p className="recording-heard">
-                      Model heard: {entry.modelText}
-                    </p>
-                  )}
+                  <Outputs entry={entry} models={state.models} use={setText} />
                   <label htmlFor="recording-correction">What you said</label>
                   <textarea
                     id="recording-correction"
@@ -157,6 +225,12 @@ export function RecordingReview({
                     value={text}
                     disabled={busy}
                     onChange={(event) => setText(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" || !(mac ? event.metaKey : event.ctrlKey))
+                        return;
+                      event.preventDefault();
+                      if (!busy && text.trim()) void change(entry, false);
+                    }}
                   />
                   <div className="recording-actions">
                     <button
@@ -166,6 +240,9 @@ export function RecordingReview({
                     >
                       Delete
                     </button>
+                    <span className="recording-hint">
+                      {mac ? "⌘↩" : "Ctrl+Enter"} saves and opens the next clip
+                    </span>
                     <button
                       disabled={busy || !text.trim()}
                       onClick={() => void change(entry, false)}

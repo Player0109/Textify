@@ -577,7 +577,7 @@ function App() {
         )}
         {pane === "Activity" && <ActivityPane phase={state.phase} />}
         {pane === "Recordings" && (
-          <RecordingReview phase={state.phase} run={run} />
+          <RecordingReview state={state} run={run} />
         )}
         {pane === "Privacy" && (
           <section className="privacy">

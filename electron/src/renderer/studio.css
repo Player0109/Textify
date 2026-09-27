@@ -657,9 +657,51 @@
   height: 36px;
 }
 
-.studio .recording-heard {
+.studio .recording-outputs {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--line);
+}
+
+.studio .recording-output {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 12px;
+  background: #19212b;
+}
+
+.studio .recording-output > span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.studio .recording-output p {
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.studio .recording-output mark {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: #7e492766;
+  color: #ffd3a8;
+}
+
+.studio .recording-output em {
+  color: var(--muted);
+}
+
+.studio .recording-hint {
+  margin: 0 14px 0 auto;
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .studio .recording-editor label {

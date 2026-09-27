@@ -27,6 +27,7 @@ import { Capture } from "./capture";
 import { AccessibilitySetup } from "./accessibility";
 import { ActivityStore } from "./activity";
 import { RecordingStore } from "./recordings";
+import { Comparison } from "./comparison";
 import { defaults, validatePreferences } from "./preferences";
 import { linuxStartup, linuxStartupEnabled } from "./startup";
 import type { Action, Preferences, Snapshot, ModelCommand } from "../shared";
@@ -68,11 +69,13 @@ let preferences: Preferences = defaults(process.platform, wayland);
 const platform = new Platform(resources);
 let models: Models,
   worker: WhisperWorker,
+  comparison: Comparison,
   capture: Capture,
   dictation: Dictation;
 const activity = new ActivityStore(join(app.getPath("userData"), "activity.json"));
 let activityError = false;
 const recordings = new RecordingStore(join(app.getPath("userData"), "Recordings"));
+let recordingsVersion = 0;
 let broadcastTimer: ReturnType<typeof setTimeout> | undefined;
 const appBundle = dirname(dirname(dirname(process.execPath)));
 const accessibility = process.platform === "darwin"
@@ -131,9 +134,14 @@ function snapshot(): Snapshot {
     preferences,
     models: models?.views() ?? [],
     downloadModelID: models?.progressID ?? null,
+    recordingsVersion,
     exclusionsAvailable: platform.exclusionsAvailable,
     startupAvailable: app.isPackaged,
   };
+}
+function recordingsChanged() {
+  recordingsVersion++;
+  changed();
 }
 function changed() {
   if (broadcastTimer || quitting) return;
@@ -426,6 +434,7 @@ async function savePreferences(value: unknown) {
       if (models.installed) await loadModel();
     }
     if (next.trigger !== previous.trigger && stopTrigger) await enableTrigger();
+    if (next.saveRecordings) comparison.schedule();
     changed();
   } finally {
     savingPreferences = false;
@@ -562,6 +571,23 @@ else {
         ),
         changed,
       );
+      comparison = new Comparison(
+        join(
+          resources,
+          `textify-whisper${process.platform === "win32" ? ".exe" : ""}`,
+        ),
+        recordings,
+        () => models.views(),
+        (id) => models.pathFor(id),
+        () => preferences.saveRecordings && !quitting,
+        () =>
+          !modelBusy &&
+          !models.busy &&
+          !["armed", "recording", "processing", "inserting"].includes(
+            dictation.phase,
+          ),
+        recordingsChanged,
+      );
       main = createWindow({
         width: 1120,
         height: 780,
@@ -644,6 +670,10 @@ else {
                 modelID: preferences.activeModelID,
                 language: preferences.language,
               })
+              .then(() => {
+                recordingsChanged();
+                comparison.schedule();
+              })
               .catch(() => {
                 notice =
                   "A training recording could not be saved. Check available storage.";
@@ -706,11 +736,11 @@ else {
       });
       ipcMain.handle("correct-recording", (event, id, text) => {
         if (!allowed(event, [main])) throw new Error("unauthorized");
-        return recordings.correct(id, text);
+        return recordings.correct(id, text).then(recordingsChanged);
       });
       ipcMain.handle("delete-recording", (event, id) => {
         if (!allowed(event, [main])) throw new Error("unauthorized");
-        return recordings.remove(id);
+        return recordings.remove(id).then(recordingsChanged);
       });
       ipcMain.handle("devices", (event) => {
         if (!allowed(event, [main])) throw new Error("unauthorized");
@@ -836,6 +866,7 @@ else {
         await models.init(preferences.activeModelID);
         initialized = true;
         if (models.installed) await loadModel();
+        if (preferences.saveRecordings) comparison.schedule();
       } catch {
         notice =
           "The bundled model catalog could not be verified. Reinstall this preview.";
@@ -861,6 +892,7 @@ else {
     stopTrigger?.();
     models?.cancel();
     worker?.stop();
+    comparison?.stop();
     capture?.shutdown();
     audio?.destroy();
     void (async () => {

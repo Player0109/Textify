@@ -2843,3 +2843,28 @@ Task 1 must merge before parallel Wave 1 work begins.
 - Follow-up: the owner could not find the review page under Privacy, so it
   is also a **Recordings** sidebar pane, shown while saving is on. This adds
   that pane and its icon to the navigation in `renderer/index.tsx`.
+
+### Training recording review priority — 2026-09-27
+
+- The owner asked for review that puts human effort on the clips the model
+  most likely got wrong. This task owns the new `electron/src/core/compare.ts`,
+  `electron/src/main/comparison.ts`, and `electron/tests/compare.test.ts`, and
+  continues the training recordings files. It hands off narrow edits to
+  `RecordingEntry` in `electron/src/shared.ts`, the comparison wiring in
+  `electron/src/main/index.ts`, review styles in
+  `electron/src/renderer/studio.css`, and the recordings paragraph in
+  `electron/README.md`. This handoff precedes those edits.
+- While saving is on and dictation is idle, the largest installed Whisper,
+  Parakeet, or Qwen3-ASR model from each family other than the clip's own
+  transcribes saved clips locally, and the text is stored in the clip's JSON.
+  Review sorts clips that need review by how much the dictation model's text
+  differs from the others, highlights the disputed words, and can copy another
+  model's text into the correction.
+- Validation: TypeScript, 134 tests and the production build passed. An
+  isolated Electron check seeded three JFK clips labeled as Qwen3-ASR 1.7B
+  output, one with "cutting tree" for "country", and cloned the installed
+  Whisper large-v3 and Parakeet models. Both transcribed all clips in the
+  background within 10 s of launch; the open Recordings page updated, ranked
+  the wrong clip first with only "cutting" and "tree" marked, **Use** copied
+  Whisper's text, ⌘↩ saved it and opened the next clip that needs review. The
+  earlier review check still passes, and the page fits at 780 px.
