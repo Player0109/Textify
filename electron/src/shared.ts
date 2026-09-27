@@ -87,9 +87,14 @@ export interface ActivitySnapshot {
   totals: ActivityTotals;
   days: ActivityDay[];
 }
-export interface RecordingsSummary {
-  count: number;
+export interface RecordingEntry {
+  id: string;
+  createdAt: string;
   seconds: number;
+  modelID: string;
+  modelText: string;
+  finalText: string;
+  correctedText: string | null;
 }
 export type Action =
   | "press"
@@ -124,7 +129,10 @@ export type AudioReply = {
 export interface TextifyBridge {
   snapshot(): Promise<Snapshot>;
   activity(): Promise<ActivitySnapshot>;
-  recordings(): Promise<RecordingsSummary>;
+  recordings(): Promise<RecordingEntry[]>;
+  recordingAudio(id: string): Promise<Uint8Array<ArrayBuffer>>;
+  correctRecording(id: string, text: string): Promise<void>;
+  deleteRecording(id: string): Promise<void>;
   action(action: Action): Promise<void>;
   preferences(value: Preferences): Promise<void>;
   model(command: ModelCommand): Promise<void>;

@@ -2817,3 +2817,26 @@ Task 1 must merge before parallel Wave 1 work begins.
   count. Show folder opened the folder, and turning the setting off updated
   `settings.json`. The overlay cannot read the recordings summary. The row
   fits at 1120 and 780 px widths.
+
+### Training recording review — 2026-09-27
+
+- This task owns the new `electron/src/renderer/RecordingReview.tsx` and
+  continues the training recordings files: `electron/src/main/recordings.ts`,
+  `electron/src/renderer/Recordings.tsx`, and `electron/tests/recordings.test.ts`.
+  It hands off narrow edits to the recordings bridge in `electron/src/shared.ts`
+  and `electron/src/main/preload.ts`, the recordings IPC handlers in
+  `electron/src/main/index.ts`, the Privacy review route in
+  `electron/src/renderer/index.tsx`, review styles in
+  `electron/src/renderer/studio.css`, `media-src` in
+  `electron/src/renderer/index.html` for local playback, and the recordings
+  paragraph in `electron/README.md`. This handoff precedes those edits.
+- Privacy → Review lists saved recordings newest first, plays each clip, and
+  saves the typed transcript as `correctedText`, then opens the next clip that
+  needs review. Delete removes a clip's JSON record and WAV file.
+- Validation: TypeScript, 127 tests and the production build passed. An
+  isolated Electron check seeded three JFK-fixture clips. It confirmed the
+  Privacy count and Review route, newest-first order, blob playback of the
+  11 s clip with autoplay, a saved correction that leaves `modelText` intact,
+  advancing past reviewed clips, deletion of both files, Show folder, and
+  refusal of recordings calls from the overlay and of names outside the
+  folder. The page fits at 1120 and 780 px widths (screenshots inspected).

@@ -1,7 +1,7 @@
-import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { SAMPLE_RATE } from "../core/audio";
-import type { RecordingsSummary } from "../shared";
+import type { RecordingEntry } from "../shared";
 
 export type Recording = {
   audio: Float32Array;
@@ -35,6 +35,9 @@ export function wav(samples: Float32Array): Buffer {
   return out;
 }
 
+// Record names are save timestamps, e.g. 2026-09-27T10-15-30-123Z.
+const ID = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z$/;
+
 export class RecordingStore {
   private pending: Promise<void> = Promise.resolve();
 
@@ -59,45 +62,96 @@ export class RecordingStore {
       null,
       2,
     );
-    const task = this.pending.catch(() => {}).then(async () => {
+    return this.queue(async () => {
       await mkdir(this.directory, { recursive: true, mode: 0o700 });
       await writeFile(join(this.directory, `${id}.wav`), audio, { mode: 0o600 });
       // The record appears only after its audio is complete.
-      const record = join(this.directory, `${id}.json`);
-      await writeFile(`${record}.tmp`, metadata, { mode: 0o600 });
-      await rename(`${record}.tmp`, record);
+      await this.write(this.file(id, "json"), metadata);
     });
-    this.pending = task;
-    return task;
   }
 
   flush(): Promise<void> {
     return this.pending;
   }
 
-  async summary(): Promise<RecordingsSummary> {
+  async list(): Promise<RecordingEntry[]> {
     await this.pending.catch(() => {});
     let names: string[];
     try {
       names = await readdir(this.directory);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT")
-        return { count: 0, seconds: 0 };
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
       throw error;
     }
-    const summary = { count: 0, seconds: 0 };
-    for (const name of names.filter((name) => name.endsWith(".json"))) {
+    const entries: RecordingEntry[] = [];
+    for (const name of names) {
+      const id = name.slice(0, -".json".length);
+      if (!name.endsWith(".json") || !ID.test(id)) continue;
       try {
-        const { seconds } = JSON.parse(
-          await readFile(join(this.directory, name), "utf8"),
-        );
-        if (!Number.isFinite(seconds) || seconds <= 0) continue;
-        summary.count++;
-        summary.seconds += seconds;
+        const { createdAt, seconds, modelID, modelText, finalText, correctedText } =
+          JSON.parse(await readFile(join(this.directory, name), "utf8"));
+        if (
+          !Number.isFinite(seconds) ||
+          seconds <= 0 ||
+          ![createdAt, modelID, modelText, finalText].every(
+            (value) => typeof value === "string",
+          )
+        )
+          continue;
+        entries.push({
+          id,
+          createdAt,
+          seconds,
+          modelID,
+          modelText,
+          finalText,
+          correctedText: typeof correctedText === "string" ? correctedText : null,
+        });
       } catch {
         /* Skip records edited into invalid JSON during review. */
       }
     }
-    return summary;
+    // Timestamp names sort chronologically; newest first.
+    return entries.sort((a, b) => b.id.localeCompare(a.id));
+  }
+
+  async audio(id: string): Promise<Buffer> {
+    return readFile(this.file(id, "wav"));
+  }
+
+  async correct(id: string, text: string): Promise<void> {
+    const record = this.file(id, "json");
+    if (typeof text !== "string" || !text.trim() || text.length > 20_000)
+      throw new Error("recording_text");
+    return this.queue(async () => {
+      const data = JSON.parse(await readFile(record, "utf8"));
+      data.correctedText = text.trim();
+      await this.write(record, JSON.stringify(data, null, 2));
+    });
+  }
+
+  async remove(id: string): Promise<void> {
+    const record = this.file(id, "json");
+    const audio = this.file(id, "wav");
+    return this.queue(async () => {
+      await rm(record, { force: true });
+      await rm(audio, { force: true });
+    });
+  }
+
+  private file(id: string, extension: "json" | "wav") {
+    if (typeof id !== "string" || !ID.test(id)) throw new Error("recording_id");
+    return join(this.directory, `${id}.${extension}`);
+  }
+
+  private async write(path: string, contents: string) {
+    await writeFile(`${path}.tmp`, contents, { mode: 0o600 });
+    await rename(`${path}.tmp`, path);
+  }
+
+  private queue(work: () => Promise<void>): Promise<void> {
+    const task = this.pending.catch(() => {}).then(work);
+    this.pending = task;
+    return task;
   }
 }

@@ -24,8 +24,8 @@ const sample = (seconds: number) => ({
 });
 
 describe("training recordings", () => {
-  it("reports nothing before the folder exists", async () => {
-    expect(await new RecordingStore(await fixture()).summary()).toEqual({ count: 0, seconds: 0 });
+  it("lists nothing before the folder exists", async () => {
+    expect(await new RecordingStore(await fixture()).list()).toEqual([]);
   });
 
   it("writes 16 kHz mono WAV audio with a reviewable private record", async () => {
@@ -66,13 +66,64 @@ describe("training recordings", () => {
     expect(await readdir(directory)).not.toContain("2026-09-27T10-15-30-123Z.json.tmp");
   });
 
-  it("totals saved records and skips records broken during review", async () => {
+  it("lists records newest first and skips records broken during review", async () => {
     const directory = await fixture();
     const store = new RecordingStore(directory);
     void store.save(sample(3), new Date("2026-09-27T10:00:00.000Z"));
     void store.save(sample(1), new Date("2026-09-27T10:00:01.000Z"));
-    expect(await store.summary()).toEqual({ count: 2, seconds: 4 });
-    await writeFile(join(directory, "broken.json"), "{");
-    expect(await store.summary()).toEqual({ count: 2, seconds: 4 });
+    const listed = await store.list();
+    expect(listed.map((entry) => [entry.id, entry.seconds])).toEqual([
+      ["2026-09-27T10-00-01-000Z", 1],
+      ["2026-09-27T10-00-00-000Z", 3],
+    ]);
+    expect(listed[0]).toMatchObject({
+      createdAt: "2026-09-27T10:00:01.000Z",
+      modelID: "qwen3-asr-1.7b-bf16",
+      modelText: "hello comma world",
+      finalText: "Hello, world",
+      correctedText: null,
+    });
+    await writeFile(join(directory, "2026-09-27T10-00-02-000Z.json"), "{");
+    await writeFile(join(directory, "notes.json"), "{}");
+    expect(await store.list()).toHaveLength(2);
+  });
+
+  it("saves a trimmed correction and returns the clip's audio", async () => {
+    const directory = await fixture();
+    const store = new RecordingStore(directory);
+    const id = "2026-09-27T10-00-00-000Z";
+    void store.save(sample(1), new Date("2026-09-27T10:00:00.000Z"));
+    await store.correct(id, "  hello comma word \n");
+    const record = JSON.parse(await readFile(join(directory, `${id}.json`), "utf8"));
+    expect(record.correctedText).toBe("hello comma word");
+    expect(record.modelText).toBe("hello comma world");
+    expect((await store.list())[0].correctedText).toBe("hello comma word");
+    expect((await store.audio(id)).length).toBe(44 + 32000);
+    await expect(store.correct(id, "   ")).rejects.toThrow("recording_text");
+    expect(await readdir(directory)).not.toContain(`${id}.json.tmp`);
+  });
+
+  it("deletes a clip's record and audio", async () => {
+    const directory = await fixture();
+    const store = new RecordingStore(directory);
+    void store.save(sample(1), new Date("2026-09-27T10:00:00.000Z"));
+    void store.save(sample(1), new Date("2026-09-27T10:00:01.000Z"));
+    await store.remove("2026-09-27T10-00-00-000Z");
+    expect((await readdir(directory)).sort()).toEqual([
+      "2026-09-27T10-00-01-000Z.json",
+      "2026-09-27T10-00-01-000Z.wav",
+    ]);
+  });
+
+  it("refuses names outside the recording folder", async () => {
+    const directory = await fixture();
+    const store = new RecordingStore(directory);
+    await writeFile(join(directory, "..", "secret.wav"), "private");
+    for (const id of ["../secret", "2026-09-27T10-00-00-000Z/../../secret", "", "notes"]) {
+      await expect(store.audio(id)).rejects.toThrow("recording_id");
+      await expect(store.correct(id, "text")).rejects.toThrow("recording_id");
+      await expect(store.remove(id)).rejects.toThrow("recording_id");
+    }
+    expect(await readFile(join(directory, "..", "secret.wav"), "utf8")).toBe("private");
   });
 });

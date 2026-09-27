@@ -13,6 +13,7 @@ import { AccessibilityDragHelp } from "./AccessibilityDragHelp";
 import { CustomWords } from "./CustomWords";
 import { Exclusions } from "./Exclusions";
 import { Recordings } from "./Recordings";
+import { RecordingReview } from "./RecordingReview";
 import { ActivityPane } from "./ActivityPane";
 import textifyIcon from "../../assets/textify-icon.png";
 
@@ -96,7 +97,10 @@ function NavIcon({ name }: { name: string }) {
 const panes = ["General", "Models", "Vocabulary", "Activity", "Privacy"] as const;
 function App() {
   const state = useSnapshot();
-  const [pane, setPane] = useState<(typeof panes)[number]>("General");
+  // Recording review opens from Privacy and keeps it selected.
+  const [pane, setPane] = useState<(typeof panes)[number] | "Recordings">(
+    "General",
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [devices, setDevices] = useState<{ id: string; name: string }[]>([]);
@@ -188,7 +192,11 @@ function App() {
           {panes.map((name) => (
             <button
               key={name}
-              aria-current={pane === name ? "page" : undefined}
+              aria-current={
+                pane === name || (pane === "Recordings" && name === "Privacy")
+                  ? "page"
+                  : undefined
+              }
               onClick={() => setPane(name)}
             >
               <span aria-hidden="true">
@@ -202,7 +210,13 @@ function App() {
       <main className={pane === "Models" ? "models-main" : undefined}>
         <header>
           <div>
-            <h1>{pane === "Models" ? "Transcription models" : pane}</h1>
+            <h1>
+              {pane === "Models"
+                ? "Transcription models"
+                : pane === "Recordings"
+                  ? "Training recordings"
+                  : pane}
+            </h1>
             {pane === "Vocabulary" && (
               <p>
                 Custom words apply to Whisper models. Replacement pairs work
@@ -210,6 +224,12 @@ function App() {
               </p>
             )}
             {pane === "Activity" && <p>Your dictation activity, saved on this device.</p>}
+            {pane === "Recordings" && (
+              <p>
+                Correct each transcript to exactly what you said. Keep spoken
+                commands such as “comma” as words.
+              </p>
+            )}
           </div>
         </header>
         {(error || state.message) && (
@@ -541,6 +561,13 @@ function App() {
           </div>
         )}
         {pane === "Activity" && <ActivityPane phase={state.phase} />}
+        {pane === "Recordings" && (
+          <RecordingReview
+            phase={state.phase}
+            run={run}
+            back={() => setPane("Privacy")}
+          />
+        )}
         {pane === "Privacy" && (
           <section className="privacy">
             <div className="privacy-intro">
@@ -570,7 +597,12 @@ function App() {
                   Check microphone
                 </button>
               </div>
-              <Recordings state={state} busy={working || busy} save={save} run={run} />
+              <Recordings
+                state={state}
+                busy={working || busy}
+                save={save}
+                review={() => setPane("Recordings")}
+              />
               <Exclusions state={state} busy={working || busy} save={save} />
             </div>
             <p className="footnote">

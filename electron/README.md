@@ -128,8 +128,14 @@ as a 16 kHz mono 16-bit WAV of the audio the model received, plus a JSON record:
 `modelText` (raw model output), `finalText` (after replacement pairs and spoken
 punctuation), `modelID`, `language`, `seconds`, and `correctedText`, which stays
 `null` until you fill it in during review. Cancelled, empty, secure-field and
-excluded-app dictations are not saved. Nothing is uploaded; **Show folder**
-opens the folder, and deleting files there removes them.
+excluded-app dictations are not saved. Nothing is uploaded.
+
+**Privacy → Review** lists the saved clips, newest first. Opening a clip plays
+it and shows the model's transcript for editing; **Save** writes the text to
+`correctedText` and opens the next clip that needs review. Keep spoken commands
+such as "comma" as words, because the correction is the training target for the
+model's raw output. **Delete** removes the clip's WAV and JSON files, and
+**Show folder** opens the folder.
 Custom words, preferences, model files and trust records remain in the existing
 **Textify Electron** data directory so preview updates retain them.
 

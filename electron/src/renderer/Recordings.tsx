@@ -1,24 +1,30 @@
 import React, { useEffect, useState } from "react";
-import type { Action, Preferences, RecordingsSummary, Snapshot } from "../shared";
+import type { Preferences, RecordingEntry, Snapshot } from "../shared";
 export function Recordings({
   state,
   busy,
   save,
-  run,
+  review,
 }: {
   state: Snapshot;
   busy: boolean;
   save(value: Preferences): Promise<boolean>;
-  run(action: Action): Promise<void>;
+  review(): void;
 }) {
-  const [summary, setSummary] = useState<RecordingsSummary>();
+  const [entries, setEntries] = useState<RecordingEntry[]>([]);
   const enabled = state.preferences.saveRecordings;
   useEffect(() => {
-    if (state.phase !== "idle") return;
-    void window.textify
-      .recordings()
-      .then(setSummary, () => setSummary(undefined));
+    let active = true;
+    void window.textify.recordings().then(
+      (list) => active && setEntries(list),
+      () => active && setEntries([]),
+    );
+    return () => {
+      active = false;
+    };
   }, [state.phase, enabled]);
+  const seconds = entries.reduce((total, entry) => total + entry.seconds, 0);
+  const reviewed = entries.filter((entry) => entry.correctedText !== null).length;
   return (
     <div className="privacy-recordings">
       <span className="privacy-microphone-icon" aria-hidden="true">
@@ -42,19 +48,15 @@ export function Recordings({
           Keeps each dictation's audio and transcript in a folder on this
           device, so you can correct them and fine-tune a model.
         </p>
-        {summary && summary.count > 0 && (
+        {entries.length > 0 && (
           <p>
-            {summary.count} saved · {(summary.seconds / 60).toFixed(1)} min of
-            audio
+            {entries.length} saved · {reviewed} reviewed ·{" "}
+            {(seconds / 60).toFixed(1)} min of audio
           </p>
         )}
       </div>
-      <button
-        className="secondary"
-        disabled={busy}
-        onClick={() => void run("reveal-recordings")}
-      >
-        Show folder
+      <button className="secondary" onClick={review}>
+        Review
       </button>
       <input
         type="checkbox"

@@ -698,7 +698,19 @@ else {
       });
       ipcMain.handle("recordings", (event) => {
         if (!allowed(event, [main])) throw new Error("unauthorized");
-        return recordings.summary();
+        return recordings.list();
+      });
+      ipcMain.handle("recording-audio", (event, id) => {
+        if (!allowed(event, [main])) throw new Error("unauthorized");
+        return recordings.audio(id);
+      });
+      ipcMain.handle("correct-recording", (event, id, text) => {
+        if (!allowed(event, [main])) throw new Error("unauthorized");
+        return recordings.correct(id, text);
+      });
+      ipcMain.handle("delete-recording", (event, id) => {
+        if (!allowed(event, [main])) throw new Error("unauthorized");
+        return recordings.remove(id);
       });
       ipcMain.handle("devices", (event) => {
         if (!allowed(event, [main])) throw new Error("unauthorized");
