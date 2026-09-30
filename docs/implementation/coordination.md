@@ -2793,3 +2793,37 @@ Task 1 must merge before parallel Wave 1 work begins.
   silent GIF preview with GitHub's video player. The approved promotion's
   original video and audio remain unchanged. The verification agent performs
   read-only checks of GitHub's supported attachment and playback behavior.
+
+### Mac automatic updates — 2026-10-01
+
+- The owner requested in-app updates: automatic checks, a notification, a
+  download only after the user chooses Update, and installation on the next
+  quit without another prompt. Windows and Linux updates wait until their
+  installers are code-signed.
+- This task explicitly owns automatic updates, which the Electron milestone had
+  excluded. It owns `electron/src/main/updates.ts`,
+  `electron/src/renderer/UpdateNotice.tsx`, the update wiring in
+  `electron/src/main/index.ts`, `src/shared.ts`, `src/main/preferences.ts` and
+  the General settings row, the production Mac feed and ZIP in
+  `electron/scripts/package.mjs`, the feed checks in `scripts/mac-release.mjs`
+  and `scripts/checksums.mjs`, the bundled license copies in `scripts/build.mjs`,
+  their tests, and the update wording in `PRIVACY.md`, `docs/SPEC.md`,
+  `electron/README.md`, `RELEASING.md`, `MANUAL_QA.md` and
+  `THIRD_PARTY_NOTICES.md`.
+- Work is on branch `claude/mac-auto-update` in a separate worktree, because
+  another session had uncommitted edits to `index.ts`, `index.tsx` and
+  `studio.css` in the main checkout. Merging must reconcile those edits.
+- Signed catalogs, model code and native helpers are unchanged. No release was
+  published. The local end-to-end check used Developer ID signing without
+  notarization, a separate test bundle ID, an isolated home directory and a
+  local feed server. Version preview.90 found preview.91, showed the notice,
+  downloaded after Update, and Squirrel.Mac installed preview.91 on quit. The
+  updated app passed strict signature verification and relaunched as
+  preview.91 with no further offer. The first run exposed that "ready" was
+  reported before Squirrel.Mac staged the update; readiness now waits for
+  Electron's native `update-downloaded` event.
+- A read-only check against the real GitHub releases confirmed preview installs
+  select `v0.2.0-preview.23` and skip `v1.1.0-unsigned-preview.1` and
+  `models-v1`. That release has no feed, so the check stops quietly.
+- The root README still describes the published preview.23 download, which has
+  no updater. Update it when the first updater-enabled release is published.

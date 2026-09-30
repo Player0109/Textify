@@ -462,6 +462,17 @@ input {
 .copy-row button {
   font-size: 12px;
 }
+.update-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.update-notice span {
+  flex: 1;
+}
+.update-notice button {
+  font-size: 12px;
+}
 .loading {
   padding: 50px;
 }

@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@deltachat/dbus-next": "1.0.1",
+    "electron-updater": "6.8.10",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "uiohook-napi": "1.5.5"

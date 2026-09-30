@@ -1,7 +1,9 @@
 import {
   app,
+  autoUpdater as squirrel,
   BrowserWindow,
   Menu,
+  Notification,
   Tray,
   nativeImage,
   ipcMain,
@@ -13,9 +15,11 @@ import {
   shell,
 } from "electron";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
+import { existsSync } from "node:fs";
 import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { autoUpdater } from "electron-updater";
 import { Dictation } from "../core/dictation";
 import { engineError } from "../core/engine-error";
 import { overlayBounds } from "../core/overlay-geometry";
@@ -28,6 +32,7 @@ import { AccessibilitySetup } from "./accessibility";
 import { ActivityStore } from "./activity";
 import { defaults, validatePreferences } from "./preferences";
 import { linuxStartup, linuxStartupEnabled } from "./startup";
+import { Updates } from "./updates";
 import type { Action, Preferences, Snapshot, ModelCommand } from "../shared";
 
 app.setName("Textify");
@@ -49,6 +54,8 @@ let main: BrowserWindow,
   overlay: BrowserWindow,
   tray: Tray;
 let accessibilityHelp: BrowserWindow | undefined;
+let updates: Updates | null = null,
+  updateNotice: Notification | undefined;
 let quitting = false,
   cleaned = false,
   modelBusy = false,
@@ -131,6 +138,8 @@ function snapshot(): Snapshot {
     downloadModelID: models?.progressID ?? null,
     exclusionsAvailable: platform.exclusionsAvailable,
     startupAvailable: app.isPackaged,
+    updatesSupported: Boolean(updates),
+    update: updates?.view ?? null,
   };
 }
 function changed() {
@@ -169,6 +178,16 @@ function showMain() {
     main.show();
     main.focus();
   }
+}
+function announceUpdate(version: string) {
+  if (!Notification.isSupported()) return;
+  // Keep a reference so a click still opens Textify after garbage collection.
+  updateNotice = new Notification({
+    title: "Textify update available",
+    body: `Version ${version} is available. Open Textify to update.`,
+  });
+  updateNotice.on("click", showMain);
+  updateNotice.show();
 }
 function showAccessibilityHelp() {
   if (!accessibilityHelp || accessibilityHelp.isDestroyed()) return;
@@ -359,6 +378,10 @@ async function action(action: Action) {
     case "import":
       await modelAction({ action, id: preferences.activeModelID });
       break;
+    case "update":
+      // Settings stays usable while the update downloads.
+      void updates?.download();
+      break;
     default:
       throw new Error("unsupported_action");
   }
@@ -420,6 +443,8 @@ async function savePreferences(value: unknown) {
       if (models.installed) await loadModel();
     }
     if (next.trigger !== previous.trigger && stopTrigger) await enableTrigger();
+    if (next.checkForUpdates !== previous.checkForUpdates)
+      updates?.setEnabled(next.checkForUpdates);
     changed();
   } finally {
     savingPreferences = false;
@@ -805,6 +830,18 @@ else {
           "The bundled model catalog could not be verified. Reinstall this preview.";
       }
       if (!smoke && !wayland) await enableTrigger();
+      // Only signed direct-download Mac releases carry an update feed.
+      // Windows and Linux stay manual until their installers are signed,
+      // and a Mac App Store build updates through the App Store.
+      if (
+        process.platform === "darwin" &&
+        app.isPackaged &&
+        !process.mas &&
+        existsSync(join(process.resourcesPath, "app-update.yml"))
+      ) {
+        updates = new Updates(autoUpdater, squirrel, changed, announceUpdate);
+        updates.setEnabled(preferences.checkForUpdates);
+      }
       changed();
     })
     .catch(() => {
@@ -822,6 +859,7 @@ else {
     quitting = true;
     clearTimeout(broadcastTimer);
     accessibility?.stop();
+    updates?.stop();
     stopTrigger?.();
     models?.cancel();
     worker?.stop();

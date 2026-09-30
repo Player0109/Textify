@@ -13,6 +13,7 @@ import { AccessibilityDragHelp } from "./AccessibilityDragHelp";
 import { CustomWords } from "./CustomWords";
 import { Exclusions } from "./Exclusions";
 import { ActivityPane } from "./ActivityPane";
+import { UpdateNotice } from "./UpdateNotice";
 import textifyIcon from "../../assets/textify-icon.png";
 
 const mode = new URLSearchParams(location.search).get("mode");
@@ -211,6 +212,7 @@ function App() {
             {pane === "Activity" && <p>Your dictation activity, saved on this device.</p>}
           </div>
         </header>
+        <UpdateNotice update={state.update} />
         {(error || state.message) && (
           <div className="notice" role="status">
             {error || state.message}
@@ -441,6 +443,25 @@ function App() {
                   }
                 />
               </div>
+              {state.updatesSupported && (
+                <div className="setting-row">
+                  <div>
+                    <h3>Check for updates automatically</h3>
+                  </div>
+                  <input
+                    type="checkbox"
+                    aria-label="Check for updates automatically"
+                    checked={state.preferences.checkForUpdates}
+                    disabled={working || busy}
+                    onChange={(event) =>
+                      void save({
+                        ...state.preferences,
+                        checkForUpdates: event.target.checked,
+                      })
+                    }
+                  />
+                </div>
+              )}
             </section>
             <FloatingIconSettings
               preferences={state.preferences}
@@ -570,8 +591,10 @@ function App() {
               <Exclusions state={state} busy={working || busy} save={save} />
             </div>
             <p className="footnote">
-              Network access is used only when you choose to download a model.
-              Model hosts receive normal download request information.
+              {state.updatesSupported
+                ? "Network access is used when you choose to download a model or an app update, and to check GitHub for new versions while automatic checks are on."
+                : "Network access is used only when you choose to download a model."}{" "}
+              Download hosts receive normal request information.
             </p>
           </section>
         )}

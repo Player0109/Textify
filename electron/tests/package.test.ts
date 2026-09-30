@@ -47,6 +47,22 @@ describe("Mac packaging identity", () => {
     expect(notarizeMacDmg).toHaveBeenCalledWith(resolve("release/Textify-test-mac-arm64.dmg"), authority);
   });
 
+  it("adds the GitHub update feed and a notarized ZIP only to signed releases", async () => {
+    await import(packageURL);
+    const { config } = build.mock.calls[0][0];
+    expect(config.publish).toEqual({ provider: "github", owner: "Player0109", repo: "Textify" });
+    expect(config.mac.target).toEqual(["dmg", "zip"]);
+    expect(config.dmg).toEqual({ sign: true, writeUpdateInfo: false });
+  });
+
+  it("keeps previews without an update feed", async () => {
+    process.argv.push("--preview");
+    await import(packageURL);
+    const { config } = build.mock.calls[0][0];
+    expect(config.publish).toBeUndefined();
+    expect(config.mac.target).toEqual(["dmg"]);
+  });
+
   it("keeps pull-request previews ad-hoc without notarization or publication", async () => {
     process.argv.push("--preview", "--dir");
     await import(packageURL);

@@ -152,6 +152,22 @@ packaging refuses to run without notarization credentials. Verify the resulting
 app's ticket and Gatekeeper assessment before distribution; signing alone does
 not claim a notarized release, and credentials are never bundled.
 
+### Automatic updates
+
+Signed macOS releases update themselves from GitHub Releases. Production Mac
+packaging adds the GitHub update feed and a ZIP of the notarized app. At launch
+and every six hours, Textify checks the newest `v*-preview.*` release for
+`preview-mac.yml`. A newer version shows a notification and a Settings notice.
+Choosing **Update** downloads the ZIP, checks its SHA-512 against the feed and
+hands it to Squirrel.Mac. Squirrel.Mac accepts only an app with the same
+bundle ID and Developer ID team, then installs it the next time Textify quits.
+General settings can turn the checks off.
+
+Preview and development builds have no update feed, so they never check.
+Windows and Linux stay manual until their installers are code-signed. A Mac App
+Store build must not include this updater. Install the first updater-enabled
+release manually; later releases arrive through the app.
+
 ### Accessibility setup on macOS
 
 General shows **Enable Accessibility** when permission is missing. The button

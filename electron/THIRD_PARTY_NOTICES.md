@@ -25,6 +25,12 @@ the publishers' public profiles or site:
   https://github.com/kwhat/libuiohook
 - dbus-next (Delta Chat fork), MIT:
   https://github.com/deltachat/node-dbus-next
+- electron-updater and builder-util-runtime, MIT:
+  https://github.com/electron-userland/electron-builder. The Mac updater also
+  bundles debug, fs-extra, graceful-fs, has-flag, js-yaml, jsonfile, lazy-val,
+  lodash.escaperegexp, lodash.isequal, ms, sax, semver, supports-color and
+  universalify under MIT, ISC or BlueOak-1.0.0 terms. lazy-val declares MIT
+  and publishes no separate license file.
 
 The installed uiohook-napi source, its included libuiohook source, and build
 description are provided in `textify/native-source/uiohook-napi`. Its native

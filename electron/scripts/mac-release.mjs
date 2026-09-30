@@ -1,5 +1,9 @@
 import { spawnSync } from "node:child_process";
-import { resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { createReadStream } from "node:fs";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
 export function notaryCredentials(env = process.env) {
   // Match electron-builder's credential precedence for the app submission.
@@ -58,10 +62,51 @@ export function notarizeMacDmg(dmg, identity, env = process.env, run = runMacToo
 export function verifyProductionInstallers(files, version, platform = process.platform, run = runMacTool) {
   if (platform !== "darwin")
     throw new Error("Assemble production checksums on the maintainer Mac so the DMG can be verified.");
-  for (const suffix of ["mac-arm64.dmg", "win-x64.exe", "linux-x86_64.AppImage", "linux-amd64.deb"]) {
+  for (const suffix of ["mac-arm64.dmg", "mac-arm64.zip", "win-x64.exe", "linux-x86_64.AppImage", "linux-amd64.deb"]) {
     if (!files.includes(`Textify-${version}-${suffix}`))
       throw new Error(`Missing release installer: Textify-${version}-${suffix}`);
   }
   for (const file of files.filter((name) => name.endsWith(".dmg")))
     verifyMacDmg(resolve("release", file), run);
+}
+
+// Installed apps trust the update feed's hash and size, so the feed must
+// describe these exact ZIP bytes, and the app inside must pass the same
+// Developer ID, staple, and Gatekeeper checks as the DMG.
+export function macUpdateFeed(version) {
+  // electron-builder names the feed after the first prerelease label.
+  return `${/^[^-+]+-([^.+]+)/.exec(version)?.[1] ?? "latest"}-mac.yml`;
+}
+
+export async function verifyMacUpdate(directory, version, run = runMacTool) {
+  const name = `Textify-${version}-mac-arm64.zip`;
+  const zip = resolve(directory, name);
+  const feed = await readFile(resolve(directory, macUpdateFeed(version)), "utf8");
+  const hash = createHash("sha512");
+  let size = 0;
+  for await (const bytes of createReadStream(zip)) {
+    hash.update(bytes);
+    size += bytes.length;
+  }
+  const sha512 = hash.digest("base64");
+  const values = (key) => [...feed.matchAll(new RegExp(`^\\s*(?:- )?${key}: (.+)$`, "gm"))].map((match) => match[1].trim());
+  if (!values("version").every((value) => value === version) || values("version").length !== 1)
+    throw new Error("The Mac update feed does not match the package version.");
+  if (!values("url").length || !values("url").every((value) => value === name) ||
+      !values("path").every((value) => value === name))
+    throw new Error(`The Mac update feed must list only ${name}.`);
+  if (!values("sha512").length || !values("sha512").every((value) => value === sha512) ||
+      !values("size").length || !values("size").every((value) => Number(value) === size))
+    throw new Error("The Mac update feed does not match the final ZIP bytes.");
+  const extracted = await mkdtemp(join(tmpdir(), "textify-update-"));
+  try {
+    run("ditto", ["-x", "-k", zip, extracted]);
+    const app = join(extracted, "Textify.app");
+    run("codesign", ["--verify", "--deep", "--strict", app]);
+    verifyDeveloperId(app, run);
+    run("xcrun", ["stapler", "validate", app]);
+    run("spctl", ["--assess", "--verbose", "--type", "execute", app]);
+  } finally {
+    await rm(extracted, { recursive: true, force: true });
+  }
 }

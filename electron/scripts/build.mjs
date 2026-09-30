@@ -1,6 +1,6 @@
 import { build } from "esbuild";
 import { build as viteBuild } from "vite";
-import { cp, mkdir, access } from "node:fs/promises";
+import { cp, mkdir, access, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 
 await mkdir("resources", { recursive: true });
@@ -37,6 +37,30 @@ for (const name of [
     `node_modules/${name}/LICENSE`,
     `resources/licenses/${name.replaceAll("/", "-")}.txt`,
   );
+}
+// electron-updater and the packages bundled with it into the main process.
+// lazy-val declares MIT but publishes no license file.
+for (const name of [
+  "electron-updater",
+  "builder-util-runtime",
+  "debug",
+  "fs-extra",
+  "graceful-fs",
+  "has-flag",
+  "js-yaml",
+  "jsonfile",
+  "lodash.escaperegexp",
+  "lodash.isequal",
+  "ms",
+  "sax",
+  "semver",
+  "supports-color",
+  "universalify",
+]) {
+  const license = (await readdir(`node_modules/${name}`)).find((file) =>
+    /^licen[cs]e/i.test(file),
+  );
+  await cp(`node_modules/${name}/${license}`, `resources/licenses/${name}.txt`);
 }
 // Ship the exact installed hook sources so its native module can be rebuilt.
 for (const name of ["src", "libuiohook", "binding.gyp", "package.json"]) {

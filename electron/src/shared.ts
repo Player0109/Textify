@@ -23,6 +23,7 @@ export interface Preferences {
   language: string;
   activeModelID: string;
   launchAtLogin: boolean;
+  checkForUpdates: boolean;
   exclusions: { id: string; name: string }[];
   overlay: { x: number; y: number; scale: number };
 }
@@ -45,6 +46,11 @@ export interface ModelView {
   languages: string[];
   resumable: boolean;
   storedBytes: number;
+}
+export interface UpdateView {
+  status: "available" | "downloading" | "ready" | "failed";
+  version: string;
+  progress: number;
 }
 export interface Snapshot {
   phase: Phase;
@@ -70,6 +76,8 @@ export interface Snapshot {
   downloadModelID: string | null;
   exclusionsAvailable: boolean;
   startupAvailable: boolean;
+  updatesSupported: boolean;
+  update: UpdateView | null;
   preferences: Preferences;
   models: ModelView[];
 }
@@ -99,7 +107,8 @@ export type Action =
   | "enable-trigger"
   | "download"
   | "cancel-download"
-  | "import";
+  | "import"
+  | "update";
 export type ModelCommand = {
   action: "download" | "import" | "use" | "verify" | "remove" | "source";
   id: string;

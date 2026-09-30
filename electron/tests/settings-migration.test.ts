@@ -13,6 +13,18 @@ describe("settings and language migration", () => {
     expect(next.microphone).toBe("device");
     expect(next.language).toBe("en");
   });
+  it("turns on update checks for earlier settings and rejects invalid values", () => {
+    const earlier: Record<string, unknown> = { ...defaults() };
+    delete earlier.checkForUpdates;
+    expect(validatePreferences(earlier).checkForUpdates).toBe(true);
+    expect(
+      validatePreferences({ ...defaults(), checkForUpdates: false })
+        .checkForUpdates,
+    ).toBe(false);
+    expect(() =>
+      validatePreferences({ ...defaults(), checkForUpdates: "yes" }),
+    ).toThrow();
+  });
   it("rejects duplicate custom words and invalid overlay sizes", () => {
     expect(() =>
       validatePreferences({

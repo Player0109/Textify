@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { readdir, readFile, writeFile, copyFile, rm } from "node:fs/promises";
-import { verifyProductionInstallers } from "./mac-release.mjs";
+import { verifyMacUpdate, verifyProductionInstallers } from "./mac-release.mjs";
 const production = process.argv.slice(2).includes("--production");
 if (process.argv.slice(2).some((arg) => arg !== "--production"))
   throw new Error("Only --production is supported");
@@ -14,11 +14,14 @@ const files = (await readdir("release"))
   .filter(
     (name) =>
       name.startsWith(`Textify-${version}-`) &&
-      /\.(dmg|exe|AppImage|deb)$/.test(name),
+      /\.(dmg|zip|exe|AppImage|deb)$/.test(name),
   )
   .sort();
 if (!files.length) throw new Error("No preview installers found");
-if (production) verifyProductionInstallers(files, version);
+if (production) {
+  verifyProductionInstallers(files, version);
+  await verifyMacUpdate("release", version);
+}
 const lines = [];
 for (const file of files) {
   const hash = createHash("sha256");

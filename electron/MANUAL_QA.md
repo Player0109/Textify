@@ -36,6 +36,18 @@ Xvfb and do not establish GNOME/KDE Wayland behavior.
 | Quit during recording or recognition | Mic stops; no delayed insertion | Pending |
 | Five-minute cap | Recording stops and produces at most one result | Pending |
 
+## Mac automatic updates
+
+Install the previous updater-enabled release in `/Applications`, then publish
+the new release with its ZIP, blockmap and `preview-mac.yml`.
+
+| Check | Expected result | Result |
+| --- | --- | --- |
+| Launch the previous release | Notification and Settings notice name the new version | Pending |
+| Choose Update | Progress reaches ready; the app keeps working | Pending |
+| Quit and reopen Textify | New version runs; Accessibility, microphone and settings are kept | Pending |
+| Turn off automatic checks, relaunch | No update notice or request to GitHub | Pending |
+
 ## Permissions, focus, and clipboard
 
 Use test text only. For focus checks, have Notepad and a browser test field open.
