@@ -2793,3 +2793,19 @@ Task 1 must merge before parallel Wave 1 work begins.
   silent GIF preview with GitHub's video player. The approved promotion's
   original video and audio remain unchanged. The verification agent performs
   read-only checks of GitHub's supported attachment and playback behavior.
+
+### General settings control alignment — 2026-09-26
+
+- This task owns only the General settings control styling in
+  `electron/src/renderer/studio.css` and the corresponding control-stack class
+  in `electron/src/renderer/index.tsx`. Set the model, language, microphone,
+  and trigger controls to the same width, with secondary action links below
+  their controls. This handoff precedes those edits.
+- Verify layout with the trigger link shown and hidden at normal and narrow
+  window widths using isolated UI state. Desktop integration, user settings,
+  model assets, packaging, and publication remain outside this change.
+- Validation: TypeScript and production build passed. Isolated Electron layout
+  checks passed with the trigger link shown and hidden at widths 780, 930, 931,
+  1050, 1051, and 1120: all four controls measure 170 px, links sit below and
+  align right, and the trigger retains its horizontal position without label
+  overlap or page overflow. Normal and narrow screenshots were inspected.
