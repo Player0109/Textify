@@ -62,7 +62,9 @@ arbitrary custom model files and runtime plugins are not supported.
 
 Model weights are downloaded separately after an explicit user action. Exact
 file sizes and SHA-256 values must match the trusted signed metadata before
-activation. Download sources are immutable Textify release assets or exact
+activation. Each download or import is hashed once before installation;
+launching the app or switching models checks file sizes and layout without
+rehashing. Download sources are immutable Textify release assets or exact
 commit-pinned public Hugging Face files. Interrupted transfers may resume.
 Signed revocations remain enforced locally; restoration requires explicit
 verification before an artifact can be used again.

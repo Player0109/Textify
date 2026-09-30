@@ -50,6 +50,8 @@ export class WhisperWorker {
       stdio: "pipe",
       windowsHide: true,
       shell: false,
+      // Third-party overlay layers (Steam, OBS, RivaTuner) can stall Vulkan startup.
+      env: { ...process.env, VK_LOADER_LAYERS_DISABLE: "~implicit~" },
     }));
     const lines = createInterface({ input: child.stdout });
     lines.on("line", (line) => {

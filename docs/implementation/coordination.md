@@ -2809,3 +2809,25 @@ Task 1 must merge before parallel Wave 1 work begins.
   1050, 1051, and 1120: all four controls measure 170 px, links sit below and
   align right, and the trigger retains its horizontal position without label
   overlap or page overflow. Normal and narrow screenshots were inspected.
+
+### Model launch without rehashing — 2026-10-01
+
+- The owner decided that install-time verification is sufficient: downloads
+  and imports already match catalog size and SHA-256 before their atomic rename.
+  This task owns the launch-time check in `electron/src/main/models.ts` and
+  `transfer.ts`, the model-switch path in `electron/src/main/index.ts`, a launch
+  test in `electron/tests/storage.test.ts`, and the matching sentences in
+  `docs/SPEC.md` and `electron/README.md`. This handoff precedes those edits.
+- Launch and model switching check file type, size, and directory layout only.
+  Downloads, imports, and the explicit Verify action still hash every file.
+  Revocations, receipts, catalogs, and the native workers remain unchanged.
+
+### GPU worker startup diagnostics — 2026-10-01
+
+- This task owns the worker spawn environment in `electron/src/main/worker.ts`
+  and its test, the hash read size in `electron/src/main/transfer.ts`, startup
+  timing output in `electron/scripts/runtime-smoke.mjs`, and the matching
+  sentences in `electron/README.md`. This handoff precedes those edits.
+- Workers start with implicit Vulkan layers disabled so third-party overlays
+  are not loaded into GPU startup. Windows behavior requires physical-device
+  QA; macOS Metal and the precompiled Metal library are outside this change.
