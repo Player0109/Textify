@@ -35,7 +35,26 @@ inline std::string json(const std::string &value) {
     }
     return out + '"';
 }
+// ggml-vulkan reports a failed device allocation only on std::cerr, after
+// trying every memory type. Pass the text through and remember that fact.
+class memory_watch : public std::streambuf {
+    std::streambuf *out = std::cerr.rdbuf(this);
+    std::string line;
+  public:
+    bool exhausted = false;
+  protected:
+    int overflow(int c) override {
+        if (c == traits_type::eof()) return traits_type::not_eof(c);
+        if (c != '\n') { if (line.size() < 256) line += char(c); }
+        else { exhausted |= line.find("allocation of size") != std::string::npos; line.clear(); }
+        return out->sputc(char(c));
+    }
+    int sync() override { return out->pubsync(); }
+};
+inline memory_watch &memory() { static memory_watch watch; return watch; }
 inline int failure(const char *code) {
+    if (memory().exhausted && (std::strcmp(code, "gpu_model_load") == 0 || std::strcmp(code, "gpu_inference") == 0))
+        code = "gpu_memory";
     std::cout << "{\"error\":" << json(code) << "}\n" << std::flush;
     return 1;
 }
@@ -49,6 +68,7 @@ inline bool configuration() {
     _setmode(_fileno(stdin), _O_BINARY);
     _setmode(_fileno(stdout), _O_BINARY);
 #endif
+    memory(); // Watch std::cerr before any model code runs.
     const auto n = count();
     if (!std::cin || n > 8192) return false;
     std::string prompt(n, '\0');

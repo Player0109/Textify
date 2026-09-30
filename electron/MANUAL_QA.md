@@ -153,6 +153,11 @@ This automated evidence does not mark the pending physical-desktop checks passed
   recognizes a public phrase; Confucius shows live text while recording.
 - [ ] Windows: a new-family model loads from a path containing non-ASCII
   characters, as in a user profile with a non-ASCII name.
+- [ ] Windows RTX 2060 (6 GB): Qwen3-ASR 1.7B BF16 and Confucius F16 and
+  BF16 either load and recognize a public phrase, or show the "needs more GPU
+  memory" message, never CPU inference or an endless load.
+- [ ] Windows: removing, then re-downloading or importing, the active Confucius
+  model succeeds without a file-in-use error.
 - [ ] Windows icon: the taskbar, title bar, Alt+Tab, notification area and
   installer show the T mark without the tile, sharp at 100%, 125% and 150%
   display scaling, on light and dark taskbars.

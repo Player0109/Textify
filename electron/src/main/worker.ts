@@ -199,7 +199,7 @@ export class WhisperWorker {
       return null;
     return value.text;
   }
-  stop(error?: Error) {
+  stop(error?: Error): Promise<void> {
     const child = this.child;
     this.child = undefined;
     this.ready = false;
@@ -211,8 +211,15 @@ export class WhisperWorker {
       this.pending.reject(error ?? new Error("worker_stopped"));
       this.pending = undefined;
     }
+    // Windows keeps a memory-mapped model file locked until its process exits.
+    const exited = new Promise<void>((resolve) => {
+      if (!child?.pid || child.exitCode !== null || child.signalCode !== null)
+        resolve();
+      else child.once("exit", () => resolve());
+    });
     child?.stdin.destroy();
     child?.kill();
     this.changed();
+    return exited;
   }
 }

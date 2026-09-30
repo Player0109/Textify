@@ -2858,3 +2858,35 @@ Task 1 must merge before parallel Wave 1 work begins.
   sizes. The Windows NVIDIA check of the new families, the icon check on a
   Windows PC and all Linux hardware checks are pending; Linux is covered by CI
   only.
+
+### GPU memory error and model removal on Windows — 2026-10-01
+
+- The owner approved finishing the Windows model plan on this branch, keeping
+  Linux enabled and the current transcribe.cpp/audio.cpp pins. A model that
+  does not fit fails with a clear message; GPU work never spills into system
+  memory. This task owns failure codes in `electron/native/model-protocol.h`,
+  `transcribe-worker.cpp` and `audio-worker.cpp`, the `gpu_memory` message in
+  `electron/src/core/engine-error.ts`, `WhisperWorker.stop()` in
+  `electron/src/main/worker.ts` and its callers in `electron/src/main/index.ts`,
+  their tests, and the matching README and MANUAL_QA text. This handoff
+  precedes those edits.
+- The uncommitted "GPU worker startup diagnostics" task in the main checkout
+  edits the worker spawn environment in `worker.ts`; this task edits only
+  `stop()` and its callers.
+- Out-of-memory detection: ggml-vulkan prints "Device memory allocation of size
+  N failed" to std::cerr after every memory type fails, and the audio.cpp C API
+  reports GPU allocation failures as generic errors. The workers keep stderr
+  unchanged but remember that line, so a failed load or inference reports
+  `gpu_memory`; transcribe.cpp's `TRANSCRIBE_ERR_OOM` does the same. The
+  worker-stop wait matters because audio.cpp memory-maps model files with
+  `MapViewOfFile` on Windows. Stack size and a BF16-to-F16 audio encoder
+  option were not added: the pinned ggml ran with 512 KiB thread stacks
+  upstream, and the MoltenVK run above already exercised the BF16 path.
+- Validation: TypeScript, 134 tests and the production build pass; the new stop
+  test fails against the previous `stop()`. A standalone check of the header
+  confirmed that unrelated stderr lines keep `gpu_model_load`, the Vulkan
+  allocation line turns load and inference failures into `gpu_memory`,
+  protocol errors are unchanged, and stderr text passes through. Rebuilt Metal
+  workers pass the CPU-refusal tests and recognize the public JFK fixture with
+  Parakeet Q8_0, Qwen 0.6B Q8_0 and Confucius original BF16, including
+  Confucius live preview. Windows CI and the RTX 2060 checks are pending.

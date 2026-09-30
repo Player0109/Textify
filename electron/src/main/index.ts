@@ -466,7 +466,7 @@ async function modelAction(command: ModelCommand) {
     });
     if (answer.response !== 1 || dictation.busy || modelBusy || models.busy)
       return;
-    if (models.id === command.id) worker.stop();
+    if (models.id === command.id) await worker.stop();
     await models.remove(command.id);
   } else if (command.action === "use") {
     if (model.status !== "installed") throw new Error("model_not_ready");
@@ -518,7 +518,7 @@ async function modelAction(command: ModelCommand) {
         return;
       source = choice.filePaths[0];
     }
-    if (models.id === command.id) worker.stop();
+    if (models.id === command.id) await worker.stop();
     await models.install(source, command.id);
     if (models.id === command.id) await loadModel();
   }

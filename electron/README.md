@@ -49,7 +49,11 @@ are not included. Custom vocabulary prompts apply
 to Whisper; replacement pairs apply to every engine. Windows and Linux run these
 versions on Vulkan; their physical-GPU checks are listed in
 [MANUAL_QA.md](MANUAL_QA.md). Published catalog benchmark ratings are not claimed
-as measurements of these desktop workers.
+as measurements of these desktop workers. A version that does not fit in free GPU
+memory fails with a message asking for a smaller version; weights are never
+moved to system memory. The largest versions are about 4.1 GB before working
+buffers. Removing or replacing the active model waits for its worker to exit,
+because Windows keeps a memory-mapped model file locked until then.
 
 **BF16 · Original** downloads the publisher's 11 original files (4.09 GB) from
 `netease-youdao/Confucius4-R2T2` revision
