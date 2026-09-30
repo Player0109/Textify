@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import {
+  lstat,
   open,
   readFile,
   rename,
@@ -18,7 +19,8 @@ export interface ModelFile {
 }
 export async function hashFile(path: string) {
   const hash = createHash("sha256");
-  for await (const bytes of createReadStream(path)) hash.update(bytes);
+  for await (const bytes of createReadStream(path, { highWaterMark: 1 << 20 }))
+    hash.update(bytes);
   return hash.digest("hex");
 }
 export async function validFile(path: string, file: ModelFile) {
@@ -27,6 +29,14 @@ export async function validFile(path: string, file: ModelFile) {
       (await stat(path)).size === file.sizeBytes &&
       (await hashFile(path)) === file.sha256
     );
+  } catch {
+    return false;
+  }
+}
+export async function sizedFile(path: string, file: ModelFile) {
+  try {
+    const info = await lstat(path);
+    return info.isFile() && info.size === file.sizeBytes;
   } catch {
     return false;
   }

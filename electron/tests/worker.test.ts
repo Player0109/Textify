@@ -41,6 +41,21 @@ it.each([
     expect(worker.ready).toBe(false);
   },
 );
+it("starts the worker without implicit Vulkan layers", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "textify-worker-env-"));
+  const script = join(dir, "worker.cjs");
+  await writeFile(
+    script,
+    `process.stdin.resume(); console.log(JSON.stringify({ ready: true, gpu: { backend: "Vulkan", device: process.env.VK_LOADER_LAYERS_DISABLE } }));`,
+  );
+  const worker = new WhisperWorker(process.execPath, () => {});
+  cleanup.push(async () => {
+    worker.stop();
+    await rm(dir, { recursive: true });
+  });
+  await worker.load(script);
+  expect(worker.gpu?.device).toBe("~implicit~");
+});
 it("accepts a confirmed GPU and clears it when stopped", async () => {
   const gpu = { backend: "Vulkan", device: "NVIDIA test device" };
   const { worker, script } = await fixture({ ready: true, gpu });

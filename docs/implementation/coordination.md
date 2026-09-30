@@ -2794,6 +2794,22 @@ Task 1 must merge before parallel Wave 1 work begins.
   original video and audio remain unchanged. The verification agent performs
   read-only checks of GitHub's supported attachment and playback behavior.
 
+### General settings control alignment — 2026-09-26
+
+- This task owns only the General settings control styling in
+  `electron/src/renderer/studio.css` and the corresponding control-stack class
+  in `electron/src/renderer/index.tsx`. Set the model, language, microphone,
+  and trigger controls to the same width, with secondary action links below
+  their controls. This handoff precedes those edits.
+- Verify layout with the trigger link shown and hidden at normal and narrow
+  window widths using isolated UI state. Desktop integration, user settings,
+  model assets, packaging, and publication remain outside this change.
+- Validation: TypeScript and production build passed. Isolated Electron layout
+  checks passed with the trigger link shown and hidden at widths 780, 930, 931,
+  1050, 1051, and 1120: all four controls measure 170 px, links sit below and
+  align right, and the trigger retains its horizontal position without label
+  overlap or page overflow. Normal and narrow screenshots were inspected.
+
 ### Windows/Linux Vulkan fixes and additional models — 2026-09-27
 
 - The owner reported that preview.23 on a Windows PC with an NVIDIA RTX 2060
@@ -2858,6 +2874,28 @@ Task 1 must merge before parallel Wave 1 work begins.
   sizes. The Windows NVIDIA check of the new families, the icon check on a
   Windows PC and all Linux hardware checks are pending; Linux is covered by CI
   only.
+
+### Model launch without rehashing — 2026-10-01
+
+- The owner decided that install-time verification is sufficient: downloads
+  and imports already match catalog size and SHA-256 before their atomic rename.
+  This task owns the launch-time check in `electron/src/main/models.ts` and
+  `transfer.ts`, the model-switch path in `electron/src/main/index.ts`, a launch
+  test in `electron/tests/storage.test.ts`, and the matching sentences in
+  `docs/SPEC.md` and `electron/README.md`. This handoff precedes those edits.
+- Launch and model switching check file type, size, and directory layout only.
+  Downloads, imports, and the explicit Verify action still hash every file.
+  Revocations, receipts, catalogs, and the native workers remain unchanged.
+
+### GPU worker startup diagnostics — 2026-10-01
+
+- This task owns the worker spawn environment in `electron/src/main/worker.ts`
+  and its test, the hash read size in `electron/src/main/transfer.ts`, startup
+  timing output in `electron/scripts/runtime-smoke.mjs`, and the matching
+  sentences in `electron/README.md`. This handoff precedes those edits.
+- Workers start with implicit Vulkan layers disabled so third-party overlays
+  are not loaded into GPU startup. Windows behavior requires physical-device
+  QA; macOS Metal and the precompiled Metal library are outside this change.
 
 ### GPU memory error and model removal on Windows — 2026-10-01
 

@@ -11,7 +11,13 @@ import {
 import { basename, join } from "node:path";
 import { verifyCatalog } from "./trust";
 import { Revocations } from "./revocations";
-import { hashFile, validFile, transfer, type ModelFile } from "./transfer";
+import {
+  hashFile,
+  sizedFile,
+  validFile,
+  transfer,
+  type ModelFile,
+} from "./transfer";
 import type { ModelView } from "../shared";
 export { verifyCatalog, hashFile };
 export type { ModelFile };
@@ -262,7 +268,12 @@ export class Models {
   private async refresh(model: Model) {
     const protection = this.revocations.status(model.id, model.files);
     model.restorations = protection.restorations;
-    model.installed = await this.valid(model);
+    // Install hashes every file before its atomic rename; Verify rehashes.
+    model.installed = await this.valid(
+      model,
+      this.pathFor(model.id),
+      sizedFile,
+    );
     const partial = `${this.pathFor(model.id)}.partial`;
     model.resumable = model.directory
       ? await readdir(partial)
@@ -398,8 +409,12 @@ export class Models {
       this.changed();
     }
   }
-  private async valid(model: Model, path = this.pathFor(model.id)) {
-    if (!model.directory) return validFile(path, model.file);
+  private async valid(
+    model: Model,
+    path = this.pathFor(model.id),
+    check = validFile,
+  ) {
+    if (!model.directory) return check(path, model.file);
     try {
       // Never load extra GGUF weights, scripts, or symlinks from an imported folder.
       if (!(await lstat(path)).isDirectory()) return false;
@@ -408,7 +423,7 @@ export class Models {
       for (const file of model.files)
         if (
           !(await lstat(join(path, file.filename))).isFile() ||
-          !(await validFile(join(path, file.filename), file))
+          !(await check(join(path, file.filename), file))
         )
           return false;
       return true;

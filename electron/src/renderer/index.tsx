@@ -339,7 +339,7 @@ function App() {
                 <div>
                   <h3>Microphone</h3>
                 </div>
-                <div className="control-stack microphone-control">
+                <div className="control-stack">
                   <select
                     aria-label="Microphone"
                     disabled={working || busy}

@@ -1,8 +1,10 @@
 import { createHash } from "node:crypto";
 import {
+  cp,
   mkdtemp,
   readFile,
   rm,
+  truncate,
   writeFile,
   mkdir,
   readdir,
@@ -164,5 +166,34 @@ describe("verified model storage", () => {
     );
     await h.model.install();
     expect(await readFile(h.model.path)).toEqual(h.bytes);
+  });
+});
+describe("model launch", () => {
+  it("trusts install-time hashing and checks only size, while Verify rehashes", async () => {
+    const resources = await mkdtemp(join(tmpdir(), "textify-resources-"));
+    const storage = await mkdtemp(join(tmpdir(), "textify-storage-"));
+    directories.push(resources, storage);
+    await cp("models", join(resources, "extra-models"), { recursive: true });
+    for (const name of [
+      "manifest.json",
+      "manifest.json.sig",
+      "revocations.json",
+      "revocations.json.sig",
+    ])
+      await cp(join("../models", name), join(resources, name));
+    const launch = async () => {
+      const models = new Models(resources, storage, () => {});
+      await models.init("ggml-small.en-q5_1");
+      return models;
+    };
+    const models = await launch();
+    expect(models.installed).toBe(false);
+    // Zero bytes of the catalog size stand in for a file install already hashed.
+    await writeFile(models.path, "");
+    await truncate(models.path, models.file!.sizeBytes);
+    expect((await launch()).installed).toBe(true);
+    await expect((await launch()).verify()).rejects.toThrow("model_integrity");
+    await truncate(models.path, models.file!.sizeBytes - 1);
+    expect((await launch()).installed).toBe(false);
   });
 });

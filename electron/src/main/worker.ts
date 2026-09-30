@@ -51,8 +51,14 @@ export class WhisperWorker {
       windowsHide: true,
       shell: false,
       // Old AMD drivers' switchable-graphics Vulkan layer returns VK_INCOMPLETE
-      // on every GPU enumeration, and ggml retries forever.
-      env: { ...process.env, DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1: "1" },
+      // on every GPU enumeration, and ggml retries forever. Third-party
+      // overlay layers (Steam, OBS, RivaTuner) can stall Vulkan startup.
+      // Loaders older than the layer filter still honor the AMD variable.
+      env: {
+        ...process.env,
+        DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1: "1",
+        VK_LOADER_LAYERS_DISABLE: "~implicit~",
+      },
     }));
     const lines = createInterface({ input: child.stdout });
     lines.on("line", (line) => {

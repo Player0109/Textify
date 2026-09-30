@@ -29,7 +29,9 @@ filters narrow the list. A version's options button reveals Import and Remove.
 All platforms support Whisper small.en, large-v2, large-v3, and large-v3-turbo.
 The first three expose English; turbo exposes English and Hindi according to
 the bundled signed catalog. Import copies into this app's own storage and
-checks size and SHA-256.
+checks size and SHA-256. Downloads and imports are hashed once; launching
+Textify or switching models checks file sizes and layout without rereading the
+weights. Remove and download a model again if its file is damaged.
 
 All platforms also support these GPU-only versions:
 
@@ -238,7 +240,8 @@ physical-device checks are recorded in the desktop QA guide.
 For additional local model checks, `scripts/runtime-smoke.mjs` verifies the signed
 model hash and exercises language and custom-word configuration with public test
 audio. It accepts `MODEL [en|hi] [mono-16khz-f32-file]`; English defaults to the
-public JFK sample. No recognized text is logged or saved.
+public JFK sample. It prints GPU worker startup and final transcription times,
+or how long a failed startup ran. No recognized text is logged or saved.
 
 ## GPU-required preview
 
@@ -255,7 +258,10 @@ timed out.
 `native/require-gpu.mjs` applies exact edits to the checksum-pinned whisper
 source: GPU backend initialization must succeed, model weights must use GPU
 buffers, and the graph scheduler refuses CPU computation. Software/virtual
-Vulkan devices are rejected. Audio preprocessing, token sampling, memory
+Vulkan devices are rejected. Workers start with implicit Vulkan layers disabled
+(`VK_LOADER_LAYERS_DISABLE=~implicit~`), so overlays such as Steam, OBS or
+RivaTuner are not loaded into GPU startup; loaders older than 1.3.234 ignore
+the setting. Audio preprocessing, token sampling, memory
 transfers and graph bookkeeping still use the CPU. The native build runs a
 regression test that attempts a CPU matrix graph and requires refusal.
 

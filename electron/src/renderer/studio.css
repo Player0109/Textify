@@ -254,27 +254,22 @@
   max-width: 200px;
 }
 
+.studio .setting-row > button,
 .studio .setting-row select {
-  max-width: 170px;
-  min-width: 115px;
+  width: 170px;
+  flex-shrink: 0;
   font-size: 12px;
 }
 
 .studio .control-stack {
   max-width: none;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
 }
 
 .studio .control-stack .text-button {
   font-size: 11px;
-}
-
-.studio .microphone-control {
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
 }
 
 .studio .floating-settings {

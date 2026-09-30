@@ -509,7 +509,6 @@ async function modelAction(command: ModelCommand) {
       if (answer.response !== 1) return;
       language = model.languages[0];
     }
-    await models.verify(command.id);
     await savePreferences({
       ...preferences,
       activeModelID: command.id,
