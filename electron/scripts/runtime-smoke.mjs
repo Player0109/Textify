@@ -27,8 +27,6 @@ const models = catalogModels(
     await readFile("resources/manifest.json"),
     await readFile("resources/manifest.json.sig"),
   ),
-  process.platform,
-  process.arch,
   verifyCatalog(
     await readFile("resources/extra-models/manifest.json"),
     await readFile("resources/extra-models/manifest.json.sig"),
@@ -79,10 +77,21 @@ const worker = new WhisperWorker(
   ),
   () => {},
 );
+const seconds = (start) => ((performance.now() - start) / 1000).toFixed(2);
 try {
-  await worker.load(resolve(path), language, ["Textify"], model.engine);
+  const loading = performance.now();
+  await worker
+    .load(resolve(path), language, ["Textify"], model.engine)
+    .catch((error) => {
+      console.log(
+        `GPU worker failed after ${seconds(loading)} s: ${error.message}`,
+      );
+      throw error;
+    });
   assert.ok(worker.gpu?.device);
-  console.log(`GPU: ${worker.gpu.device} (${worker.gpu.backend})`);
+  console.log(
+    `GPU: ${worker.gpu.device} (${worker.gpu.backend}), ready in ${seconds(loading)} s`,
+  );
   if (process.env.TEXTIFY_STREAMING_SMOKE === "1") {
     assert.equal(worker.streaming, true);
     await worker.beginStream();
@@ -167,7 +176,9 @@ try {
       `Paced 32-second preview passed: ${updates} updates, first at ${Math.round(first)} ms including audio arrival, ${afterReset} after window reset. Not a general latency benchmark.`,
     );
   }
+  const transcribing = performance.now();
   const text = await worker.transcribe(samples);
+  console.log(`Final transcription: ${seconds(transcribing)} s`);
   assert.ok(
     text &&
       (language === "hi"

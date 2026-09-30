@@ -51,5 +51,13 @@ model file was requested. Textify does not add dictated content or an analytics
 payload to those requests.
 
 Opening model, source, or license links uses the default browser, whose privacy
-practices apply. App updates are downloaded manually from GitHub Releases;
-Textify does not run an automatic update check.
+practices apply.
+
+Signed macOS releases that include automatic updates check GitHub Releases for
+a newer version when the app starts and every six hours. GitHub receives
+ordinary request metadata, such as the IP address, user agent, and request
+time. The check sends no dictated content, settings, or analytics. An update
+downloads only after you choose **Update**, and it installs the next time
+Textify quits. You can turn off automatic checks in General settings. Earlier
+releases, Windows builds, and Linux builds do not check for updates; install
+those updates manually from GitHub Releases.

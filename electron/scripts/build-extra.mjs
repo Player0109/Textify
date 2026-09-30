@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { cp, mkdir } from "node:fs/promises";
 export async function buildExtra() {
-  if (process.platform !== "darwin") return;
+  const metal = process.platform === "darwin";
   const run = (command, args) => {
     if (spawnSync(command, args, { stdio: "inherit" }).status !== 0)
       throw new Error(`${command} failed`);
@@ -23,7 +23,9 @@ export async function buildExtra() {
             "-DTRANSCRIBE_BUILD_EXAMPLES=OFF",
             "-DTRANSCRIBE_BUILD_TOOLS=OFF",
             "-DTRANSCRIBE_BUILD_SHARED=OFF",
-            "-DTRANSCRIBE_METAL=ON",
+            // macOS always uses Accelerate; elsewhere, no system BLAS dependency.
+            "-DTRANSCRIBE_USE_SYSTEM_BLAS=OFF",
+            metal ? "-DTRANSCRIBE_METAL=ON" : "-DTRANSCRIBE_VULKAN=ON",
           ]
         : [
             "-DAUDIOCPP_MODEL_SET=custom",
@@ -32,8 +34,10 @@ export async function buildExtra() {
             "-DAUDIOCPP_BUILD_C_API=ON",
             "-DAUDIOCPP_BUILD_NATIVE_MODEL_MANAGER=OFF",
             "-DAUDIOCPP_BUILD_SERVER_FRONTENDS=OFF",
-            "-DENGINE_ENABLE_METAL=ON",
+            metal ? "-DENGINE_ENABLE_METAL=ON" : "-DENGINE_ENABLE_VULKAN=ON",
             "-DENGINE_ENABLE_OPENMP=OFF",
+            // As in the Whisper build: no libgomp or vcomp140 runtime dependency.
+            "-DGGML_OPENMP=OFF",
             "-DENGINE_ENABLE_NATIVE_CPU=OFF",
           ];
     run("cmake", [
@@ -42,14 +46,17 @@ export async function buildExtra() {
       "-B",
       `.native/${name}-build`,
       "-DCMAKE_BUILD_TYPE=Release",
-      "-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0",
       "-DGGML_NATIVE=OFF",
-      "-DGGML_METAL_EMBED_LIBRARY=ON",
+      ...(metal
+        ? ["-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0", "-DGGML_METAL_EMBED_LIBRARY=ON"]
+        : []),
       ...flags,
     ]);
     run("cmake", [
       "--build",
       `.native/${name}-build`,
+      "--config",
+      "Release",
       "--target",
       `textify-${name}`,
       "textify-gpu-policy-test",
@@ -59,13 +66,17 @@ export async function buildExtra() {
     run("ctest", [
       "--test-dir",
       `.native/${name}-build`,
+      "-C",
+      "Release",
       "--output-on-failure",
       "-R",
       "^gpu-required$",
     ]);
+    const suffix = process.platform === "win32" ? ".exe" : "";
+    const subdir = process.platform === "win32" ? "Release/" : "";
     await cp(
-      `.native/${name}-build/bin/textify-${name}`,
-      `resources/textify-${name}`,
+      `.native/${name}-build/bin/${subdir}textify-${name}${suffix}`,
+      `resources/textify-${name}${suffix}`,
     );
   }
 }

@@ -60,7 +60,11 @@ notarization credentials; it never publishes. It notarizes and staples the app,
 signs the final DMG, submits that DMG to Apple, requires an Accepted result,
 staples it, and validates its signature, staple, and Gatekeeper assessment before
 reporting success. Production DMGs omit automatic-update blockmaps because
-stapling changes the final bytes. Explicit preview packaging is unchanged.
+stapling changes the final bytes. The update feed instead uses
+`Textify-<version>-mac-arm64.zip`, which electron-builder creates from the
+already notarized and stapled app. The same command writes the ZIP's
+`.blockmap` and the update feed, `preview-mac.yml` for a preview version.
+Explicit preview packaging is unchanged and has no update feed.
 Verify the DMG by mounting it,
 checking its `Textify.app` signature and Gatekeeper assessment, and checking the
 DMG after building. Confirm a fresh install and update on a second Mac before
@@ -71,9 +75,12 @@ artifacts. They are not code-signed. Download those exact artifacts and verify
 their workflow checksums. Place the final Mac, Windows, and Linux installers in
 `electron/release/`, then run `node scripts/checksums.mjs --production` from
 `electron/` on the maintainer Mac to write one combined checksum file and copy
-`RELEASE_INSTALL.md`. This requires all four current-version installers, checks
-the DMG's Developer ID signature, staple, and Gatekeeper result, and removes
-stale combined checksums and signed-release installation notes before validation.
+`RELEASE_INSTALL.md`. This requires all four current-version installers and the
+Mac ZIP. It checks the DMG's Developer ID signature, staple, and Gatekeeper
+result. It also checks that the update feed names this version and matches the
+ZIP's exact size and SHA-512, and that the app inside the ZIP passes the same
+signature, staple, and Gatekeeper checks. It removes stale combined checksums
+and signed-release installation notes before validation.
 Checksums must be generated only after the final notarization and stapling.
 Check the file
 against all installers before attaching them to a GitHub pre-release. The
@@ -81,3 +88,24 @@ release notes must state the macOS version/architecture, GPU requirements,
 model download requirement, physical hardware tested, and the unsigned status
 of Windows and Linux. Publish only after the owner reviews the final artifacts
 and notes.
+
+## Publish the Mac update
+
+Installed Macs with automatic checks find a release as soon as it is public.
+Create the GitHub pre-release as a draft and attach every file before
+publishing it:
+
+- the four installers, `SHA256SUMS.txt` and `RELEASE_INSTALL.md`;
+- `Textify-<version>-mac-arm64.zip` and its `.blockmap`;
+- `preview-mac.yml`, or `latest-mac.yml` for a stable version.
+
+The tag must follow `v<version>` with a `-preview.<n>` version, as in
+`v0.2.0-preview.24`. Preview installs only move to newer `preview` tags, so
+tags such as `models-v1` and the retired Swift app's release are ignored. Never
+replace the assets of a published release; publish a new version instead.
+Preview installs never offer a stable release. Before the first stable
+release, ship and test a final preview whose updater follows the stable
+channel.
+
+Only the first release that contains the updater needs a manual install.
+Update the root README's download notes when that release is published.

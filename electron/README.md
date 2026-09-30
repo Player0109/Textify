@@ -29,9 +29,11 @@ filters narrow the list. A version's options button reveals Import and Remove.
 All platforms support Whisper small.en, large-v2, large-v3, and large-v3-turbo.
 The first three expose English; turbo exposes English and Hindi according to
 the bundled signed catalog. Import copies into this app's own storage and
-checks size and SHA-256.
+checks size and SHA-256. Downloads and imports are hashed once; launching
+Textify or switching models checks file sizes and layout without rereading the
+weights. Remove and download a model again if its file is damaged.
 
-Apple Silicon also supports these GPU-only versions:
+All platforms also support these GPU-only versions:
 
 | Checkpoint | Versions | Runtime |
 | --- | --- | --- |
@@ -46,9 +48,14 @@ The bar shows Textify's icon, waveform, colored border and three-line
 transcript, with compact Copy and dismissal controls for recovery.
 Qwen and Parakeet offer automatic language detection. MLX/CoreML variants
 are not included. Custom vocabulary prompts apply
-to Whisper; replacement pairs apply to every engine. New family support on
-Windows/Linux is deferred. Published catalog benchmark ratings are not claimed
-as measurements of these desktop workers.
+to Whisper; replacement pairs apply to every engine. Windows and Linux run these
+versions on Vulkan; their physical-GPU checks are listed in
+[MANUAL_QA.md](MANUAL_QA.md). Published catalog benchmark ratings are not claimed
+as measurements of these desktop workers. A version that does not fit in free GPU
+memory fails with a message asking for a smaller version; weights are never
+moved to system memory. The largest versions are about 4.1 GB before working
+buffers. Removing or replacing the active model waits for its worker to exit,
+because Windows keeps a memory-mapped model file locked until then.
 
 **BF16 · Original** downloads the publisher's 11 original files (4.09 GB) from
 `netease-youdao/Confucius4-R2T2` revision
@@ -62,11 +69,13 @@ The shared root catalog is unchanged. Model weights remain BF16; there is no
 Python service, runtime conversion to GGUF, cloud ASR or CPU inference fallback.
 
 The extra source archives are checksum-pinned. They build offline as separate
-executables with embedded Metal shaders and no non-system dylibs. audio.cpp's
-deployment build also embeds model specifications required by original HF folders.
-Parakeet's
-predictor/joint graphs are moved to Metal, and each ggml copy rejects CPU graph
-execution. GPU-less Mac CI also checks both additional workers refuse startup.
+executables with embedded Metal or Vulkan shaders. Mac workers use no non-system
+dylibs; Windows and Linux workers use the system Vulkan loader, as the Whisper
+worker does. audio.cpp's deployment build also embeds model specifications
+required by original HF folders. Parakeet's predictor/joint graphs are moved to
+the GPU, each ggml copy rejects CPU graph execution, and software Vulkan devices
+are rejected. CI on all three OSes checks that both additional workers refuse
+startup without a supported GPU.
 
 Streaming uses 320 ms chunks and bounded 25-second decoder windows, independent
 of the complete five-minute capture retained for final recognition. Cancel and
@@ -152,6 +161,22 @@ packaging refuses to run without notarization credentials. Verify the resulting
 app's ticket and Gatekeeper assessment before distribution; signing alone does
 not claim a notarized release, and credentials are never bundled.
 
+### Automatic updates
+
+Signed macOS releases update themselves from GitHub Releases. Production Mac
+packaging adds the GitHub update feed and a ZIP of the notarized app. At launch
+and every six hours, Textify checks the newest `v*-preview.*` release for
+`preview-mac.yml`. A newer version shows a notification and a Settings notice.
+Choosing **Update** downloads the ZIP, checks its SHA-512 against the feed and
+hands it to Squirrel.Mac. Squirrel.Mac accepts only an app with the same
+bundle ID and Developer ID team, then installs it the next time Textify quits.
+General settings can turn the checks off.
+
+Preview and development builds have no update feed, so they never check.
+Windows and Linux stay manual until their installers are code-signed. A Mac App
+Store build must not include this updater. Install the first updater-enabled
+release manually; later releases arrive through the app.
+
 ### Accessibility setup on macOS
 
 General shows **Enable Accessibility** when permission is missing. The button
@@ -209,26 +234,34 @@ GNOME/KDE Wayland checks remain in [MANUAL_QA.md](MANUAL_QA.md). The owner can t
 Windows; a Linux desktop tester is still needed. Xvfb is not a Wayland desktop.
 
 The preview does not include speech enhancement or diagnostics export.
-Confucius4-R2T2 provides live transcription previews on macOS. Outstanding
+Confucius4-R2T2 provides live transcription previews. Outstanding
 physical-device checks are recorded in the desktop QA guide.
 
 For additional local model checks, `scripts/runtime-smoke.mjs` verifies the signed
 model hash and exercises language and custom-word configuration with public test
 audio. It accepts `MODEL [en|hi] [mono-16khz-f32-file]`; English defaults to the
-public JFK sample. No recognized text is logged or saved.
+public JFK sample. It prints GPU worker startup and final transcription times,
+or how long a failed startup ran. No recognized text is logged or saved.
 
 ## GPU-required preview
 
 `0.2.0-preview.2` supersedes the CPU-based Windows/Linux preview. Metal is
 required on macOS; Windows and Linux build with `GGML_VULKAN=ON`. For Windows
 builds install the Vulkan SDK (headers, libraries and glslc); Ubuntu builds need
-`libvulkan-dev glslc`. End users need their hardware vendor's GPU driver, not
+`libvulkan-dev glslc spirv-headers`. End users need their hardware vendor's GPU driver, not
 the SDK. Linux also requires the system Vulkan loader (`libvulkan1`).
+Workers start with `DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1=1`. On a Windows PC
+with an NVIDIA GPU, an older AMD driver's switchable-graphics layer returned an
+incomplete device list on every call, and ggml retried until model loading
+timed out.
 
 `native/require-gpu.mjs` applies exact edits to the checksum-pinned whisper
 source: GPU backend initialization must succeed, model weights must use GPU
 buffers, and the graph scheduler refuses CPU computation. Software/virtual
-Vulkan devices are rejected. Audio preprocessing, token sampling, memory
+Vulkan devices are rejected. Workers start with implicit Vulkan layers disabled
+(`VK_LOADER_LAYERS_DISABLE=~implicit~`), so overlays such as Steam, OBS or
+RivaTuner are not loaded into GPU startup; loaders older than 1.3.234 ignore
+the setting. Audio preprocessing, token sampling, memory
 transfers and graph bookkeeping still use the CPU. The native build runs a
 regression test that attempts a CPU matrix graph and requires refusal.
 

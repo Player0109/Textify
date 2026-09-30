@@ -1,5 +1,18 @@
 import { readFile, writeFile } from "node:fs/promises";
 
+// Also applied to the ggml copies of the additional engines.
+export const vulkanDevicePolicy = [
+  '    GGML_LOG_DEBUG("ggml_vulkan: Found %zu Vulkan devices:\\n", vk_instance.device_indices.size());',
+  `    // Textify: reject software and virtual devices, even with a visibility override.
+    const auto physical_devices = vk_instance.instance.enumeratePhysicalDevices();
+    auto & indices = vk_instance.device_indices;
+    indices.erase(std::remove_if(indices.begin(), indices.end(), [&](size_t index) {
+        const auto type = physical_devices[index].getProperties().deviceType;
+        return type != vk::PhysicalDeviceType::eDiscreteGpu && type != vk::PhysicalDeviceType::eIntegratedGpu;
+    }), indices.end());
+    GGML_LOG_DEBUG("ggml_vulkan: Found %zu Vulkan devices:\\n", vk_instance.device_indices.size());`,
+];
+
 // Exact edits to the checksum-pinned whisper revision. Fail if upstream drifts.
 // CPU still handles PCM preparation/token sampling and graph bookkeeping;
 // it must never execute a model graph or replace an unavailable GPU.
@@ -35,16 +48,5 @@ export async function requireGPU(root) {
 
         // copy the input tensors to the split backend`,
   );
-  await edit(
-    "ggml/src/ggml-vulkan/ggml-vulkan.cpp",
-    '    GGML_LOG_DEBUG("ggml_vulkan: Found %zu Vulkan devices:\\n", vk_instance.device_indices.size());',
-    `    // Textify: reject software and virtual devices, even with a visibility override.
-    const auto physical_devices = vk_instance.instance.enumeratePhysicalDevices();
-    auto & indices = vk_instance.device_indices;
-    indices.erase(std::remove_if(indices.begin(), indices.end(), [&](size_t index) {
-        const auto type = physical_devices[index].getProperties().deviceType;
-        return type != vk::PhysicalDeviceType::eDiscreteGpu && type != vk::PhysicalDeviceType::eIntegratedGpu;
-    }), indices.end());
-    GGML_LOG_DEBUG("ggml_vulkan: Found %zu Vulkan devices:\\n", vk_instance.device_indices.size());`,
-  );
+  await edit("ggml/src/ggml-vulkan/ggml-vulkan.cpp", ...vulkanDevicePolicy);
 }

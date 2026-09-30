@@ -1,6 +1,6 @@
 # Textify desktop specification
 
-Current scope: September 25, 2026.
+Current scope: September 27, 2026.
 
 Textify is an Electron desktop dictation utility for macOS, Windows, and Linux.
 The previous Swift macOS application has been retired. The remaining Swift
@@ -12,14 +12,19 @@ an application.
 Hold the microphone button or an available global trigger, speak, and release.
 Textify records in memory, transcribes with a local GPU worker, applies the
 selected text rules, and delivers one final result. Recording has a five-minute
-limit. Confucius4-R2T2 additionally supports an in-memory live preview on macOS.
+limit. Confucius4-R2T2 additionally supports an in-memory live preview.
 This is a dictation utility, not a transcript-history or file-transcription
 workspace.
 
 The app provides a persistent settings window, tray/menu-bar access, a floating
 recording bar, model management, microphone selection, vocabulary, replacement
 pairs, and local numeric Activity views. Closing the settings window leaves the
-app running. Updates are installed manually from GitHub Releases.
+app running. Signed direct-download macOS releases check GitHub Releases when
+the app starts and every six hours, unless the user turns checks off. A new
+version shows a notification and a Settings notice. It downloads after the user
+chooses Update and installs the next time Textify quits. Windows and Linux
+updates stay manual until those installers are code-signed. A Mac App Store
+build would update only through the App Store.
 
 ## Platforms and delivery
 
@@ -54,15 +59,17 @@ alone is not a promise of desktop support. The supported subset is defined by
 `electron/src/main/models.ts` and documented in the
 [desktop model guide](../electron/README.md).
 
-Whisper small.en, large-v2, large-v3, and large-v3-turbo are available on all
-three platforms. Apple Silicon also supports selected Parakeet TDT, Qwen3-ASR,
-and Confucius4-R2T2 artifacts. Languages and import formats follow each signed
+Whisper small.en, large-v2, large-v3, and large-v3-turbo, and selected Parakeet
+TDT, Qwen3-ASR, and Confucius4-R2T2 artifacts, are available on all three
+platforms. Languages and import formats follow each signed
 artifact's capabilities. Imports copy and verify exact supported artifacts;
 arbitrary custom model files and runtime plugins are not supported.
 
 Model weights are downloaded separately after an explicit user action. Exact
 file sizes and SHA-256 values must match the trusted signed metadata before
-activation. Download sources are immutable Textify release assets or exact
+activation. Each download or import is hashed once before installation;
+launching the app or switching models checks file sizes and layout without
+rehashing. Download sources are immutable Textify release assets or exact
 commit-pinned public Hugging Face files. Interrupted transfers may resume.
 Signed revocations remain enforced locally; restoration requires explicit
 verification before an artifact can be used again.
@@ -81,7 +88,8 @@ dictation. Speech enhancement and diagnostics export are not desktop features.
 Audio and pending dictated text stay in memory. The app has no accounts,
 telemetry, cloud speech recognition, or transcript history. Preferences,
 vocabulary, model files, trust records, and Activity totals remain local.
-Explicit model downloads and user-opened source links require network access.
+Explicit model downloads, user-opened source links, and macOS update checks
+require network access.
 
 Activity stores only daily word count, dictation count, recording duration, and
 estimated time saved, with day/week/month views. It stores no dictated text,

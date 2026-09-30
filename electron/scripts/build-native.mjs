@@ -41,7 +41,7 @@ await writeFile(
     arch: process.arch,
     whisperRevision: "a8d002cfd879315632a579e73f0148d06959de36",
     gpuRequired: true,
-    extraMetalWorkers: process.platform === "darwin",
+    extraWorkers: true,
     backend: process.platform === "darwin" ? "Metal" : "Vulkan",
   }),
 );

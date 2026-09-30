@@ -21,23 +21,24 @@ console.log(
   "Shipping worker refused startup without a GPU before attempting model load.",
 );
 
-if (process.platform === "darwin") {
-  for (const name of ["transcribe", "audio"]) {
-    const result = spawnSync(
-      resolve(`resources/textify-${name}`),
-      ["must-not-load.gguf", "en"],
-      {
-        input: Buffer.alloc(4),
-        timeout: 15000,
-      },
-    );
-    assert.equal(result.error, undefined);
-    assert.equal(result.status, 1);
-    assert.deepEqual(JSON.parse(result.stdout.toString()), {
-      error: "gpu_unavailable",
-    });
-  }
-  console.log(
-    "Additional Metal workers also refused the unsupported virtual GPU.",
+// Expose the first Vulkan device, such as Linux runners' software renderer.
+// The additional workers must still refuse it.
+for (const name of ["transcribe", "audio"]) {
+  const result = spawnSync(
+    resolve(
+      `resources/textify-${name}${process.platform === "win32" ? ".exe" : ""}`,
+    ),
+    ["must-not-load.gguf", "en"],
+    {
+      env: { ...process.env, GGML_VK_VISIBLE_DEVICES: "0" },
+      input: Buffer.alloc(4),
+      timeout: 15000,
+    },
   );
+  assert.equal(result.error, undefined);
+  assert.equal(result.status, 1);
+  assert.deepEqual(JSON.parse(result.stdout.toString()), {
+    error: "gpu_unavailable",
+  });
 }
+console.log("Additional workers also refused the unsupported or missing GPU.");

@@ -11,7 +11,13 @@ import {
 import { basename, join } from "node:path";
 import { verifyCatalog } from "./trust";
 import { Revocations } from "./revocations";
-import { hashFile, validFile, transfer, type ModelFile } from "./transfer";
+import {
+  hashFile,
+  sizedFile,
+  validFile,
+  transfer,
+  type ModelFile,
+} from "./transfer";
 import type { ModelView } from "../shared";
 export { verifyCatalog, hashFile };
 export type { ModelFile };
@@ -27,7 +33,7 @@ export interface Model extends ModelView {
   files: ModelFile[];
   restorations: string[];
 }
-const macArtifacts: Record<string, string> = {
+const extraArtifacts: Record<string, string> = {
   ...Object.fromEntries(
     ["bf16", "q8-0", "q5-k-m"].flatMap((quant) => [
       [`qwen3-asr-0.6b-${quant}`, "transcribe_cpp"],
@@ -43,12 +49,7 @@ const macArtifacts: Record<string, string> = {
   "confucius4-r2t2-q8_0": "audio_cpp",
   "confucius4-r2t2-f16": "audio_cpp",
 };
-export function catalogModels(
-  catalog: any,
-  platform = process.platform,
-  arch = process.arch,
-  supplement?: any,
-): Model[] {
+export function catalogModels(catalog: any, supplement?: any): Model[] {
   if (
     supplement &&
     (supplement.models?.length !== 1 ||
@@ -60,10 +61,8 @@ export function catalogModels(
     ...Object.fromEntries(
       Object.keys(supported).map((id) => [id, "whisper_cpp"]),
     ),
-    ...(platform === "darwin" && arch === "arm64" ? macArtifacts : {}),
-    ...(supplement && platform === "darwin" && arch === "arm64"
-      ? { "confucius4-r2t2-bf16": "audio_cpp" }
-      : {}),
+    ...extraArtifacts,
+    ...(supplement ? { "confucius4-r2t2-bf16": "audio_cpp" } : {}),
   };
   return Object.entries(engines).map(([id, engine]) => {
     const source = id === "confucius4-r2t2-bf16" ? supplement : catalog;
@@ -257,8 +256,6 @@ export class Models {
       this.revocations.addAliases(supplement.artifactAliases);
       this.entries = catalogModels(
         verifyCatalog(catalog, signature),
-        process.platform,
-        process.arch,
         supplement,
       );
       this.id = id;
@@ -271,7 +268,12 @@ export class Models {
   private async refresh(model: Model) {
     const protection = this.revocations.status(model.id, model.files);
     model.restorations = protection.restorations;
-    model.installed = await this.valid(model);
+    // Install hashes every file before its atomic rename; Verify rehashes.
+    model.installed = await this.valid(
+      model,
+      this.pathFor(model.id),
+      sizedFile,
+    );
     const partial = `${this.pathFor(model.id)}.partial`;
     model.resumable = model.directory
       ? await readdir(partial)
@@ -407,8 +409,12 @@ export class Models {
       this.changed();
     }
   }
-  private async valid(model: Model, path = this.pathFor(model.id)) {
-    if (!model.directory) return validFile(path, model.file);
+  private async valid(
+    model: Model,
+    path = this.pathFor(model.id),
+    check = validFile,
+  ) {
+    if (!model.directory) return check(path, model.file);
     try {
       // Never load extra GGUF weights, scripts, or symlinks from an imported folder.
       if (!(await lstat(path)).isDirectory()) return false;
@@ -417,7 +423,7 @@ export class Models {
       for (const file of model.files)
         if (
           !(await lstat(join(path, file.filename))).isFile() ||
-          !(await validFile(join(path, file.filename), file))
+          !(await check(join(path, file.filename), file))
         )
           return false;
       return true;

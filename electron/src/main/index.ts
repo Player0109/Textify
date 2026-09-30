@@ -1,7 +1,9 @@
 import {
   app,
+  autoUpdater as squirrel,
   BrowserWindow,
   Menu,
+  Notification,
   Tray,
   nativeImage,
   ipcMain,
@@ -13,9 +15,11 @@ import {
   shell,
 } from "electron";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
+import { existsSync } from "node:fs";
 import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { autoUpdater } from "electron-updater";
 import { Dictation } from "../core/dictation";
 import { engineError } from "../core/engine-error";
 import { overlayBounds } from "../core/overlay-geometry";
@@ -28,6 +32,7 @@ import { AccessibilitySetup } from "./accessibility";
 import { ActivityStore } from "./activity";
 import { defaults, validatePreferences } from "./preferences";
 import { linuxStartup, linuxStartupEnabled } from "./startup";
+import { Updates } from "./updates";
 import type { Action, Preferences, Snapshot, ModelCommand } from "../shared";
 
 app.setName("Textify");
@@ -49,6 +54,8 @@ let main: BrowserWindow,
   overlay: BrowserWindow,
   tray: Tray;
 let accessibilityHelp: BrowserWindow | undefined;
+let updates: Updates | null = null,
+  updateNotice: Notification | undefined;
 let quitting = false,
   cleaned = false,
   modelBusy = false,
@@ -125,12 +132,15 @@ function snapshot(): Snapshot {
     ),
     gpu: worker?.gpu ?? null,
     modelBusy: modelBusy || Boolean(models?.busy),
+    modelStorageBusy: Boolean(models?.busy),
     download: models?.progress ?? null,
     preferences,
     models: models?.views() ?? [],
     downloadModelID: models?.progressID ?? null,
     exclusionsAvailable: platform.exclusionsAvailable,
     startupAvailable: app.isPackaged,
+    updatesSupported: Boolean(updates),
+    update: updates?.view ?? null,
   };
 }
 function changed() {
@@ -169,6 +179,16 @@ function showMain() {
     main.show();
     main.focus();
   }
+}
+function announceUpdate(version: string) {
+  if (!Notification.isSupported()) return;
+  // Keep a reference so a click still opens Textify after garbage collection.
+  updateNotice = new Notification({
+    title: "Textify update available",
+    body: `Version ${version} is available. Open Textify to update.`,
+  });
+  updateNotice.on("click", showMain);
+  updateNotice.show();
 }
 function showAccessibilityHelp() {
   if (!accessibilityHelp || accessibilityHelp.isDestroyed()) return;
@@ -359,6 +379,10 @@ async function action(action: Action) {
     case "import":
       await modelAction({ action, id: preferences.activeModelID });
       break;
+    case "update":
+      // Settings stays usable while the update downloads.
+      void updates?.download();
+      break;
     default:
       throw new Error("unsupported_action");
   }
@@ -415,15 +439,16 @@ async function savePreferences(value: unknown) {
     preferences = next;
     notice = "";
     models.id = next.activeModelID;
-    if (changedModel) {
-      worker.stop();
-      if (models.installed) await loadModel();
-    }
+    if (changedModel) worker.stop();
     if (next.trigger !== previous.trigger && stopTrigger) await enableTrigger();
+    if (next.checkForUpdates !== previous.checkForUpdates)
+      updates?.setEnabled(next.checkForUpdates);
     changed();
   } finally {
     savingPreferences = false;
   }
+  // Reload outside the settings lock so a slow load cannot block downloads.
+  if (changedModel && models.installed) await loadModel();
 }
 async function modelAction(command: ModelCommand) {
   if (command?.action === "source" && typeof command.id === "string") {
@@ -433,9 +458,13 @@ async function modelAction(command: ModelCommand) {
     await shell.openExternal(source.href);
     return;
   }
+  // Another model may download or import while the active one loads.
+  const installingOther =
+    (command?.action === "download" || command?.action === "import") &&
+    command.id !== models.id;
   if (
     dictation.busy ||
-    modelBusy ||
+    (modelBusy && !installingOther) ||
     models.busy ||
     savingPreferences ||
     !initialized
@@ -462,7 +491,7 @@ async function modelAction(command: ModelCommand) {
     });
     if (answer.response !== 1 || dictation.busy || modelBusy || models.busy)
       return;
-    if (models.id === command.id) worker.stop();
+    if (models.id === command.id) await worker.stop();
     await models.remove(command.id);
   } else if (command.action === "use") {
     if (model.status !== "installed") throw new Error("model_not_ready");
@@ -480,7 +509,6 @@ async function modelAction(command: ModelCommand) {
       if (answer.response !== 1) return;
       language = model.languages[0];
     }
-    await models.verify(command.id);
     await savePreferences({
       ...preferences,
       activeModelID: command.id,
@@ -505,10 +533,16 @@ async function modelAction(command: ModelCommand) {
               },
             ],
       });
-      if (choice.canceled || dictation.busy || modelBusy || models.busy) return;
+      if (
+        choice.canceled ||
+        dictation.busy ||
+        (modelBusy && models.id === command.id) ||
+        models.busy
+      )
+        return;
       source = choice.filePaths[0];
     }
-    if (models.id === command.id) worker.stop();
+    if (models.id === command.id) await worker.stop();
     await models.install(source, command.id);
     if (models.id === command.id) await loadModel();
   }
@@ -771,9 +805,12 @@ else {
         ]),
       );
       tray = new Tray(
-        nativeImage
-          .createFromPath(join(resources, "icon.png"))
-          .resize({ width: 20, height: 20 }),
+        // Windows picks the icon file's size for the display scale.
+        process.platform === "win32"
+          ? join(resources, "icon.ico")
+          : nativeImage
+              .createFromPath(join(resources, "icon.png"))
+              .resize({ width: 20, height: 20 }),
       );
       tray.setToolTip("Textify");
       tray.setContextMenu(
@@ -805,6 +842,18 @@ else {
           "The bundled model catalog could not be verified. Reinstall this preview.";
       }
       if (!smoke && !wayland) await enableTrigger();
+      // Only signed direct-download Mac releases carry an update feed.
+      // Windows and Linux stay manual until their installers are signed,
+      // and a Mac App Store build updates through the App Store.
+      if (
+        process.platform === "darwin" &&
+        app.isPackaged &&
+        !process.mas &&
+        existsSync(join(process.resourcesPath, "app-update.yml"))
+      ) {
+        updates = new Updates(autoUpdater, squirrel, changed, announceUpdate);
+        updates.setEnabled(preferences.checkForUpdates);
+      }
       changed();
     })
     .catch(() => {
@@ -822,6 +871,7 @@ else {
     quitting = true;
     clearTimeout(broadcastTimer);
     accessibility?.stop();
+    updates?.stop();
     stopTrigger?.();
     models?.cancel();
     worker?.stop();

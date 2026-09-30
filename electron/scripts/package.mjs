@@ -26,11 +26,16 @@ if (process.platform === "darwin") {
     }
     releaseIdentity = selected[0];
     identity = releaseIdentity.replace(/^Developer ID Application:\s*/, "");
-    // Stapling changes the final bytes; automatic updates/blockmaps are deferred.
+    // Stapling changes the DMG after electron-builder records it, so the DMG
+    // stays out of the update feed. The updater installs the notarized ZIP.
     config.dmg = { sign: true, writeUpdateInfo: false };
+    // Only signed Mac releases check for updates; Squirrel.Mac requires a
+    // Developer ID signature, and Windows/Linux stay manual until signed.
+    config.publish = { provider: "github", owner: "Player0109", repo: "Textify" };
   }
   config.forceCodeSigning = !preview;
   config.mac = {
+    target: preview ? ["dmg"] : ["dmg", "zip"],
     identity,
     type: "distribution",
     entitlements: preview ? "native/entitlements.mac.plist" : "native/entitlements.mac.release.plist",

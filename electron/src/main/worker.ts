@@ -50,6 +50,15 @@ export class WhisperWorker {
       stdio: "pipe",
       windowsHide: true,
       shell: false,
+      // Old AMD drivers' switchable-graphics Vulkan layer returns VK_INCOMPLETE
+      // on every GPU enumeration, and ggml retries forever. Third-party
+      // overlay layers (Steam, OBS, RivaTuner) can stall Vulkan startup.
+      // Loaders older than the layer filter still honor the AMD variable.
+      env: {
+        ...process.env,
+        DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1: "1",
+        VK_LOADER_LAYERS_DISABLE: "~implicit~",
+      },
     }));
     const lines = createInterface({ input: child.stdout });
     lines.on("line", (line) => {
@@ -196,7 +205,7 @@ export class WhisperWorker {
       return null;
     return value.text;
   }
-  stop(error?: Error) {
+  stop(error?: Error): Promise<void> {
     const child = this.child;
     this.child = undefined;
     this.ready = false;
@@ -208,8 +217,15 @@ export class WhisperWorker {
       this.pending.reject(error ?? new Error("worker_stopped"));
       this.pending = undefined;
     }
+    // Windows keeps a memory-mapped model file locked until its process exits.
+    const exited = new Promise<void>((resolve) => {
+      if (!child?.pid || child.exitCode !== null || child.signalCode !== null)
+        resolve();
+      else child.once("exit", () => resolve());
+    });
     child?.stdin.destroy();
     child?.kill();
     this.changed();
+    return exited;
   }
 }

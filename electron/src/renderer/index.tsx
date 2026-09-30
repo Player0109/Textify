@@ -13,6 +13,7 @@ import { AccessibilityDragHelp } from "./AccessibilityDragHelp";
 import { CustomWords } from "./CustomWords";
 import { Exclusions } from "./Exclusions";
 import { ActivityPane } from "./ActivityPane";
+import { UpdateNotice } from "./UpdateNotice";
 import textifyIcon from "../../assets/textify-icon.png";
 
 const mode = new URLSearchParams(location.search).get("mode");
@@ -211,6 +212,7 @@ function App() {
             {pane === "Activity" && <p>Your dictation activity, saved on this device.</p>}
           </div>
         </header>
+        <UpdateNotice update={state.update} />
         {(error || state.message) && (
           <div className="notice" role="status">
             {error || state.message}
@@ -337,7 +339,7 @@ function App() {
                 <div>
                   <h3>Microphone</h3>
                 </div>
-                <div className="control-stack microphone-control">
+                <div className="control-stack">
                   <select
                     aria-label="Microphone"
                     disabled={working || busy}
@@ -441,6 +443,25 @@ function App() {
                   }
                 />
               </div>
+              {state.updatesSupported && (
+                <div className="setting-row">
+                  <div>
+                    <h3>Check for updates automatically</h3>
+                  </div>
+                  <input
+                    type="checkbox"
+                    aria-label="Check for updates automatically"
+                    checked={state.preferences.checkForUpdates}
+                    disabled={working || busy}
+                    onChange={(event) =>
+                      void save({
+                        ...state.preferences,
+                        checkForUpdates: event.target.checked,
+                      })
+                    }
+                  />
+                </div>
+              )}
             </section>
             <FloatingIconSettings
               preferences={state.preferences}
@@ -456,7 +477,12 @@ function App() {
           </>
         )}
         {pane === "Models" && (
-          <ModelsPane state={state} busy={working || busy} run={runModel} />
+          <ModelsPane
+            state={state}
+            // While a model loads, the snapshot decides which buttons lock.
+            busy={dictating || (busy && !state.modelBusy)}
+            run={runModel}
+          />
         )}
         {pane === "Vocabulary" && (
           <div className="vocabulary-grid">
@@ -570,8 +596,10 @@ function App() {
               <Exclusions state={state} busy={working || busy} save={save} />
             </div>
             <p className="footnote">
-              Network access is used only when you choose to download a model.
-              Model hosts receive normal download request information.
+              {state.updatesSupported
+                ? "Network access is used when you choose to download a model or an app update, and to check GitHub for new versions while automatic checks are on."
+                : "Network access is used only when you choose to download a model."}{" "}
+              Download hosts receive normal request information.
             </p>
           </section>
         )}

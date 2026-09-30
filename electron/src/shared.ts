@@ -23,6 +23,7 @@ export interface Preferences {
   language: string;
   activeModelID: string;
   launchAtLogin: boolean;
+  checkForUpdates: boolean;
   exclusions: { id: string; name: string }[];
   overlay: { x: number; y: number; scale: number };
 }
@@ -46,6 +47,11 @@ export interface ModelView {
   resumable: boolean;
   storedBytes: number;
 }
+export interface UpdateView {
+  status: "available" | "downloading" | "ready" | "failed";
+  version: string;
+  progress: number;
+}
 export interface Snapshot {
   phase: Phase;
   message: string;
@@ -66,10 +72,14 @@ export interface Snapshot {
   ready: boolean;
   gpu: { backend: "Metal" | "Vulkan"; device: string } | null;
   modelBusy: boolean;
+  // A download, import, verification or removal; excludes worker loading.
+  modelStorageBusy: boolean;
   download: number | null;
   downloadModelID: string | null;
   exclusionsAvailable: boolean;
   startupAvailable: boolean;
+  updatesSupported: boolean;
+  update: UpdateView | null;
   preferences: Preferences;
   models: ModelView[];
 }
@@ -99,7 +109,8 @@ export type Action =
   | "enable-trigger"
   | "download"
   | "cancel-download"
-  | "import";
+  | "import"
+  | "update";
 export type ModelCommand = {
   action: "download" | "import" | "use" | "verify" | "remove" | "source";
   id: string;
