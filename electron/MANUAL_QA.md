@@ -6,8 +6,9 @@ signed and notarized; Windows and Linux installers are unsigned. Record the app
 version, OS version, desktop environment (on Linux), microphone, and pass/fail
 for each row.
 
-The owner confirmed macOS microphone and text insertion testing. Windows and
-Linux remain untested on physical hardware. Final signed Mac fresh-install and
+The owner confirmed macOS microphone and text insertion testing. Windows has
+one physical-PC result, recorded below; Linux remains untested on physical
+hardware. Final signed Mac fresh-install and
 update verification on a second Mac remains pending. Automated Linux checks use
 Xvfb and do not establish GNOME/KDE Wayland behavior.
 
@@ -145,3 +146,39 @@ This automated evidence does not mark the pending physical-desktop checks passed
 - [x] Corrected packaged application installed; process activation policy is regular.
 - [x] Owner confirmed the new blue T icon is visible in the bottom Dock.
 - [x] Qwen 0.6B fixture capture-to-Copy still passes; Right Command reports ready.
+
+## Additional models on Windows and Linux (September 27)
+
+- [x] Windows PC with an NVIDIA RTX 2060: on preview.23, model loading ran until
+  it timed out. An older AMD driver's switchable-graphics Vulkan layer returned
+  an incomplete device list on every call. With
+  `DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1=1` set by hand, the worker loaded on
+  the NVIDIA GPU and the owner's dictation was transcribed. Workers now start
+  with this variable.
+- [x] Mac, rebuilt Metal workers: public fixture recognition for Parakeet
+  Q8_0/Q5_K_M, Qwen 0.6B Q8_0/Q5_K_M (English/Hindi), Qwen 1.7B BF16 and
+  Confucius Q8_0/F16/original BF16 (English/Chinese), plus Confucius live preview.
+- [x] Mac, Vulkan builds of both additional workers through MoltenVK (a
+  development check, not a shipped configuration): the same models and fixtures
+  produce the same text as Metal, including Confucius live preview.
+- [ ] Windows NVIDIA: each new family shows the GPU name after loading and
+  recognizes a public phrase; Confucius shows live text while recording.
+- [ ] Windows: a new-family model loads from a path containing non-ASCII
+  characters, as in a user profile with a non-ASCII name.
+- [ ] Windows RTX 2060 (6 GB): Qwen3-ASR 1.7B BF16 and Confucius F16 and
+  BF16 either load and recognize a public phrase, or show the "needs more GPU
+  memory" message, never CPU inference or an endless load.
+- [ ] Windows: removing, then re-downloading or importing, the active Confucius
+  model succeeds without a file-in-use error.
+- [ ] Windows icon: the taskbar, title bar, Alt+Tab, notification area and
+  installer show the T mark without the tile, sharp at 100%, 125% and 150%
+  display scaling, on light and dark taskbars.
+- [ ] Linux hardware Vulkan: untested. CI covers compilation and refusal
+  without a supported GPU only.
+
+Commit `8642e84` passed all three OS jobs, including the Windows build of both
+additional workers, packaged launch and installer checks:
+https://github.com/Player0109/Textify/actions/runs/36266929560
+The Windows installer's embedded icon matches the generated icon at all 15
+sizes. This automated evidence does not mark the pending physical-desktop checks
+passed.

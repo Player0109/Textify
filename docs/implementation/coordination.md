@@ -2794,6 +2794,103 @@ Task 1 must merge before parallel Wave 1 work begins.
   original video and audio remain unchanged. The verification agent performs
   read-only checks of GitHub's supported attachment and playback behavior.
 
+### Windows/Linux Vulkan fixes and additional models — 2026-09-27
+
+- The owner reported that preview.23 on a Windows PC with an NVIDIA RTX 2060
+  never finished loading a model, and asked for every model family on Windows
+  and Linux. This task owns the worker environment in
+  `electron/src/main/worker.ts`; the additional workers
+  (`electron/native/transcribe-worker.cpp` and `audio-worker.cpp`, renamed from
+  `.mm`, `model-protocol.h`, `utf8.manifest` and `prepare-extra.mjs`); the
+  Vulkan device edit exported from `require-gpu.mjs`; `scripts/build-extra.mjs`,
+  `build-native.mjs`, `before-pack.cjs`, the additional-worker section of
+  `no-gpu-smoke.mjs`, `runtime-smoke.mjs` and the model browser checks in
+  `smoke.mjs`; platform filtering in `src/main/models.ts`; their tests; and the
+  matching README, SPEC, THIRD_PARTY_NOTICES and MANUAL_QA text. Signed
+  catalogs, model bytes and the whisper.cpp pin are unchanged.
+- Cause of the load failure: an older AMD driver's switchable-graphics Vulkan
+  layer returned VK_INCOMPLETE on every device enumeration, and ggml retried
+  until the load timed out. Workers now start with
+  `DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1=1`. With the variable set by hand,
+  the owner's dictation ran on the NVIDIA GPU.
+- transcribe.cpp and audio.cpp now also build with Vulkan on Windows and Linux.
+  They keep CPU graph refusal, reject software Vulkan devices and accept
+  integrated GPUs. Windows workers delay-load `vulkan-1.dll` and use a UTF-8
+  process code page. Neither worker links OpenMP or a system BLAS. The first
+  Windows CI build failed to link the audio worker: audio.cpp's C API is built
+  statically but tells its users to import it from a DLL, so
+  `prepare-extra.mjs` removes that define.
+- Handoff: the uncommitted "Quiet speech trimming and speech check" task also
+  edits `transcribe-worker.mm`, `require-gpu.mjs`, `no-gpu-smoke.mjs`,
+  `before-pack.cjs`, `build-native.mjs`, README, SPEC and THIRD_PARTY_NOTICES,
+  in different parts of those files. Whichever branch merges second resolves
+  the overlap: the speech task's `TRANSCRIBE_ERR_OUTPUT_TRUNCATED` handling
+  goes into the renamed `transcribe-worker.cpp`, and its whisper-only
+  `require-gpu.mjs` edits follow the shared `vulkanDevicePolicy` edit.
+- The owner approved letting other models download or import while the active
+  model loads, so a slow load no longer locks the model pane. This task also
+  owns `savePreferences`, `modelAction` and the snapshot's `modelStorageBusy`
+  field in `electron/src/main/index.ts`, that field in `electron/src/shared.ts`,
+  the button locks in `electron/src/renderer/ModelsPane.tsx` and the
+  `ModelsPane` `busy` prop in `electron/src/renderer/index.tsx`. The speech task
+  (startup in `index.ts`, a preference in `shared.ts`, a settings toggle in
+  `index.tsx`) and the General settings alignment task (a control-stack class in
+  `index.tsx`) edit other parts of those files. Using, verifying or removing a
+  model still waits for the load, and only one download or import runs at a
+  time.
+- The owner approved a Windows-only icon: the logo's T and waveform bars on a
+  transparent background, laid out on whole pixels for each Win32 size, because
+  the tile shrank to a blue square in the taskbar. This task also owns
+  `electron/scripts/windows-icon.mjs`, its test, the icon step in
+  `scripts/build.mjs`, `win.icon` in `package.json`, the Windows tray icon in
+  `src/main/index.ts` and the Windows section of `electron/assets/README.md`.
+  macOS and Linux keep `textify-icon.png`.
+- Validation: 116 tests, TypeScript and production build pass. Rebuilt Metal
+  workers and MoltenVK Vulkan builds of both additional workers produce the
+  same public-fixture text for Parakeet Q8_0/Q5_K_M, Qwen 0.6B Q8_0/Q5_K_M
+  (English/Hindi), Qwen 1.7B BF16 and Confucius Q8_0/F16/original BF16
+  (English/Chinese), including Confucius live preview. An isolated Electron
+  check started a Whisper small.en download while Confucius F16 was loading,
+  found a second download locked, paused the first and saw the load finish on
+  Metal. Commit `8642e84` passed all three OS jobs in CI run 36266929560,
+  including the Windows build of both additional workers and the installer
+  checks. The installer's embedded icon matches the generated one at all 15
+  sizes. The Windows NVIDIA check of the new families, the icon check on a
+  Windows PC and all Linux hardware checks are pending; Linux is covered by CI
+  only.
+
+### GPU memory error and model removal on Windows — 2026-10-01
+
+- The owner approved finishing the Windows model plan on this branch, keeping
+  Linux enabled and the current transcribe.cpp/audio.cpp pins. A model that
+  does not fit fails with a clear message; GPU work never spills into system
+  memory. This task owns failure codes in `electron/native/model-protocol.h`,
+  `transcribe-worker.cpp` and `audio-worker.cpp`, the `gpu_memory` message in
+  `electron/src/core/engine-error.ts`, `WhisperWorker.stop()` in
+  `electron/src/main/worker.ts` and its callers in `electron/src/main/index.ts`,
+  their tests, and the matching README and MANUAL_QA text. This handoff
+  precedes those edits.
+- The uncommitted "GPU worker startup diagnostics" task in the main checkout
+  edits the worker spawn environment in `worker.ts`; this task edits only
+  `stop()` and its callers.
+- Out-of-memory detection: ggml-vulkan prints "Device memory allocation of size
+  N failed" to std::cerr after every memory type fails, and the audio.cpp C API
+  reports GPU allocation failures as generic errors. The workers keep stderr
+  unchanged but remember that line, so a failed load or inference reports
+  `gpu_memory`; transcribe.cpp's `TRANSCRIBE_ERR_OOM` does the same. The
+  worker-stop wait matters because audio.cpp memory-maps model files with
+  `MapViewOfFile` on Windows. Stack size and a BF16-to-F16 audio encoder
+  option were not added: the pinned ggml ran with 512 KiB thread stacks
+  upstream, and the MoltenVK run above already exercised the BF16 path.
+- Validation: TypeScript, 134 tests and the production build pass; the new stop
+  test fails against the previous `stop()`. A standalone check of the header
+  confirmed that unrelated stderr lines keep `gpu_model_load`, the Vulkan
+  allocation line turns load and inference failures into `gpu_memory`,
+  protocol errors are unchanged, and stderr text passes through. Rebuilt Metal
+  workers pass the CPU-refusal tests and recognize the public JFK fixture with
+  Parakeet Q8_0, Qwen 0.6B Q8_0 and Confucius original BF16, including
+  Confucius live preview. Windows CI and the RTX 2060 checks are pending.
+
 ### Mac automatic updates — 2026-10-01
 
 - The owner requested in-app updates: automatic checks, a notification, a

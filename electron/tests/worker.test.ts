@@ -27,7 +27,13 @@ it("refuses a ready worker that has not confirmed a hardware GPU", async () => {
   await expect(worker.load(script)).rejects.toThrow("gpu_unavailable");
   expect(worker.ready).toBe(false);
 });
-it.each(["gpu_unavailable", "gpu_init", "gpu_model_load", "gpu_inference"])(
+it.each([
+  "gpu_unavailable",
+  "gpu_init",
+  "gpu_model_load",
+  "gpu_memory",
+  "gpu_inference",
+])(
   "preserves safe %s errors from the native worker",
   async (error) => {
     const { worker, script } = await fixture({ error });
@@ -43,6 +49,40 @@ it("accepts a confirmed GPU and clears it when stopped", async () => {
   expect(worker.gpu).toEqual(gpu);
   worker.stop();
   expect(worker.gpu).toBeNull();
+});
+it("waits for the worker process to exit before a model file is changed", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "textify-worker-exit-"));
+  const script = join(dir, "worker.cjs");
+  // Outside Windows the worker outlives SIGTERM briefly, as a process
+  // unmapping a model would. Windows terminates it without the handler.
+  await writeFile(
+    script,
+    `process.stdin.resume();
+    process.on("SIGTERM", () => setTimeout(() => process.exit(0), 200));
+    console.log(JSON.stringify({ready: true, gpu: {backend: "Vulkan", device: String(process.pid)}}));`,
+  );
+  const worker = new WhisperWorker(process.execPath, () => {});
+  cleanup.push(() => rm(dir, { recursive: true }));
+  await worker.load(script);
+  const pid = Number(worker.gpu?.device);
+  await worker.stop();
+  expect(() => process.kill(pid, 0)).toThrow();
+  await expect(worker.stop()).resolves.toBeUndefined();
+});
+it("starts the native worker with AMD's switchable-graphics Vulkan layer disabled", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "textify-worker-env-"));
+  const script = join(dir, "worker.cjs");
+  await writeFile(
+    script,
+    `process.stdin.resume(); console.log(JSON.stringify({ready: true, gpu: {backend: "Vulkan", device: "layer disabled: " + process.env.DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1}}));`,
+  );
+  const worker = new WhisperWorker(process.execPath, () => {});
+  cleanup.push(async () => {
+    worker.stop();
+    await rm(dir, { recursive: true });
+  });
+  await worker.load(script);
+  expect(worker.gpu?.device).toBe("layer disabled: 1");
 });
 
 it.each(["transcribe_cpp", "audio_cpp"] as const)(

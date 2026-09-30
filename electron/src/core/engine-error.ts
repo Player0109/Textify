@@ -5,6 +5,8 @@ const errors: Record<string, string> = {
     "The GPU could not start. Update your GPU driver and close other GPU-heavy apps, then reopen Textify. CPU inference is disabled.",
   gpu_model_load:
     "The model could not load on the GPU. Try a smaller model or free GPU memory. CPU inference is disabled.",
+  gpu_memory:
+    "This model needs more GPU memory than is free. Choose a smaller model or version, or close other GPU-heavy apps. CPU inference is disabled.",
   gpu_inference:
     "The GPU could not transcribe this recording. Try a smaller model or update your GPU driver. CPU inference is disabled.",
 };

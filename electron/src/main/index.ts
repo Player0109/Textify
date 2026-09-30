@@ -132,6 +132,7 @@ function snapshot(): Snapshot {
     ),
     gpu: worker?.gpu ?? null,
     modelBusy: modelBusy || Boolean(models?.busy),
+    modelStorageBusy: Boolean(models?.busy),
     download: models?.progress ?? null,
     preferences,
     models: models?.views() ?? [],
@@ -438,10 +439,7 @@ async function savePreferences(value: unknown) {
     preferences = next;
     notice = "";
     models.id = next.activeModelID;
-    if (changedModel) {
-      worker.stop();
-      if (models.installed) await loadModel();
-    }
+    if (changedModel) worker.stop();
     if (next.trigger !== previous.trigger && stopTrigger) await enableTrigger();
     if (next.checkForUpdates !== previous.checkForUpdates)
       updates?.setEnabled(next.checkForUpdates);
@@ -449,6 +447,8 @@ async function savePreferences(value: unknown) {
   } finally {
     savingPreferences = false;
   }
+  // Reload outside the settings lock so a slow load cannot block downloads.
+  if (changedModel && models.installed) await loadModel();
 }
 async function modelAction(command: ModelCommand) {
   if (command?.action === "source" && typeof command.id === "string") {
@@ -458,9 +458,13 @@ async function modelAction(command: ModelCommand) {
     await shell.openExternal(source.href);
     return;
   }
+  // Another model may download or import while the active one loads.
+  const installingOther =
+    (command?.action === "download" || command?.action === "import") &&
+    command.id !== models.id;
   if (
     dictation.busy ||
-    modelBusy ||
+    (modelBusy && !installingOther) ||
     models.busy ||
     savingPreferences ||
     !initialized
@@ -487,7 +491,7 @@ async function modelAction(command: ModelCommand) {
     });
     if (answer.response !== 1 || dictation.busy || modelBusy || models.busy)
       return;
-    if (models.id === command.id) worker.stop();
+    if (models.id === command.id) await worker.stop();
     await models.remove(command.id);
   } else if (command.action === "use") {
     if (model.status !== "installed") throw new Error("model_not_ready");
@@ -530,10 +534,16 @@ async function modelAction(command: ModelCommand) {
               },
             ],
       });
-      if (choice.canceled || dictation.busy || modelBusy || models.busy) return;
+      if (
+        choice.canceled ||
+        dictation.busy ||
+        (modelBusy && models.id === command.id) ||
+        models.busy
+      )
+        return;
       source = choice.filePaths[0];
     }
-    if (models.id === command.id) worker.stop();
+    if (models.id === command.id) await worker.stop();
     await models.install(source, command.id);
     if (models.id === command.id) await loadModel();
   }
@@ -796,9 +806,12 @@ else {
         ]),
       );
       tray = new Tray(
-        nativeImage
-          .createFromPath(join(resources, "icon.png"))
-          .resize({ width: 20, height: 20 }),
+        // Windows picks the icon file's size for the display scale.
+        process.platform === "win32"
+          ? join(resources, "icon.ico")
+          : nativeImage
+              .createFromPath(join(resources, "icon.png"))
+              .resize({ width: 20, height: 20 }),
       );
       tray.setToolTip("Textify");
       tray.setContextMenu(
