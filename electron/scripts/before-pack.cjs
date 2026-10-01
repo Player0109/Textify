@@ -30,4 +30,5 @@ module.exports = async (context) => {
   const suffix = native.platform === "win32" ? ".exe" : "";
   await access(join(resources, `textify-whisper${suffix}`));
   await access(join(resources, `textify-platform${suffix}`));
+  await access(join(resources, "ggml-silero-v5.1.2.bin"));
 };

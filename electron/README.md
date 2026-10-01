@@ -19,8 +19,8 @@ npm start
 ```
 
 `native:prepare` explicitly downloads and verifies a pinned upstream whisper.cpp
-archive. Compilation does not download source. JavaScript dependencies are
-locked in `package-lock.json`.
+archive and the pinned Silero speech detector. Compilation does not download
+source. JavaScript dependencies are locked in `package-lock.json`.
 
 Open **Transcription models** to search, download or import an exact signed
 model artifact. Each model shows its supported languages, versions and sizes,
@@ -232,13 +232,30 @@ Vulkan devices are rejected. Audio preprocessing, token sampling, memory
 transfers and graph bookkeeping still use the CPU. The native build runs a
 regression test that attempts a CPU matrix graph and requires refusal.
 
-On all hosted CI runners, no-GPU startup and disabled recording are tested.
+The one exception is the Silero VAD v5.1.2 speech detector (885 KB, MIT,
+`ggml-silero-v5.1.2.bin` from `ggml-org/whisper-vad`).
+`textify-whisper --speech` runs it on the CPU, on one thread, before every
+transcription. The patch lets only its scheduler compute on the CPU, and it
+takes the CPU backend directly, so it never starts Metal or Vulkan. A second
+native test requires it to detect speech in the JFK sample and none in silence,
+then requires refusal of an ordinary CPU graph in the same process.
+
+On all hosted CI runners, no-GPU startup, disabled recording, and the CPU
+speech check are tested.
 The hosted Mac exposes a paravirtual Metal device without Apple7 compute features.
 These checks are not evidence of NVIDIA/AMD/Intel GPU recognition or performance;
 those require a real GPU. The local Mac fixture uses real Metal.
 
 Holds without usable audio and rejected or empty recognition return quietly to
-idle. Capture, model, and insertion failures still show actionable errors.
+idle. So do recordings in which the speech detector finds under 0.25 s of speech
+(checked on the whole recording, made louder when quiet); if the detector
+cannot run, transcription proceeds. Quiet recordings, whose loudest frames stay
+below -26 dBFS, are trimmed at 10 dB above their noise floor (between -60 and
+-45 dBFS) with a 400 ms margin; other recordings keep the -45 dBFS threshold and
+150 ms margin. **Raise quiet speech** (General settings, on by default) raises
+quiet recordings by up to 30 dB before transcription. A transcribe.cpp decode
+that reaches its output limit returns no text instead of a GPU error.
+Capture, model, and insertion failures still show actionable errors.
 The Mac package now explicitly includes the Audio Input entitlement on the app
 and helpers. `mac-signature-smoke.mjs` verifies the signed output; the earlier
 unsigned package lacked this capability even though it declared a usage string.

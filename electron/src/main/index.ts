@@ -21,6 +21,7 @@ import { engineError } from "../core/engine-error";
 import { overlayBounds } from "../core/overlay-geometry";
 import { Models } from "./models";
 import { WhisperWorker } from "./worker";
+import { speechSeconds } from "./speech";
 import { Platform, nativeTrigger } from "./platform";
 import { waylandTrigger } from "./wayland";
 import { Capture } from "./capture";
@@ -622,6 +623,15 @@ else {
             capture.start(id, preferences.microphone, samples, failed),
           stop: (id, discard) => capture.stop(id, discard),
           transcribe: (samples) => worker.transcribe(samples),
+          speech: (samples) =>
+            speechSeconds(
+              join(
+                resources,
+                `textify-whisper${process.platform === "win32" ? ".exe" : ""}`,
+              ),
+              ["--speech", join(resources, "ggml-silero-v5.1.2.bin")],
+              samples,
+            ),
           streaming: () => (worker.streaming ? worker : undefined),
           insert: (text, target) => platform.insert(text, target),
           completed: (result) => {
@@ -635,6 +645,7 @@ else {
         () => preferences.replacements,
         () => Date.now(),
         () => preferences.language,
+        () => preferences.raiseQuietSpeech,
       );
       const trustedAudio = (contents: WebContents | null) =>
         contents === audio.webContents;

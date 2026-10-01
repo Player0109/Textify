@@ -6,8 +6,8 @@ reporting service, transcript history, or speech upload.
 
 ## Audio and dictated text
 
-- Audio is captured while you actively dictate and processed locally by the
-  installed speech model.
+- Audio is captured while you actively dictate and processed locally by a
+  bundled speech detector and the installed speech model.
 - Audio, live previews, and pending dictated text stay in memory for the active
   session. Textify does not retain recordings or transcript history.
 - Textify does not send audio, dictated text, custom vocabulary, or replacement

@@ -2,6 +2,7 @@ import type { Phase, Replacement } from "../shared";
 import {
   MAX_SAMPLES,
   SAMPLE_RATE,
+  raiseQuiet,
   rms,
   SpeechGuard,
   stitch,
@@ -30,6 +31,8 @@ export interface DictationPorts {
   ): Promise<void>;
   stop(id: number, discard: boolean): Promise<void>;
   transcribe(samples: Float32Array): Promise<string | null>;
+  // Seconds of likely speech in the recording.
+  speech?(samples: Float32Array): Promise<number>;
   streaming?(): StreamingPorts | undefined;
   insert(
     text: string,
@@ -78,6 +81,7 @@ export class Dictation {
     private replacements: () => Replacement[],
     private now = () => Date.now(),
     private language = () => "en",
+    private raiseQuietSpeech = () => true,
   ) {}
   get busy() {
     return this.copying || !["idle", "error", "copy"].includes(this.phase);
@@ -259,6 +263,7 @@ export class Dictation {
       return;
     this.timers();
     this.update("processing", "Transcribing on this device…");
+    let all: Float32Array = new Float32Array();
     let pcm: Float32Array = new Float32Array();
     try {
       await this.ports.stop(s.id, false);
@@ -271,7 +276,7 @@ export class Dictation {
         );
         return;
       }
-      const all = new Float32Array(s.count);
+      all = new Float32Array(s.count);
       let offset = 0;
       for (const frame of s.frames) {
         all.set(frame, offset);
@@ -280,11 +285,24 @@ export class Dictation {
       }
       s.frames = [];
       pcm = trimSilence(all);
-      all.fill(0);
       if (!pcm.length) {
         this.update("idle");
         return;
       }
+      if (this.ports.speech) {
+        // Models can write text for noise alone. Skip transcription when the
+        // speech detector finds under 0.25 s of speech in the whole recording,
+        // raised when quiet. If the check fails, transcription goes ahead.
+        raiseQuiet(all);
+        const seconds = await this.ports.speech(all).catch(() => undefined);
+        if (s.cancelled) return;
+        if (seconds !== undefined && seconds < 0.25) {
+          this.update("idle");
+          return;
+        }
+      }
+      all.fill(0);
+      if (this.raiseQuietSpeech()) raiseQuiet(pcm);
       let text = "";
       for (const audio of windows(pcm)) {
         const chunk = await this.ports.transcribe(audio);
@@ -342,6 +360,7 @@ export class Dictation {
         );
     } finally {
       await s.preview?.stop().catch(() => {});
+      all.fill(0);
       pcm.fill(0);
       this.clear(s);
       this.ports.changed();

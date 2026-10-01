@@ -32,6 +32,10 @@ for (const name of ["textify-whisper", "textify-platform"]) {
     `resources/${name}${suffix}`,
   );
 }
+await cp(
+  ".native/ggml-silero-v5.1.2.bin",
+  "resources/ggml-silero-v5.1.2.bin",
+);
 const { buildExtra } = await import("./build-extra.mjs");
 await buildExtra();
 await writeFile(

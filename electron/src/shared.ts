@@ -23,6 +23,7 @@ export interface Preferences {
   language: string;
   activeModelID: string;
   launchAtLogin: boolean;
+  raiseQuietSpeech: boolean;
   exclusions: { id: string; name: string }[];
   overlay: { x: number; y: number; scale: number };
 }

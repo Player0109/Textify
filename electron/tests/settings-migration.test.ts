@@ -13,6 +13,19 @@ describe("settings and language migration", () => {
     expect(next.microphone).toBe("device");
     expect(next.language).toBe("en");
   });
+  it("raises quiet speech unless the saved choice turned it off", () => {
+    expect(
+      validatePreferences({ trigger: "right-control", replacements: [] })
+        .raiseQuietSpeech,
+    ).toBe(true);
+    expect(
+      validatePreferences({ ...defaults(), raiseQuietSpeech: false })
+        .raiseQuietSpeech,
+    ).toBe(false);
+    expect(() =>
+      validatePreferences({ ...defaults(), raiseQuietSpeech: "yes" }),
+    ).toThrow();
+  });
   it("rejects duplicate custom words and invalid overlay sizes", () => {
     expect(() =>
       validatePreferences({

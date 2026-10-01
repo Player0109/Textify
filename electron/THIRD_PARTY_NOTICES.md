@@ -20,6 +20,10 @@ the publishers' public profiles or site:
   https://github.com/ggml-org/whisper.cpp
 - OpenAI Whisper and small.en, large-v2, large-v3, large-v3-turbo models, MIT:
   https://github.com/openai/whisper
+- Silero VAD v5.1.2 speech detector, MIT, bundled as
+  `textify/ggml-silero-v5.1.2.bin` from ggml-org/whisper-vad revision
+  `9ffd54a1e1ee413ddf265af9913beaf518d1639b`; the license is included in
+  `textify/licenses/Silero-VAD.txt`: https://github.com/snakers4/silero-vad
 - uiohook-napi, MIT: https://github.com/SnosMe/uiohook-napi
 - libuiohook, LGPL-3.0-or-later, copyright Alexander Barker:
   https://github.com/kwhat/libuiohook
@@ -41,7 +45,8 @@ drivers and the system Vulkan loader are external dependencies, not bundled.
 The Vulkan SDK/glslc is used at build time; end users do not need the SDK.
 The pinned whisper source is modified by `native/require-gpu.mjs` to refuse
 CPU graph execution, require GPU weights/backends and reject software Vulkan
-devices.
+devices. The one exception is the Silero speech detector, which runs on the
+CPU by design.
 
 Apple Silicon builds also contain isolated, statically linked Metal workers:
 
