@@ -27,12 +27,13 @@ transcription.
 The app provides a persistent settings window, tray/menu-bar access, a floating
 recording bar, model management, microphone selection, vocabulary, replacement
 pairs, and local numeric Activity views. Closing the settings window leaves the
-app running. Signed direct-download macOS releases check GitHub Releases when
-the app starts and every six hours, unless the user turns checks off. A new
-version shows a notification and a Settings notice. It downloads after the user
-chooses Update and installs the next time Textify quits. Windows and Linux
-updates stay manual until those installers are code-signed. A Mac App Store
-build would update only through the App Store.
+app running. Direct-download releases check GitHub Releases when the app starts
+and every six hours, unless the user turns checks off. A new version shows a
+notification and a Settings notice. It downloads after the user chooses Update
+and installs the next time Textify quits. Windows installs accept only
+installers signed by SignPath Foundation. Linux packages are unsigned and are
+checked against the feed's SHA-512. A Mac App Store build would update only
+through the App Store.
 
 ## Platforms and delivery
 
@@ -139,7 +140,9 @@ and no-GPU refusal. They do not replace physical microphone, permission,
 global-shortcut, hardware-GPU, or Wayland testing.
 
 Mac production artifacts require Developer ID signing, notarization, stapling,
-and Gatekeeper validation. Windows/Linux preview installers remain unsigned.
+and Gatekeeper validation. Windows release installers are signed by SignPath
+Foundation in CI after a maintainer approves each request. Linux packages and
+CI preview installers remain unsigned.
 Generate checksums from the final distributable bytes. Packaging never publishes
 by itself, and unfinished physical-platform checks remain explicit in preview
 release notes.

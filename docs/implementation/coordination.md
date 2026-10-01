@@ -3131,3 +3131,30 @@ Task 1 must merge before parallel Wave 1 work begins.
   Windows and Linux builds of the speech check, physical-microphone testing at
   a distance, and Windows model removal while comparisons run are not yet
   verified.
+
+### Windows signing and Windows/Linux updates — 2026-10-01
+
+- The owner asked for signed Windows installers and automatic updates on
+  Windows and Linux. The owner chose the free SignPath Foundation certificate
+  for open-source projects, signing in GitHub Actions with a manual approval in
+  SignPath for each release, and unsigned Linux packages that update
+  themselves. This task owns the updater startup in
+  `electron/src/main/index.ts` and `electron/src/main/updates.ts`, the Windows
+  and Linux settings in `electron/scripts/package.mjs`, the release checks in
+  `electron/scripts/checksums.mjs` and `electron/scripts/mac-release.mjs`, a new
+  `electron/scripts/update-feeds.mjs`, their tests, a signing job in
+  `.github/workflows/electron.yml`, and the release, privacy, install and QA
+  documents that describe updates and signing. It also adds a code signing
+  policy to the root `README.md`, which SignPath Foundation requires. This
+  handoff precedes those edits.
+- Windows installs accept only updates signed by SignPath Foundation. Linux
+  picks the AppImage updater when `APPIMAGE` is set, because the AppImage and
+  `.deb` targets share one resources folder while they build. CI rebuilds the
+  Windows blockmap and feed entry after signing, and production checksums
+  refuse a Windows feed next to an unsigned installer.
+- Validation on the M4 Max: `npm run check` passed with 205 tests and the
+  production build. New tests cover the Windows and Linux publish settings,
+  feed checks against installer bytes, the certificate check on a minimal PE
+  file, and the feed rebuild after signing. CI builds with feeds, the SignPath
+  request, and updates on physical Windows and Linux machines are not yet
+  verified. SignPath Foundation approval is pending.

@@ -19,7 +19,7 @@ import { existsSync } from "node:fs";
 import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { autoUpdater } from "electron-updater";
+import { AppImageUpdater, autoUpdater } from "electron-updater";
 import { Dictation } from "../core/dictation";
 import { engineError } from "../core/engine-error";
 import { overlayBounds } from "../core/overlay-geometry";
@@ -933,16 +933,25 @@ else {
           "The bundled model catalog could not be verified. Reinstall this preview.";
       }
       if (!smoke && !wayland) await enableTrigger();
-      // Only signed direct-download Mac releases carry an update feed.
-      // Windows and Linux stay manual until their installers are signed,
-      // and a Mac App Store build updates through the App Store.
+      // Release builds carry an update feed. Mac previews have none, and a
+      // Mac App Store build updates through the App Store.
       if (
-        process.platform === "darwin" &&
         app.isPackaged &&
         !process.mas &&
         existsSync(join(process.resourcesPath, "app-update.yml"))
       ) {
-        updates = new Updates(autoUpdater, squirrel, changed, announceUpdate);
+        // The AppImage and .deb build from one folder at the same time, so an
+        // AppImage can contain the .deb's package-type file. A running AppImage
+        // sets APPIMAGE.
+        const updater = process.env.APPIMAGE ? new AppImageUpdater() : autoUpdater;
+        // Squirrel.Mac must stage a download before it can install on quit.
+        // Elsewhere electron-updater reports a verified download itself.
+        updates = new Updates(
+          updater,
+          process.platform === "darwin" ? squirrel : updater,
+          changed,
+          announceUpdate,
+        );
         updates.setEnabled(preferences.checkForUpdates);
       }
       changed();

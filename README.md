@@ -127,6 +127,15 @@ The current desktop app lives in [`electron/`](electron/). Start with the [deskt
 
 Please report vulnerabilities privately through the process in [SECURITY.md](.github/SECURITY.md).
 
+## Code signing policy
+
+Windows releases use free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/). Only installers that this repository's GitHub Actions workflow builds from a release tag are signed, and a maintainer approves each signing request.
+
+- Committers and reviewers: [Player0109](https://github.com/Player0109)
+- Approvers: [Player0109](https://github.com/Player0109)
+
+The [privacy policy](PRIVACY.md#network-access) describes the network requests Textify makes.
+
 ## License and acknowledgments
 
 Textify is licensed under the **[Apache License 2.0](LICENSE)**. It builds on open-source speech runtimes and models from many communities.

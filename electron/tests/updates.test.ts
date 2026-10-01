@@ -97,6 +97,19 @@ describe("app updates", () => {
     expect(updates.view).toEqual({ status: "ready", version: "1.0.0", progress: 1 });
   });
 
+  it("is ready once electron-updater reports a checked download on Windows and Linux", async () => {
+    const updater = new FakeUpdater();
+    const updates = new Updates(updater as unknown as Updater, updater, vi.fn(), vi.fn());
+    // electron-updater emits update-downloaded before downloadUpdate resolves.
+    updater.downloadUpdate.mockImplementation(async () => {
+      updater.emit("update-downloaded");
+      return undefined;
+    });
+    updater.emit("update-available", { version: "1.0.0" });
+    await updates.download();
+    expect(updates.view).toEqual({ status: "ready", version: "1.0.0", progress: 1 });
+  });
+
   it("ignores a staged update the user did not start", () => {
     const { squirrel, updater, updates } = setup();
     updater.emit("update-available", { version: "1.0.0" });

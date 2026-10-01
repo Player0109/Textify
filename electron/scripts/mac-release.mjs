@@ -4,6 +4,7 @@ import { createReadStream } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { feedName } from "./update-feeds.mjs";
 
 export function notaryCredentials(env = process.env) {
   // Match electron-builder's credential precedence for the app submission.
@@ -74,8 +75,7 @@ export function verifyProductionInstallers(files, version, platform = process.pl
 // describe these exact ZIP bytes, and the app inside must pass the same
 // Developer ID, staple, and Gatekeeper checks as the DMG.
 export function macUpdateFeed(version) {
-  // electron-builder names the feed after the first prerelease label.
-  return `${/^[^-+]+-([^.+]+)/.exec(version)?.[1] ?? "latest"}-mac.yml`;
+  return feedName(version, "mac");
 }
 
 export async function verifyMacUpdate(directory, version, run = runMacTool) {

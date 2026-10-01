@@ -9,6 +9,7 @@ if (extra.length) throw new Error(`Unsupported packaging option: ${extra.join(" 
 const preview = args.includes("--preview");
 const directory = args.includes("--dir");
 const config = {};
+const releaseFeed = { provider: "github", owner: "Player0109", repo: "Textify" };
 let releaseIdentity;
 if (process.platform === "darwin") {
   let identity = "-";
@@ -29,9 +30,9 @@ if (process.platform === "darwin") {
     // Stapling changes the DMG after electron-builder records it, so the DMG
     // stays out of the update feed. The updater installs the notarized ZIP.
     config.dmg = { sign: true, writeUpdateInfo: false };
-    // Only signed Mac releases check for updates; Squirrel.Mac requires a
-    // Developer ID signature, and Windows/Linux stay manual until signed.
-    config.publish = { provider: "github", owner: "Player0109", repo: "Textify" };
+    // Squirrel.Mac requires a Developer ID signature, so Mac previews have
+    // no update feed.
+    config.publish = releaseFeed;
   }
   config.forceCodeSigning = !preview;
   config.mac = {
@@ -43,6 +44,13 @@ if (process.platform === "darwin") {
     notarize: !preview,
   };
 }
+// Windows and Linux releases update from GitHub Releases. The Windows build is
+// unsigned here; CI signs the installer with SignPath Foundation's certificate,
+// and installed apps refuse updates that this publisher did not sign.
+if (process.platform !== "darwin" && !preview)
+  config.publish = process.platform === "win32"
+    ? { ...releaseFeed, publisherName: ["SignPath Foundation"] }
+    : releaseFeed;
 // Packaging never publishes. Notarization uses electron-builder's optional local
 // Keychain profile (APPLE_KEYCHAIN_PROFILE); credentials never enter the bundle.
 const artifacts = await build({ dir: directory, publish: "never", config });

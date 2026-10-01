@@ -177,7 +177,9 @@ and signs the app and its embedded code with the selected identity.
 Until a certificate is available, `npm run package:preview` and
 `npm run dist:preview` explicitly produce local ad-hoc previews. These can require
 permissions to be renewed after an update. Electron CI uses these preview
-commands; Windows installers remain unsigned. No packaging command publishes.
+commands on macOS. On Windows and Linux it runs `npm run dist`, which adds the
+update feed. CI signs the Windows installer only for a release tag, through
+SignPath; see [RELEASING.md](RELEASING.md). No packaging command publishes.
 For notarization, configure electron-builder's `APPLE_KEYCHAIN_PROFILE` with an
 existing local notarytool credential profile before packaging. Production Mac
 packaging refuses to run without notarization credentials. Verify the resulting
@@ -186,19 +188,25 @@ not claim a notarized release, and credentials are never bundled.
 
 ### Automatic updates
 
-Signed macOS releases update themselves from GitHub Releases. Production Mac
-packaging adds the GitHub update feed and a ZIP of the notarized app. At launch
-and every six hours, Textify checks the newest `v*-preview.*` release for
-`preview-mac.yml`. A newer version shows a notification and a Settings notice.
-Choosing **Update** downloads the ZIP, checks its SHA-512 against the feed and
-hands it to Squirrel.Mac. Squirrel.Mac accepts only an app with the same
-bundle ID and Developer ID team, then installs it the next time Textify quits.
-General settings can turn the checks off.
+Releases update themselves from GitHub Releases. At launch and every six
+hours, Textify checks the newest `v*-preview.*` release for its platform's feed:
+`preview-mac.yml`, `preview.yml` on Windows, or `preview-linux.yml` on Linux. A
+newer version shows a notification and a Settings notice. Choosing **Update**
+downloads the new version and checks its SHA-512 against the feed. It installs
+the next time Textify quits. General settings can turn the checks off.
 
-Preview and development builds have no update feed, so they never check.
-Windows and Linux stay manual until their installers are code-signed. A Mac App
-Store build must not include this updater. Install the first updater-enabled
-release manually; later releases arrive through the app.
+- **macOS:** production Mac packaging adds the feed and a ZIP of the notarized
+  app. Squirrel.Mac accepts only an app with the same bundle ID and Developer ID
+  team.
+- **Windows:** the updater accepts only an installer signed by SignPath
+  Foundation and runs it silently when Textify quits.
+- **Linux:** an AppImage replaces its own file. A `.deb` install runs `dpkg`
+  and asks for an administrator password when Textify quits. Linux packages are
+  not signed, so the feed's SHA-512 is their only check.
+
+Packaging with `--preview` and development builds have no update feed, so they
+never check. A Mac App Store build must not include this updater. Install the
+first updater-enabled release manually; later releases arrive through the app.
 
 ### Accessibility setup on macOS
 
