@@ -49,7 +49,7 @@ export class Updates {
     });
     // On macOS electron-updater finishes when it hands the ZIP to Squirrel.Mac.
     // The update is ready only after Squirrel.Mac has staged it for
-    // installation. On Windows the event follows the publisher check.
+    // installation. On Windows and Linux the event follows the SHA-512 check.
     native.on("update-downloaded", () => {
       if (this.view?.status === "downloading")
         this.set({ ...this.view, status: "ready", progress: 1 });

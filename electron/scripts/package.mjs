@@ -44,13 +44,9 @@ if (process.platform === "darwin") {
     notarize: !preview,
   };
 }
-// Windows and Linux releases update from GitHub Releases. The Windows build is
-// unsigned here; CI signs the installer with SignPath Foundation's certificate,
-// and installed apps refuse updates that this publisher did not sign.
-if (process.platform !== "darwin" && !preview)
-  config.publish = process.platform === "win32"
-    ? { ...releaseFeed, publisherName: ["SignPath Foundation"] }
-    : releaseFeed;
+// Windows and Linux releases are unsigned. They update from GitHub Releases
+// after checking each download against the feed's SHA-512.
+if (process.platform !== "darwin" && !preview) config.publish = releaseFeed;
 // Packaging never publishes. Notarization uses electron-builder's optional local
 // Keychain profile (APPLE_KEYCHAIN_PROFILE); credentials never enter the bundle.
 const artifacts = await build({ dir: directory, publish: "never", config });

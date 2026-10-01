@@ -99,7 +99,7 @@ jobs:
           if ($install.ExitCode -ne 0) { throw 'Windows installation failed' }
           node scripts/packaged-smoke.mjs (Join-Path $installDirectory 'Textify.exe')
           if ($LASTEXITCODE -ne 0) { throw 'Installed Windows app failed' }
-          if (-not (Select-String -LiteralPath (Join-Path $installDirectory 'resources\app-update.yml') -Pattern 'SignPath Foundation' -Quiet)) { throw 'The installed app does not check its update publisher' }
+          if (-not (Select-String -LiteralPath (Join-Path $installDirectory 'resources\app-update.yml') -Pattern 'provider: github' -Quiet)) { throw 'The installed app has no update feed' }
           $uninstaller = (Get-ChildItem $installDirectory -Filter 'Uninstall*.exe' | Select-Object -First 1).FullName
           Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait
       - name: Test Debian installation and AppImage extraction
@@ -147,74 +147,4 @@ jobs:
         with:
           name: electron-checks-${{ matrix.os }}
           path: electron/artifacts/
-          retention-days: 7
-
-  # A release tag's Windows installer is signed with SignPath Foundation's
-  # certificate. Each request waits for a maintainer to approve it in SignPath.
-  sign-windows:
-    needs: desktop
-    if: startsWith(github.ref, 'refs/tags/v') && vars.SIGNPATH_ORGANIZATION_ID != ''
-    runs-on: windows-2025
-    environment: release
-    timeout-minutes: 150
-    permissions:
-      contents: read
-      # SignPath downloads the unsigned installer with this job's token.
-      actions: read
-    defaults:
-      run:
-        working-directory: electron
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: electron/package-lock.json
-      # The feed script needs only electron-builder's JavaScript.
-      - run: npm ci --ignore-scripts
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: textify-desktop-windows-2025
-          path: electron/release
-      - name: Upload the installer for signing
-        id: unsigned
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: textify-windows-unsigned
-          path: electron/release/*.exe
-          retention-days: 1
-      - name: Sign with SignPath
-        uses: signpath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2
-        with:
-          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
-          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
-          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
-          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
-          wait-for-completion-timeout-in-seconds: 7200
-          output-artifact-directory: electron/signed
-      - name: Check the signature
-        shell: pwsh
-        run: |
-          Move-Item signed\*.exe release -Force
-          $installer = (Get-ChildItem release -Filter '*win-x64.exe' | Select-Object -First 1).FullName
-          $signature = Get-AuthenticodeSignature -LiteralPath $installer
-          if ($signature.Status -ne 'Valid') { throw "Signature status: $($signature.Status)" }
-          $subject = $signature.SignerCertificate.Subject
-          if ($subject -notmatch '(^|, )CN=SignPath Foundation(,|$)') { throw "Unexpected signer: $subject" }
-          "Signed by $subject"
-      - name: Update the feed and checksums
-        run: |
-          node scripts/signed-windows-feed.mjs
-          node scripts/checksums.mjs
-      - name: Upload the signed installer
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: textify-windows-signed
-          path: |
-            electron/release/*.exe
-            electron/release/*.blockmap
-            electron/release/*.yml
-            electron/release/SHA256SUMS.txt
           retention-days: 7

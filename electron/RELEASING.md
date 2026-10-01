@@ -70,110 +70,44 @@ checking its `Textify.app` signature and Gatekeeper assessment, and checking the
 DMG after building. Confirm a fresh install and update on a second Mac before
 making the release public.
 
-## Collect the Windows and Linux installers
-
-Push the release tag, `v<version>`, on the commit you built the Mac app from.
-The Electron workflow for that tag builds the Windows and Linux installers with
-their update feeds. Its `sign-windows` job then sends the Windows installer to
-SignPath; see [Sign the Windows installer](#sign-the-windows-installer). Until
-the release is published, update checks find the tag without feeds and fail
-quietly, so publish soon after the tag.
-
-Download `textify-desktop-ubuntu-24.04` and `textify-windows-signed` from that
-run and verify their workflow checksums. Until SignPath signing is set up, use
-`textify-desktop-windows-2025` and leave out its `preview.yml`. Place the final
-Mac, Windows, and Linux files in `electron/release/`, then run
+The Windows and Linux installers come from the successful Electron workflow's
+artifacts. They are not code-signed. Download those exact artifacts with their
+update feeds, `preview.yml` and `preview-linux.yml`, and the Windows
+installer's blockmap, and verify their workflow checksums. Place the final Mac,
+Windows, and Linux files in `electron/release/`, then run
 `node scripts/checksums.mjs --production` from `electron/` on the maintainer
-Mac to write one combined checksum file and copy `RELEASE_INSTALL.md`.
-
-This requires all four current-version installers and the Mac ZIP. It checks the
+Mac to write one combined checksum file and copy `RELEASE_INSTALL.md`. This
+requires all four current-version installers and the Mac ZIP. It checks the
 DMG's Developer ID signature, staple, and Gatekeeper result. It also checks that
 each update feed names this version and matches its installers' exact sizes and
 SHA-512 values, and that the app inside the ZIP passes the same signature,
-staple, and Gatekeeper checks. A Windows installer signed by SignPath
-Foundation must have a matching `preview.yml`. An unsigned Windows installer
-must not have one, because installed apps would download it and then refuse it;
-the command says when Windows installs will not be offered the release. It
-removes stale combined checksums and signed-release installation notes before
-validation.
-
+staple, and Gatekeeper checks. It removes stale combined checksums
+and signed-release installation notes before validation.
 Checksums must be generated only after the final notarization and stapling.
 Check the file
 against all installers before attaching them to a GitHub pre-release. The
 release notes must state the macOS version/architecture, GPU requirements,
-model download requirement, physical hardware tested, whether the Windows
-installer is signed, and that Linux packages are unsigned. Publish only after
-the owner reviews the final artifacts and notes.
-
-## Sign the Windows installer
-
-Windows installers are signed with SignPath Foundation's free certificate for
-open-source projects. Windows then names SignPath Foundation as the publisher,
-and installed apps accept only updates with that signature. SmartScreen may
-still warn until the signed releases build reputation. The private key stays
-with SignPath; GitHub holds only an API token.
-
-SignPath Foundation signs many open-source projects with the same certificate.
-The publisher check proves that an update passed through SignPath Foundation,
-not that it came from Textify, so the GitHub account and release assets still
-need strong protection.
-
-One-time setup:
-
-1. Turn on multi-factor authentication for the GitHub account and, later, for
-   the SignPath account. SignPath Foundation requires it.
-2. Apply at <https://signpath.org/apply>. The root README's code signing policy
-   and the Apache 2.0 license are part of the requirements. Wait for approval.
-3. In SignPath, connect the project to GitHub as a trusted build system and add
-   this artifact configuration. SignPath may add restrictions on the product
-   name, Textify, and the version from `package.json`.
-
-   ```xml
-   <?xml version="1.0" encoding="utf-8"?>
-   <artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
-     <zip-file>
-       <pe-file path="Textify-*-win-x64.exe">
-         <authenticode-sign/>
-       </pe-file>
-     </zip-file>
-   </artifact-configuration>
-   ```
-
-4. Use a release signing policy with SignPath Foundation's certificate and
-   manual approval. Create a CI user that may submit to it and copy its API
-   token.
-5. In GitHub, open **Settings → Environments**, create `release`, limit it to
-   `v*` tags, and add the secret `SIGNPATH_API_TOKEN`. Under **Settings →
-   Secrets and variables → Actions → Variables**, add
-   `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG` and
-   `SIGNPATH_SIGNING_POLICY_SLUG`. The signing job runs only after
-   `SIGNPATH_ORGANIZATION_ID` is set.
-
-For each release, approve the signing request in SignPath within two hours of
-pushing the tag. The job checks that Windows reports a valid SignPath
-Foundation signature, rebuilds the installer's blockmap and `preview.yml` from
-the signed bytes, and uploads them as `textify-windows-signed`. Signing only
-adds a signature, so the job does not run the installation tests again.
-Install the signed release on a Windows machine before publishing.
-
-The Linux AppImage and `.deb` are not signed. They update themselves after the
-feed's SHA-512 check. Ubuntu still describes a downloaded `.deb` as coming from
-a third party.
+model download requirement, physical hardware tested, and the unsigned status
+of Windows and Linux. Publish only after the owner reviews the final artifacts
+and notes.
 
 ## Publish the release
 
 Installed apps with automatic checks find a release as soon as it is public.
-Create the GitHub pre-release as a draft on the pushed tag and attach every
-file before publishing it:
+Create the GitHub pre-release as a draft and attach every file before
+publishing it:
 
 - the four installers, `SHA256SUMS.txt` and `RELEASE_INSTALL.md`;
 - `Textify-<version>-mac-arm64.zip` and its `.blockmap`;
-- `preview-mac.yml` and `preview-linux.yml`;
-- for a signed Windows installer, `preview.yml` and
-  `Textify-<version>-win-x64.exe.blockmap`.
+- `Textify-<version>-win-x64.exe.blockmap`;
+- `preview-mac.yml`, `preview.yml` and `preview-linux.yml`.
 
-A stable version uses `latest-mac.yml`, `latest-linux.yml` and `latest.yml`
+A stable version uses `latest-mac.yml`, `latest.yml` and `latest-linux.yml`
 instead.
+
+Windows and Linux updates are unsigned. Installed apps install whatever the
+release's feed lists, so the GitHub account and release assets need strong
+protection.
 
 The tag must follow `v<version>` with a `-preview.<n>` version, as in
 `v0.2.0-preview.24`. Preview installs only move to newer `preview` tags, so

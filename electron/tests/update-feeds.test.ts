@@ -1,16 +1,15 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-const { feedName, refreshWindowsFeed, verifyUpdateFeed, verifyWindowsUpdate } =
+const { feedName, verifyUpdateFeed } =
   await import(pathToFileURL(resolve("scripts/update-feeds.mjs")).href);
 const version = "0.2.0-preview.24";
 const appImage = `Textify-${version}-linux-x86_64.AppImage`;
 const deb = `Textify-${version}-linux-amd64.deb`;
-const exe = `Textify-${version}-win-x64.exe`;
 let directory: string;
 
 const sha512 = (bytes: Buffer) => createHash("sha512").update(bytes).digest("base64");
@@ -24,19 +23,6 @@ function feed(files: { url: string; bytes: Buffer }[], overrides: Record<string,
   lines.push(`path: ${files[0].url}`, `sha512: ${sha512(files[0].bytes)}`,
     "releaseDate: '2026-10-01T00:00:00.000Z'", "");
   return lines.join("\n");
-}
-
-// A minimal PE32 file whose security directory points at a certificate table.
-function windowsExecutable(signer?: string) {
-  const bytes = Buffer.alloc(0x200);
-  bytes.writeUInt32LE(0x80, 0x3c);
-  bytes.write("PE\0\0", 0x80, "latin1");
-  bytes.writeUInt16LE(0x10b, 0x98);
-  if (!signer) return bytes;
-  const table = Buffer.from(`certificate for ${signer}`);
-  bytes.writeUInt32LE(bytes.length, 0x98 + 96 + 32);
-  bytes.writeUInt32LE(table.length, 0x98 + 96 + 36);
-  return Buffer.concat([bytes, table]);
 }
 
 beforeEach(async () => {
@@ -85,39 +71,5 @@ describe("Linux update feed", () => {
   it("requires the feed", async () => {
     await expect(verifyUpdateFeed(directory, version, "linux", [appImage, deb]))
       .rejects.toThrow("Missing update feed: preview-linux.yml");
-  });
-});
-
-describe("Windows update feed", () => {
-  it("leaves an unsigned installer out of the update feed", async () => {
-    const bytes = windowsExecutable();
-    await writeFile(join(directory, exe), bytes);
-    await expect(verifyWindowsUpdate(directory, version)).resolves.toBe(false);
-    await writeFile(join(directory, "preview.yml"), feed([{ url: exe, bytes }]));
-    await expect(verifyWindowsUpdate(directory, version)).rejects.toThrow("Remove preview.yml");
-  });
-
-  it("rejects another publisher's signature", async () => {
-    const bytes = windowsExecutable("Someone Else");
-    await writeFile(join(directory, exe), bytes);
-    await writeFile(join(directory, "preview.yml"), feed([{ url: exe, bytes }]));
-    await expect(verifyWindowsUpdate(directory, version)).rejects.toThrow("must be signed by SignPath Foundation");
-    await expect(refreshWindowsFeed(directory, version)).rejects.toThrow("must be signed by SignPath Foundation");
-  });
-
-  it("rebuilds the blockmap and feed entry from the signed installer", async () => {
-    const unsigned = windowsExecutable();
-    await writeFile(join(directory, "preview.yml"), feed([{ url: exe, bytes: unsigned }]));
-    await writeFile(join(directory, exe), windowsExecutable("SignPath Foundation"));
-    await expect(verifyWindowsUpdate(directory, version)).rejects.toThrow(`does not match ${exe}`);
-
-    await refreshWindowsFeed(directory, version);
-    const signed = await readFile(join(directory, exe));
-    const text = await readFile(join(directory, "preview.yml"), "utf8");
-    expect(text).not.toContain(sha512(unsigned));
-    expect(text.match(new RegExp(sha512(signed).replace(/[+/]/g, "\\$&"), "g"))).toHaveLength(2);
-    expect(text).toContain(`    size: ${signed.length}\n`);
-    expect((await stat(join(directory, `${exe}.blockmap`))).size).toBeGreaterThan(0);
-    await expect(verifyWindowsUpdate(directory, version)).resolves.toBe(true);
   });
 });

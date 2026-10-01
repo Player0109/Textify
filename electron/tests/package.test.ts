@@ -83,19 +83,13 @@ describe("Mac packaging identity", () => {
 describe("Windows and Linux packaging", () => {
   const feed = { provider: "github", owner: "Player0109", repo: "Textify" };
 
-  it("adds a feed that accepts only SignPath Foundation's Windows signature", async () => {
-    Object.defineProperty(process, "platform", { value: "win32" });
+  it.each(["win32", "linux"])("adds the unsigned %s release feed", async (platform) => {
+    Object.defineProperty(process, "platform", { value: platform });
     await import(packageURL);
     const { config } = build.mock.calls[0][0];
-    expect(config.publish).toEqual({ ...feed, publisherName: ["SignPath Foundation"] });
+    expect(config.publish).toEqual(feed);
     expect(config.forceCodeSigning).toBeUndefined();
     expect(execFileSync).not.toHaveBeenCalled();
-  });
-
-  it("adds the same feed to Linux releases without a publisher check", async () => {
-    Object.defineProperty(process, "platform", { value: "linux" });
-    await import(packageURL);
-    expect(build.mock.calls[0][0].config.publish).toEqual(feed);
   });
 
   it.each(["win32", "linux"])("keeps %s previews without an update feed", async (platform) => {

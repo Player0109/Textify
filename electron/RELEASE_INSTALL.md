@@ -16,11 +16,9 @@ version and signing status.
 ## Windows x64
 
 Download the `Textify-…-win-x64.exe` installer and compare its SHA-256 value
-with `SHA256SUMS.txt`. A signed installer names SignPath Foundation as its
-publisher; the release notes state whether this release's installer is signed.
-SmartScreen may still warn about a newly signed installer and always warns about
-an unsigned one. Verify the repository, release, and checksum before choosing
-More info → Run anyway. Managed-device policy may prevent installation.
+with `SHA256SUMS.txt`. Windows installers are currently unsigned, so Windows may
+show a SmartScreen warning. Verify the repository, release, and checksum before
+choosing More info → Run anyway. Managed-device policy may prevent installation.
 The default global trigger is Right Control.
 
 ## Linux x64
@@ -36,6 +34,5 @@ microphone button for a first recording. Check the release notes for tested
 hardware, supported models, and any remaining platform limitations.
 
 Textify checks GitHub Releases for newer versions and offers them in Settings.
-An update installs when you quit Textify. Windows accepts only updates signed by
-SignPath Foundation. The Debian package asks for an administrator password while
-an update installs.
+An update installs when you quit Textify. The Debian package asks for an
+administrator password while an update installs.

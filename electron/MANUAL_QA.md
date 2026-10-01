@@ -56,9 +56,7 @@ Install the previous updater-enabled release, then publish the new release with
 
 | Check | Expected result | Result |
 | --- | --- | --- |
-| Run the signed Windows installer | Windows names SignPath Foundation as the publisher | Pending |
 | Windows: choose Update, then quit | The installer runs silently; the new version starts next time with settings kept | Pending |
-| Windows: offer an installer from another publisher | The update fails and the installed version is kept | Pending |
 | AppImage: choose Update, then quit | The AppImage file is replaced and the new version starts next time | Pending |
 | `.deb`: choose Update, then quit | An administrator password prompt appears; the new version starts next time | Pending |
 
