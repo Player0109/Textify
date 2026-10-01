@@ -18,6 +18,7 @@ export function defaults(
     activeModelID: "ggml-small.en-q5_1",
     launchAtLogin: false,
     checkForUpdates: true,
+    saveRecordings: false,
     exclusions: [],
     overlay: { x: 0, y: 0, scale: 1 },
   };
@@ -52,7 +53,8 @@ export function validatePreferences(
     typeof next.activeModelID !== "string" ||
     !/^[a-zA-Z0-9._-]{1,240}$/.test(next.activeModelID) ||
     typeof next.launchAtLogin !== "boolean" ||
-    typeof next.checkForUpdates !== "boolean"
+    typeof next.checkForUpdates !== "boolean" ||
+    typeof next.saveRecordings !== "boolean"
   )
     throw new Error("preferences_invalid");
   const seen = new Set<string>();

@@ -40,6 +40,12 @@ export interface DictationPorts {
     recordingSeconds: number;
     elapsedSeconds: number;
   }): void;
+  // The audio buffer is cleared after this returns; copy it synchronously.
+  recorded?(sample: {
+    audio: Float32Array;
+    modelText: string;
+    finalText: string;
+  }): void;
   changed(): void;
 }
 type Session = {
@@ -295,11 +301,13 @@ export class Dictation {
         }
         text = stitch(text, chunk);
       }
+      const modelText = text;
       text = processText(text, this.replacements(), this.language());
       if (!text.trim() || s.cancelled) {
         if (!s.cancelled) this.update("idle");
         return;
       }
+      this.ports.recorded?.({ audio: pcm, modelText, finalText: text });
       const completion = () => ({
         words: countWords(text),
         recordingSeconds: s.count / SAMPLE_RATE,

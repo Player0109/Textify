@@ -2962,3 +2962,95 @@ Task 1 must merge before parallel Wave 1 work begins.
   `models-v1`. That release has no feed, so the check stops quietly.
 - The root README still describes the published preview.23 download, which has
   no updater. Update it when the first updater-enabled release is published.
+### Opt-in training recordings — 2026-09-27
+
+- This task owns the new `electron/src/main/recordings.ts`,
+  `electron/src/renderer/Recordings.tsx`, and `electron/tests/recordings.test.ts`.
+  It hands off narrow edits to `electron/src/shared.ts`,
+  `electron/src/main/preferences.ts`, `electron/src/main/preload.ts`,
+  `electron/src/main/index.ts`, `electron/src/core/dictation.ts`, the Privacy
+  pane in `electron/src/renderer/index.tsx`, the Privacy row selectors in
+  `electron/src/renderer/studio.css`, the dictation and settings tests, and the
+  privacy statements in `docs/SPEC.md`, `electron/README.md`, and `PRIVACY.md`.
+  This handoff precedes those edits. The General settings alignment edits in
+  the same renderer files are left untouched.
+- An off-by-default Privacy setting saves each completed dictation's trimmed
+  16 kHz audio as WAV with a JSON record of the model output, final text, model,
+  language, and an empty correction field, for later review and fine-tuning.
+  Cancelled, secure-field, excluded-app, and empty dictations are not saved.
+- Validation: TypeScript, 124 tests and the production build passed. An
+  isolated Electron check fed the public JFK fixture through the real
+  AudioWorklet and Parakeet Q8_0 worker with the setting on. It produced one
+  11.19 s WAV and a matching JSON record, and the Privacy row showed the saved
+  count. Show folder opened the folder, and turning the setting off updated
+  `settings.json`. The overlay cannot read the recordings summary. The row
+  fits at 1120 and 780 px widths.
+
+### Training recording review — 2026-09-27
+
+- This task owns the new `electron/src/renderer/RecordingReview.tsx` and
+  continues the training recordings files: `electron/src/main/recordings.ts`,
+  `electron/src/renderer/Recordings.tsx`, and `electron/tests/recordings.test.ts`.
+  It hands off narrow edits to the recordings bridge in `electron/src/shared.ts`
+  and `electron/src/main/preload.ts`, the recordings IPC handlers in
+  `electron/src/main/index.ts`, the Privacy review route in
+  `electron/src/renderer/index.tsx`, review styles in
+  `electron/src/renderer/studio.css`, `media-src` in
+  `electron/src/renderer/index.html` for local playback, and the recordings
+  paragraph in `electron/README.md`. This handoff precedes those edits.
+- Privacy → Review lists saved recordings newest first, plays each clip, and
+  saves the typed transcript as `correctedText`, then opens the next clip that
+  needs review. Delete removes a clip's JSON record and WAV file.
+- Validation: TypeScript, 127 tests and the production build passed. An
+  isolated Electron check seeded three JFK-fixture clips. It confirmed the
+  Privacy count and Review route, newest-first order, blob playback of the
+  11 s clip with autoplay, a saved correction that leaves `modelText` intact,
+  advancing past reviewed clips, deletion of both files, Show folder, and
+  refusal of recordings calls from the overlay and of names outside the
+  folder. The page fits at 1120 and 780 px widths (screenshots inspected).
+- Follow-up: the owner could not find the review page under Privacy, so it
+  is also a **Recordings** sidebar pane, shown while saving is on. This adds
+  that pane and its icon to the navigation in `renderer/index.tsx`.
+
+### Training recording review priority — 2026-09-27
+
+- The owner asked for review that puts human effort on the clips the model
+  most likely got wrong. This task owns the new `electron/src/core/compare.ts`,
+  `electron/src/main/comparison.ts`, and `electron/tests/compare.test.ts`, and
+  continues the training recordings files. It hands off narrow edits to
+  `RecordingEntry` in `electron/src/shared.ts`, the comparison wiring in
+  `electron/src/main/index.ts`, review styles in
+  `electron/src/renderer/studio.css`, and the recordings paragraph in
+  `electron/README.md`. This handoff precedes those edits.
+- While saving is on and dictation is idle, the largest installed Whisper,
+  Parakeet, or Qwen3-ASR model from each family other than the clip's own
+  transcribes saved clips locally, and the text is stored in the clip's JSON.
+  Review sorts clips that need review by how much the dictation model's text
+  differs from the others, highlights the disputed words, and can copy another
+  model's text into the correction.
+- Validation: TypeScript, 134 tests and the production build passed. An
+  isolated Electron check seeded three JFK clips labeled as Qwen3-ASR 1.7B
+  output, one with "cutting tree" for "country", and cloned the installed
+  Whisper large-v3 and Parakeet models. Both transcribed all clips in the
+  background within 10 s of launch; the open Recordings page updated, ranked
+  the wrong clip first with only "cutting" and "tree" marked, **Use** copied
+  Whisper's text, ⌘↩ saved it and opened the next clip that needs review. The
+  earlier review check still passes, and the page fits at 780 px.
+
+### Training recordings and quiet speech merge — 2026-10-01
+
+- The owner asked to merge the unmerged training recordings branch and the
+  uncommitted quiet speech work into the `2026-10-01` branch from master. The
+  quiet speech edits were first committed unchanged on `quiet-speech-check`.
+  This task owns only the merge resolutions and the fixes the combination
+  needs. It hands off narrow edits to `electron/src/main/comparison.ts`, the
+  model removal and replacement paths in `electron/src/main/index.ts`, a test
+  in `electron/tests/compare.test.ts`, the General settings grid rules in
+  `electron/src/renderer/studio.css`, and the conflicting lines in the files
+  both features and master edit. This handoff precedes those edits.
+- Master now waits for the active model's worker to exit before removing or
+  replacing a model, because Windows keeps a memory-mapped model file locked.
+  Training comparisons start workers for other installed models and keep them
+  for two minutes. Removing or replacing a model now also stops those workers,
+  waits for them to exit, and keeps comparisons waiting until the files have
+  changed.

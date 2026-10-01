@@ -12,6 +12,8 @@ import { AccessibilitySetup } from "./AccessibilitySetup";
 import { AccessibilityDragHelp } from "./AccessibilityDragHelp";
 import { CustomWords } from "./CustomWords";
 import { Exclusions } from "./Exclusions";
+import { Recordings } from "./Recordings";
+import { RecordingReview } from "./RecordingReview";
 import { ActivityPane } from "./ActivityPane";
 import { UpdateNotice } from "./UpdateNotice";
 import textifyIcon from "../../assets/textify-icon.png";
@@ -79,6 +81,11 @@ function NavIcon({ name }: { name: string }) {
         <>
           <path d="M12 20c-2-1.5-5-2.2-9-1.8V4.5c4-.4 7 .3 9 1.8m0 13.7c2-1.5 5-2.2 9-1.8V4.5c-4-.4-7 .3-9 1.8M12 6.3V20" />
         </>
+      ) : name === "Recordings" ? (
+        <>
+          <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <path d="M8 13h1m2-2v4m2-3v2m2-1h1" />
+        </>
       ) : name === "Privacy" ? (
         <>
           <path d="M12 2 4 6v6c0 5 8 10 8 10s8-5 8-10V6z" />
@@ -93,7 +100,14 @@ function NavIcon({ name }: { name: string }) {
     </svg>
   );
 }
-const panes = ["General", "Models", "Vocabulary", "Activity", "Privacy"] as const;
+const panes = [
+  "General",
+  "Models",
+  "Vocabulary",
+  "Activity",
+  "Recordings",
+  "Privacy",
+] as const;
 function App() {
   const state = useSnapshot();
   const [pane, setPane] = useState<(typeof panes)[number]>("General");
@@ -185,24 +199,40 @@ function App() {
           </div>
         </div>
         <nav aria-label="Settings">
-          {panes.map((name) => (
-            <button
-              key={name}
-              aria-current={pane === name ? "page" : undefined}
-              onClick={() => setPane(name)}
-            >
-              <span aria-hidden="true">
-                <NavIcon name={name} />
-              </span>
-              {name === "Models" ? "Transcription models" : name}
-            </button>
-          ))}
+          {panes
+            // Recordings appears while saving is on; Privacy → Review opens it otherwise.
+            .filter((name) => name !== "Recordings" || state.preferences.saveRecordings)
+            .map((name) => (
+              <button
+                key={name}
+                aria-current={
+                  pane === name ||
+                  (pane === "Recordings" &&
+                    name === "Privacy" &&
+                    !state.preferences.saveRecordings)
+                    ? "page"
+                    : undefined
+                }
+                onClick={() => setPane(name)}
+              >
+                <span aria-hidden="true">
+                  <NavIcon name={name} />
+                </span>
+                {name === "Models" ? "Transcription models" : name}
+              </button>
+            ))}
         </nav>
       </aside>
       <main className={pane === "Models" ? "models-main" : undefined}>
         <header>
           <div>
-            <h1>{pane === "Models" ? "Transcription models" : pane}</h1>
+            <h1>
+              {pane === "Models"
+                ? "Transcription models"
+                : pane === "Recordings"
+                  ? "Training recordings"
+                  : pane}
+            </h1>
             {pane === "Vocabulary" && (
               <p>
                 Custom words apply to Whisper models. Replacement pairs work
@@ -210,6 +240,12 @@ function App() {
               </p>
             )}
             {pane === "Activity" && <p>Your dictation activity, saved on this device.</p>}
+            {pane === "Recordings" && (
+              <p>
+                Correct each transcript to exactly what you said. Keep spoken
+                commands such as “comma” as words.
+              </p>
+            )}
           </div>
         </header>
         <UpdateNotice update={state.update} />
@@ -566,13 +602,18 @@ function App() {
           </div>
         )}
         {pane === "Activity" && <ActivityPane phase={state.phase} />}
+        {pane === "Recordings" && (
+          <RecordingReview state={state} run={run} />
+        )}
         {pane === "Privacy" && (
           <section className="privacy">
             <div className="privacy-intro">
               <h2>Your speech stays here.</h2>
               <p>
-                Textify processes speech on this device. No recordings or
-                transcript history are saved.
+                Textify processes speech on this device.{" "}
+                {state.preferences.saveRecordings
+                  ? "Recordings you choose to save stay in a folder on this device."
+                  : "No recordings or transcript history are saved."}
               </p>
             </div>
             <div className="privacy-workspace">
@@ -593,6 +634,12 @@ function App() {
                   Check microphone
                 </button>
               </div>
+              <Recordings
+                state={state}
+                busy={working || busy}
+                save={save}
+                review={() => setPane("Recordings")}
+              />
               <Exclusions state={state} busy={working || busy} save={save} />
             </div>
             <p className="footnote">

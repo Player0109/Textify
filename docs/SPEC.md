@@ -86,7 +86,10 @@ dictation. Speech enhancement and diagnostics export are not desktop features.
 ## Privacy and Activity
 
 Audio and pending dictated text stay in memory. The app has no accounts,
-telemetry, cloud speech recognition, or transcript history. Preferences,
+telemetry, cloud speech recognition, or transcript history. The one exception
+is an opt-in Privacy setting, off by default, that saves each completed
+dictation's audio and transcript to a local `Recordings` folder for review and
+model fine-tuning. Preferences,
 vocabulary, model files, trust records, and Activity totals remain local.
 Explicit model downloads, user-opened source links, and macOS update checks
 require network access.

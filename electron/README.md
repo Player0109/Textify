@@ -130,6 +130,29 @@ Audio and pending dictation stay in memory. Activity stores only daily numeric
 totals for completed dictations, with day, week, and month views derived from
 those totals. There is no transcript
 history, telemetry, or speech upload. Model downloads require an explicit action.
+
+**Privacy → Save recordings for training** is off by default. When it is on,
+each completed dictation is saved in the data directory's `Recordings` folder
+as a 16 kHz mono 16-bit WAV of the audio the model received, plus a JSON record:
+`modelText` (raw model output), `finalText` (after replacement pairs and spoken
+punctuation), `modelID`, `language`, `seconds`, and `correctedText`, which stays
+`null` until you fill it in during review. Cancelled, empty, secure-field and
+excluded-app dictations are not saved. Nothing is uploaded.
+
+While saving is on and you are not dictating, Textify also transcribes each
+saved clip locally with the largest installed Whisper, Parakeet, or Qwen3-ASR
+model from each family other than the clip's own, and stores that text in the
+record's `comparisons`, keyed by model ID.
+
+**Recordings**, in the sidebar while saving is on (or **Privacy → Review**),
+lists clips that need review first, ranked by how much the dictation model's
+words differ from the other models' (case and punctuation are ignored). Opening
+a clip plays it and shows each model's text with the disputed words marked;
+**Use** copies a model's text into the correction. **Save** (⌘↩, or Ctrl+Enter)
+writes the text to `correctedText` and opens the highest-ranked clip that still
+needs review. Keep spoken commands such as "comma" as words, because the
+correction is the training target for the model's raw output. **Delete** removes
+the clip's WAV and JSON files, and **Show folder** opens the folder.
 Custom words, preferences, model files and trust records remain in the existing
 **Textify Electron** data directory so preview updates retain them.
 

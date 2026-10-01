@@ -317,4 +317,42 @@ describe("dictation lifecycle", () => {
     await h.app.release();
     expect(h.ports.insert).toHaveBeenCalledOnce();
   });
+  it("offers the recognized audio with model and final text before delivery, then clears it", async () => {
+    let saved: { audio: Float32Array; copy: Float32Array; modelText: string; finalText: string } | undefined;
+    const h = harness({
+      recorded: vi.fn((sample) => {
+        saved = { ...sample, copy: sample.audio.slice() };
+      }),
+    });
+    h.app.press();
+    await vi.advanceTimersByTimeAsync(300);
+    h.speech();
+    await h.app.release();
+    expect(saved?.modelText).toBe("hello comma world");
+    expect(saved?.finalText).toBe("Hello, world");
+    expect(saved?.copy.length).toBeGreaterThan(0);
+    expect(saved?.copy.some((x) => x !== 0)).toBe(true);
+    expect(saved?.audio.every((x) => x === 0)).toBe(true);
+    expect(h.ports.insert).toHaveBeenCalledOnce();
+  });
+  it("does not offer cancelled or empty dictations for recording", async () => {
+    const recognition = deferred<string>();
+    const cancelled = harness({ transcribe: () => recognition.promise, recorded: vi.fn() });
+    cancelled.app.press();
+    await vi.advanceTimersByTimeAsync(300);
+    cancelled.speech();
+    const release = cancelled.app.release();
+    await vi.advanceTimersByTimeAsync(1);
+    const cancel = cancelled.app.cancel();
+    recognition.resolve("late words");
+    await Promise.all([release, cancel]);
+    expect(cancelled.ports.recorded).not.toHaveBeenCalled();
+
+    const empty = harness({ transcribe: async () => "  ", recorded: vi.fn() });
+    empty.app.press();
+    await vi.advanceTimersByTimeAsync(300);
+    empty.speech();
+    await empty.app.release();
+    expect(empty.ports.recorded).not.toHaveBeenCalled();
+  });
 });
