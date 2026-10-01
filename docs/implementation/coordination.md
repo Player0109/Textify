@@ -3037,6 +3037,65 @@ Task 1 must merge before parallel Wave 1 work begins.
   Whisper's text, ⌘↩ saved it and opened the next clip that needs review. The
   earlier review check still passes, and the page fits at 780 px.
 
+### Quiet speech trimming and speech check — 2026-09-26
+
+- The owner approved these dictation-accuracy changes after the far-field and
+  noise evaluation: trimming relative to the recording's own noise with a
+  400 ms margin for quiet recordings, a Raise quiet speech preference (on by
+  default), a CPU speech check before transcription, and treating a truncated
+  transcribe.cpp decode as no text instead of a GPU error. The owner explicitly
+  approved the whisper.cpp change the speech check requires.
+- This task owns `electron/src/core/audio.ts` and `dictation.ts`, a new speech
+  check client in `electron/src/main/` and its wiring in `index.ts`, the new
+  preference (`shared.ts`, `preferences.ts` and one General settings row in
+  `renderer/index.tsx`), `electron/native/whisper-worker.cpp`,
+  `transcribe-worker.mm`, `require-gpu.mjs`, a native speech test and its CMake
+  entry, the pinned Silero model download, copy and packaging checks, the
+  model's license and notices, their tests (including a speech section in
+  `scripts/no-gpu-smoke.mjs`), and the matching SPEC, README and PRIVACY text.
+- The GPU policy stays in force for every model graph except the Silero speech
+  detector (885 KB, MIT, pinned from `ggml-org/whisper-vad`); only that
+  detector's scheduler may compute on the CPU. The regression test must still
+  refuse ordinary CPU graphs. Transcription model weights, catalogs and signed
+  metadata are unchanged.
+- Another task's uncommitted General settings control alignment change also
+  edits `renderer/index.tsx` and `renderer/studio.css`. This task adds one
+  setting row in `index.tsx`, below Microphone. In `studio.css` it changes only
+  the General settings grid from three to four rows per column
+  (`grid-template-rows` and the `nth-child` border rules, including the
+  narrow-width overrides), so the seventh row stays in the two-column grid. The
+  four left rows now draw the line between the columns, so it runs the full
+  height, and every row except the last in each layout has a line below it. At
+  the owner's request, this task also applies that task's control rules
+  unchanged so the test build shows them: one 170 px width for the model button
+  and the three selects, and links below their controls (the `control-stack`
+  rules, with `microphone-control` removed). The lines are identical to the
+  other task's uncommitted edit, so either branch can merge first; that task
+  keeps ownership of these rules.
+- Validation: `npm run check`, `npm run native:build` (including the
+  `gpu-required` and `speech-on-cpu` tests), the packaged preview (model
+  checksum, license, `textify-whisper --speech`, `mac-signature-smoke`),
+  `npm run smoke` and the speech section of `scripts/no-gpu-smoke.mjs` pass on
+  the local Mac; the rest of that script needs a runner without a GPU. The real
+  `Dictation` class with the built worker and speech check reproduced the
+  offline evaluation. Qwen3-ASR 1.7B word error rate: AMI 8.4% headset and
+  19.4% table microphone with 4 dictations lost (previously 14.2% and 46.9%
+  with 43 lost); VOiCES speech at -40, -47 and -55 dBFS 2.5%, 2.5% and 3.2%
+  (previously 4.1%, 34.2% and 100%); VoiceBank, BERSt, Open ASR and
+  VoiceCodeBench within 0.3 points of before. No-speech clips that produced
+  text: MUSAN 12, 3 and 5 of 200 (previously 182, 62 and 10), DEMAND 28, 6 and
+  5 of 125 (previously 97, 13 and 0), with no GPU errors. Whisper large-v3: AMI
+  13.4% and 24.9% with 7 lost (previously 19.2% and 50.8% with 48 lost), and
+  0 of 600 MUSAN clips produced text. The speech check takes about 3.7 ms per
+  second of recording on an M4 Max, 1.1 s at the 5-minute limit; slower CPUs
+  have not been measured.
+  Testing with a physical microphone at a distance is still needed. With the
+  seventh row, the applied control rules were rechecked in Electron at widths
+  780, 930, 931, 1050, 1051 and 1120 with the trigger link shown and hidden:
+  all four controls measure 170 px and line up, links sit below and align
+  right, the trigger select does not move, and nothing overflows. The row and
+  column lines were checked the same way at 780, 930, 931, 1051 and 1120.
+
 ### Training recordings and quiet speech merge — 2026-10-01
 
 - The owner asked to merge the unmerged training recordings branch and the
@@ -3054,3 +3113,21 @@ Task 1 must merge before parallel Wave 1 work begins.
   for two minutes. Removing or replacing a model now also stops those workers,
   waits for them to exit, and keeps comparisons waiting until the files have
   changed.
+- Master's packaged Mac builds add a seventh General row, Check for updates
+  automatically. With master's three-row grid it formed a third column. Raise
+  quiet speech makes seven rows everywhere and eight on packaged Macs, so the
+  four-row grid also removes the bottom line under the eighth row and, in the
+  one-column layout, under whichever row is last.
+- Quiet recordings are raised before transcription, so training recordings
+  save the audio the model transcribed.
+- Validation on the M4 Max: `npm run check` passed with 191 tests and the
+  production build. `npm run native:prepare` and `npm run native:build` passed,
+  including `gpu-required` for all three workers and `speech-on-cpu`. The speech
+  section of `scripts/no-gpu-smoke.mjs` and `npm run smoke` passed. A new
+  comparison test fails on the previous stop method and passes now. An
+  Electron check of General with seven and eight rows at widths 1120, 931, 930
+  and 780 confirmed two columns of four rows above 930 px, one column below,
+  the expected row lines, and no page overflow. Screenshots were inspected.
+  Windows and Linux builds of the speech check, physical-microphone testing at
+  a distance, and Windows model removal while comparisons run are not yet
+  verified.

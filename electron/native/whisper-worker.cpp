@@ -132,18 +132,62 @@ static int run(const std::string &model_path, const std::string &language, bool 
     whisper_free(context);
     return 0;
 }
+// Speech check before transcription: Silero VAD on the CPU, one thread. For each
+// recording it reports the seconds of 32 ms windows that are likely speech (p >= 0.5).
+static int speech(const std::string &model_path) {
+#ifdef _WIN32
+    _setmode(_fileno(stdin), _O_BINARY);
+    _setmode(_fileno(stdout), _O_BINARY);
+#endif
+    whisper_log_set(quiet, nullptr);
+    ggml_log_set(quiet, nullptr);
+    auto config = whisper_vad_default_context_params();
+    config.n_threads = 1;
+    config.use_gpu = false;
+    whisper_vad_context *context;
+    try { context = whisper_vad_init_from_file_with_params(model_path.c_str(), config); }
+    catch (...) { return failure("speech_model"); }
+    if (!context) return failure("speech_model");
+    std::cout << "{\"ready\":true}\n" << std::flush;
+    unsigned char header[4];
+    while (std::cin.read(reinterpret_cast<char *>(header), 4)) {
+        const uint32_t count = uint32_t(header[0]) | uint32_t(header[1]) << 8 |
+            uint32_t(header[2]) << 16 | uint32_t(header[3]) << 24;
+        if (count == 0 || count > 300 * 16000) break;
+        std::vector<float> samples(count);
+        if (!std::cin.read(reinterpret_cast<char *>(samples.data()), count * sizeof(float))) break;
+        bool valid = std::all_of(samples.begin(), samples.end(), [](float x) { return std::isfinite(x) && std::abs(x) <= 1.0f; });
+        if (!valid) break;
+        const bool detected = whisper_vad_detect_speech(context, samples.data(), int(count));
+        std::fill(samples.begin(), samples.end(), 0);
+        if (!detected) { whisper_vad_free(context); return failure("speech_detection"); }
+        const float *probabilities = whisper_vad_probs(context);
+        int windows = 0;
+        for (int i = 0; i < whisper_vad_n_probs(context); ++i) windows += probabilities[i] >= 0.5f;
+        // Silero processes 512-sample (32 ms) windows at 16 kHz.
+        std::cout << "{\"speech\":" << windows * 512 / 16000.0 << "}\n" << std::flush;
+    }
+    whisper_vad_free(context);
+    return 0;
+}
 #ifdef _WIN32
 int wmain(int argc, wchar_t **argv) {
     if (argc != 2 && argc != 3) return 2;
-    int size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, argv[1], -1, nullptr, 0, nullptr, nullptr);
+    const bool check = argc == 3 && std::wstring(argv[1]) == L"--speech";
+    const wchar_t *file = argv[check ? 2 : 1];
+    int size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, file, -1, nullptr, 0, nullptr, nullptr);
     if (size <= 1) return 2;
     std::string path(size, '\0');
-    WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, argv[1], -1, path.data(), size, nullptr, nullptr);
+    WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, file, -1, path.data(), size, nullptr, nullptr);
     path.pop_back();
+    if (check) return speech(path);
     std::string language = "en";
     if (argc == 3) { language.clear(); for (const wchar_t *ch = argv[2]; *ch; ++ch) { if (*ch < 'a' || *ch > 'z') return 2; language += char(*ch); } }
     return run(path, language, argc == 3);
 }
 #else
-int main(int argc, char **argv) { return (argc == 2 || argc == 3) ? run(argv[1], argc == 3 ? argv[2] : "en", argc == 3) : 2; }
+int main(int argc, char **argv) {
+    if (argc == 3 && std::strcmp(argv[1], "--speech") == 0) return speech(argv[2]);
+    return (argc == 2 || argc == 3) ? run(argv[1], argc == 3 ? argv[2] : "en", argc == 3) : 2;
+}
 #endif

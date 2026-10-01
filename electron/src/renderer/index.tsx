@@ -415,6 +415,24 @@ function App() {
               </div>
               <div className="setting-row">
                 <div>
+                  <h3>Raise quiet speech</h3>
+                  <p>Helps when you speak farther from the microphone.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  aria-label="Raise quiet speech"
+                  checked={state.preferences.raiseQuietSpeech}
+                  disabled={working || busy}
+                  onChange={(event) =>
+                    void save({
+                      ...state.preferences,
+                      raiseQuietSpeech: event.target.checked,
+                    })
+                  }
+                />
+              </div>
+              <div className="setting-row">
+                <div>
                   <h3>Dictation trigger</h3>
                 </div>
                 <div className="control-stack">

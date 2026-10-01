@@ -211,7 +211,7 @@
 .studio .settings-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: repeat(3, minmax(69px, auto));
+  grid-template-rows: repeat(4, minmax(69px, auto));
   grid-auto-flow: column;
   margin-top: 16px;
   padding: 0 18px;
@@ -227,13 +227,16 @@
   border-bottom: 1px solid var(--line);
 }
 
-.studio .settings-list .setting-row:nth-child(n + 4) {
-  border-left: 1px solid var(--line);
+.studio .settings-list .setting-row:nth-child(-n + 4) {
+  border-right: 1px solid var(--line);
+}
+
+.studio .settings-list .setting-row:nth-child(n + 5) {
   padding-left: 20px;
 }
 
-.studio .settings-list .setting-row:nth-child(3),
-.studio .settings-list .setting-row:nth-child(6) {
+.studio .settings-list .setting-row:nth-child(4),
+.studio .settings-list .setting-row:nth-child(8) {
   border-bottom: 0;
 }
 
@@ -1379,12 +1382,17 @@
   .studio .vocabulary-grid {
     display: block;
   }
-  .studio .settings-list .setting-row:nth-child(n + 4) {
-    border-left: 0;
+  .studio .settings-list .setting-row:nth-child(-n + 4) {
+    border-right: 0;
+  }
+  .studio .settings-list .setting-row:nth-child(n + 5) {
     padding-left: 12px;
   }
-  .studio .settings-list .setting-row:nth-child(3) {
+  .studio .settings-list .setting-row:nth-child(4) {
     border-bottom: 1px solid var(--line);
+  }
+  .studio .settings-list .setting-row:last-child {
+    border-bottom: 0;
   }
   .studio .vocabulary-panel + .vocabulary-panel {
     margin-top: 14px;

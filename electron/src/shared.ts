@@ -25,6 +25,7 @@ export interface Preferences {
   launchAtLogin: boolean;
   checkForUpdates: boolean;
   saveRecordings: boolean;
+  raiseQuietSpeech: boolean;
   exclusions: { id: string; name: string }[];
   overlay: { x: number; y: number; scale: number };
 }

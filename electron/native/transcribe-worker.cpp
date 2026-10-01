@@ -28,6 +28,9 @@ int main(int argc, char **argv) {
     while (textify::audio(samples)) {
         auto status = transcribe_run(context, samples.data(), int(samples.size()), &params);
         std::fill(samples.begin(), samples.end(), 0);
+        // A decode that reached its output limit (a repetition loop on noise) yields
+        // no text rather than a GPU error. The session stays usable.
+        if (status == TRANSCRIBE_ERR_OUTPUT_TRUNCATED) { std::cout << "{\"text\":\"\"}\n" << std::flush; continue; }
         if (status != TRANSCRIBE_OK) {
             transcribe_close(context);
             return textify::failure(status == TRANSCRIBE_ERR_OOM ? "gpu_memory" : "gpu_inference");
