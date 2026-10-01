@@ -19,8 +19,8 @@ npm start
 ```
 
 `native:prepare` explicitly downloads and verifies a pinned upstream whisper.cpp
-archive. Compilation does not download source. JavaScript dependencies are
-locked in `package-lock.json`.
+archive and the pinned Silero speech detector. Compilation does not download
+source. JavaScript dependencies are locked in `package-lock.json`.
 
 Open **Transcription models** to search, download or import an exact signed
 model artifact. Each model shows its supported languages, versions and sizes,
@@ -130,6 +130,29 @@ Audio and pending dictation stay in memory. Activity stores only daily numeric
 totals for completed dictations, with day, week, and month views derived from
 those totals. There is no transcript
 history, telemetry, or speech upload. Model downloads require an explicit action.
+
+**Privacy → Save recordings for training** is off by default. When it is on,
+each completed dictation is saved in the data directory's `Recordings` folder
+as a 16 kHz mono 16-bit WAV of the audio the model received, plus a JSON record:
+`modelText` (raw model output), `finalText` (after replacement pairs and spoken
+punctuation), `modelID`, `language`, `seconds`, and `correctedText`, which stays
+`null` until you fill it in during review. Cancelled, empty, secure-field and
+excluded-app dictations are not saved. Nothing is uploaded.
+
+While saving is on and you are not dictating, Textify also transcribes each
+saved clip locally with the largest installed Whisper, Parakeet, or Qwen3-ASR
+model from each family other than the clip's own, and stores that text in the
+record's `comparisons`, keyed by model ID.
+
+**Recordings**, in the sidebar while saving is on (or **Privacy → Review**),
+lists clips that need review first, ranked by how much the dictation model's
+words differ from the other models' (case and punctuation are ignored). Opening
+a clip plays it and shows each model's text with the disputed words marked;
+**Use** copies a model's text into the correction. **Save** (⌘↩, or Ctrl+Enter)
+writes the text to `correctedText` and opens the highest-ranked clip that still
+needs review. Keep spoken commands such as "comma" as words, because the
+correction is the training target for the model's raw output. **Delete** removes
+the clip's WAV and JSON files, and **Show folder** opens the folder.
 Custom words, preferences, model files and trust records remain in the existing
 **Textify Electron** data directory so preview updates retain them.
 
@@ -265,13 +288,30 @@ the setting. Audio preprocessing, token sampling, memory
 transfers and graph bookkeeping still use the CPU. The native build runs a
 regression test that attempts a CPU matrix graph and requires refusal.
 
-On all hosted CI runners, no-GPU startup and disabled recording are tested.
+The one exception is the Silero VAD v5.1.2 speech detector (885 KB, MIT,
+`ggml-silero-v5.1.2.bin` from `ggml-org/whisper-vad`).
+`textify-whisper --speech` runs it on the CPU, on one thread, before every
+transcription. The patch lets only its scheduler compute on the CPU, and it
+takes the CPU backend directly, so it never starts Metal or Vulkan. A second
+native test requires it to detect speech in the JFK sample and none in silence,
+then requires refusal of an ordinary CPU graph in the same process.
+
+On all hosted CI runners, no-GPU startup, disabled recording, and the CPU
+speech check are tested.
 The hosted Mac exposes a paravirtual Metal device without Apple7 compute features.
 These checks are not evidence of NVIDIA/AMD/Intel GPU recognition or performance;
 those require a real GPU. The local Mac fixture uses real Metal.
 
 Holds without usable audio and rejected or empty recognition return quietly to
-idle. Capture, model, and insertion failures still show actionable errors.
+idle. So do recordings in which the speech detector finds under 0.25 s of speech
+(checked on the whole recording, made louder when quiet); if the detector
+cannot run, transcription proceeds. Quiet recordings, whose loudest frames stay
+below -26 dBFS, are trimmed at 10 dB above their noise floor (between -60 and
+-45 dBFS) with a 400 ms margin; other recordings keep the -45 dBFS threshold and
+150 ms margin. **Raise quiet speech** (General settings, on by default) raises
+quiet recordings by up to 30 dB before transcription. A transcribe.cpp decode
+that reaches its output limit returns no text instead of a GPU error.
+Capture, model, and insertion failures still show actionable errors.
 The Mac package now explicitly includes the Audio Input entitlement on the app
 and helpers. `mac-signature-smoke.mjs` verifies the signed output; the earlier
 unsigned package lacked this capability even though it declared a usage string.

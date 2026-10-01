@@ -8,7 +8,10 @@ function deferred<T>() {
   });
   return { promise, resolve };
 }
-function harness(overrides: Partial<DictationPorts> = {}) {
+function harness(
+  overrides: Partial<DictationPorts> = {},
+  raiseQuietSpeech = () => true,
+) {
   let samples: (data: Float32Array) => void = () => {};
   const ports = {
     target: vi.fn(async () => ({ target: "42", secure: false })),
@@ -23,7 +26,13 @@ function harness(overrides: Partial<DictationPorts> = {}) {
     changed: vi.fn(),
     ...overrides,
   };
-  const app = new Dictation(ports, () => []);
+  const app = new Dictation(
+    ports,
+    () => [],
+    undefined,
+    undefined,
+    raiseQuietSpeech,
+  );
   const speech = (frames = 20) => {
     for (let i = 0; i < frames; i++) samples(new Float32Array(320).fill(0.1));
   };
@@ -308,6 +317,79 @@ describe("dictation lifecycle", () => {
     expect(h.ports.insert).not.toHaveBeenCalled();
     expect(h.app.phase).toBe("idle");
   });
+  it("skips recognition when the speech check finds under 0.25 s of speech", async () => {
+    const h = harness({ speech: async () => 0.2 });
+    h.app.press();
+    await vi.advanceTimersByTimeAsync(300);
+    h.speech();
+    await h.app.release();
+    expect(h.ports.transcribe).not.toHaveBeenCalled();
+    expect(h.app.phase).toBe("idle");
+    expect(h.app.message).toBe("");
+  });
+  it.each([
+    ["finds speech", async () => 0.25],
+    [
+      "cannot run",
+      async () => {
+        throw new Error("speech_check");
+      },
+    ],
+  ])("transcribes when the speech check %s", async (_, speech) => {
+    const h = harness({ speech });
+    h.app.press();
+    await vi.advanceTimersByTimeAsync(300);
+    h.speech();
+    await h.app.release();
+    expect(h.ports.insert).toHaveBeenCalledOnce();
+  });
+  it.each([true, false])(
+    "checks the whole recording raised; raising for recognition is %s",
+    async (enabled) => {
+      const checked: Float32Array[] = [];
+      const heard: Float32Array[] = [];
+      const recognized: Float32Array[] = [];
+      const h = harness(
+        {
+          speech: async (samples) => {
+            checked.push(samples);
+            heard.push(samples.slice());
+            return 1;
+          },
+          transcribe: async (samples) => {
+            recognized.push(samples.slice());
+            return "hello";
+          },
+        },
+        () => enabled,
+      );
+      h.app.press();
+      await vi.advanceTimersByTimeAsync(300);
+      // Quiet speech at -40 dBFS between 0.8 s silences.
+      for (let i = 0; i < 100; i++)
+        h.samples(new Float32Array(320).fill(i >= 40 && i < 60 ? 0.01 : 0));
+      await h.app.release();
+      expect(heard[0]).toHaveLength(32000);
+      expect(heard[0][16000]).toBeCloseTo(0.1, 6);
+      expect(checked[0].every((x) => x === 0)).toBe(true);
+      expect(recognized[0]).toHaveLength(19200);
+      expect(recognized[0][9600]).toBeCloseTo(enabled ? 0.1 : 0.01, 6);
+    },
+  );
+  it("ignores a speech check that finishes after cancellation", async () => {
+    const check = deferred<number>();
+    const h = harness({ speech: () => check.promise });
+    h.app.press();
+    await vi.advanceTimersByTimeAsync(300);
+    h.speech();
+    const release = h.app.release();
+    await vi.advanceTimersByTimeAsync(1);
+    const cancel = h.app.cancel();
+    check.resolve(1);
+    await Promise.all([release, cancel]);
+    expect(h.ports.transcribe).not.toHaveBeenCalled();
+    expect(h.app.phase).toBe("idle");
+  });
   it("processes at the five-minute cap without inserting twice on release", async () => {
     const h = harness();
     h.app.press();
@@ -316,5 +398,43 @@ describe("dictation lifecycle", () => {
     await vi.advanceTimersByTimeAsync(300000);
     await h.app.release();
     expect(h.ports.insert).toHaveBeenCalledOnce();
+  });
+  it("offers the recognized audio with model and final text before delivery, then clears it", async () => {
+    let saved: { audio: Float32Array; copy: Float32Array; modelText: string; finalText: string } | undefined;
+    const h = harness({
+      recorded: vi.fn((sample) => {
+        saved = { ...sample, copy: sample.audio.slice() };
+      }),
+    });
+    h.app.press();
+    await vi.advanceTimersByTimeAsync(300);
+    h.speech();
+    await h.app.release();
+    expect(saved?.modelText).toBe("hello comma world");
+    expect(saved?.finalText).toBe("Hello, world");
+    expect(saved?.copy.length).toBeGreaterThan(0);
+    expect(saved?.copy.some((x) => x !== 0)).toBe(true);
+    expect(saved?.audio.every((x) => x === 0)).toBe(true);
+    expect(h.ports.insert).toHaveBeenCalledOnce();
+  });
+  it("does not offer cancelled or empty dictations for recording", async () => {
+    const recognition = deferred<string>();
+    const cancelled = harness({ transcribe: () => recognition.promise, recorded: vi.fn() });
+    cancelled.app.press();
+    await vi.advanceTimersByTimeAsync(300);
+    cancelled.speech();
+    const release = cancelled.app.release();
+    await vi.advanceTimersByTimeAsync(1);
+    const cancel = cancelled.app.cancel();
+    recognition.resolve("late words");
+    await Promise.all([release, cancel]);
+    expect(cancelled.ports.recorded).not.toHaveBeenCalled();
+
+    const empty = harness({ transcribe: async () => "  ", recorded: vi.fn() });
+    empty.app.press();
+    await vi.advanceTimersByTimeAsync(300);
+    empty.speech();
+    await empty.app.release();
+    expect(empty.ports.recorded).not.toHaveBeenCalled();
   });
 });

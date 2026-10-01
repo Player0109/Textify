@@ -34,6 +34,24 @@ const result = spawnSync(
 );
 if (result.status !== 0) process.exit(result.status ?? 1);
 await requireGPU(".native/whisper");
+// Silero VAD v5.1.2 (MIT) in ggml format, for the speech check before transcription.
+const speechModel = ".native/ggml-silero-v5.1.2.bin";
+let model;
+try {
+  model = await readFile(speechModel);
+} catch {
+  const response = await fetch(
+    "https://huggingface.co/ggml-org/whisper-vad/resolve/9ffd54a1e1ee413ddf265af9913beaf518d1639b/ggml-silero-v5.1.2.bin",
+  );
+  if (!response.ok) throw new Error("Pinned Silero speech model download failed");
+  model = Buffer.from(await response.arrayBuffer());
+}
+if (
+  createHash("sha256").update(model).digest("hex") !==
+  "29940d98d42b91fbd05ce489f3ecf7c72f0a42f027e4875919a28fb4c04ea2cf"
+)
+  throw new Error("Silero speech model checksum mismatch");
+await writeFile(speechModel, model);
 console.log(`Verified whisper.cpp ${revision}. Native builds now run offline.`);
 const { prepareExtra } = await import("../native/prepare-extra.mjs");
 await prepareExtra();

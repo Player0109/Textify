@@ -24,6 +24,8 @@ export interface Preferences {
   activeModelID: string;
   launchAtLogin: boolean;
   checkForUpdates: boolean;
+  saveRecordings: boolean;
+  raiseQuietSpeech: boolean;
   exclusions: { id: string; name: string }[];
   overlay: { x: number; y: number; scale: number };
 }
@@ -82,6 +84,8 @@ export interface Snapshot {
   update: UpdateView | null;
   preferences: Preferences;
   models: ModelView[];
+  // Changes whenever a training recording is saved, compared, or edited.
+  recordingsVersion: number;
 }
 export interface ActivityTotals {
   words: number;
@@ -96,6 +100,18 @@ export interface ActivitySnapshot {
   totals: ActivityTotals;
   days: ActivityDay[];
 }
+export interface RecordingEntry {
+  id: string;
+  createdAt: string;
+  seconds: number;
+  modelID: string;
+  modelText: string;
+  finalText: string;
+  correctedText: string | null;
+  language: string;
+  // Other installed models' text for the same audio, by model ID.
+  comparisons: Record<string, string>;
+}
 export type Action =
   | "press"
   | "release"
@@ -106,6 +122,7 @@ export type Action =
   | "permissions"
   | "permission-settings"
   | "reveal-app"
+  | "reveal-recordings"
   | "enable-trigger"
   | "download"
   | "cancel-download"
@@ -129,6 +146,10 @@ export type AudioReply = {
 export interface TextifyBridge {
   snapshot(): Promise<Snapshot>;
   activity(): Promise<ActivitySnapshot>;
+  recordings(): Promise<RecordingEntry[]>;
+  recordingAudio(id: string): Promise<Uint8Array<ArrayBuffer>>;
+  correctRecording(id: string, text: string): Promise<void>;
+  deleteRecording(id: string): Promise<void>;
   action(action: Action): Promise<void>;
   preferences(value: Preferences): Promise<void>;
   model(command: ModelCommand): Promise<void>;

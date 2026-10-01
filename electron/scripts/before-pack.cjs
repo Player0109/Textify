@@ -28,4 +28,5 @@ module.exports = async (context) => {
   await access(join(resources, `textify-audio${suffix}`));
   await access(join(resources, `textify-whisper${suffix}`));
   await access(join(resources, `textify-platform${suffix}`));
+  await access(join(resources, "ggml-silero-v5.1.2.bin"));
 };

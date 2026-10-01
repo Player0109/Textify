@@ -25,11 +25,14 @@ import { engineError } from "../core/engine-error";
 import { overlayBounds } from "../core/overlay-geometry";
 import { Models } from "./models";
 import { WhisperWorker } from "./worker";
+import { speechSeconds } from "./speech";
 import { Platform, nativeTrigger } from "./platform";
 import { waylandTrigger } from "./wayland";
 import { Capture } from "./capture";
 import { AccessibilitySetup } from "./accessibility";
 import { ActivityStore } from "./activity";
+import { RecordingStore } from "./recordings";
+import { Comparison } from "./comparison";
 import { defaults, validatePreferences } from "./preferences";
 import { linuxStartup, linuxStartupEnabled } from "./startup";
 import { Updates } from "./updates";
@@ -59,6 +62,7 @@ let updates: Updates | null = null,
 let quitting = false,
   cleaned = false,
   modelBusy = false,
+  changingModelFiles = false,
   initialized = false;
 let notice = "",
   triggerStatus = "Global trigger is off",
@@ -74,10 +78,13 @@ let preferences: Preferences = defaults(process.platform, wayland);
 const platform = new Platform(resources);
 let models: Models,
   worker: WhisperWorker,
+  comparison: Comparison,
   capture: Capture,
   dictation: Dictation;
 const activity = new ActivityStore(join(app.getPath("userData"), "activity.json"));
 let activityError = false;
+const recordings = new RecordingStore(join(app.getPath("userData"), "Recordings"));
+let recordingsVersion = 0;
 let broadcastTimer: ReturnType<typeof setTimeout> | undefined;
 const appBundle = dirname(dirname(dirname(process.execPath)));
 const accessibility = process.platform === "darwin"
@@ -137,11 +144,16 @@ function snapshot(): Snapshot {
     preferences,
     models: models?.views() ?? [],
     downloadModelID: models?.progressID ?? null,
+    recordingsVersion,
     exclusionsAvailable: platform.exclusionsAvailable,
     startupAvailable: app.isPackaged,
     updatesSupported: Boolean(updates),
     update: updates?.view ?? null,
   };
+}
+function recordingsChanged() {
+  recordingsVersion++;
+  changed();
 }
 function changed() {
   if (broadcastTimer || quitting) return;
@@ -369,6 +381,10 @@ async function action(action: Action) {
     case "reveal-app":
       if (accessibility) shell.showItemInFolder(appBundle);
       break;
+    case "reveal-recordings":
+      await mkdir(recordings.directory, { recursive: true, mode: 0o700 });
+      await shell.openPath(recordings.directory);
+      break;
     case "enable-trigger":
       if (!active) await enableTrigger();
       break;
@@ -443,12 +459,26 @@ async function savePreferences(value: unknown) {
     if (next.trigger !== previous.trigger && stopTrigger) await enableTrigger();
     if (next.checkForUpdates !== previous.checkForUpdates)
       updates?.setEnabled(next.checkForUpdates);
+    if (next.saveRecordings) comparison.schedule();
     changed();
   } finally {
     savingPreferences = false;
   }
   // Reload outside the settings lock so a slow load cannot block downloads.
   if (changedModel && models.installed) await loadModel();
+}
+// Windows keeps a model file locked while a worker has it open, so every
+// worker that may use the model exits first. Comparisons wait until the files
+// have changed.
+async function changeModelFiles(id: string, change: () => Promise<void>) {
+  changingModelFiles = true;
+  try {
+    if (models.id === id) await worker.stop();
+    await comparison.stop();
+    await change();
+  } finally {
+    changingModelFiles = false;
+  }
 }
 async function modelAction(command: ModelCommand) {
   if (command?.action === "source" && typeof command.id === "string") {
@@ -491,8 +521,7 @@ async function modelAction(command: ModelCommand) {
     });
     if (answer.response !== 1 || dictation.busy || modelBusy || models.busy)
       return;
-    if (models.id === command.id) await worker.stop();
-    await models.remove(command.id);
+    await changeModelFiles(command.id, () => models.remove(command.id));
   } else if (command.action === "use") {
     if (model.status !== "installed") throw new Error("model_not_ready");
     let language = preferences.language;
@@ -542,8 +571,7 @@ async function modelAction(command: ModelCommand) {
         return;
       source = choice.filePaths[0];
     }
-    if (models.id === command.id) await worker.stop();
-    await models.install(source, command.id);
+    await changeModelFiles(command.id, () => models.install(source, command.id));
     if (models.id === command.id) await loadModel();
   }
   changed();
@@ -589,6 +617,24 @@ else {
           `textify-whisper${process.platform === "win32" ? ".exe" : ""}`,
         ),
         changed,
+      );
+      comparison = new Comparison(
+        join(
+          resources,
+          `textify-whisper${process.platform === "win32" ? ".exe" : ""}`,
+        ),
+        recordings,
+        () => models.views(),
+        (id) => models.pathFor(id),
+        () => preferences.saveRecordings && !quitting,
+        () =>
+          !modelBusy &&
+          !changingModelFiles &&
+          !models.busy &&
+          !["armed", "recording", "processing", "inserting"].includes(
+            dictation.phase,
+          ),
+        recordingsChanged,
       );
       main = createWindow({
         width: 1120,
@@ -656,6 +702,15 @@ else {
             capture.start(id, preferences.microphone, samples, failed),
           stop: (id, discard) => capture.stop(id, discard),
           transcribe: (samples) => worker.transcribe(samples),
+          speech: (samples) =>
+            speechSeconds(
+              join(
+                resources,
+                `textify-whisper${process.platform === "win32" ? ".exe" : ""}`,
+              ),
+              ["--speech", join(resources, "ggml-silero-v5.1.2.bin")],
+              samples,
+            ),
           streaming: () => (worker.streaming ? worker : undefined),
           insert: (text, target) => platform.insert(text, target),
           completed: (result) => {
@@ -664,11 +719,30 @@ else {
                 activityError = true;
               });
           },
+          recorded: (sample) => {
+            if (!preferences.saveRecordings) return;
+            void recordings
+              .save({
+                ...sample,
+                modelID: preferences.activeModelID,
+                language: preferences.language,
+              })
+              .then(() => {
+                recordingsChanged();
+                comparison.schedule();
+              })
+              .catch(() => {
+                notice =
+                  "A training recording could not be saved. Check available storage.";
+                changed();
+              });
+          },
           changed,
         },
         () => preferences.replacements,
         () => Date.now(),
         () => preferences.language,
+        () => preferences.raiseQuietSpeech,
       );
       const trustedAudio = (contents: WebContents | null) =>
         contents === audio.webContents;
@@ -709,6 +783,22 @@ else {
         if (activityError) throw new Error("activity_unavailable");
         await activity.flush();
         return activity.snapshot();
+      });
+      ipcMain.handle("recordings", (event) => {
+        if (!allowed(event, [main])) throw new Error("unauthorized");
+        return recordings.list();
+      });
+      ipcMain.handle("recording-audio", (event, id) => {
+        if (!allowed(event, [main])) throw new Error("unauthorized");
+        return recordings.audio(id);
+      });
+      ipcMain.handle("correct-recording", (event, id, text) => {
+        if (!allowed(event, [main])) throw new Error("unauthorized");
+        return recordings.correct(id, text).then(recordingsChanged);
+      });
+      ipcMain.handle("delete-recording", (event, id) => {
+        if (!allowed(event, [main])) throw new Error("unauthorized");
+        return recordings.remove(id).then(recordingsChanged);
       });
       ipcMain.handle("devices", (event) => {
         if (!allowed(event, [main])) throw new Error("unauthorized");
@@ -837,6 +927,7 @@ else {
         await models.init(preferences.activeModelID);
         initialized = true;
         if (models.installed) await loadModel();
+        if (preferences.saveRecordings) comparison.schedule();
       } catch {
         notice =
           "The bundled model catalog could not be verified. Reinstall this preview.";
@@ -875,11 +966,13 @@ else {
     stopTrigger?.();
     models?.cancel();
     worker?.stop();
+    comparison?.stop();
     capture?.shutdown();
     audio?.destroy();
     void (async () => {
       await dictation?.cancel();
       await activity.flush().catch(() => {});
+      await recordings.flush().catch(() => {});
       overlay?.destroy();
       accessibilityHelp?.destroy();
       tray?.destroy();

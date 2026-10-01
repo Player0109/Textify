@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { processText } from "../src/core/text";
-import { SpeechGuard, stitch, trimSilence, windows } from "../src/core/audio";
+import {
+  raiseQuiet,
+  SpeechGuard,
+  stitch,
+  trimSilence,
+  windows,
+} from "../src/core/audio";
 import { validatePreferences } from "../src/main/preferences";
 describe("ported text rules", () => {
   it.each([
@@ -52,6 +58,36 @@ describe("audio rules", () => {
     const trimmed = trimSilence(sample);
     expect(trimmed.length).toBeGreaterThan(20000);
     expect(trimmed.some((x) => x === 0)).toBe(true);
+  });
+  const level = (db: number) => 10 ** (db / 20);
+  it("keeps soft words and a 400 ms margin in quiet recordings", () => {
+    // Room noise at -65 dBFS, speech at -40 dBFS, then softer words at -50 dBFS.
+    const sample = new Float32Array(64000).fill(level(-65));
+    sample.fill(level(-40), 16000, 32000);
+    sample.fill(level(-50), 32000, 40000);
+    expect(trimSilence(sample)).toHaveLength(24000 + 2 * 6400);
+  });
+  it("keeps the -45 dBFS threshold and 150 ms margin at normal levels", () => {
+    const sample = new Float32Array(64000).fill(level(-50));
+    sample.fill(0.1, 16000, 32000);
+    expect(trimSilence(sample)).toHaveLength(16000 + 2 * 2400);
+  });
+  it("raises only quiet recordings, by at most 30 dB and below a -1 dBFS peak", () => {
+    const quiet = new Float32Array(32000).fill(level(-40));
+    raiseQuiet(quiet);
+    expect(quiet[0]).toBeCloseTo(level(-20), 6);
+    const faint = new Float32Array(32000).fill(level(-55));
+    raiseQuiet(faint);
+    expect(faint[0]).toBeCloseTo(level(-25), 6);
+    const click = new Float32Array(32000).fill(level(-40));
+    click[100] = level(-10);
+    raiseQuiet(click);
+    expect(click[100]).toBeCloseTo(level(-1), 6);
+    expect(click[0]).toBeCloseTo(level(-31), 6);
+    const normal = new Float32Array(32000).fill(0.1);
+    const before = normal.slice();
+    raiseQuiet(normal);
+    expect(normal).toEqual(before);
   });
   it("bounds every window and retains forced-boundary overlap", () => {
     const audio = new Float32Array(16000 * 300).fill(0.1),

@@ -12,6 +12,13 @@ describe("settings and language migration", () => {
     expect(next.replacements).toHaveLength(1);
     expect(next.microphone).toBe("device");
     expect(next.language).toBe("en");
+    expect(next.saveRecordings).toBe(false);
+  });
+  it("accepts only a boolean training recordings choice", () => {
+    expect(validatePreferences({ ...defaults(), saveRecordings: true }).saveRecordings).toBe(true);
+    expect(() =>
+      validatePreferences({ ...defaults(), saveRecordings: "yes" }),
+    ).toThrow();
   });
   it("turns on update checks for earlier settings and rejects invalid values", () => {
     const earlier: Record<string, unknown> = { ...defaults() };
@@ -23,6 +30,19 @@ describe("settings and language migration", () => {
     ).toBe(false);
     expect(() =>
       validatePreferences({ ...defaults(), checkForUpdates: "yes" }),
+    ).toThrow();
+  });
+  it("raises quiet speech unless the saved choice turned it off", () => {
+    expect(
+      validatePreferences({ trigger: "right-control", replacements: [] })
+        .raiseQuietSpeech,
+    ).toBe(true);
+    expect(
+      validatePreferences({ ...defaults(), raiseQuietSpeech: false })
+        .raiseQuietSpeech,
+    ).toBe(false);
+    expect(() =>
+      validatePreferences({ ...defaults(), raiseQuietSpeech: "yes" }),
     ).toThrow();
   });
   it("rejects duplicate custom words and invalid overlay sizes", () => {

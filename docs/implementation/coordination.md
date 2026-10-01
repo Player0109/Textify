@@ -2962,3 +2962,172 @@ Task 1 must merge before parallel Wave 1 work begins.
   `models-v1`. That release has no feed, so the check stops quietly.
 - The root README still describes the published preview.23 download, which has
   no updater. Update it when the first updater-enabled release is published.
+### Opt-in training recordings — 2026-09-27
+
+- This task owns the new `electron/src/main/recordings.ts`,
+  `electron/src/renderer/Recordings.tsx`, and `electron/tests/recordings.test.ts`.
+  It hands off narrow edits to `electron/src/shared.ts`,
+  `electron/src/main/preferences.ts`, `electron/src/main/preload.ts`,
+  `electron/src/main/index.ts`, `electron/src/core/dictation.ts`, the Privacy
+  pane in `electron/src/renderer/index.tsx`, the Privacy row selectors in
+  `electron/src/renderer/studio.css`, the dictation and settings tests, and the
+  privacy statements in `docs/SPEC.md`, `electron/README.md`, and `PRIVACY.md`.
+  This handoff precedes those edits. The General settings alignment edits in
+  the same renderer files are left untouched.
+- An off-by-default Privacy setting saves each completed dictation's trimmed
+  16 kHz audio as WAV with a JSON record of the model output, final text, model,
+  language, and an empty correction field, for later review and fine-tuning.
+  Cancelled, secure-field, excluded-app, and empty dictations are not saved.
+- Validation: TypeScript, 124 tests and the production build passed. An
+  isolated Electron check fed the public JFK fixture through the real
+  AudioWorklet and Parakeet Q8_0 worker with the setting on. It produced one
+  11.19 s WAV and a matching JSON record, and the Privacy row showed the saved
+  count. Show folder opened the folder, and turning the setting off updated
+  `settings.json`. The overlay cannot read the recordings summary. The row
+  fits at 1120 and 780 px widths.
+
+### Training recording review — 2026-09-27
+
+- This task owns the new `electron/src/renderer/RecordingReview.tsx` and
+  continues the training recordings files: `electron/src/main/recordings.ts`,
+  `electron/src/renderer/Recordings.tsx`, and `electron/tests/recordings.test.ts`.
+  It hands off narrow edits to the recordings bridge in `electron/src/shared.ts`
+  and `electron/src/main/preload.ts`, the recordings IPC handlers in
+  `electron/src/main/index.ts`, the Privacy review route in
+  `electron/src/renderer/index.tsx`, review styles in
+  `electron/src/renderer/studio.css`, `media-src` in
+  `electron/src/renderer/index.html` for local playback, and the recordings
+  paragraph in `electron/README.md`. This handoff precedes those edits.
+- Privacy → Review lists saved recordings newest first, plays each clip, and
+  saves the typed transcript as `correctedText`, then opens the next clip that
+  needs review. Delete removes a clip's JSON record and WAV file.
+- Validation: TypeScript, 127 tests and the production build passed. An
+  isolated Electron check seeded three JFK-fixture clips. It confirmed the
+  Privacy count and Review route, newest-first order, blob playback of the
+  11 s clip with autoplay, a saved correction that leaves `modelText` intact,
+  advancing past reviewed clips, deletion of both files, Show folder, and
+  refusal of recordings calls from the overlay and of names outside the
+  folder. The page fits at 1120 and 780 px widths (screenshots inspected).
+- Follow-up: the owner could not find the review page under Privacy, so it
+  is also a **Recordings** sidebar pane, shown while saving is on. This adds
+  that pane and its icon to the navigation in `renderer/index.tsx`.
+
+### Training recording review priority — 2026-09-27
+
+- The owner asked for review that puts human effort on the clips the model
+  most likely got wrong. This task owns the new `electron/src/core/compare.ts`,
+  `electron/src/main/comparison.ts`, and `electron/tests/compare.test.ts`, and
+  continues the training recordings files. It hands off narrow edits to
+  `RecordingEntry` in `electron/src/shared.ts`, the comparison wiring in
+  `electron/src/main/index.ts`, review styles in
+  `electron/src/renderer/studio.css`, and the recordings paragraph in
+  `electron/README.md`. This handoff precedes those edits.
+- While saving is on and dictation is idle, the largest installed Whisper,
+  Parakeet, or Qwen3-ASR model from each family other than the clip's own
+  transcribes saved clips locally, and the text is stored in the clip's JSON.
+  Review sorts clips that need review by how much the dictation model's text
+  differs from the others, highlights the disputed words, and can copy another
+  model's text into the correction.
+- Validation: TypeScript, 134 tests and the production build passed. An
+  isolated Electron check seeded three JFK clips labeled as Qwen3-ASR 1.7B
+  output, one with "cutting tree" for "country", and cloned the installed
+  Whisper large-v3 and Parakeet models. Both transcribed all clips in the
+  background within 10 s of launch; the open Recordings page updated, ranked
+  the wrong clip first with only "cutting" and "tree" marked, **Use** copied
+  Whisper's text, ⌘↩ saved it and opened the next clip that needs review. The
+  earlier review check still passes, and the page fits at 780 px.
+
+### Quiet speech trimming and speech check — 2026-09-26
+
+- The owner approved these dictation-accuracy changes after the far-field and
+  noise evaluation: trimming relative to the recording's own noise with a
+  400 ms margin for quiet recordings, a Raise quiet speech preference (on by
+  default), a CPU speech check before transcription, and treating a truncated
+  transcribe.cpp decode as no text instead of a GPU error. The owner explicitly
+  approved the whisper.cpp change the speech check requires.
+- This task owns `electron/src/core/audio.ts` and `dictation.ts`, a new speech
+  check client in `electron/src/main/` and its wiring in `index.ts`, the new
+  preference (`shared.ts`, `preferences.ts` and one General settings row in
+  `renderer/index.tsx`), `electron/native/whisper-worker.cpp`,
+  `transcribe-worker.mm`, `require-gpu.mjs`, a native speech test and its CMake
+  entry, the pinned Silero model download, copy and packaging checks, the
+  model's license and notices, their tests (including a speech section in
+  `scripts/no-gpu-smoke.mjs`), and the matching SPEC, README and PRIVACY text.
+- The GPU policy stays in force for every model graph except the Silero speech
+  detector (885 KB, MIT, pinned from `ggml-org/whisper-vad`); only that
+  detector's scheduler may compute on the CPU. The regression test must still
+  refuse ordinary CPU graphs. Transcription model weights, catalogs and signed
+  metadata are unchanged.
+- Another task's uncommitted General settings control alignment change also
+  edits `renderer/index.tsx` and `renderer/studio.css`. This task adds one
+  setting row in `index.tsx`, below Microphone. In `studio.css` it changes only
+  the General settings grid from three to four rows per column
+  (`grid-template-rows` and the `nth-child` border rules, including the
+  narrow-width overrides), so the seventh row stays in the two-column grid. The
+  four left rows now draw the line between the columns, so it runs the full
+  height, and every row except the last in each layout has a line below it. At
+  the owner's request, this task also applies that task's control rules
+  unchanged so the test build shows them: one 170 px width for the model button
+  and the three selects, and links below their controls (the `control-stack`
+  rules, with `microphone-control` removed). The lines are identical to the
+  other task's uncommitted edit, so either branch can merge first; that task
+  keeps ownership of these rules.
+- Validation: `npm run check`, `npm run native:build` (including the
+  `gpu-required` and `speech-on-cpu` tests), the packaged preview (model
+  checksum, license, `textify-whisper --speech`, `mac-signature-smoke`),
+  `npm run smoke` and the speech section of `scripts/no-gpu-smoke.mjs` pass on
+  the local Mac; the rest of that script needs a runner without a GPU. The real
+  `Dictation` class with the built worker and speech check reproduced the
+  offline evaluation. Qwen3-ASR 1.7B word error rate: AMI 8.4% headset and
+  19.4% table microphone with 4 dictations lost (previously 14.2% and 46.9%
+  with 43 lost); VOiCES speech at -40, -47 and -55 dBFS 2.5%, 2.5% and 3.2%
+  (previously 4.1%, 34.2% and 100%); VoiceBank, BERSt, Open ASR and
+  VoiceCodeBench within 0.3 points of before. No-speech clips that produced
+  text: MUSAN 12, 3 and 5 of 200 (previously 182, 62 and 10), DEMAND 28, 6 and
+  5 of 125 (previously 97, 13 and 0), with no GPU errors. Whisper large-v3: AMI
+  13.4% and 24.9% with 7 lost (previously 19.2% and 50.8% with 48 lost), and
+  0 of 600 MUSAN clips produced text. The speech check takes about 3.7 ms per
+  second of recording on an M4 Max, 1.1 s at the 5-minute limit; slower CPUs
+  have not been measured.
+  Testing with a physical microphone at a distance is still needed. With the
+  seventh row, the applied control rules were rechecked in Electron at widths
+  780, 930, 931, 1050, 1051 and 1120 with the trigger link shown and hidden:
+  all four controls measure 170 px and line up, links sit below and align
+  right, the trigger select does not move, and nothing overflows. The row and
+  column lines were checked the same way at 780, 930, 931, 1051 and 1120.
+
+### Training recordings and quiet speech merge — 2026-10-01
+
+- The owner asked to merge the unmerged training recordings branch and the
+  uncommitted quiet speech work into the `2026-10-01` branch from master. The
+  quiet speech edits were first committed unchanged on `quiet-speech-check`.
+  This task owns only the merge resolutions and the fixes the combination
+  needs. It hands off narrow edits to `electron/src/main/comparison.ts`, the
+  model removal and replacement paths in `electron/src/main/index.ts`, a test
+  in `electron/tests/compare.test.ts`, the General settings grid rules in
+  `electron/src/renderer/studio.css`, and the conflicting lines in the files
+  both features and master edit. This handoff precedes those edits.
+- Master now waits for the active model's worker to exit before removing or
+  replacing a model, because Windows keeps a memory-mapped model file locked.
+  Training comparisons start workers for other installed models and keep them
+  for two minutes. Removing or replacing a model now also stops those workers,
+  waits for them to exit, and keeps comparisons waiting until the files have
+  changed.
+- Master's packaged Mac builds add a seventh General row, Check for updates
+  automatically. With master's three-row grid it formed a third column. Raise
+  quiet speech makes seven rows everywhere and eight on packaged Macs, so the
+  four-row grid also removes the bottom line under the eighth row and, in the
+  one-column layout, under whichever row is last.
+- Quiet recordings are raised before transcription, so training recordings
+  save the audio the model transcribed.
+- Validation on the M4 Max: `npm run check` passed with 191 tests and the
+  production build. `npm run native:prepare` and `npm run native:build` passed,
+  including `gpu-required` for all three workers and `speech-on-cpu`. The speech
+  section of `scripts/no-gpu-smoke.mjs` and `npm run smoke` passed. A new
+  comparison test fails on the previous stop method and passes now. An
+  Electron check of General with seven and eight rows at widths 1120, 931, 930
+  and 780 confirmed two columns of four rows above 930 px, one column below,
+  the expected row lines, and no page overflow. Screenshots were inspected.
+  Windows and Linux builds of the speech check, physical-microphone testing at
+  a distance, and Windows model removal while comparisons run are not yet
+  verified.

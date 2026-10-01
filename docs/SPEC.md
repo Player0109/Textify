@@ -16,6 +16,14 @@ limit. Confucius4-R2T2 additionally supports an in-memory live preview.
 This is a dictation utility, not a transcript-history or file-transcription
 workspace.
 
+Before transcription, Textify trims silence from both ends of the recording and
+runs a small speech detector (Silero VAD) on the CPU. A recording with under
+0.25 s of detected speech returns to idle without transcription; if the
+detector cannot run, transcription proceeds. Quiet recordings, such as speech
+from farther away, are trimmed relative to the room's noise floor with a 400 ms
+margin. The Raise quiet speech setting, on by default, makes them louder before
+transcription.
+
 The app provides a persistent settings window, tray/menu-bar access, a floating
 recording bar, model management, microphone selection, vocabulary, replacement
 pairs, and local numeric Activity views. Closing the settings window leaves the
@@ -36,7 +44,8 @@ build would update only through the App Store.
 | Linux x64, Wayland | Hardware Vulkan GPU and compatible driver | Desktop GlobalShortcuts portal when available | Explicit Copy and manual paste |
 
 CPU-only inference and software Vulkan devices are not supported. CPU work for
-capture, preprocessing, token sampling, and runtime bookkeeping still occurs.
+capture, preprocessing, the speech check, token sampling, and runtime
+bookkeeping still occurs.
 The microphone button always uses the explicit Copy workflow. It does not
 inspect another app or require a global shortcut. App exclusions are available
 on macOS, Windows, and X11; Wayland cannot reliably identify foreground apps.
@@ -81,12 +90,16 @@ credentials never belong in the repository or CI.
 
 Whisper supports custom vocabulary prompts. Replacement pairs apply to every
 engine, and English spoken-punctuation rewriting is skipped for non-English
-dictation. Speech enhancement and diagnostics export are not desktop features.
+dictation. Noise removal and other speech enhancement, and diagnostics export,
+are not desktop features; Raise quiet speech changes only the recording level.
 
 ## Privacy and Activity
 
 Audio and pending dictated text stay in memory. The app has no accounts,
-telemetry, cloud speech recognition, or transcript history. Preferences,
+telemetry, cloud speech recognition, or transcript history. The one exception
+is an opt-in Privacy setting, off by default, that saves each completed
+dictation's audio and transcript to a local `Recordings` folder for review and
+model fine-tuning. Preferences,
 vocabulary, model files, trust records, and Activity totals remain local.
 Explicit model downloads, user-opened source links, and macOS update checks
 require network access.
