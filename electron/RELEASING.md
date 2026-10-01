@@ -63,7 +63,8 @@ reporting success. Production DMGs omit automatic-update blockmaps because
 stapling changes the final bytes. The update feed instead uses
 `Textify-<version>-mac-arm64.zip`, which electron-builder creates from the
 already notarized and stapled app. The same command writes the ZIP's
-`.blockmap` and the update feed, `preview-mac.yml` for a preview version.
+`.blockmap` and the update feed, `latest-mac.yml`. electron-builder uses the
+`latest` feed names for preview versions too.
 Explicit preview packaging is unchanged and has no update feed.
 Verify the DMG by mounting it,
 checking its `Textify.app` signature and Gatekeeper assessment, and checking the
@@ -72,7 +73,7 @@ making the release public.
 
 The Windows and Linux installers come from the successful Electron workflow's
 artifacts. They are not code-signed. Download those exact artifacts with their
-update feeds, `preview.yml` and `preview-linux.yml`, and the Windows
+update feeds, `latest.yml` and `latest-linux.yml`, and the Windows
 installer's blockmap, and verify their workflow checksums. Place the final Mac,
 Windows, and Linux files in `electron/release/`, then run
 `node scripts/checksums.mjs --production` from `electron/` on the maintainer
@@ -100,10 +101,10 @@ publishing it:
 - the four installers, `SHA256SUMS.txt` and `RELEASE_INSTALL.md`;
 - `Textify-<version>-mac-arm64.zip` and its `.blockmap`;
 - `Textify-<version>-win-x64.exe.blockmap`;
-- `preview-mac.yml`, `preview.yml` and `preview-linux.yml`.
+- `latest-mac.yml`, `latest.yml` and `latest-linux.yml`.
 
-A stable version uses `latest-mac.yml`, `latest.yml` and `latest-linux.yml`
-instead.
+A preview install first asks the release for `preview-mac.yml`, `preview.yml`
+or `preview-linux.yml`, then falls back to the `latest` file.
 
 Windows and Linux updates are unsigned. Installed apps install whatever the
 release's feed lists, so the GitHub account and release assets need strong

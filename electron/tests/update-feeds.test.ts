@@ -34,11 +34,10 @@ afterEach(async () => {
 });
 
 describe("update feed names", () => {
-  it("matches electron-builder's channel names on each platform", () => {
-    expect(feedName(version, "mac")).toBe("preview-mac.yml");
-    expect(feedName(version, "windows")).toBe("preview.yml");
-    expect(feedName(version, "linux")).toBe("preview-linux.yml");
-    expect(feedName("1.0.0", "windows")).toBe("latest.yml");
+  it("matches the names electron-builder gives GitHub feeds", () => {
+    expect(feedName("mac")).toBe("latest-mac.yml");
+    expect(feedName("windows")).toBe("latest.yml");
+    expect(feedName("linux")).toBe("latest-linux.yml");
   });
 });
 
@@ -53,9 +52,9 @@ describe("Linux update feed", () => {
   });
 
   it("accepts a feed that lists both packages in either order", async () => {
-    await writeFile(join(directory, "preview-linux.yml"), feed(files));
+    await writeFile(join(directory, "latest-linux.yml"), feed(files));
     await verifyUpdateFeed(directory, version, "linux", [appImage, deb]);
-    await writeFile(join(directory, "preview-linux.yml"), feed([...files].reverse()));
+    await writeFile(join(directory, "latest-linux.yml"), feed([...files].reverse()));
     await verifyUpdateFeed(directory, version, "linux", [appImage, deb]);
   });
 
@@ -64,12 +63,12 @@ describe("Linux update feed", () => {
     [{ [deb]: "stale" }, files, `does not match ${deb}`],
     [{}, files.slice(1), "must list only"],
   ])("rejects a feed that does not match the release: %o", async (overrides, listed, message) => {
-    await writeFile(join(directory, "preview-linux.yml"), feed(listed, overrides));
+    await writeFile(join(directory, "latest-linux.yml"), feed(listed, overrides));
     await expect(verifyUpdateFeed(directory, version, "linux", [appImage, deb])).rejects.toThrow(message);
   });
 
   it("requires the feed", async () => {
     await expect(verifyUpdateFeed(directory, version, "linux", [appImage, deb]))
-      .rejects.toThrow("Missing update feed: preview-linux.yml");
+      .rejects.toThrow("Missing update feed: latest-linux.yml");
   });
 });

@@ -40,7 +40,7 @@ Xvfb and do not establish GNOME/KDE Wayland behavior.
 ## Mac automatic updates
 
 Install the previous updater-enabled release in `/Applications`, then publish
-the new release with its ZIP, blockmap and `preview-mac.yml`.
+the new release with its ZIP, blockmap and `latest-mac.yml`.
 
 | Check | Expected result | Result |
 | --- | --- | --- |
@@ -52,7 +52,7 @@ the new release with its ZIP, blockmap and `preview-mac.yml`.
 ## Windows and Linux automatic updates
 
 Install the previous updater-enabled release, then publish the new release with
-`preview.yml`, the Windows installer's blockmap and `preview-linux.yml`.
+`latest.yml`, the Windows installer's blockmap and `latest-linux.yml`.
 
 | Check | Expected result | Result |
 | --- | --- | --- |

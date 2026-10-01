@@ -74,14 +74,10 @@ export function verifyProductionInstallers(files, version, platform = process.pl
 // Installed apps trust the update feed's hash and size, so the feed must
 // describe these exact ZIP bytes, and the app inside must pass the same
 // Developer ID, staple, and Gatekeeper checks as the DMG.
-export function macUpdateFeed(version) {
-  return feedName(version, "mac");
-}
-
 export async function verifyMacUpdate(directory, version, run = runMacTool) {
   const name = `Textify-${version}-mac-arm64.zip`;
   const zip = resolve(directory, name);
-  const feed = await readFile(resolve(directory, macUpdateFeed(version)), "utf8");
+  const feed = await readFile(resolve(directory, feedName("mac")), "utf8");
   const hash = createHash("sha512");
   let size = 0;
   for await (const bytes of createReadStream(zip)) {

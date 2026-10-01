@@ -189,7 +189,7 @@ not claim a notarized release, and credentials are never bundled.
 
 Releases update themselves from GitHub Releases. At launch and every six
 hours, Textify checks the newest `v*-preview.*` release for its platform's feed:
-`preview-mac.yml`, `preview.yml` on Windows, or `preview-linux.yml` on Linux. A
+`latest-mac.yml`, `latest.yml` on Windows, or `latest-linux.yml` on Linux. A
 newer version shows a notification and a Settings notice. Choosing **Update**
 downloads the new version and checks its SHA-512 against the feed. It installs
 the next time Textify quits. General settings can turn the checks off.

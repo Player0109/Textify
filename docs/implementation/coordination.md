@@ -3150,7 +3150,15 @@ Task 1 must merge before parallel Wave 1 work begins.
   when `APPIMAGE` is set, because the AppImage and `.deb` targets share one
   resources folder while they build. Production checksums now check the
   Windows and Linux feeds against the installers.
-- Validation on the M4 Max: `npm run check` passed with 202 tests
-  and the production build. New tests cover the Windows and Linux publish
-  settings and feed checks against installer bytes. CI builds with feeds and
-  updates on physical Windows and Linux machines are not yet verified.
+- The CI artifacts showed that electron-builder names GitHub feeds
+  `latest*.yml` for every version. The Mac release check and documents from the
+  Mac updater work expected `preview-mac.yml`, so the first updater-enabled Mac
+  release would have failed its checksum step. All checks and documents now use
+  the `latest` names. A preview install asks for `preview*.yml` first and falls
+  back to them.
+- Validation on the M4 Max: `npm run check` passed with 201 tests and the
+  production build. New tests cover the Windows and Linux publish settings and
+  feed checks against installer bytes. Electron CI passed on all three
+  platforms, including the installed app's feed check, and the Windows and
+  Linux feeds from that run match their installers. Updates on physical
+  Windows and Linux machines are not yet verified.

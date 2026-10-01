@@ -5,9 +5,10 @@ import { join } from "node:path";
 
 const suffixes = { mac: "-mac", windows: "", linux: "-linux" };
 
-export function feedName(version, platform) {
-  // electron-builder names the feed after the first prerelease label.
-  return `${/^[^-+]+-([^.+]+)/.exec(version)?.[1] ?? "latest"}${suffixes[platform]}.yml`;
+// electron-builder names GitHub feeds latest*.yml for every version. A preview
+// install asks for preview*.yml first and then falls back to these.
+export function feedName(platform) {
+  return `latest${suffixes[platform]}.yml`;
 }
 
 // electron-builder writes these feeds with js-yaml in a fixed layout: top-level
@@ -40,7 +41,7 @@ async function measure(file) {
 // Installed apps trust the feed's hash and size, so the feed must describe
 // exactly these installers.
 export async function verifyUpdateFeed(directory, version, platform, names) {
-  const name = feedName(version, platform);
+  const name = feedName(platform);
   let feed;
   try {
     feed = readFeed(await readFile(join(directory, name), "utf8"));
