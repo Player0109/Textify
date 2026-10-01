@@ -12,8 +12,9 @@ export interface Updater {
   on(event: "error", listener: (error: Error) => void): unknown;
 }
 
-// Electron's native autoUpdater. On macOS it runs Squirrel.Mac, which unpacks
-// and verifies the download before it can install on quit.
+// The source of the update-downloaded event. On macOS this is Electron's
+// autoUpdater, which runs Squirrel.Mac. On Windows and Linux it is the
+// electron-updater instance itself.
 export interface NativeUpdater {
   on(event: "update-downloaded", listener: () => void): unknown;
 }
@@ -46,8 +47,9 @@ export class Updates {
     updater.on("update-not-available", () => {
       if (!this.busy) this.set(null);
     });
-    // electron-updater finishes when it hands the ZIP to Squirrel.Mac. The
-    // update is ready only after Squirrel.Mac has staged it for installation.
+    // On macOS electron-updater finishes when it hands the ZIP to Squirrel.Mac.
+    // The update is ready only after Squirrel.Mac has staged it for
+    // installation. On Windows and Linux the event follows the SHA-512 check.
     native.on("update-downloaded", () => {
       if (this.view?.status === "downloading")
         this.set({ ...this.view, status: "ready", progress: 1 });

@@ -40,7 +40,7 @@ Xvfb and do not establish GNOME/KDE Wayland behavior.
 ## Mac automatic updates
 
 Install the previous updater-enabled release in `/Applications`, then publish
-the new release with its ZIP, blockmap and `preview-mac.yml`.
+the new release with its ZIP, blockmap and `latest-mac.yml`.
 
 | Check | Expected result | Result |
 | --- | --- | --- |
@@ -48,6 +48,17 @@ the new release with its ZIP, blockmap and `preview-mac.yml`.
 | Choose Update | Progress reaches ready; the app keeps working | Pending |
 | Quit and reopen Textify | New version runs; Accessibility, microphone and settings are kept | Pending |
 | Turn off automatic checks, relaunch | No update notice or request to GitHub | Pending |
+
+## Windows and Linux automatic updates
+
+Install the previous updater-enabled release, then publish the new release with
+`latest.yml`, the Windows installer's blockmap and `latest-linux.yml`.
+
+| Check | Expected result | Result |
+| --- | --- | --- |
+| Windows: choose Update, then quit | The installer runs silently; the new version starts next time with settings kept | Pending |
+| AppImage: choose Update, then quit | The AppImage file is replaced and the new version starts next time | Pending |
+| `.deb`: choose Update, then quit | An administrator password prompt appears; the new version starts next time | Pending |
 
 ## Permissions, focus, and clipboard
 

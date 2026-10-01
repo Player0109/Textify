@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const helperURL = pathToFileURL(resolve("scripts/mac-release.mjs")).href;
-const { macUpdateFeed, notaryCredentials, notarizeMacDmg, verifyMacUpdate, verifyProductionInstallers } = await import(helperURL);
+const { notaryCredentials, notarizeMacDmg, verifyMacUpdate, verifyProductionInstallers } = await import(helperURL);
 const identity = "Developer ID Application: Release Test (ABC1234567)";
 const dmg = "/release/Textify-test-mac-arm64.dmg";
 const credentials = { APPLE_KEYCHAIN_PROFILE: "test-notary" };
@@ -107,14 +107,9 @@ describe("Mac update feed", () => {
   async function release(text: string) {
     const directory = await mkdtemp(join(tmpdir(), "textify-feed-test-"));
     await writeFile(join(directory, zip), bytes);
-    await writeFile(join(directory, "preview-mac.yml"), text);
+    await writeFile(join(directory, "latest-mac.yml"), text);
     return directory;
   }
-
-  it("uses electron-builder's channel feed name", () => {
-    expect(macUpdateFeed("0.2.0-preview.24")).toBe("preview-mac.yml");
-    expect(macUpdateFeed("1.0.0")).toBe("latest-mac.yml");
-  });
 
   it("accepts a feed for the exact ZIP and checks the app inside it", async () => {
     const directory = await release(feed());

@@ -32,3 +32,7 @@ global trigger also depends on desktop GlobalShortcuts portal support.
 After launch, open Transcription models, install a supported model, then use the
 microphone button for a first recording. Check the release notes for tested
 hardware, supported models, and any remaining platform limitations.
+
+Textify checks GitHub Releases for newer versions and offers them in Settings.
+An update installs when you quit Textify. The Debian package asks for an
+administrator password while an update installs.

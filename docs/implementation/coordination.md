@@ -3131,3 +3131,34 @@ Task 1 must merge before parallel Wave 1 work begins.
   Windows and Linux builds of the speech check, physical-microphone testing at
   a distance, and Windows model removal while comparisons run are not yet
   verified.
+
+### Windows and Linux automatic updates — 2026-10-01
+
+- The owner asked for signed Windows and Linux installers with automatic
+  updates. Every certificate Windows trusts needs a third party to verify the
+  publisher, including the free SignPath Foundation program, so the owner
+  dropped signing and kept unsigned updates. This task owns the updater startup
+  in `electron/src/main/index.ts` and `electron/src/main/updates.ts`, the
+  Windows and Linux settings in `electron/scripts/package.mjs`, the release
+  checks in `electron/scripts/checksums.mjs` and
+  `electron/scripts/mac-release.mjs`, a new `electron/scripts/update-feeds.mjs`,
+  their tests, the installer build step in `.github/workflows/electron.yml`, and
+  the release, privacy, install and QA documents that describe updates. This
+  handoff precedes those edits.
+- Windows and Linux release builds carry the GitHub update feed. Their updates
+  are checked only against the feed's SHA-512. Linux picks the AppImage updater
+  when `APPIMAGE` is set, because the AppImage and `.deb` targets share one
+  resources folder while they build. Production checksums now check the
+  Windows and Linux feeds against the installers.
+- The CI artifacts showed that electron-builder names GitHub feeds
+  `latest*.yml` for every version. The Mac release check and documents from the
+  Mac updater work expected `preview-mac.yml`, so the first updater-enabled Mac
+  release would have failed its checksum step. All checks and documents now use
+  the `latest` names. A preview install asks for `preview*.yml` first and falls
+  back to them.
+- Validation on the M4 Max: `npm run check` passed with 201 tests and the
+  production build. New tests cover the Windows and Linux publish settings and
+  feed checks against installer bytes. Electron CI passed on all three
+  platforms, including the installed app's feed check, and the Windows and
+  Linux feeds from that run match their installers. Updates on physical
+  Windows and Linux machines are not yet verified.

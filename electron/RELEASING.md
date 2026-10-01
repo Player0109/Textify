@@ -63,7 +63,8 @@ reporting success. Production DMGs omit automatic-update blockmaps because
 stapling changes the final bytes. The update feed instead uses
 `Textify-<version>-mac-arm64.zip`, which electron-builder creates from the
 already notarized and stapled app. The same command writes the ZIP's
-`.blockmap` and the update feed, `preview-mac.yml` for a preview version.
+`.blockmap` and the update feed, `latest-mac.yml`. electron-builder uses the
+`latest` feed names for preview versions too.
 Explicit preview packaging is unchanged and has no update feed.
 Verify the DMG by mounting it,
 checking its `Textify.app` signature and Gatekeeper assessment, and checking the
@@ -71,15 +72,17 @@ DMG after building. Confirm a fresh install and update on a second Mac before
 making the release public.
 
 The Windows and Linux installers come from the successful Electron workflow's
-artifacts. They are not code-signed. Download those exact artifacts and verify
-their workflow checksums. Place the final Mac, Windows, and Linux installers in
-`electron/release/`, then run `node scripts/checksums.mjs --production` from
-`electron/` on the maintainer Mac to write one combined checksum file and copy
-`RELEASE_INSTALL.md`. This requires all four current-version installers and the
-Mac ZIP. It checks the DMG's Developer ID signature, staple, and Gatekeeper
-result. It also checks that the update feed names this version and matches the
-ZIP's exact size and SHA-512, and that the app inside the ZIP passes the same
-signature, staple, and Gatekeeper checks. It removes stale combined checksums
+artifacts. They are not code-signed. Download those exact artifacts with their
+update feeds, `latest.yml` and `latest-linux.yml`, and the Windows
+installer's blockmap, and verify their workflow checksums. Place the final Mac,
+Windows, and Linux files in `electron/release/`, then run
+`node scripts/checksums.mjs --production` from `electron/` on the maintainer
+Mac to write one combined checksum file and copy `RELEASE_INSTALL.md`. This
+requires all four current-version installers and the Mac ZIP. It checks the
+DMG's Developer ID signature, staple, and Gatekeeper result. It also checks that
+each update feed names this version and matches its installers' exact sizes and
+SHA-512 values, and that the app inside the ZIP passes the same signature,
+staple, and Gatekeeper checks. It removes stale combined checksums
 and signed-release installation notes before validation.
 Checksums must be generated only after the final notarization and stapling.
 Check the file
@@ -89,15 +92,23 @@ model download requirement, physical hardware tested, and the unsigned status
 of Windows and Linux. Publish only after the owner reviews the final artifacts
 and notes.
 
-## Publish the Mac update
+## Publish the release
 
-Installed Macs with automatic checks find a release as soon as it is public.
+Installed apps with automatic checks find a release as soon as it is public.
 Create the GitHub pre-release as a draft and attach every file before
 publishing it:
 
 - the four installers, `SHA256SUMS.txt` and `RELEASE_INSTALL.md`;
 - `Textify-<version>-mac-arm64.zip` and its `.blockmap`;
-- `preview-mac.yml`, or `latest-mac.yml` for a stable version.
+- `Textify-<version>-win-x64.exe.blockmap`;
+- `latest-mac.yml`, `latest.yml` and `latest-linux.yml`.
+
+A preview install first asks the release for `preview-mac.yml`, `preview.yml`
+or `preview-linux.yml`, then falls back to the `latest` file.
+
+Windows and Linux updates are unsigned. Installed apps install whatever the
+release's feed lists, so the GitHub account and release assets need strong
+protection.
 
 The tag must follow `v<version>` with a `-preview.<n>` version, as in
 `v0.2.0-preview.24`. Preview installs only move to newer `preview` tags, so

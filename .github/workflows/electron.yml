@@ -85,8 +85,10 @@ jobs:
       - name: Packaged Linux smoke
         if: runner.os == 'Linux'
         run: xvfb-run --auto-servernum node scripts/packaged-smoke.mjs 'release/linux-unpacked/textify-electron'
-      - name: Build preview installers
-        run: npm run dist:preview -- --publish never
+      # Windows and Linux build the release configuration with its update feed.
+      # A Mac release needs the maintainer's Developer ID, so CI builds a preview.
+      - name: Build installers
+        run: npm run ${{ runner.os == 'macOS' && 'dist:preview' || 'dist' }} -- --publish never
       - name: Test Windows installation
         if: runner.os == 'Windows'
         shell: pwsh
@@ -97,6 +99,7 @@ jobs:
           if ($install.ExitCode -ne 0) { throw 'Windows installation failed' }
           node scripts/packaged-smoke.mjs (Join-Path $installDirectory 'Textify.exe')
           if ($LASTEXITCODE -ne 0) { throw 'Installed Windows app failed' }
+          if (-not (Select-String -LiteralPath (Join-Path $installDirectory 'resources\app-update.yml') -Pattern 'provider: github' -Quiet)) { throw 'The installed app has no update feed' }
           $uninstaller = (Get-ChildItem $installDirectory -Filter 'Uninstall*.exe' | Select-Object -First 1).FullName
           Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait
       - name: Test Debian installation and AppImage extraction
@@ -105,11 +108,13 @@ jobs:
         run: |
           sudo apt-get install -y "$PWD"/release/*.deb
           xvfb-run --auto-servernum node scripts/packaged-smoke.mjs "$(command -v textify-electron)"
+          grep -q 'provider: github' "$(dirname "$(readlink -f "$(command -v textify-electron)")")/resources/app-update.yml"
           mkdir -p .native/appimage-check
           image=$(realpath release/*.AppImage)
           chmod +x "$image"
           (cd .native/appimage-check && "$image" --appimage-extract > /dev/null)
           xvfb-run --auto-servernum node scripts/packaged-smoke.mjs .native/appimage-check/squashfs-root/textify-electron
+          grep -q 'provider: github' .native/appimage-check/squashfs-root/resources/app-update.yml
           sudo apt-get remove -y textify-electron
       - name: Test macOS disk image
         if: runner.os == 'macOS'
@@ -131,6 +136,8 @@ jobs:
             electron/release/*.AppImage
             electron/release/*.deb
             electron/release/*.blockmap
+            electron/release/*.yml
+            !electron/release/builder-debug.yml
             electron/release/SHA256SUMS.txt
             electron/release/PREVIEW_INSTALL.md
           retention-days: 7

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { readdir, readFile, writeFile, copyFile, rm } from "node:fs/promises";
 import { verifyMacUpdate, verifyProductionInstallers } from "./mac-release.mjs";
+import { verifyUpdateFeed } from "./update-feeds.mjs";
 const production = process.argv.slice(2).includes("--production");
 if (process.argv.slice(2).some((arg) => arg !== "--production"))
   throw new Error("Only --production is supported");
@@ -21,6 +22,8 @@ if (!files.length) throw new Error("No preview installers found");
 if (production) {
   verifyProductionInstallers(files, version);
   await verifyMacUpdate("release", version);
+  await verifyUpdateFeed("release", version, "windows", files.filter((name) => name.endsWith(".exe")));
+  await verifyUpdateFeed("release", version, "linux", files.filter((name) => /\.(AppImage|deb)$/.test(name)));
 }
 const lines = [];
 for (const file of files) {

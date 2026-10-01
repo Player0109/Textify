@@ -79,3 +79,23 @@ describe("Mac packaging identity", () => {
     expect(notarizeMacDmg).not.toHaveBeenCalled();
   });
 });
+
+describe("Windows and Linux packaging", () => {
+  const feed = { provider: "github", owner: "Player0109", repo: "Textify" };
+
+  it.each(["win32", "linux"])("adds the unsigned %s release feed", async (platform) => {
+    Object.defineProperty(process, "platform", { value: platform });
+    await import(packageURL);
+    const { config } = build.mock.calls[0][0];
+    expect(config.publish).toEqual(feed);
+    expect(config.forceCodeSigning).toBeUndefined();
+    expect(execFileSync).not.toHaveBeenCalled();
+  });
+
+  it.each(["win32", "linux"])("keeps %s previews without an update feed", async (platform) => {
+    Object.defineProperty(process, "platform", { value: platform });
+    process.argv.push("--preview");
+    await import(packageURL);
+    expect(build.mock.calls[0][0].config.publish).toBeUndefined();
+  });
+});

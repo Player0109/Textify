@@ -27,12 +27,12 @@ transcription.
 The app provides a persistent settings window, tray/menu-bar access, a floating
 recording bar, model management, microphone selection, vocabulary, replacement
 pairs, and local numeric Activity views. Closing the settings window leaves the
-app running. Signed direct-download macOS releases check GitHub Releases when
-the app starts and every six hours, unless the user turns checks off. A new
-version shows a notification and a Settings notice. It downloads after the user
-chooses Update and installs the next time Textify quits. Windows and Linux
-updates stay manual until those installers are code-signed. A Mac App Store
-build would update only through the App Store.
+app running. Direct-download releases check GitHub Releases when the app starts
+and every six hours, unless the user turns checks off. A new version shows a
+notification and a Settings notice. It downloads after the user chooses Update
+and installs the next time Textify quits. Windows and Linux installers are
+unsigned, so their updates are checked only against the feed's SHA-512. A Mac
+App Store build would update only through the App Store.
 
 ## Platforms and delivery
 
